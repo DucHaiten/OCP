@@ -26,6 +26,20 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 - Test results:
 - Notes/risks:
 
+## Quick Snapshot (BẮT BUỘC ĐỌC TRƯỚC)
+- Mục tiêu phiên bản:
+  - Khóa core semantics v0.2 theo hướng core-first, bounded, fail-honest.
+- Trạng thái tổng quan:
+  - Xem `Trạng thái Gate v0.2` ngay bên dưới.
+- Trình tự làm việc chuẩn:
+  - Planning freeze -> Implementation -> Test -> Closeout.
+- Bằng chứng kỹ thuật phải có cho từng gate:
+  - Files changed
+  - Commands run
+  - Test results (PASS/FAIL)
+- Bước tiếp theo:
+  - Không nhảy gate, chỉ mở gate mới khi gate hiện tại `DONE`.
+
 ## Trạng thái Gate v0.2
 - Gate V2-A (Canonicalization Freeze): `DONE` (2026-03-03)
 - Gate V2-B (P0 Core Alignment): `DONE` (2026-03-03)
@@ -520,4 +534,3 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 - Notes/risks:
 - Không có regression mới ở các suite đã tồn tại.
 - Soak compare hiện là binary baseline tối thiểu cho matrix v0.2; có thể mở rộng logic ở v0.2.1+ nếu cần so sánh artifact chi tiết.
-

@@ -1,0 +1,7 @@
+version=1
+file=src/generated/core_fetch.ocl
+file=src/generated/core_log.ocl
+file=src/generated/mod.ocl
+file=src/main.ocl
+file=tests/smoke.ocl
+dep=std|0.1.0|7578c00340467769

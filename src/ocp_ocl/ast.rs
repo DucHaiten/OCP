@@ -7,9 +7,48 @@ pub struct Program {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stmt {
+    ModuleDecl {
+        path: Vec<String>,
+        span: Span,
+    },
+    ImportDecl {
+        path: Vec<String>,
+        span: Span,
+    },
+    ExportDecl {
+        name: String,
+        span: Span,
+    },
+    StructDecl {
+        name: String,
+        fields: Vec<String>,
+        span: Span,
+    },
+    EnumDecl {
+        name: String,
+        variants: Vec<String>,
+        span: Span,
+    },
+    FnDef {
+        name: String,
+        params: Vec<String>,
+        body: Vec<Stmt>,
+        span: Span,
+    },
     Let {
         name: String,
         value: Expr,
+        span: Span,
+    },
+    Return {
+        value: Expr,
+        span: Span,
+    },
+    ForRange {
+        var: String,
+        start: Expr,
+        end: Expr,
+        body: Vec<Stmt>,
         span: Span,
     },
     Observe {
@@ -70,6 +109,18 @@ pub enum Expr {
         args: Vec<Expr>,
         span: Span,
     },
+    List {
+        items: Vec<Expr>,
+        span: Span,
+    },
+    Map {
+        entries: Vec<(String, Expr)>,
+        span: Span,
+    },
+    Try {
+        value: Box<Expr>,
+        span: Span,
+    },
     FieldAccess {
         base: Box<Expr>,
         field: String,
@@ -85,6 +136,9 @@ impl Expr {
             | Self::String { span, .. }
             | Self::Ident { span, .. }
             | Self::Call { span, .. }
+            | Self::List { span, .. }
+            | Self::Map { span, .. }
+            | Self::Try { span, .. }
             | Self::FieldAccess { span, .. } => *span,
         }
     }

@@ -3,5 +3,27 @@
 version = 4
 
 [[package]]
+name = "ocl-cli"
+version = "0.1.0"
+dependencies = [
+ "ocl-runtime-core",
+ "ocl-sdk",
+]
+
+[[package]]
+name = "ocl-runtime-core"
+version = "0.1.0"
+dependencies = [
+ "ocp-ocl",
+]
+
+[[package]]
+name = "ocl-sdk"
+version = "0.1.0"
+dependencies = [
+ "ocl-runtime-core",
+]
+
+[[package]]
 name = "ocp-ocl"
 version = "0.1.0"

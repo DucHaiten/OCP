@@ -1,0 +1,15 @@
+module apps.mini_server.main;
+
+fn on_event(event) {
+  observe("std.log.info", "tier2", ctx("message=mini-server"), budget(5)) -> log_res;
+  match log_res {
+    OK => { let logged = true; condition(logged); }
+    DEGRADED => { let logged = true; condition(logged); }
+    INSUFFICIENT => { let logged = true; condition(logged); }
+    DEFERRED => { let logged = true; condition(logged); }
+  }
+  return event;
+}
+
+let boot = true;
+condition(boot);

@@ -7,6 +7,8 @@ pub enum Value {
     Int(i64),
     Bool(bool),
     String(String),
+    List(Vec<Value>),
+    Map(BTreeMap<String, Value>),
     Budget(u32),
     Ctx(String),
     Payload(BTreeMap<String, String>),

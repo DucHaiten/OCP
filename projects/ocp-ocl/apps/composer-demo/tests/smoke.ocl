@@ -1,0 +1,2 @@
+let smoke = true;
+condition(smoke);

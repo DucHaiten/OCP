@@ -1,0 +1,6 @@
+fn helper(v) {
+  return true;
+}
+
+let smoke = helper(true);
+condition(smoke);

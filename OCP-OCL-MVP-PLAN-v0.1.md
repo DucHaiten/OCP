@@ -6,6 +6,23 @@ Mục tiêu: Kế hoạch + nhật ký triển khai cho **OCP-OCL v0.1**. Đây 
 
 ---
 
+0) Quick Snapshot (BẮT BUỘC ĐỌC TRƯỚC)
+
+- Mục tiêu phiên bản:
+  - Dựng core language + runtime kernel OCP-OCL v0.1 theo gate V1-A -> V1-H.
+- Trạng thái tổng quan:
+  - Xem `2) Gate Plan (v0.1)` để biết gate nào DONE/chưa DONE.
+- Trình tự làm việc chuẩn:
+  - Planning freeze -> Implement -> Test -> Implementation closeout.
+- Bằng chứng kỹ thuật phải có cho từng gate:
+  - Files changed
+  - Commands run
+  - Test results (PASS/FAIL)
+- Bước tiếp theo:
+  - Chỉ mở gate mới khi gate hiện tại `DONE`.
+
+---
+
 0) Constitution (LOCKED)
 
 0.1 Mục tiêu bắt buộc

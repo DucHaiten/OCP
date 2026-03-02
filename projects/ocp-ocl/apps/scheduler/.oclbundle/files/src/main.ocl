@@ -1,0 +1,24 @@
+module apps.scheduler.main;
+
+fn on_event(event) {
+  return event;
+}
+
+observe("std.time.now", "tier2", ctx("clock=main"), budget(5)) -> now_res;
+observe("std.time.sleep", "tier2", ctx("ms=10"), budget(1)) -> sleep_res;
+
+match now_res {
+  OK => { let seen = true; condition(seen); }
+  DEGRADED => { let seen = true; condition(seen); }
+  INSUFFICIENT => { let seen = true; condition(seen); }
+  DEFERRED => { let seen = true; condition(seen); }
+}
+
+match sleep_res {
+  OK => { let wait = true; condition(wait); }
+  DEGRADED => { let wait = true; condition(wait); }
+  INSUFFICIENT => { let wait = true; condition(wait); }
+  DEFERRED => { let wait = true; condition(wait); }
+}
+
+condition(true);

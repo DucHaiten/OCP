@@ -1,0 +1,11 @@
+[package]
+name = "web_fetch"
+version = "0.1.0"
+
+[targets]
+default = "main"
+
+[dependencies]
+http = "0.1.0"
+json = "0.1.0"
+std = "0.1.0"

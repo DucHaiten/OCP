@@ -66,15 +66,36 @@ impl Default for CapabilityRegistry {
 impl CapabilityRegistry {
     pub fn v1_baseline() -> Self {
         let mut enabled_families = HashSet::new();
-        for f in ["world", "render", "mem", "dlg", "self", "rel", "plan"] {
+        for f in [
+            "world", "render", "mem", "dlg", "self", "rel", "plan", "std",
+        ] {
             enabled_families.insert(f.to_string());
         }
+
+        let mut ctx_required = HashMap::new();
+        ctx_required.insert("std.args.get".to_string(), vec!["value".to_string()]);
+        ctx_required.insert("std.fs.read".to_string(), vec!["path".to_string()]);
+        ctx_required.insert(
+            "std.fs.write".to_string(),
+            vec!["path".to_string(), "content".to_string()],
+        );
+        ctx_required.insert("std.fs.list".to_string(), vec!["path".to_string()]);
+        ctx_required.insert("std.fs.stat".to_string(), vec!["path".to_string()]);
+        ctx_required.insert("std.http.get".to_string(), vec!["url".to_string()]);
+        ctx_required.insert(
+            "std.http.post".to_string(),
+            vec!["url".to_string(), "body".to_string()],
+        );
+        ctx_required.insert("std.json.parse".to_string(), vec!["raw".to_string()]);
+        ctx_required.insert("std.json.emit".to_string(), vec!["value".to_string()]);
+        ctx_required.insert("std.time.sleep".to_string(), vec!["ms".to_string()]);
+        ctx_required.insert("std.log.info".to_string(), vec!["message".to_string()]);
 
         Self {
             enabled_families,
             allow_patterns: vec![KeyPattern::Any],
             deny_patterns: Vec::new(),
-            ctx_required: HashMap::new(),
+            ctx_required,
             commit_allowed: HashMap::new(),
         }
     }

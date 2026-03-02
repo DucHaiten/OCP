@@ -1,0 +1,3 @@
+version=1
+file=src/main.ocl
+file=tests/smoke.ocl

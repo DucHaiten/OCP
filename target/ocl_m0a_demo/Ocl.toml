@@ -1,0 +1,6 @@
+[package]
+name = "ocl_m0a_demo"
+version = "0.1.0"
+
+[targets]
+default = "main"

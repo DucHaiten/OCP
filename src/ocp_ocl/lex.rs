@@ -2,6 +2,15 @@ use crate::ocp_ocl::{DiagPhase, Diagnostic, ErrorCode, Span};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
+    Module,
+    Import,
+    Export,
+    Struct,
+    Enum,
+    Fn,
+    Return,
+    For,
+    In,
     Let,
     Observe,
     Commit,
@@ -21,9 +30,14 @@ pub enum TokenKind {
     RParen,
     LBrace,
     RBrace,
+    LBracket,
+    RBracket,
     Comma,
     Semi,
+    Colon,
     Dot,
+    Range,
+    Question,
     Eq,
     Arrow,
     FatArrow,
@@ -79,6 +93,15 @@ impl<'a> Lexer<'a> {
                 'a'..='z' | 'A'..='Z' | '_' => {
                     let text = self.read_ident();
                     let kind = match text.as_str() {
+                        "module" => TokenKind::Module,
+                        "import" => TokenKind::Import,
+                        "export" => TokenKind::Export,
+                        "struct" => TokenKind::Struct,
+                        "enum" => TokenKind::Enum,
+                        "fn" => TokenKind::Fn,
+                        "return" => TokenKind::Return,
+                        "for" => TokenKind::For,
+                        "in" => TokenKind::In,
                         "let" => TokenKind::Let,
                         "observe" => TokenKind::Observe,
                         "commit" => TokenKind::Commit,
@@ -119,9 +142,29 @@ impl<'a> Lexer<'a> {
                 ')' => out.push(self.single(TokenKind::RParen)),
                 '{' => out.push(self.single(TokenKind::LBrace)),
                 '}' => out.push(self.single(TokenKind::RBrace)),
+                '[' => out.push(self.single(TokenKind::LBracket)),
+                ']' => out.push(self.single(TokenKind::RBracket)),
                 ',' => out.push(self.single(TokenKind::Comma)),
                 ';' => out.push(self.single(TokenKind::Semi)),
-                '.' => out.push(self.single(TokenKind::Dot)),
+                ':' => out.push(self.single(TokenKind::Colon)),
+                '?' => out.push(self.single(TokenKind::Question)),
+                '.' => {
+                    self.bump();
+                    if self.peek() == Some('.') {
+                        self.bump();
+                        out.push(Token {
+                            kind: TokenKind::Range,
+                            text: "..".to_string(),
+                            span: self.span_from(start),
+                        });
+                    } else {
+                        out.push(Token {
+                            kind: TokenKind::Dot,
+                            text: ".".to_string(),
+                            span: self.span_from(start),
+                        });
+                    }
+                }
                 '=' => {
                     self.bump();
                     if self.peek() == Some('>') {

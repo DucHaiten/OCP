@@ -27,17 +27,159 @@ impl Parser {
 
     fn parse_stmt(&mut self) -> Result<Stmt, Diagnostic> {
         match self.peek().kind {
+            TokenKind::Module => self.parse_module_decl(),
+            TokenKind::Import => self.parse_import_decl(),
+            TokenKind::Export => self.parse_export_decl(),
+            TokenKind::Struct => self.parse_struct_decl(),
+            TokenKind::Enum => self.parse_enum_decl(),
+            TokenKind::Fn => self.parse_fn_def(),
+            TokenKind::Return => self.parse_return(),
+            TokenKind::For => self.parse_for_range(),
             TokenKind::Let => self.parse_let(),
             TokenKind::Observe => self.parse_observe(),
             TokenKind::Commit => self.parse_commit(),
             TokenKind::Condition => self.parse_condition(),
             TokenKind::Entangle => self.parse_entangle(),
             TokenKind::Match => self.parse_match(),
-            _ => Err(self.error_here(
-                ErrorCode::PUnexpectedToken,
-                "expected statement (`let`, `observe`, `commit`, `condition`, `entangle`, `match`)",
-            )),
+            _ => Err(self.error_here(ErrorCode::PUnexpectedToken, "expected statement")),
         }
+    }
+
+    fn parse_module_decl(&mut self) -> Result<Stmt, Diagnostic> {
+        let start = self.expect(TokenKind::Module, "expected `module`")?.span;
+        let path = self.parse_path("expected module path after `module`")?;
+        let end = self.expect(TokenKind::Semi, "expected `;` after module declaration")?;
+        Ok(Stmt::ModuleDecl {
+            path,
+            span: merge_span(start, end.span),
+        })
+    }
+
+    fn parse_import_decl(&mut self) -> Result<Stmt, Diagnostic> {
+        let start = self.expect(TokenKind::Import, "expected `import`")?.span;
+        let path = self.parse_path("expected import path after `import`")?;
+        let end = self.expect(TokenKind::Semi, "expected `;` after import declaration")?;
+        Ok(Stmt::ImportDecl {
+            path,
+            span: merge_span(start, end.span),
+        })
+    }
+
+    fn parse_export_decl(&mut self) -> Result<Stmt, Diagnostic> {
+        let start = self.expect(TokenKind::Export, "expected `export`")?.span;
+        let name = self.expect_ident("expected exported name after `export`")?;
+        let end = self.expect(TokenKind::Semi, "expected `;` after export declaration")?;
+        Ok(Stmt::ExportDecl {
+            name,
+            span: merge_span(start, end.span),
+        })
+    }
+
+    fn parse_struct_decl(&mut self) -> Result<Stmt, Diagnostic> {
+        let start = self.expect(TokenKind::Struct, "expected `struct`")?.span;
+        let name = self.expect_ident("expected struct name")?;
+        self.expect(TokenKind::LBrace, "expected `{` after struct name")?;
+        let mut fields = Vec::new();
+        if !self.at(TokenKind::RBrace) {
+            loop {
+                fields.push(self.expect_ident("expected struct field name")?);
+                if self.consume_if(TokenKind::Comma) {
+                    continue;
+                }
+                break;
+            }
+        }
+        let rbrace_span = self
+            .expect(TokenKind::RBrace, "expected `}` after struct fields")?
+            .span;
+        let end = self.expect(TokenKind::Semi, "expected `;` after struct declaration")?;
+        Ok(Stmt::StructDecl {
+            name,
+            fields,
+            span: merge_span(start, merge_span(rbrace_span, end.span)),
+        })
+    }
+
+    fn parse_enum_decl(&mut self) -> Result<Stmt, Diagnostic> {
+        let start = self.expect(TokenKind::Enum, "expected `enum`")?.span;
+        let name = self.expect_ident("expected enum name")?;
+        self.expect(TokenKind::LBrace, "expected `{` after enum name")?;
+        let mut variants = Vec::new();
+        if !self.at(TokenKind::RBrace) {
+            loop {
+                variants.push(self.expect_ident("expected enum variant name")?);
+                if self.consume_if(TokenKind::Comma) {
+                    continue;
+                }
+                break;
+            }
+        }
+        let rbrace_span = self
+            .expect(TokenKind::RBrace, "expected `}` after enum variants")?
+            .span;
+        let end = self.expect(TokenKind::Semi, "expected `;` after enum declaration")?;
+        Ok(Stmt::EnumDecl {
+            name,
+            variants,
+            span: merge_span(start, merge_span(rbrace_span, end.span)),
+        })
+    }
+
+    fn parse_fn_def(&mut self) -> Result<Stmt, Diagnostic> {
+        let start = self.expect(TokenKind::Fn, "expected `fn`")?.span;
+        let name = self.expect_ident("expected function name")?;
+        self.expect(TokenKind::LParen, "expected `(` after function name")?;
+        let mut params = Vec::new();
+        if !self.at(TokenKind::RParen) {
+            loop {
+                params.push(self.expect_ident("expected function parameter name")?);
+                if self.consume_if(TokenKind::Comma) {
+                    continue;
+                }
+                break;
+            }
+        }
+        self.expect(TokenKind::RParen, "expected `)` after function parameters")?;
+        self.expect(TokenKind::LBrace, "expected `{` to open function body")?;
+        let mut body = Vec::new();
+        while !self.at(TokenKind::RBrace) {
+            body.push(self.parse_stmt()?);
+        }
+        let rbrace = self.expect(TokenKind::RBrace, "expected `}` to close function body")?;
+        Ok(Stmt::FnDef {
+            name,
+            params,
+            body,
+            span: merge_span(start, rbrace.span),
+        })
+    }
+
+    fn parse_return(&mut self) -> Result<Stmt, Diagnostic> {
+        let start = self.expect(TokenKind::Return, "expected `return`")?.span;
+        let value = self.parse_expr()?;
+        let end = self.expect(TokenKind::Semi, "expected `;` after return")?;
+        Ok(Stmt::Return {
+            value,
+            span: merge_span(start, end.span),
+        })
+    }
+
+    fn parse_for_range(&mut self) -> Result<Stmt, Diagnostic> {
+        let start = self.expect(TokenKind::For, "expected `for`")?.span;
+        let var = self.expect_ident("expected loop variable after `for`")?;
+        self.expect(TokenKind::In, "expected `in` after loop variable")?;
+        let start_expr = self.parse_expr()?;
+        self.expect(TokenKind::Range, "expected `..` in for-range")?;
+        let end_expr = self.parse_expr()?;
+        let body = self.parse_block()?;
+        let end_span = body.last().map(stmt_span).unwrap_or(start_expr.span());
+        Ok(Stmt::ForRange {
+            var,
+            start: start_expr,
+            end: end_expr,
+            body,
+            span: merge_span(start, end_span),
+        })
     }
 
     fn parse_let(&mut self) -> Result<Stmt, Diagnostic> {
@@ -202,14 +344,27 @@ impl Parser {
 
     fn parse_expr(&mut self) -> Result<Expr, Diagnostic> {
         let mut expr = self.parse_primary()?;
-        while self.consume_if(TokenKind::Dot) {
-            let field_tok = self.expect_kind(TokenKind::Ident, "expected field name after `.`")?;
-            let span = merge_span(expr.span(), field_tok.span);
-            expr = Expr::FieldAccess {
-                base: Box::new(expr),
-                field: field_tok.text,
-                span,
-            };
+        loop {
+            if self.consume_if(TokenKind::Dot) {
+                let field_tok =
+                    self.expect_kind(TokenKind::Ident, "expected field name after `.`")?;
+                let span = merge_span(expr.span(), field_tok.span);
+                expr = Expr::FieldAccess {
+                    base: Box::new(expr),
+                    field: field_tok.text,
+                    span,
+                };
+                continue;
+            }
+            if self.consume_if(TokenKind::Question) {
+                let span = merge_span(expr.span(), self.peek().span);
+                expr = Expr::Try {
+                    value: Box::new(expr),
+                    span,
+                };
+                continue;
+            }
+            break;
         }
         Ok(expr)
     }
@@ -268,6 +423,44 @@ impl Parser {
                     })
                 }
             }
+            TokenKind::LBracket => {
+                let mut items = Vec::new();
+                if !self.at(TokenKind::RBracket) {
+                    loop {
+                        items.push(self.parse_expr()?);
+                        if self.consume_if(TokenKind::Comma) {
+                            continue;
+                        }
+                        break;
+                    }
+                }
+                let end = self.expect(TokenKind::RBracket, "expected `]` after list literal")?;
+                Ok(Expr::List {
+                    items,
+                    span: merge_span(tok.span, end.span),
+                })
+            }
+            TokenKind::LBrace => {
+                let mut entries = Vec::new();
+                if !self.at(TokenKind::RBrace) {
+                    loop {
+                        let key =
+                            self.expect_kind(TokenKind::Str, "expected string key in map literal")?;
+                        self.expect(TokenKind::Colon, "expected `:` after map key")?;
+                        let value = self.parse_expr()?;
+                        entries.push((key.text, value));
+                        if self.consume_if(TokenKind::Comma) {
+                            continue;
+                        }
+                        break;
+                    }
+                }
+                let end = self.expect(TokenKind::RBrace, "expected `}` after map literal")?;
+                Ok(Expr::Map {
+                    entries,
+                    span: merge_span(tok.span, end.span),
+                })
+            }
             _ => Err(Diagnostic::new(
                 ErrorCode::PUnexpectedToken,
                 DiagPhase::Parse,
@@ -323,6 +516,14 @@ impl Parser {
         Ok(tok.text)
     }
 
+    fn parse_path(&mut self, message: &str) -> Result<Vec<String>, Diagnostic> {
+        let mut path = vec![self.expect_ident(message)?];
+        while self.consume_if(TokenKind::Dot) {
+            path.push(self.expect_ident("expected identifier segment after `.`")?);
+        }
+        Ok(path)
+    }
+
     fn error_here(&self, code: ErrorCode, message: impl Into<String>) -> Diagnostic {
         Diagnostic::new(code, DiagPhase::Parse, self.peek().span, message)
     }
@@ -348,4 +549,23 @@ fn set_arm(
     }
     *slot = Some(body);
     Ok(())
+}
+
+fn stmt_span(stmt: &Stmt) -> Span {
+    match stmt {
+        Stmt::ModuleDecl { span, .. }
+        | Stmt::ImportDecl { span, .. }
+        | Stmt::ExportDecl { span, .. }
+        | Stmt::StructDecl { span, .. }
+        | Stmt::EnumDecl { span, .. }
+        | Stmt::FnDef { span, .. }
+        | Stmt::Let { span, .. }
+        | Stmt::Return { span, .. }
+        | Stmt::ForRange { span, .. }
+        | Stmt::Observe { span, .. }
+        | Stmt::Commit { span, .. }
+        | Stmt::Condition { span, .. }
+        | Stmt::Entangle { span, .. } => *span,
+        Stmt::Match(m) => m.span,
+    }
 }

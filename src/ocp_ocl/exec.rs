@@ -61,6 +61,18 @@ struct ConstraintSession {
     degree_by_binding: HashMap<String, usize>,
 }
 
+#[derive(Debug, Clone)]
+struct FunctionDefRuntime {
+    params: Vec<String>,
+    body: Vec<Stmt>,
+}
+
+#[derive(Debug, Clone)]
+enum Flow {
+    Continue,
+    Return(Value),
+}
+
 pub struct Executor {
     env: HashMap<String, Value>,
     meter: BudgetMeter,
@@ -70,6 +82,7 @@ pub struct Executor {
     commits: Vec<CommitEvent>,
     trace: TraceLog,
     constraints: ConstraintSession,
+    functions: HashMap<String, FunctionDefRuntime>,
 }
 
 impl Executor {
@@ -83,6 +96,7 @@ impl Executor {
             commits: Vec::new(),
             trace: TraceLog::default(),
             constraints: ConstraintSession::default(),
+            functions: HashMap::new(),
         }
     }
 
@@ -96,12 +110,38 @@ impl Executor {
             commits: Vec::new(),
             trace: TraceLog::default(),
             constraints: ConstraintSession::default(),
+            functions: HashMap::new(),
         }
     }
 
     pub fn run(mut self, program: &Program) -> Result<ExecOutput, Diagnostic> {
         for stmt in &program.statements {
-            self.exec_stmt(stmt)?;
+            if let Stmt::FnDef {
+                name, params, body, ..
+            } = stmt
+            {
+                self.functions.insert(
+                    name.clone(),
+                    FunctionDefRuntime {
+                        params: params.clone(),
+                        body: body.clone(),
+                    },
+                );
+            }
+        }
+
+        for stmt in &program.statements {
+            match self.exec_stmt_inner(stmt, false)? {
+                Flow::Continue => {}
+                Flow::Return(_) => {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        stmt_span(stmt),
+                        "return is only allowed inside function body",
+                    ));
+                }
+            }
         }
         self.trace.push(TraceEvent::ProgramEnd {
             steps: self.meter.steps(),
@@ -116,21 +156,49 @@ impl Executor {
         })
     }
 
-    fn exec_block(&mut self, block: &[Stmt]) -> Result<(), Diagnostic> {
+    fn exec_block(&mut self, block: &[Stmt], in_function: bool) -> Result<Flow, Diagnostic> {
         for stmt in block {
-            self.exec_stmt(stmt)?;
+            match self.exec_stmt_inner(stmt, in_function)? {
+                Flow::Continue => {}
+                Flow::Return(v) => return Ok(Flow::Return(v)),
+            }
         }
-        Ok(())
+        Ok(Flow::Continue)
     }
 
-    fn exec_stmt(&mut self, stmt: &Stmt) -> Result<(), Diagnostic> {
+    fn exec_stmt_inner(&mut self, stmt: &Stmt, in_function: bool) -> Result<Flow, Diagnostic> {
         self.tick(stmt_span(stmt))?;
         match stmt {
+            Stmt::ModuleDecl { .. }
+            | Stmt::ImportDecl { .. }
+            | Stmt::ExportDecl { .. }
+            | Stmt::StructDecl { .. }
+            | Stmt::EnumDecl { .. }
+            | Stmt::FnDef { .. } => Ok(Flow::Continue),
             Stmt::Let { name, value, .. } => {
                 let v = self.eval_expr(value)?;
                 self.env.insert(name.clone(), v);
-                Ok(())
+                Ok(Flow::Continue)
             }
+            Stmt::Return { value, span } => {
+                if !in_function {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        *span,
+                        "return is only allowed inside function body",
+                    ));
+                }
+                let v = self.eval_expr(value)?;
+                Ok(Flow::Return(v))
+            }
+            Stmt::ForRange {
+                var,
+                start,
+                end,
+                body,
+                span,
+            } => self.exec_for_range(var, start, end, body, *span, in_function),
             Stmt::Observe {
                 key,
                 tier,
@@ -196,7 +264,7 @@ impl Executor {
 
                 let origin_id = self.allocate_origin_id();
                 let r = match self.registry.check_observe(key_lit, ctx_lit) {
-                    Ok(kref) => observe_stub_result(&kref.raw),
+                    Ok(kref) => observe_stub_result(&kref.raw, ctx_lit),
                     Err(e) => Result4::<Value>::insufficient(e.to_reason_code()),
                 }
                 .with_origin_id(origin_id);
@@ -214,17 +282,26 @@ impl Executor {
                     origin_id,
                 });
                 self.env.insert(bind.clone(), Value::Result4(Box::new(r)));
-                Ok(())
+                Ok(Flow::Continue)
             }
-            Stmt::Commit { value, span } => self.exec_commit(value, *span),
-            Stmt::Condition { value, span } => self.exec_condition(value, *span),
+            Stmt::Commit { value, span } => {
+                self.exec_commit(value, *span)?;
+                Ok(Flow::Continue)
+            }
+            Stmt::Condition { value, span } => {
+                self.exec_condition(value, *span)?;
+                Ok(Flow::Continue)
+            }
             Stmt::Entangle {
                 left,
                 right,
                 constraint,
                 span,
-            } => self.exec_entangle(left, right, constraint, *span),
-            Stmt::Match(m) => self.exec_match(m),
+            } => {
+                self.exec_entangle(left, right, constraint, *span)?;
+                Ok(Flow::Continue)
+            }
+            Stmt::Match(m) => self.exec_match(m, in_function),
         }
     }
 
@@ -331,7 +408,62 @@ impl Executor {
         Ok(())
     }
 
-    fn exec_match(&mut self, m: &MatchStmt) -> Result<(), Diagnostic> {
+    fn exec_for_range(
+        &mut self,
+        var: &str,
+        start: &Expr,
+        end: &Expr,
+        body: &[Stmt],
+        span: Span,
+        in_function: bool,
+    ) -> Result<Flow, Diagnostic> {
+        let start_v = self.eval_expr(start)?;
+        let end_v = self.eval_expr(end)?;
+        let Value::Int(start_i) = start_v else {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "for-range start must evaluate to int",
+            ));
+        };
+        let Value::Int(end_i) = end_v else {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "for-range end must evaluate to int",
+            ));
+        };
+        if end_i < start_i {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "for-range end must be >= start",
+            ));
+        }
+        if (end_i - start_i) > 10_000 {
+            return Err(Diagnostic::new(
+                ErrorCode::XBudgetExceeded,
+                DiagPhase::Exec,
+                span,
+                "for-range exceeds bounded cap (max 10000 iterations)",
+            ));
+        }
+        let snapshot = self.env.clone();
+        for i in start_i..end_i {
+            self.env.insert(var.to_string(), Value::Int(i));
+            if let Flow::Return(v) = self.exec_block(body, in_function)? {
+                self.env = snapshot;
+                return Ok(Flow::Return(v));
+            }
+        }
+        self.env = snapshot;
+        Ok(Flow::Continue)
+    }
+
+    fn exec_match(&mut self, m: &MatchStmt, in_function: bool) -> Result<Flow, Diagnostic> {
         let v = self.eval_expr(&m.value)?;
         let Value::Result4(r) = v else {
             return Err(Diagnostic::new(
@@ -345,10 +477,10 @@ impl Executor {
         self.trace
             .push(TraceEvent::MatchArmSelected { arm: r.kind });
         match r.kind {
-            ResultKind::Ok => self.exec_block(&m.ok_arm),
-            ResultKind::Degraded => self.exec_block(&m.degraded_arm),
-            ResultKind::Insufficient => self.exec_block(&m.insufficient_arm),
-            ResultKind::Deferred => self.exec_block(&m.deferred_arm),
+            ResultKind::Ok => self.exec_block(&m.ok_arm, in_function),
+            ResultKind::Degraded => self.exec_block(&m.degraded_arm, in_function),
+            ResultKind::Insufficient => self.exec_block(&m.insufficient_arm, in_function),
+            ResultKind::Deferred => self.exec_block(&m.deferred_arm, in_function),
         }
     }
 
@@ -517,6 +649,42 @@ impl Executor {
                 )
             }),
             Expr::Call { callee, args, span } => self.eval_call(callee, args, *span),
+            Expr::List { items, .. } => {
+                let mut out = Vec::with_capacity(items.len());
+                for item in items {
+                    out.push(self.eval_expr(item)?);
+                }
+                Ok(Value::List(out))
+            }
+            Expr::Map { entries, .. } => {
+                let mut out = BTreeMap::new();
+                for (k, vexpr) in entries {
+                    out.insert(k.clone(), self.eval_expr(vexpr)?);
+                }
+                Ok(Value::Map(out))
+            }
+            Expr::Try { value, span } => {
+                let base = self.eval_expr(value)?;
+                let Value::Result4(result) = base else {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        *span,
+                        "`?` expects Result4 runtime value",
+                    ));
+                };
+                match result.kind {
+                    ResultKind::Ok | ResultKind::Degraded => {
+                        Ok(result.payload.unwrap_or(Value::Unit))
+                    }
+                    ResultKind::Insufficient | ResultKind::Deferred => Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        *span,
+                        "`?` cannot unwrap INSUFFICIENT/DEFERRED result",
+                    )),
+                }
+            }
             Expr::FieldAccess { base, field, span } => {
                 let b = self.eval_expr(base)?;
                 match b {
@@ -524,6 +692,8 @@ impl Executor {
                         .get(field)
                         .map(|v| Value::String(v.clone()))
                         .unwrap_or(Value::Unknown)),
+                    Value::Map(map) => Ok(map.get(field).cloned().unwrap_or(Value::Unknown)),
+                    Value::List(items) if field == "len" => Ok(Value::Int(items.len() as i64)),
                     Value::Result4(r) => match r.payload {
                         Some(Value::Payload(map)) => Ok(map
                             .get(field)
@@ -595,13 +765,76 @@ impl Executor {
                     "payload() in V1-D accepts 0 args only",
                 ))
             }
-            _ => Err(Diagnostic::new(
+            "list" => {
+                if !args.is_empty() {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "list() expects 0 arguments",
+                    ));
+                }
+                Ok(Value::List(Vec::new()))
+            }
+            "map" => {
+                if !args.is_empty() {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "map() expects 0 arguments",
+                    ));
+                }
+                Ok(Value::Map(BTreeMap::new()))
+            }
+            _ => self.eval_user_function_call(callee, args, span),
+        }
+    }
+
+    fn eval_user_function_call(
+        &mut self,
+        callee: &str,
+        args: &[Expr],
+        span: Span,
+    ) -> Result<Value, Diagnostic> {
+        let Some(def) = self.functions.get(callee).cloned() else {
+            return Err(Diagnostic::new(
                 ErrorCode::XCommitForbidden,
                 DiagPhase::Exec,
                 span,
                 format!("unknown runtime call `{callee}`"),
-            )),
+            ));
+        };
+        if def.params.len() != args.len() {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                format!(
+                    "function `{callee}` expects {} args, got {}",
+                    def.params.len(),
+                    args.len()
+                ),
+            ));
         }
+
+        let mut arg_values = Vec::with_capacity(args.len());
+        for arg in args {
+            arg_values.push(self.eval_expr(arg)?);
+        }
+
+        let snapshot = self.env.clone();
+        for (idx, param) in def.params.iter().enumerate() {
+            self.env.insert(param.clone(), arg_values[idx].clone());
+        }
+
+        let out = match self.exec_block(&def.body, true)? {
+            Flow::Continue => Value::Unit,
+            Flow::Return(v) => v,
+        };
+
+        self.env = snapshot;
+        Ok(out)
     }
 
     fn tick(&mut self, span: Span) -> Result<(), Diagnostic> {
@@ -624,7 +857,15 @@ impl Executor {
 
 fn stmt_span(stmt: &Stmt) -> Span {
     match stmt {
-        Stmt::Let { span, .. }
+        Stmt::ModuleDecl { span, .. }
+        | Stmt::ImportDecl { span, .. }
+        | Stmt::ExportDecl { span, .. }
+        | Stmt::StructDecl { span, .. }
+        | Stmt::EnumDecl { span, .. }
+        | Stmt::FnDef { span, .. }
+        | Stmt::Let { span, .. }
+        | Stmt::Return { span, .. }
+        | Stmt::ForRange { span, .. }
         | Stmt::Observe { span, .. }
         | Stmt::Commit { span, .. }
         | Stmt::Condition { span, .. }
@@ -675,6 +916,37 @@ fn condition_budget_stats(expr: &Expr) -> ConditionBudgetStats {
                 }
                 stats
             }
+            Expr::List { items, .. } => {
+                let mut stats = ConditionBudgetStats {
+                    steps: 1,
+                    constraints: 1,
+                };
+                for item in items {
+                    let child = walk(item);
+                    stats.steps = stats.steps.saturating_add(child.steps);
+                    stats.constraints = stats.constraints.saturating_add(child.constraints);
+                }
+                stats
+            }
+            Expr::Map { entries, .. } => {
+                let mut stats = ConditionBudgetStats {
+                    steps: 1,
+                    constraints: 1,
+                };
+                for (_, value) in entries {
+                    let child = walk(value);
+                    stats.steps = stats.steps.saturating_add(child.steps);
+                    stats.constraints = stats.constraints.saturating_add(child.constraints);
+                }
+                stats
+            }
+            Expr::Try { value, .. } => {
+                let child = walk(value);
+                ConditionBudgetStats {
+                    steps: child.steps.saturating_add(1),
+                    constraints: child.constraints.saturating_add(1),
+                }
+            }
             Expr::FieldAccess { base, .. } => {
                 let child = walk(base);
                 ConditionBudgetStats {
@@ -714,14 +986,122 @@ fn validate_ctx_literal(raw: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn observe_stub_result(key: &str) -> Result4<Value> {
+fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
     if key.starts_with("world.ok") {
         return Result4::ok(stub_payload(key));
     }
     if key.starts_with("world.degraded") {
         return Result4::degraded(stub_payload(key), ReasonCode::AdapterFailed);
     }
-    Result4::deferred(ReasonCode::NotImplemented)
+
+    let ctx = parse_ctx_pairs(ctx_literal);
+
+    match key {
+        "std.args.get" => {
+            let mut map = BTreeMap::new();
+            let name = ctx
+                .get("value")
+                .cloned()
+                .unwrap_or_else(|| "value".to_string());
+            map.insert("key".to_string(), name.clone());
+            map.insert("value".to_string(), format!("arg:{name}"));
+            Result4::ok(Value::Payload(map))
+        }
+        "std.fs.read" => {
+            let mut map = BTreeMap::new();
+            let path = ctx
+                .get("path")
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string());
+            map.insert("path".to_string(), path.clone());
+            map.insert("content".to_string(), format!("sample:{path}"));
+            Result4::ok(Value::Payload(map))
+        }
+        "std.fs.write" => {
+            let mut map = BTreeMap::new();
+            map.insert(
+                "path".to_string(),
+                ctx.get("path").cloned().unwrap_or_default(),
+            );
+            map.insert(
+                "bytes".to_string(),
+                ctx.get("content")
+                    .map(|v| v.len().to_string())
+                    .unwrap_or_else(|| "0".to_string()),
+            );
+            map.insert("status".to_string(), "queued".to_string());
+            Result4::ok(Value::Payload(map))
+        }
+        "std.fs.list" => {
+            let mut map = BTreeMap::new();
+            map.insert(
+                "path".to_string(),
+                ctx.get("path").cloned().unwrap_or_default(),
+            );
+            map.insert("items".to_string(), "a.txt,b.txt".to_string());
+            Result4::ok(Value::Payload(map))
+        }
+        "std.fs.stat" => {
+            let mut map = BTreeMap::new();
+            map.insert(
+                "path".to_string(),
+                ctx.get("path").cloned().unwrap_or_default(),
+            );
+            map.insert("exists".to_string(), "true".to_string());
+            map.insert("kind".to_string(), "file".to_string());
+            Result4::ok(Value::Payload(map))
+        }
+        "std.http.get" => {
+            let mut map = BTreeMap::new();
+            map.insert(
+                "url".to_string(),
+                ctx.get("url").cloned().unwrap_or_default(),
+            );
+            map.insert("status".to_string(), "200".to_string());
+            map.insert("body".to_string(), "{\"ok\":true}".to_string());
+            Result4::ok(Value::Payload(map))
+        }
+        "std.http.post" => {
+            let mut map = BTreeMap::new();
+            map.insert(
+                "url".to_string(),
+                ctx.get("url").cloned().unwrap_or_default(),
+            );
+            map.insert("status".to_string(), "202".to_string());
+            map.insert("ack".to_string(), "accepted".to_string());
+            Result4::degraded(Value::Payload(map), ReasonCode::AdapterFailed)
+        }
+        "std.json.parse" => {
+            let mut map = BTreeMap::new();
+            let raw = ctx.get("raw").cloned().unwrap_or_default();
+            map.insert("raw".to_string(), raw);
+            map.insert("parsed".to_string(), "true".to_string());
+            Result4::ok(Value::Payload(map))
+        }
+        "std.json.emit" => {
+            let mut map = BTreeMap::new();
+            let value = ctx.get("value").cloned().unwrap_or_default();
+            map.insert("value".to_string(), value.clone());
+            map.insert("json".to_string(), format!("{{\"value\":\"{value}\"}}"));
+            Result4::ok(Value::Payload(map))
+        }
+        "std.time.now" => {
+            let mut map = BTreeMap::new();
+            map.insert("unix_ms".to_string(), "1700000000000".to_string());
+            Result4::ok(Value::Payload(map))
+        }
+        "std.time.sleep" => Result4::deferred(ReasonCode::BudgetExceeded),
+        "std.log.info" => {
+            let mut map = BTreeMap::new();
+            map.insert(
+                "message".to_string(),
+                ctx.get("message").cloned().unwrap_or_default(),
+            );
+            map.insert("status".to_string(), "accepted".to_string());
+            Result4::ok(Value::Payload(map))
+        }
+        _ => Result4::deferred(ReasonCode::NotImplemented),
+    }
 }
 
 fn stub_payload(key: &str) -> Value {
@@ -729,4 +1109,22 @@ fn stub_payload(key: &str) -> Value {
     map.insert("key".to_string(), key.to_string());
     map.insert("status".to_string(), "sample".to_string());
     Value::Payload(map)
+}
+
+fn parse_ctx_pairs(ctx_literal: &str) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    for pair in ctx_literal.split(';') {
+        let p = pair.trim();
+        if p.is_empty() {
+            continue;
+        }
+        if let Some((k, v)) = p.split_once('=') {
+            let key = k.trim();
+            let val = v.trim();
+            if !key.is_empty() {
+                out.insert(key.to_string(), val.to_string());
+            }
+        }
+    }
+    out
 }

@@ -1,0 +1,9 @@
+[package]
+name = "scheduler"
+version = "0.1.0"
+
+[targets]
+default = "main"
+
+[dependencies]
+std = "0.1.0"

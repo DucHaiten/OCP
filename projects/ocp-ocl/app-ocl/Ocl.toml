@@ -1,0 +1,6 @@
+[package]
+name = "app_ocl"
+version = "0.1.0"
+
+[targets]
+default = "main"

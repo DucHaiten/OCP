@@ -1,0 +1,23 @@
+module app.main;
+import app.shared;
+
+struct User { name, age };
+enum Mode { Idle, Busy };
+
+fn sum(limit) {
+  for i in 0..3 {
+    let keep = i;
+    condition(true);
+  }
+  return limit;
+}
+
+fn on_event(event) {
+  return event;
+}
+
+let ok = true;
+let xs = [1, 2, 3];
+let meta = {"source": "m1"};
+let out = sum(1);
+condition(ok);
