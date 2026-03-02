@@ -1,0 +1,7 @@
+observe("world.ok", "tier2", ctx("scene=lab"), budget(5)) -> r;
+match r {
+  OK => { commit(r); }
+  DEGRADED => { commit(r); }
+  INSUFFICIENT => { condition(false); }
+  DEFERRED => { condition(true); }
+}
