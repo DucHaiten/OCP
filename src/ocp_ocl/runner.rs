@@ -1,7 +1,9 @@
 use std::fs;
 use std::path::Path;
 
-use crate::ocp_ocl::{execute_program, parse_program, typecheck_program, Diagnostic, ExecConfig, ExecOutput};
+use crate::ocp_ocl::{
+    execute_program, parse_program, typecheck_program, Diagnostic, ExecConfig, ExecOutput,
+};
 
 #[derive(Debug, Clone)]
 pub enum FixtureRunnerError {
@@ -26,7 +28,11 @@ pub fn run_fixture_source(
     Ok(out)
 }
 
-pub fn run_fixture_file(path: &Path, file_id: u32, config: ExecConfig) -> Result<ExecOutput, FixtureRunnerError> {
+pub fn run_fixture_file(
+    path: &Path,
+    file_id: u32,
+    config: ExecConfig,
+) -> Result<ExecOutput, FixtureRunnerError> {
     let src = fs::read_to_string(path).map_err(|e| {
         FixtureRunnerError::Io(format!("failed to read fixture '{}': {e}", path.display()))
     })?;

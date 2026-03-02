@@ -7,10 +7,11 @@ let k = "world.exists";
 observe(k, "tier2", ctx("scene=lab"), budget(10)) -> r;
 commit(r);
 condition(true);
+entangle(k, r, true);
 "#;
 
     let program = parse_program(src, 1).expect("program should parse");
-    assert_eq!(program.statements.len(), 4);
+    assert_eq!(program.statements.len(), 5);
 }
 
 #[test]

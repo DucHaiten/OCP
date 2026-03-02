@@ -48,7 +48,7 @@ commit(r);
     let err = Executor::with_registry(ExecConfig { step_cap: 100 }, reg)
         .run(&p)
         .expect_err("exec should fail");
-    assert_eq!(err.code.as_str(), "E-COMMIT-FORBIDDEN");
+    assert_eq!(err.code.as_str(), "X-COMMIT-FORBIDDEN");
 }
 
 #[test]

@@ -28,6 +28,12 @@ pub enum Stmt {
         value: Expr,
         span: Span,
     },
+    Entangle {
+        left: String,
+        right: String,
+        constraint: Expr,
+        span: Span,
+    },
     Match(MatchStmt),
 }
 

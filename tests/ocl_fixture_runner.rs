@@ -8,7 +8,8 @@ fn fixture_runner_runs_from_source() {
 observe("world.ok", "tier2", ctx("scene=lab"), budget(5)) -> r;
 commit(r);
 "#;
-    let out = run_fixture_source(src, 7, ExecConfig { step_cap: 200 }).expect("fixture should pass");
+    let out =
+        run_fixture_source(src, 7, ExecConfig { step_cap: 200 }).expect("fixture should pass");
     assert!(!out.signature.is_empty());
     assert_eq!(out.commits.len(), 1);
 }
@@ -17,7 +18,8 @@ commit(r);
 fn fixture_runner_runs_from_file() {
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     p.push("tests/fixtures/v1/exec_ok/determinism_basic.ocl");
-    let out = run_fixture_file(&p, 9, ExecConfig { step_cap: 200 }).expect("fixture file should pass");
+    let out =
+        run_fixture_file(&p, 9, ExecConfig { step_cap: 200 }).expect("fixture file should pass");
     assert!(!out.signature.is_empty());
 }
 

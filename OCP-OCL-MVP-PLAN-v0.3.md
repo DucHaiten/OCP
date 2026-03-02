@@ -27,12 +27,12 @@ Mục tiêu: đưa OCL thành ngôn ngữ lập trình đa dụng độc lập, 
 - Notes/risks:
 
 ## Trạng thái Gate v0.3
-- Gate M0-A (Boundary cứng + Toolchain skeleton OCL-only): `DONE` (đóng ngày 2026-02-24)
-- Gate M1 (Language MVP): `DONE` (đóng ngày 2026-02-25; M1-A/B/C pass trên blocking + quarantine lanes; call-depth fail-honest test đã bật chính thức, không còn waiver)
-- Gate M2 (Stdlib/Capabilities MVP): `DONE` (closed 2026-02-25; contract-clean M2 lane pass)
-- Gate M3 (Packaging): `DONE` (closed 2026-02-25; reproducible source-bundle + exact-pin lock + workspace registry pass)
-- Gate M4 (Genome Registry + Composer MVP): `DONE` (closed 2026-02-25; morphogenesis closure auto-fill + lock/verify fail-hard + CLI compose/verify integrated)
-- Gate M5 (Conformance suite + demo apps): `DONE` (closed 2026-02-25; 5 demo apps + conformance + offline bundle verification pass)
+- Gate M0-A (Boundary cứng + Toolchain skeleton OCL-only): `TODO`
+- Gate M1 (Language MVP): `TODO`
+- Gate M2 (Stdlib/Capabilities MVP): `TODO`
+- Gate M3 (Packaging): `TODO`
+- Gate M4 (Genome Registry + Composer MVP): `TODO`
+- Gate M5 (Conformance suite + demo apps): `TODO`
 
 ## 1) Re-scope v0.3: Standalone Platform MVP
 

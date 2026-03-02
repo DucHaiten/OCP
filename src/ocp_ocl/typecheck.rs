@@ -35,7 +35,11 @@ impl TypeChecker {
 
     fn check_stmt(&mut self, stmt: &Stmt) -> Result<(), Diagnostic> {
         match stmt {
-            Stmt::Let { name, value, span: _ } => {
+            Stmt::Let {
+                name,
+                value,
+                span: _,
+            } => {
                 let ty = self.infer_expr(value)?;
                 self.vars.insert(
                     name.clone(),
@@ -81,13 +85,31 @@ impl TypeChecker {
                 self.expect_expr_type(value, Type::Bool, *span, "condition(...) expects bool")?;
                 Ok(())
             }
+            Stmt::Entangle {
+                left,
+                right,
+                constraint,
+                span,
+            } => {
+                if !self.vars.contains_key(left) {
+                    return Err(self.unknown_ident(*span, left));
+                }
+                if !self.vars.contains_key(right) {
+                    return Err(self.unknown_ident(*span, right));
+                }
+                self.expect_expr_type(
+                    constraint,
+                    Type::Bool,
+                    *span,
+                    "entangle(...) constraint must be bool",
+                )?;
+                Ok(())
+            }
             Stmt::Match(m) => {
                 let t = self.infer_expr(&m.value)?;
                 if !matches!(t, Type::Result4(_)) {
-                    return Err(self.type_error(
-                        m.span,
-                        format!("match expects Result4, got {}", t.as_str()),
-                    ));
+                    return Err(self
+                        .type_error(m.span, format!("match expects Result4, got {}", t.as_str())));
                 }
                 self.check_block(&m.ok_arm)?;
                 self.check_block(&m.degraded_arm)?;
@@ -109,7 +131,10 @@ impl TypeChecker {
 
     fn check_commit_expr(&mut self, expr: &Expr, span: Span) -> Result<(), Diagnostic> {
         match expr {
-            Expr::Ident { name, span: id_span } => {
+            Expr::Ident {
+                name,
+                span: id_span,
+            } => {
                 let Some(info) = self.vars.get(name) else {
                     return Err(self.unknown_ident(*id_span, name));
                 };
@@ -137,10 +162,7 @@ impl TypeChecker {
     ) -> Result<(), Diagnostic> {
         let got = self.infer_expr(expr)?;
         if got != expected {
-            return Err(self.type_error(
-                span,
-                format!("{msg}; got {}", got.as_str()),
-            ));
+            return Err(self.type_error(span, format!("{msg}; got {}", got.as_str())));
         }
         Ok(())
     }
@@ -216,7 +238,12 @@ impl TypeChecker {
     }
 
     fn type_error(&self, span: Span, message: impl Into<String>) -> Diagnostic {
-        Diagnostic::new(ErrorCode::TTypeMismatch, DiagPhase::Typecheck, span, message)
+        Diagnostic::new(
+            ErrorCode::TTypeMismatch,
+            DiagPhase::Typecheck,
+            span,
+            message,
+        )
     }
 }
 

@@ -31,10 +31,11 @@ impl Parser {
             TokenKind::Observe => self.parse_observe(),
             TokenKind::Commit => self.parse_commit(),
             TokenKind::Condition => self.parse_condition(),
+            TokenKind::Entangle => self.parse_entangle(),
             TokenKind::Match => self.parse_match(),
             _ => Err(self.error_here(
                 ErrorCode::PUnexpectedToken,
-                "expected statement (`let`, `observe`, `commit`, `condition`, `match`)",
+                "expected statement (`let`, `observe`, `commit`, `condition`, `entangle`, `match`)",
             )),
         }
     }
@@ -102,6 +103,29 @@ impl Parser {
         })
     }
 
+    fn parse_entangle(&mut self) -> Result<Stmt, Diagnostic> {
+        let start = self
+            .expect(TokenKind::Entangle, "expected `entangle`")?
+            .span;
+        self.expect(TokenKind::LParen, "expected `(` after entangle")?;
+        let left = self.expect_ident("expected left binding identifier in entangle")?;
+        self.expect(TokenKind::Comma, "expected `,` after entangle left binding")?;
+        let right = self.expect_ident("expected right binding identifier in entangle")?;
+        self.expect(
+            TokenKind::Comma,
+            "expected `,` after entangle right binding",
+        )?;
+        let constraint = self.parse_expr()?;
+        self.expect(TokenKind::RParen, "expected `)` after entangle args")?;
+        let end = self.expect(TokenKind::Semi, "expected `;` after entangle statement")?;
+        Ok(Stmt::Entangle {
+            left,
+            right,
+            constraint,
+            span: merge_span(start, end.span),
+        })
+    }
+
     fn parse_match(&mut self) -> Result<Stmt, Diagnostic> {
         let start = self.expect(TokenKind::Match, "expected `match`")?.span;
         let value = self.parse_expr()?;
@@ -123,9 +147,12 @@ impl Parser {
                 TokenKind::Degraded => {
                     set_arm(&mut degraded_arm, arm_body, "DEGRADED", self.peek().span)?
                 }
-                TokenKind::Insufficient => {
-                    set_arm(&mut insufficient_arm, arm_body, "INSUFFICIENT", self.peek().span)?
-                }
+                TokenKind::Insufficient => set_arm(
+                    &mut insufficient_arm,
+                    arm_body,
+                    "INSUFFICIENT",
+                    self.peek().span,
+                )?,
                 TokenKind::Deferred => {
                     set_arm(&mut deferred_arm, arm_body, "DEFERRED", self.peek().span)?
                 }

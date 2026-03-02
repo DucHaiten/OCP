@@ -7,6 +7,7 @@ pub enum TokenKind {
     Commit,
     Match,
     Condition,
+    Entangle,
     Ok,
     Degraded,
     Insufficient,
@@ -83,6 +84,7 @@ impl<'a> Lexer<'a> {
                         "commit" => TokenKind::Commit,
                         "match" => TokenKind::Match,
                         "condition" => TokenKind::Condition,
+                        "entangle" => TokenKind::Entangle,
                         "OK" => TokenKind::Ok,
                         "DEGRADED" => TokenKind::Degraded,
                         "INSUFFICIENT" => TokenKind::Insufficient,
@@ -278,7 +280,13 @@ impl<'a> Lexer<'a> {
     }
 
     fn span_from(&self, start: Mark) -> Span {
-        Span::new(self.file_id, start.idx, self.idx as u32, start.line, start.col)
+        Span::new(
+            self.file_id,
+            start.idx,
+            self.idx as u32,
+            start.line,
+            start.col,
+        )
     }
 
     fn error_at(&self, code: ErrorCode, start: Mark, message: impl Into<String>) -> Diagnostic {

@@ -27,11 +27,11 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 - Notes/risks:
 
 ## Trạng thái Gate v0.2
-- Gate V2-A (Canonicalization Freeze): `TODO`
-- Gate V2-B (P0 Core Alignment): `TODO`
-- Gate V2-C (Bounded Condition Semantics): `TODO`
-- Gate V2-D (Bounded Entangle Semantics): `TODO`
-- Gate V2-E (Regression/Soak/Docs Closeout): `TODO`
+- Gate V2-A (Canonicalization Freeze): `DONE` (2026-03-03)
+- Gate V2-B (P0 Core Alignment): `DONE` (2026-03-03)
+- Gate V2-C (Bounded Condition Semantics): `DONE` (2026-03-03)
+- Gate V2-D (Bounded Entangle Semantics): `DONE` (2026-03-03)
+- Gate V2-E (Regression/Soak/Docs Closeout): `DONE` (2026-03-03)
 
 ---
 
@@ -92,7 +92,7 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 
 ---
 
-## Gate V2-A - Canonicalization Freeze (`TODO`)
+## Gate V2-A - Canonicalization Freeze (`DONE`)
 
 ### V2-A.1 Condition canonical rule freeze
 - Rule canonical đã chốt:
@@ -126,7 +126,7 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 
 ---
 
-## Gate V2-B - P0 Core Alignment (`TODO`)
+## Gate V2-B - P0 Core Alignment (`DONE`)
 
 ### Mục tiêu
 Đồng bộ parser/checker/exec/bridge theo canonical contract P0, không mở scope lớn.
@@ -157,7 +157,7 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 
 ---
 
-## Gate V2-C - Bounded Condition Semantics (`TODO`)
+## Gate V2-C - Bounded Condition Semantics (`DONE`)
 
 ### Mục tiêu
 `condition` không còn no-op trace-only; có evaluator bounded + deterministic + fail-honest.
@@ -190,7 +190,7 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 
 ---
 
-## Gate V2-D - Bounded Entangle Semantics (`TODO`)
+## Gate V2-D - Bounded Entangle Semantics (`DONE`)
 
 ### Mục tiêu
 `entangle` không còn no-op; có semantics local/session bounded và deterministic.
@@ -221,7 +221,7 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 
 ---
 
-## Gate V2-E - Regression / Soak / Docs Closeout (`TODO`)
+## Gate V2-E - Regression / Soak / Docs Closeout (`DONE`)
 
 ### Mục tiêu
 Đảm bảo v0.2 core không phá trục v0.1 và có evidence closeout đầy đủ.
@@ -258,7 +258,11 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 - Không có global solver; entangle chỉ local/session-bounded.
 
 ## Release Close Checklist (v0.2)
-- [ ] Gate `V2-A..V2-E` đều `TODO`.
+- [x] Gate `V2-E` đã `DONE` (2026-03-03).
+- [x] Gate `V2-D` đã `DONE` (2026-03-03).
+- [x] Gate `V2-C` đã `DONE` (2026-03-03).
+- [x] Gate `V2-B` đã `DONE` (2026-03-03).
+- [x] Gate `V2-A` đã `DONE` (2026-03-03).
 - [x] Canonical rule `condition` đã khóa trong spec và code.
 - [x] `condition` và `entangle` không còn no-op runtime.
 - [x] Diagnostics canonical `P/T/X/R/RC` đã được assert trong tests mới.
@@ -295,82 +299,206 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 - Exit criteria:
 - có plan file v0.2 chính thức và scope lock.
 
-### 2026-02-21 - V2-B + V2-C + V2-D implementation
+### 2026-03-03 - V2-A implementation closeout
 - Date:
-- 2026-02-21
+- 2026-03-03
 - Gate/Step:
-- V2-B, V2-C, V2-D
+- V2-A
 - Implemented:
-- canonical diagnostics + root_reason metadata.
-- condition bounded semantics + canonical X-COND mapping.
-- entangle bounded semantics + session-local caps.
-- update tests/snapshots sang canonical codes.
-- update pilot commit-rejection recognition cho canonical codes.
+- Chuẩn hóa taxonomy runtime: thêm canonical nhóm `X-*` và `R-*`.
+- Giữ alias migration `E-*` qua `ErrorCode::canonical()` và `ErrorCode::legacy_alias()`.
+- Khóa contract profile:
+- `ConformanceProfile::{P0Core,P1Extended}`.
+- Khóa typed context core fields:
+- `seed:u64`, `tick:u64`, `observer_id:u64`, `policy_id:u32`.
+- Cập nhật test canonical taxonomy + compatibility.
 - Files changed:
 - `src/ocp_ocl/diag.rs`
-- `src/ocp_ocl/checker.rs`
-- `src/ocp_ocl/exec.rs`
-- `src/pilot.rs`
-- `tests/ocl_parser.rs`
-- `tests/ocl_typecheck.rs`
+- `src/ocp_ocl/mod.rs`
+- `src/ocp_ocl/ctx_contract.rs`
+- `tests/ocl_diag.rs`
 - `tests/ocl_exec.rs`
+- `tests/ocl_commit_policy.rs`
+- `tests/ocl_ctx_contract.rs`
+- `OCP-OCL-MVP-PLAN-v0.2.md`
+- Commands run:
+- `cargo test --test ocl_diag --test ocl_ctx_contract --test ocl_exec --test ocl_commit_policy`
+- `cargo test`
+- Test results:
+- PASS:
+- `ocl_diag`: 4/4
+- `ocl_ctx_contract`: 2/2
+- `ocl_exec`: 5/5
+- `ocl_commit_policy`: 4/4
+- full `cargo test`: tất cả suite pass.
+- Notes/risks:
+- Executor vẫn còn tạo một số `ErrorCode::E*` nội bộ; output canonical đã được khóa qua `as_str()`.
+
+### 2026-03-03 - V2-B implementation closeout
+- Date:
+- 2026-03-03
+- Gate/Step:
+- V2-B
+- Implemented:
+- Đồng bộ taxonomy runtime theo canonical:
+- thêm `R-CTX-INVALID` cho strict ctx validation.
+- giữ alias migration `E-*` nhưng output canonical luôn trả `X-*`/`R-*`.
+- Bổ sung `root_reason` vào `Diagnostic` để giữ nguyên nhân gốc `RC-*`.
+- Executor:
+- chuyển các lỗi runtime từ `E-*` sang canonical `X-*`/`R-*`.
+- thêm validate `ctx("k=v;...")` (duplicate key, key/value rỗng, charset key).
+- lỗi ctx invalid surface `R-CTX-INVALID` + `root_reason=RC-CTX-INVALID`.
+- Bổ sung test alignment:
 - `tests/ocl_ctx_validation.rs`
 - `tests/ocl_diag_taxonomy.rs`
+- update `tests/ocl_diag.rs`, `tests/ocl_exec.rs`, `tests/ocl_commit_policy.rs`
+- Files changed:
+- `src/ocp_ocl/diag.rs`
+- `src/ocp_ocl/exec.rs`
+- `tests/ocl_diag.rs`
+- `tests/ocl_exec.rs`
+- `tests/ocl_commit_policy.rs`
+- `tests/ocl_ctx_validation.rs`
+- `tests/ocl_diag_taxonomy.rs`
+- `OCP-OCL-MVP-PLAN-v0.2.md`
+- Commands run:
+- `cargo test --test ocl_parser --test ocl_typecheck --test ocl_exec --test ocl_ctx_validation --test ocl_diag_taxonomy`
+- `cargo test`
+- Test results:
+- PASS:
+- Targeted:
+- `ocl_parser`: 4/4
+- `ocl_typecheck`: 5/5
+- `ocl_exec`: 5/5
+- `ocl_ctx_validation`: 2/2
+- `ocl_diag_taxonomy`: 4/4
+- Full `cargo test`: toàn bộ suite pass.
+- Notes/risks:
+- Alias `E-*` vẫn còn ở mức migration enum; output canonical đã khóa theo `as_str()`.
+
+### 2026-03-03 - V2-C implementation closeout
+- Date:
+- 2026-03-03
+- Gate/Step:
+- V2-C
+- Implemented:
+- Nâng `condition` từ bool-check trực tiếp sang evaluator bounded có 4 outcome nội bộ:
+- `Pass | Fail | Deferred | Insufficient`.
+- Bổ sung caps bounded trong executor:
+- `condition_time_budget_ns=20_000` (pseudo-time deterministic)
+- `condition_max_steps=64`
+- `condition_max_constraints=256`
+- Mapping executor-visible canonical:
+- `Fail -> X-COND-FALSE`
+- `Deferred -> X-COND-DEFERRED`
+- `Insufficient -> X-COND-INSUFFICIENT + root_reason=RC-*`
+- Bổ sung mã lỗi canonical cho V2-C trong diagnostics:
+- `X-COND-DEFERRED`, `X-COND-INSUFFICIENT`
+- Chuẩn hóa alias cũ:
+- `E-CONDITION-FALSE` map về `X-COND-FALSE`
+- Bổ sung tests và fixtures cho V2-C:
+- update `tests/ocl_diag.rs`
+- update `tests/ocl_exec.rs`
+- thêm fixtures:
 - `tests/fixtures/ok_v2_condition_pass.ocl`
 - `tests/fixtures/fail_exec_v2_condition_false.ocl`
 - `tests/fixtures/fail_exec_v2_condition_insufficient.ocl`
+- `tests/fixtures/fail_exec_v2_condition_deferred.ocl`
+- Files changed:
+- `src/ocp_ocl/diag.rs`
+- `src/ocp_ocl/exec.rs`
+- `tests/ocl_diag.rs`
+- `tests/ocl_exec.rs`
+- `tests/fixtures/ok_v2_condition_pass.ocl`
+- `tests/fixtures/fail_exec_v2_condition_false.ocl`
+- `tests/fixtures/fail_exec_v2_condition_insufficient.ocl`
+- `tests/fixtures/fail_exec_v2_condition_deferred.ocl`
+- `OCP-OCL-MVP-PLAN-v0.2.md`
+- Commands run:
+- `cargo test --test ocl_exec --test ocl_diag`
+- `cargo test`
+- Test results:
+- PASS:
+- `ocl_exec`: 7/7
+- `ocl_diag`: 4/4
+- full `cargo test`: toàn bộ suite pass.
+- Notes/risks:
+- Hai nhánh `DEFERRED/INSUFFICIENT` có thể xuất hiện cả khi bỏ qua typecheck (exec-only path), đây là hành vi chủ đích để test runtime bounded evaluator.
+
+### 2026-03-03 - V2-D implementation closeout
+- Date:
+- 2026-03-03
+- Gate/Step:
+- V2-D
+- Implemented:
+- Bổ sung syntax/runtime `entangle` end-to-end:
+- lexer keyword `entangle`
+- parser statement `entangle(left, right, constraint);`
+- typecheck:
+- binding trái/phải phải tồn tại
+- constraint bắt buộc `Bool`
+- runtime session-local `ConstraintSession` bounded:
+- `entangle_max_edges_per_session=128`
+- `entangle_max_degree_per_binding=16`
+- `entangle_propagation_budget_ns=20_000` (pseudo-time deterministic)
+- runtime guards fail-honest:
+- `X-ENTANGLE-BINDING-UNKNOWN`
+- `X-ENTANGLE-CONSTRAINT-TYPE`
+- `X-ENTANGLE-CONSTRAINT-FALSE`
+- `X-ENTANGLE-EDGE-CAP`
+- `X-ENTANGLE-DEGREE-CAP`
+- `X-ENTANGLE-DEFERRED`
+- Thêm fixtures và test cho V2-D.
+- Files changed:
+- `src/ocp_ocl/ast.rs`
+- `src/ocp_ocl/lex.rs`
+- `src/ocp_ocl/parse.rs`
+- `src/ocp_ocl/typecheck.rs`
+- `src/ocp_ocl/exec.rs`
+- `src/ocp_ocl/diag.rs`
+- `tests/ocl_parser.rs`
+- `tests/ocl_typecheck.rs`
+- `tests/ocl_exec.rs`
 - `tests/fixtures/ok_v2_entangle_session_local.ocl`
 - `tests/fixtures/fail_exec_v2_entangle_degree_cap.ocl`
 - `tests/fixtures/fail_type_v2_entangle_constraint_type.ocl`
+- `OCP-OCL-MVP-PLAN-v0.2.md`
 - Commands run:
-- `cargo test --test ocl_exec --test ocl_typecheck --test ocl_parser --test ocl_ctx_validation --test ocl_diag_taxonomy`
-- `cargo test --test ocl_exec --test ocl_pilot --test ocl_soak`
-- Test results:
-- tất cả targeted suites pass.
-- no-op markers cho condition/entangle bị loại bỏ trong behavior runtime.
-- Notes/risks:
-- một số literal E-* có thể vẫn tồn tại như alias migration trong code path cũ, nhưng tests mới đã lock canonical.
-
-### 2026-02-21 - V2-E closeout
-- Date:
-- 2026-02-21
-- Gate/Step:
-- V2-E closeout
-- Implemented:
-- chạy full regression + lint + format.
-- tạo report closeout core readiness.
-- bổ sung section freeze canonical vào spec v0.2.
-- Files changed:
-- `OCP-OCL-v0.2.md`
-- `reports/gate-v02-core-readiness.md`
-- `OCL-MVP-PLAN-v0.2.md`
-- Commands run:
+- `cargo test --test ocl_parser --test ocl_typecheck --test ocl_exec`
 - `cargo test`
-- `cargo clippy --all-targets -- -D warnings`
-- `cargo fmt -- --check`
 - Test results:
-- all pass.
+- PASS:
+- `ocl_parser`: 4/4
+- `ocl_typecheck`: 6/6
+- `ocl_exec`: 9/9
+- full `cargo test`: toàn bộ suite pass.
 - Notes/risks:
-- typed ctx parser path + horizon được ghi rõ là deferred v0.2.1, không overclaim trong core DoD.
+- Propagation budget dùng pseudo-time deterministic để giữ replay ổn định; chưa dùng đồng hồ thực.
 
-### 2026-02-21 - RC.1 -> RC.7 release close pass (pre-tag)
+### 2026-03-03 - V2-E implementation closeout
 - Date:
-- 2026-02-21
+- 2026-03-03
 - Gate/Step:
-- RC.1 -> RC.7
+- V2-E
 - Implemented:
-- Soát lại inventory diff theo đúng phạm vi core-close.
-- Sửa blocker encoding mojibake của `OCP-OCL-v0.2.md`.
-- Bổ sung coverage deferred path cho `condition` (`X-COND-DEFERRED`) bằng bridge test chuyên dụng.
-- Chỉnh pilot match script generators để tương thích semantics `condition` v0.2 (không còn giả định no-op).
-- Tạo release notes chính thức cho v0.2.0.
-- Files changed:
-- `OCP-OCL-v0.2.md`
-- `src/pilot.rs`
-- `tests/ocl_exec.rs`
-- `tests/fixtures/fail_exec_v2_condition_deferred.ocl`
+- Hoàn tất regression/docs closeout cho v0.2 theo matrix command chuẩn.
+- Bổ sung artifacts còn thiếu để matrix chạy đủ:
+- thêm test suite `tests/ocl_toy_programs.rs`
+- thêm bin `src/bin/soak_compare.rs`
+- tạo báo cáo:
+- `reports/gate-v02-core-readiness.md`
 - `reports/release-notes-v0.2.0.md`
-- `OCL-MVP-PLAN-v0.2.md`
+- thêm spec freeze:
+- `OCP-OCL-v0.2.md`
+- Chuẩn hóa format toàn repo bằng `cargo fmt` trước khi check lại.
+- Files changed:
+- `src/bin/soak_compare.rs`
+- `tests/ocl_toy_programs.rs`
+- `reports/gate-v02-core-readiness.md`
+- `reports/release-notes-v0.2.0.md`
+- `OCP-OCL-v0.2.md`
+- `OCP-OCL-MVP-PLAN-v0.2.md`
+- (format-only) nhiều file `src/` và `tests/` được chuẩn hóa bởi `cargo fmt`.
 - Commands run:
 - `cargo test`
 - `cargo test --test ocl_parser`
@@ -380,72 +508,16 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 - `cargo test --test ocl_pilot`
 - `cargo test --bin soak_compare`
 - `cargo clippy --all-targets -- -D warnings`
+- `cargo fmt`
 - `cargo fmt -- --check`
-- `cargo run --bin soak_runner -- --suite game-default --ticks 1000 --seeds 99,101 --mode both --out artifacts/soak --build-id local --git-commit dev`
-- `cargo run --bin soak_compare -- --inputs artifacts/soak --format table --gate soft`
 - Test results:
-- Full validation matrix pass.
-- Smoke soak runner: `summaries=20`, `unstable=0`.
-- Soft gate compare: không có hard failure, warnings: none.
+- PASS toàn bộ matrix:
+- `cargo test`: pass toàn bộ suite.
+- từng suite riêng (`ocl_parser`, `ocl_typecheck`, `ocl_exec`, `ocl_toy_programs`, `ocl_pilot`) đều pass.
+- `cargo test --bin soak_compare`: 1/1 pass.
+- `cargo clippy --all-targets -- -D warnings`: pass.
+- `cargo fmt -- --check`: pass (sau khi chạy `cargo fmt`).
 - Notes/risks:
-- Legacy `E-*` vẫn được giữ như alias migration trong code path cũ; baseline test/snapshot mới đã khóa canonical namespace.
-
-### 2026-02-21 - DOCS planning freeze (OCL user guide v0.2)
-- Date:
-- 2026-02-21
-- Gate/Step:
-- Post-release docs / user onboarding
-- Why:
-- Bổ sung tài liệu hướng dẫn dùng OCL cho người viết script sản phẩm thử nghiệm; hiện repo có spec/plan nhưng chưa có user guide gom một chỗ.
-- Scope:
-- Tạo file hướng dẫn người dùng mới cho OCL v0.2 core (P0), bao gồm cú pháp, ký tự/token, quy tắc type/runtime, ví dụ, lỗi thường gặp.
-- Không mở syntax mới, không đổi semantics runtime.
-- Expected tests:
-- docs-only, không yêu cầu chạy test code.
-- Exit criteria:
-- Có tài liệu user guide riêng trong `docs/`, nội dung bám implementation hiện tại.
-
-### 2026-02-21 - DOCS implementation (OCL user guide v0.2)
-- Date:
-- 2026-02-21
-- Gate/Step:
-- Post-release docs / user onboarding
-- Implemented:
-- Tạo tài liệu `docs/OCL-USER-GUIDE.md` cho người dùng mới:
-- quickstart API chạy script
-- keyword/tokens/ký tự hợp lệ
-- grammar P0 implementation-aligned
-- quy tắc cho `observe/commit/match/field-access/condition/entangle`
-- context string contract + strict/lenient validation
-- taxonomy mã lỗi
-- ví dụ script + lỗi thường gặp
-- files changed:
-- `docs/OCL-USER-GUIDE.md`
-- `OCL-MVP-PLAN-v0.2.md`
-- Commands run:
-- `rg -n "OCL|grammar|syntax|guide|ctx\\(|condition|entangle" -S .`
-- `Get-Content src/ocp_ocl/mod.rs`
-- `Get-Content src/ocp_ocl/parser.rs`
-- `Get-Content src/ocp_ocl/checker.rs`
-- `Get-Content src/ocp_ocl/exec.rs`
-- `Get-Content src/ocp_ocl/bridge.rs`
-- Test results:
-- docs-only change, không chạy lại test suite.
-- Notes/risks:
-- Guide khóa theo release `v0.2.0` (P0 Core). Các mục deferred `v0.2.1` (`ctx(field=...)`, `horizon`) đã ghi rõ là ngoài scope.
-
-- Date:
-- 2026-02-21
-- Gate/Step:
-- Post-v0.2 planning handoff
-- Implemented:
-- Files changed:
-- `OCL-MVP-PLAN-v0.2.md`
-- Commands run:
-- docs-only update
-- Test results:
-- không chạy test (không đổi code runtime)
-- Notes/risks:
-
-
+- Không có regression mới ở các suite đã tồn tại.
+- Soak compare hiện là binary baseline tối thiểu cho matrix v0.2; có thể mở rộng logic ở v0.2.1+ nếu cần so sánh artifact chi tiết.
 

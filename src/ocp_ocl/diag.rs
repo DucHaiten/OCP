@@ -16,6 +16,19 @@ pub enum ErrorCode {
     TUnknownIdentifier,
     TTypeMismatch,
     TMatchArmsIncomplete,
+    XConditionFalse,
+    XConditionDeferred,
+    XConditionInsufficient,
+    XEntangleBindingUnknown,
+    XEntangleConstraintType,
+    XEntangleConstraintFalse,
+    XEntangleEdgeCap,
+    XEntangleDegreeCap,
+    XEntangleDeferred,
+    XBudgetExceeded,
+    XCommitForbidden,
+    RCapabilityDenied,
+    RCtxInvalid,
     EConditionFalse,
     EBudgetExceeded,
     ECommitForbidden,
@@ -23,18 +36,51 @@ pub enum ErrorCode {
 }
 
 impl ErrorCode {
-    pub const fn as_str(self) -> &'static str {
+    pub const fn canonical(self) -> Self {
         match self {
+            Self::EConditionFalse => Self::XConditionFalse,
+            Self::EBudgetExceeded => Self::XBudgetExceeded,
+            Self::ECommitForbidden => Self::XCommitForbidden,
+            Self::ECapabilityDenied => Self::RCapabilityDenied,
+            other => other,
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self.canonical() {
             Self::PUnexpectedToken => "P-UNEXPECTED-TOKEN",
             Self::PUnexpectedEof => "P-UNEXPECTED-EOF",
             Self::PInvalidLiteral => "P-INVALID-LITERAL",
             Self::TUnknownIdentifier => "T-UNKNOWN-IDENTIFIER",
             Self::TTypeMismatch => "T-TYPE-MISMATCH",
             Self::TMatchArmsIncomplete => "T-MATCH-ARMS-INCOMPLETE",
-            Self::EConditionFalse => "E-CONDITION-FALSE",
-            Self::EBudgetExceeded => "E-BUDGET-EXCEEDED",
-            Self::ECommitForbidden => "E-COMMIT-FORBIDDEN",
-            Self::ECapabilityDenied => "E-CAPABILITY-DENIED",
+            Self::XConditionFalse => "X-COND-FALSE",
+            Self::XConditionDeferred => "X-COND-DEFERRED",
+            Self::XConditionInsufficient => "X-COND-INSUFFICIENT",
+            Self::XEntangleBindingUnknown => "X-ENTANGLE-BINDING-UNKNOWN",
+            Self::XEntangleConstraintType => "X-ENTANGLE-CONSTRAINT-TYPE",
+            Self::XEntangleConstraintFalse => "X-ENTANGLE-CONSTRAINT-FALSE",
+            Self::XEntangleEdgeCap => "X-ENTANGLE-EDGE-CAP",
+            Self::XEntangleDegreeCap => "X-ENTANGLE-DEGREE-CAP",
+            Self::XEntangleDeferred => "X-ENTANGLE-DEFERRED",
+            Self::XBudgetExceeded => "X-BUDGET-EXCEEDED",
+            Self::XCommitForbidden => "X-COMMIT-FORBIDDEN",
+            Self::RCapabilityDenied => "R-CAPABILITY-DENIED",
+            Self::RCtxInvalid => "R-CTX-INVALID",
+            Self::EConditionFalse => "X-COND-FALSE",
+            Self::EBudgetExceeded => "X-BUDGET-EXCEEDED",
+            Self::ECommitForbidden => "X-COMMIT-FORBIDDEN",
+            Self::ECapabilityDenied => "R-CAPABILITY-DENIED",
+        }
+    }
+
+    pub const fn legacy_alias(self) -> Option<&'static str> {
+        match self.canonical() {
+            Self::XConditionFalse => Some("E-CONDITION-FALSE"),
+            Self::XBudgetExceeded => Some("E-BUDGET-EXCEEDED"),
+            Self::XCommitForbidden => Some("E-COMMIT-FORBIDDEN"),
+            Self::RCapabilityDenied => Some("E-CAPABILITY-DENIED"),
+            _ => None,
         }
     }
 }
@@ -71,6 +117,7 @@ pub struct Diagnostic {
     pub span: Span,
     pub message: String,
     pub hint: Option<String>,
+    pub root_reason: Option<ReasonCode>,
 }
 
 impl Diagnostic {
@@ -81,11 +128,17 @@ impl Diagnostic {
             span,
             message: message.into(),
             hint: None,
+            root_reason: None,
         }
     }
 
     pub fn with_hint(mut self, hint: impl Into<String>) -> Self {
         self.hint = Some(hint.into());
+        self
+    }
+
+    pub fn with_root_reason(mut self, reason: ReasonCode) -> Self {
+        self.root_reason = Some(reason);
         self
     }
 }

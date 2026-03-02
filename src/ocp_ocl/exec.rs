@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::ocp_ocl::ast::{Expr, MatchStmt, Program, Stmt};
 use crate::ocp_ocl::audit::{TraceEvent, TraceLog};
@@ -34,6 +34,33 @@ struct ObservationMeta {
     key: String,
 }
 
+const CONDITION_TIME_BUDGET_NS: u64 = 20_000;
+const CONDITION_MAX_STEPS: usize = 64;
+const CONDITION_MAX_CONSTRAINTS: usize = 256;
+const ENTANGLE_MAX_EDGES_PER_SESSION: usize = 128;
+const ENTANGLE_MAX_DEGREE_PER_BINDING: usize = 16;
+const ENTANGLE_PROPAGATION_BUDGET_NS: u64 = 20_000;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConditionOutcome {
+    Pass,
+    Fail,
+    Deferred(ReasonCode),
+    Insufficient(ReasonCode),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ConditionBudgetStats {
+    steps: usize,
+    constraints: usize,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ConstraintSession {
+    edge_count: usize,
+    degree_by_binding: HashMap<String, usize>,
+}
+
 pub struct Executor {
     env: HashMap<String, Value>,
     meter: BudgetMeter,
@@ -42,6 +69,7 @@ pub struct Executor {
     observations: HashMap<u64, ObservationMeta>,
     commits: Vec<CommitEvent>,
     trace: TraceLog,
+    constraints: ConstraintSession,
 }
 
 impl Executor {
@@ -54,6 +82,7 @@ impl Executor {
             observations: HashMap::new(),
             commits: Vec::new(),
             trace: TraceLog::default(),
+            constraints: ConstraintSession::default(),
         }
     }
 
@@ -66,6 +95,7 @@ impl Executor {
             observations: HashMap::new(),
             commits: Vec::new(),
             trace: TraceLog::default(),
+            constraints: ConstraintSession::default(),
         }
     }
 
@@ -116,7 +146,7 @@ impl Executor {
 
                 let key_lit = as_string_runtime(&key_value).ok_or_else(|| {
                     Diagnostic::new(
-                        ErrorCode::ECapabilityDenied,
+                        ErrorCode::RCapabilityDenied,
                         DiagPhase::Exec,
                         key.span(),
                         "observe key must evaluate to string",
@@ -124,7 +154,7 @@ impl Executor {
                 })?;
                 let tier_lit = as_string_runtime(&tier_value).ok_or_else(|| {
                     Diagnostic::new(
-                        ErrorCode::ECapabilityDenied,
+                        ErrorCode::RCapabilityDenied,
                         DiagPhase::Exec,
                         tier.span(),
                         "observe tier must evaluate to string",
@@ -132,7 +162,7 @@ impl Executor {
                 })?;
                 let ctx_lit = as_ctx_runtime(&ctx_value).ok_or_else(|| {
                     Diagnostic::new(
-                        ErrorCode::ECapabilityDenied,
+                        ErrorCode::RCapabilityDenied,
                         DiagPhase::Exec,
                         ctx.span(),
                         "observe ctx must evaluate to ctx(...) value",
@@ -140,11 +170,21 @@ impl Executor {
                 })?;
                 let budget_units = as_budget_runtime(&budget_value).ok_or_else(|| {
                     Diagnostic::new(
-                        ErrorCode::ECapabilityDenied,
+                        ErrorCode::RCapabilityDenied,
                         DiagPhase::Exec,
                         budget.span(),
                         "observe budget must evaluate to budget(...) value",
                     )
+                })?;
+
+                validate_ctx_literal(ctx_lit).map_err(|message| {
+                    Diagnostic::new(
+                        ErrorCode::RCtxInvalid,
+                        DiagPhase::Runtime,
+                        ctx.span(),
+                        message,
+                    )
+                    .with_root_reason(ReasonCode::CtxInvalid)
                 })?;
 
                 self.trace.push(TraceEvent::ObserveStart {
@@ -178,22 +218,132 @@ impl Executor {
             }
             Stmt::Commit { value, span } => self.exec_commit(value, *span),
             Stmt::Condition { value, span } => self.exec_condition(value, *span),
+            Stmt::Entangle {
+                left,
+                right,
+                constraint,
+                span,
+            } => self.exec_entangle(left, right, constraint, *span),
             Stmt::Match(m) => self.exec_match(m),
         }
+    }
+
+    fn exec_entangle(
+        &mut self,
+        left: &str,
+        right: &str,
+        constraint: &Expr,
+        span: Span,
+    ) -> Result<(), Diagnostic> {
+        if !self.env.contains_key(left) || !self.env.contains_key(right) {
+            return Err(Diagnostic::new(
+                ErrorCode::XEntangleBindingUnknown,
+                DiagPhase::Exec,
+                span,
+                "entangle(...) binding is not found in current runtime env",
+            )
+            .with_root_reason(ReasonCode::KeyUnknown));
+        }
+
+        let constraint_value = self.eval_expr(constraint)?;
+        let condition = match constraint_value {
+            Value::Bool(v) => v,
+            _ => {
+                return Err(Diagnostic::new(
+                    ErrorCode::XEntangleConstraintType,
+                    DiagPhase::Exec,
+                    span,
+                    "entangle(...) constraint must evaluate to bool at runtime",
+                )
+                .with_root_reason(ReasonCode::AdapterFailed));
+            }
+        };
+
+        if !condition {
+            return Err(Diagnostic::new(
+                ErrorCode::XEntangleConstraintFalse,
+                DiagPhase::Exec,
+                span,
+                "entangle(...) constraint evaluated to false",
+            ));
+        }
+
+        if self.constraints.edge_count >= ENTANGLE_MAX_EDGES_PER_SESSION {
+            return Err(Diagnostic::new(
+                ErrorCode::XEntangleEdgeCap,
+                DiagPhase::Exec,
+                span,
+                "entangle(...) exceeded session edge cap",
+            )
+            .with_root_reason(ReasonCode::PolicyDenied));
+        }
+
+        let left_degree = self
+            .constraints
+            .degree_by_binding
+            .get(left)
+            .copied()
+            .unwrap_or(0);
+        let right_degree = self
+            .constraints
+            .degree_by_binding
+            .get(right)
+            .copied()
+            .unwrap_or(0);
+
+        if left_degree >= ENTANGLE_MAX_DEGREE_PER_BINDING
+            || right_degree >= ENTANGLE_MAX_DEGREE_PER_BINDING
+        {
+            return Err(Diagnostic::new(
+                ErrorCode::XEntangleDegreeCap,
+                DiagPhase::Exec,
+                span,
+                "entangle(...) exceeded degree cap per binding",
+            )
+            .with_root_reason(ReasonCode::PolicyDenied));
+        }
+
+        let pseudo_elapsed_ns = (self.constraints.edge_count as u64)
+            .saturating_add(1)
+            .saturating_mul(200);
+        if pseudo_elapsed_ns > ENTANGLE_PROPAGATION_BUDGET_NS {
+            return Err(Diagnostic::new(
+                ErrorCode::XEntangleDeferred,
+                DiagPhase::Exec,
+                span,
+                "entangle(...) deferred due to propagation budget cap",
+            )
+            .with_root_reason(ReasonCode::BudgetExceeded));
+        }
+
+        self.constraints.edge_count = self.constraints.edge_count.saturating_add(1);
+        self.constraints
+            .degree_by_binding
+            .entry(left.to_string())
+            .and_modify(|v| *v = v.saturating_add(1))
+            .or_insert(1);
+        self.constraints
+            .degree_by_binding
+            .entry(right.to_string())
+            .and_modify(|v| *v = v.saturating_add(1))
+            .or_insert(1);
+
+        Ok(())
     }
 
     fn exec_match(&mut self, m: &MatchStmt) -> Result<(), Diagnostic> {
         let v = self.eval_expr(&m.value)?;
         let Value::Result4(r) = v else {
             return Err(Diagnostic::new(
-                ErrorCode::ECommitForbidden,
+                ErrorCode::XCommitForbidden,
                 DiagPhase::Exec,
                 m.span,
                 "match expects Result4 value at runtime",
             ));
         };
 
-        self.trace.push(TraceEvent::MatchArmSelected { arm: r.kind });
+        self.trace
+            .push(TraceEvent::MatchArmSelected { arm: r.kind });
         match r.kind {
             ResultKind::Ok => self.exec_block(&m.ok_arm),
             ResultKind::Degraded => self.exec_block(&m.degraded_arm),
@@ -203,27 +353,63 @@ impl Executor {
     }
 
     fn exec_condition(&mut self, expr: &Expr, span: Span) -> Result<(), Diagnostic> {
-        let v = self.eval_expr(expr)?;
-        match v {
-            Value::Bool(true) => {
+        let outcome = self.eval_condition_outcome(expr)?;
+        match outcome {
+            ConditionOutcome::Pass => {
                 self.trace.push(TraceEvent::ConditionCheck { value: true });
                 Ok(())
             }
-            Value::Bool(false) => {
+            ConditionOutcome::Fail => {
                 self.trace.push(TraceEvent::ConditionCheck { value: false });
                 Err(Diagnostic::new(
-                    ErrorCode::EConditionFalse,
+                    ErrorCode::XConditionFalse,
                     DiagPhase::Exec,
                     span,
                     "condition(...) evaluated to false",
                 ))
             }
-            _ => Err(Diagnostic::new(
-                ErrorCode::EConditionFalse,
-                DiagPhase::Exec,
-                span,
-                "condition(...) expects bool at runtime",
-            )),
+            ConditionOutcome::Deferred(reason) => {
+                self.trace.push(TraceEvent::ConditionCheck { value: false });
+                Err(Diagnostic::new(
+                    ErrorCode::XConditionDeferred,
+                    DiagPhase::Exec,
+                    span,
+                    "condition(...) deferred due to bounded evaluator budget",
+                )
+                .with_root_reason(reason))
+            }
+            ConditionOutcome::Insufficient(reason) => {
+                self.trace.push(TraceEvent::ConditionCheck { value: false });
+                Err(Diagnostic::new(
+                    ErrorCode::XConditionInsufficient,
+                    DiagPhase::Exec,
+                    span,
+                    "condition(...) insufficient: evaluator cannot prove bool outcome",
+                )
+                .with_root_reason(reason))
+            }
+        }
+    }
+
+    fn eval_condition_outcome(&mut self, expr: &Expr) -> Result<ConditionOutcome, Diagnostic> {
+        let stats = condition_budget_stats(expr);
+
+        if stats.constraints > CONDITION_MAX_CONSTRAINTS {
+            return Ok(ConditionOutcome::Insufficient(ReasonCode::NotImplemented));
+        }
+        if stats.steps > CONDITION_MAX_STEPS {
+            return Ok(ConditionOutcome::Deferred(ReasonCode::BudgetExceeded));
+        }
+        let pseudo_elapsed_ns = (stats.steps as u64).saturating_mul(400);
+        if pseudo_elapsed_ns > CONDITION_TIME_BUDGET_NS {
+            return Ok(ConditionOutcome::Deferred(ReasonCode::BudgetExceeded));
+        }
+
+        let value = self.eval_expr(expr)?;
+        match value {
+            Value::Bool(true) => Ok(ConditionOutcome::Pass),
+            Value::Bool(false) => Ok(ConditionOutcome::Fail),
+            _ => Ok(ConditionOutcome::Insufficient(ReasonCode::AdapterFailed)),
         }
     }
 
@@ -239,7 +425,7 @@ impl Executor {
                 reason: Some(ReasonCode::PolicyDenied),
             });
             return Err(Diagnostic::new(
-                ErrorCode::ECommitForbidden,
+                ErrorCode::XCommitForbidden,
                 DiagPhase::Exec,
                 span,
                 "commit(...) expects Result4 value",
@@ -257,7 +443,7 @@ impl Executor {
                 reason: Some(ReasonCode::PolicyDenied),
             });
             return Err(Diagnostic::new(
-                ErrorCode::ECommitForbidden,
+                ErrorCode::XCommitForbidden,
                 DiagPhase::Exec,
                 span,
                 "commit(...) requires observe origin_id",
@@ -269,7 +455,7 @@ impl Executor {
                 reason: Some(ReasonCode::PolicyDenied),
             });
             return Err(Diagnostic::new(
-                ErrorCode::ECommitForbidden,
+                ErrorCode::XCommitForbidden,
                 DiagPhase::Exec,
                 span,
                 "commit(...) origin_id is not recognized by runtime",
@@ -284,7 +470,7 @@ impl Executor {
                         reason: Some(ReasonCode::PolicyDenied),
                     });
                     return Err(Diagnostic::new(
-                        ErrorCode::ECommitForbidden,
+                        ErrorCode::XCommitForbidden,
                         DiagPhase::Exec,
                         span,
                         "commit policy denied for key",
@@ -307,7 +493,7 @@ impl Executor {
                     reason: Some(ReasonCode::PolicyDenied),
                 });
                 Err(Diagnostic::new(
-                    ErrorCode::ECommitForbidden,
+                    ErrorCode::XCommitForbidden,
                     DiagPhase::Exec,
                     span,
                     "commit(...) is allowed only for OK/DEGRADED result",
@@ -324,7 +510,7 @@ impl Executor {
             Expr::String { value, .. } => Ok(Value::String(value.clone())),
             Expr::Ident { name, span } => self.env.get(name).cloned().ok_or_else(|| {
                 Diagnostic::new(
-                    ErrorCode::ECommitForbidden,
+                    ErrorCode::XCommitForbidden,
                     DiagPhase::Exec,
                     *span,
                     format!("unknown runtime identifier `{name}`"),
@@ -346,7 +532,7 @@ impl Executor {
                         _ => Ok(Value::Unknown),
                     },
                     _ => Err(Diagnostic::new(
-                        ErrorCode::ECommitForbidden,
+                        ErrorCode::XCommitForbidden,
                         DiagPhase::Exec,
                         *span,
                         "field access is not supported on this runtime value",
@@ -361,7 +547,7 @@ impl Executor {
             "budget" => {
                 if args.len() != 1 {
                     return Err(Diagnostic::new(
-                        ErrorCode::ECommitForbidden,
+                        ErrorCode::XCommitForbidden,
                         DiagPhase::Exec,
                         span,
                         "budget(...) expects 1 argument",
@@ -371,7 +557,7 @@ impl Executor {
                 match arg {
                     Value::Int(v) if v >= 0 => Ok(Value::Budget(v as u32)),
                     _ => Err(Diagnostic::new(
-                        ErrorCode::ECommitForbidden,
+                        ErrorCode::XCommitForbidden,
                         DiagPhase::Exec,
                         span,
                         "budget(...) expects non-negative int",
@@ -381,7 +567,7 @@ impl Executor {
             "ctx" => {
                 if args.len() != 1 {
                     return Err(Diagnostic::new(
-                        ErrorCode::ECommitForbidden,
+                        ErrorCode::XCommitForbidden,
                         DiagPhase::Exec,
                         span,
                         "ctx(...) expects 1 argument",
@@ -391,7 +577,7 @@ impl Executor {
                 match arg {
                     Value::String(v) => Ok(Value::Ctx(v)),
                     _ => Err(Diagnostic::new(
-                        ErrorCode::ECommitForbidden,
+                        ErrorCode::XCommitForbidden,
                         DiagPhase::Exec,
                         span,
                         "ctx(...) expects string",
@@ -403,14 +589,14 @@ impl Executor {
                     return Ok(Value::Payload(BTreeMap::new()));
                 }
                 Err(Diagnostic::new(
-                    ErrorCode::ECommitForbidden,
+                    ErrorCode::XCommitForbidden,
                     DiagPhase::Exec,
                     span,
                     "payload() in V1-D accepts 0 args only",
                 ))
             }
             _ => Err(Diagnostic::new(
-                ErrorCode::ECommitForbidden,
+                ErrorCode::XCommitForbidden,
                 DiagPhase::Exec,
                 span,
                 format!("unknown runtime call `{callee}`"),
@@ -421,7 +607,7 @@ impl Executor {
     fn tick(&mut self, span: Span) -> Result<(), Diagnostic> {
         self.meter.tick().map_err(|_| {
             Diagnostic::new(
-                ErrorCode::EBudgetExceeded,
+                ErrorCode::XBudgetExceeded,
                 DiagPhase::Exec,
                 span,
                 "step cap exceeded",
@@ -441,7 +627,8 @@ fn stmt_span(stmt: &Stmt) -> Span {
         Stmt::Let { span, .. }
         | Stmt::Observe { span, .. }
         | Stmt::Commit { span, .. }
-        | Stmt::Condition { span, .. } => *span,
+        | Stmt::Condition { span, .. }
+        | Stmt::Entangle { span, .. } => *span,
         Stmt::Match(m) => m.span,
     }
 }
@@ -465,6 +652,66 @@ fn as_budget_runtime(value: &Value) -> Option<u32> {
         Value::Budget(v) => Some(*v),
         _ => None,
     }
+}
+
+fn condition_budget_stats(expr: &Expr) -> ConditionBudgetStats {
+    fn walk(expr: &Expr) -> ConditionBudgetStats {
+        match expr {
+            Expr::Int { .. } | Expr::Bool { .. } | Expr::String { .. } | Expr::Ident { .. } => {
+                ConditionBudgetStats {
+                    steps: 1,
+                    constraints: 1,
+                }
+            }
+            Expr::Call { args, .. } => {
+                let mut stats = ConditionBudgetStats {
+                    steps: 1,
+                    constraints: 1,
+                };
+                for arg in args {
+                    let child = walk(arg);
+                    stats.steps = stats.steps.saturating_add(child.steps);
+                    stats.constraints = stats.constraints.saturating_add(child.constraints);
+                }
+                stats
+            }
+            Expr::FieldAccess { base, .. } => {
+                let child = walk(base);
+                ConditionBudgetStats {
+                    steps: child.steps.saturating_add(1),
+                    constraints: child.constraints.saturating_add(1),
+                }
+            }
+        }
+    }
+
+    walk(expr)
+}
+
+fn validate_ctx_literal(raw: &str) -> Result<(), String> {
+    if raw.is_empty() {
+        return Err("ctx(...) must not be empty".to_string());
+    }
+
+    let mut seen = HashSet::new();
+    for pair in raw.split(';') {
+        let Some((key, value)) = pair.split_once('=') else {
+            return Err("ctx(...) must use `key=value` pairs separated by `;`".to_string());
+        };
+        if key.is_empty() || value.is_empty() {
+            return Err("ctx(...) key/value must not be empty".to_string());
+        }
+        if !key
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '-'))
+        {
+            return Err("ctx(...) key contains invalid character".to_string());
+        }
+        if !seen.insert(key) {
+            return Err("ctx(...) has duplicate key".to_string());
+        }
+    }
+    Ok(())
 }
 
 fn observe_stub_result(key: &str) -> Result4<Value> {

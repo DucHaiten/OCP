@@ -82,7 +82,8 @@ fn serialize_event(ev: &TraceEvent) -> String {
             origin_id
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| "-".to_string()),
-            kind.map(|k| format!("{k:?}")).unwrap_or_else(|| "-".to_string())
+            kind.map(|k| format!("{k:?}"))
+                .unwrap_or_else(|| "-".to_string())
         ),
         TraceEvent::CommitResult { allowed, reason } => format!(
             "CommitResult|{}|{}",

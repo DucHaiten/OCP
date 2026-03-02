@@ -1,0 +1,5 @@
+let a = 1;
+let b = 2;
+entangle(a, b, true);
+entangle(a, b, true);
+
