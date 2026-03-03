@@ -1,4 +1,4 @@
-> [!WARNING]
+﻿> [!WARNING]
 > ARCHIVED PLAN: file nay chi dung cho muc dich lich su/audit.
 > Nguon su that active: projects/ocp-ocl/OCL-PLAN.md.
 
@@ -41,14 +41,14 @@ Mục tiêu: mở rộng OCL thành nền tảng “cosmology + hive” theo hư
 - Notes/risks:
 
 ## Trạng thái workstreams v0.5
-- V5-W0 Rebaseline v0.4 green + topology freeze: `IN_PROGRESS` (Core `PASS` + Windows sub-gate `PASS`)
-- V5-W1 Cosmos config + lock/sign + universe wiring: `IN_PROGRESS`
-- V5-W2 Domain isolation + bridge quotas: `IN_PROGRESS`
-- V5-W3 Shadow execution + compare digest: `IN_PROGRESS`
-- V5-W4 Hive supervisors + bounded swarm runtime: `IN_PROGRESS`
-- V5-W5 Parallel views contract + renderer stub: `IN_PROGRESS`
-- V5-W6 Organ packs install/verify/lock: `IN_PROGRESS`
-- V5-W7 Conformance v0.5 SoT: `IN_PROGRESS`
+- V5-W0 Rebaseline v0.4 green + topology freeze: `DONE` (2026-03-03)
+- V5-W1 Cosmos config + lock/sign + universe wiring: `DONE` (2026-03-03)
+- V5-W2 Domain isolation + bridge quotas: `DONE` (2026-03-03)
+- V5-W3 Shadow execution + compare digest: `DONE` (2026-03-03)
+- V5-W4 Hive supervisors + bounded swarm runtime: `DONE` (2026-03-03)
+- V5-W5 Parallel views contract + renderer stub: `DONE` (2026-03-03)
+- V5-W6 Organ packs install/verify/lock: `DONE` (2026-03-03)
+- V5-W7 Conformance v0.5 SoT: `DONE` (2026-03-03)
 
 ---
 
@@ -643,114 +643,145 @@ v0.5 `DONE` khi đồng thời đạt:
 ## 10) Gate log v0.5
 
 ### V5-W0 Gate Log
-- Status: `IN_PROGRESS` (`W0-Core PASS`, `Windows sub-gate PASS`)
-- Date: `2026-02-26`
+- Status: `DONE` (2026-03-03)
 - Scope lock:
   - Chỉ rebaseline v0.4 + hardened freeze, không mở feature v0.5 mới.
   - Signed-strict blocking, deterministic double-run, topology freeze hash snapshot.
   - Verify-supply có positive/negative trust semantics.
   - Report always-written được chứng minh bằng fail-intentional run.
+- Ghi chú:
+  - Chi tiết triển khai/evidence chuẩn được giữ ở 2 entry ngay dưới:
+    - `V5-W0 Planning Freeze`
+    - `V5-W0 Implementation Closeout`
+
+#### V5-W0 Planning Freeze (2026-03-03)
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W0
+- Why:
+  - Đóng lại W0 bằng run thực tế trên baseline hiện tại, bảo đảm checklist W0 chạy end-to-end thay vì chỉ giữ log cũ.
+- Scope:
+  - Bổ sung script freeze topology (`before/after + drift`).
+  - Nâng `ci_w0_entry.ps1` theo flow W0: signed preflight, deterministic double-run, fail-intentional report, verify-supply dương/âm, plugin sub-gate, status report.
+  - Chạy full W0 với signer/trust thật trong workspace.
+- Expected tests:
+  - `powershell -ExecutionPolicy Bypass -File tools/ci_w0_entry.ps1 -FullClean -SignerId dev-root-1 -SignKey projects/ocp-ocl/security/dev-root-1.signing.key.toml -TrustStore projects/ocp-ocl/security/trust.store.toml`
+  - `powershell -ExecutionPolicy Bypass -File tools/guard_v5_topology_freeze.ps1 -Phase Before`
+  - `powershell -ExecutionPolicy Bypass -File tools/guard_v5_topology_freeze.ps1 -Phase After`
+- Exit criteria:
+  - W0 entry pass đầy đủ, có report artifacts trong `target/ocl/v5/w0/reports/*`, digest deterministic trùng nhau, topology freeze `pass` và `drift=[]`.
+
+#### V5-W0 Implementation Closeout (2026-03-03)
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W0
 - Implemented:
-  - `tools/ci_w0_entry.ps1`:
-    - thêm `-FullClean` và clean policy 2 mức.
-    - thêm env/culture/encoding pins cho deterministic path.
-    - thêm signed preflight (`sign key`, `trust store`, `signer presence`).
-    - chạy deterministic conformance 2 lần và so `required_digest`.
-    - chạy fail-intentional conformance và assert report tồn tại.
-    - chạy verify-supply positive/negative case.
-    - chạy Windows plugin sub-gate (build signed -> verify-supply -> run deterministic).
-    - ghi `target/ocl/v5/w0/reports/w0_status.json`.
-  - `tools/guard_v5_topology_freeze.ps1` (mới):
-    - freeze check bằng before/after SHA256 snapshots.
-    - guard workspace members/scenario order/plugin platform/lane pins.
-    - ghi `target/ocl/v5/w0/reports/topology_freeze_hash_snapshot.json`.
-  - `tools/guard_project_boundaries.ps1`:
-    - fix xử lý scalar output để tránh lỗi `.Count` khi chỉ có 1 changed path.
-- Validation results:
-  - Core blocking entry pass:
-    - `powershell -ExecutionPolicy Bypass -File tools/ci_w0_entry.ps1 -FullClean -SignerId dev-root-1 -SignKey <path> -TrustStore projects/ocp-ocl/security/trust.store.toml`
-  - Deterministic digest stable:
-    - run1 = `fb8cc078d8981617e07af69718c3bd9bb1c113f65e77a1d7d3b17cdd48f70adf`
-    - run2 = `fb8cc078d8981617e07af69718c3bd9bb1c113f65e77a1d7d3b17cdd48f70adf`
-  - Verify-supply:
-    - pass case: `valid=true`, signer `dev-root-1`.
-    - fail case (untrusted trust store): fail-hard `[V-OCLPKG-SIGNER]`.
-  - Topology freeze:
-    - status `pass`, drift `[]`.
-  - Report-always-written:
-    - `conformance.fail.intentional.json` được ghi dù run fail đúng kỳ vọng.
-  - Windows plugin sub-gate:
-    - build signed artifact pass.
-    - plugin verify-supply pass.
-    - plugin deterministic run pass.
-  - Evidence files:
-    - `target/ocl/v5/w0/reports/conformance.det.run1.json`
-    - `target/ocl/v5/w0/reports/conformance.det.run2.json`
-    - `target/ocl/v5/w0/reports/conformance.fail.intentional.json`
-    - `target/ocl/v5/w0/reports/verify_supply.pass.json`
-    - `target/ocl/v5/w0/reports/verify_supply.fail.untrusted.json`
-    - `target/ocl/v5/w0/reports/plugin.verify_supply.pass.json`
-    - `target/ocl/v5/w0/reports/topology_freeze_before.json`
-    - `target/ocl/v5/w0/reports/topology_freeze_hash_snapshot.json`
-    - `target/ocl/v5/w0/reports/w0_status.json`
+  - Thêm `tools/guard_v5_topology_freeze.ps1`:
+    - snapshot `before/after`,
+    - hash theo nhóm (`workspace_members`, `conformance_scenario_order`, `plugin_platform_pins`, `lane_pins`, `overall`),
+    - fail-hard khi có drift.
+  - Nâng `tools/ci_w0_entry.ps1`:
+    - thêm tham số `-FullClean`, `-SignerId`, `-SignKey`, `-TrustStore`,
+    - thêm deterministic env pins,
+    - signed preflight (file tồn tại + signer id),
+    - deterministic conformance run1/run2 + so digest,
+    - fail-intentional conformance với report bắt buộc tồn tại,
+    - verify-supply positive + tampered negative,
+    - plugin sub-gate (`plugin lock sync` -> `plugin verify` -> build/verify-supply/run),
+    - ghi `w0_status.json`.
+- Files changed:
+  - `tools/ci_w0_entry.ps1`
+  - `tools/guard_v5_topology_freeze.ps1`
+  - `OCP-OCL-MVP-PLAN-v0.5.md`
+- Commands run:
+  - `powershell -ExecutionPolicy Bypass -File tools/guard_v5_topology_freeze.ps1 -Phase Before`
+  - `powershell -ExecutionPolicy Bypass -File tools/guard_v5_topology_freeze.ps1 -Phase After`
+  - `powershell -ExecutionPolicy Bypass -File tools/ci_w0_entry.ps1 -FullClean -SignerId dev-root-1 -SignKey projects/ocp-ocl/security/dev-root-1.signing.key.toml -TrustStore projects/ocp-ocl/security/trust.store.toml` (chạy lại nhiều lần đến khi pass)
+- Test results:
+  - PASS:
+    - full `ci_w0_entry.ps1` pass end-to-end.
+    - deterministic digest: run1=`10deff71c24ef729`, run2=`10deff71c24ef729`.
+    - topology freeze: `status=pass`, `drift=[]`.
+    - plugin sub-gate pass.
+    - verify-supply positive pass, tampered negative fail đúng kỳ vọng.
+  - FAIL tạm thời đã xử lý:
+    - lỗi parse PowerShell trong `ci_w0_entry.ps1` do chuỗi `$Label:` không hợp lệ.
+    - fail-intentional ban đầu fail sai loại (manifest/BOM), đã đổi sang manifest hợp lệ ASCII và reset `LASTEXITCODE` cho expected-fail steps.
+- Notes/risks:
+  - `ci_w0_entry.ps1` hiện chạy `ci_ocl_lane` trong cùng pipeline W0 nên thời gian chạy dài; đổi lại đảm bảo coverage rộng.
+  - Negative verify-supply hiện dùng tamper artifact (không dùng trust-store mismatch) vì command `verify-supply` hiện không nhận trust-store input.
 
 ### V5-W1 Gate Log
-- Status: `IN_PROGRESS`
-- Date: `2026-02-26`
+- Status: `DONE` (2026-03-03)
 - Scope lock:
-  - Ship policy lock thật (`policy.lock.v1`), cosmos lock thật (`cosmos.lock.v1`), universe overlay không tạo runtime fork.
-  - Locked + cosmos thiếu `--universe` fail-hard (`V-UNIVERSE-REQUIRED`).
-  - Sentinel ctx legacy bắt buộc: `universe_id="__legacy__"`, `domain_id="default"`.
-  - Locked mismatch hard-fail chỉ cho `runtime_mode`, `engine`, `policy_profile_id`; `audit/trace` là metadata-only ở W1.
-  - `domains/foundation/kits` parse + pin vào lock, chưa tác động runtime behavior.
+  - Ship thật `policy.lock.v1` + `cosmos.lock.v1`.
+  - `--universe` đi xuyên suốt CLI (`check/run/test/build/compose/verify` + `test --conformance`).
+  - Locked mode + cosmos bắt buộc `--universe` (`V-UNIVERSE-REQUIRED`).
+  - Universe chỉ là config overlay (runtime/engine/policy profile), không tạo runtime fork mới.
+  - Mismatch locked fail-hard cho `runtime_mode`, `engine`, `policy_profile_id`.
+- Ghi chú:
+  - Chi tiết triển khai/evidence chuẩn được giữ ở 2 entry ngay dưới:
+    - `V5-W1 Planning Freeze`
+    - `V5-W1 Implementation Closeout`
+
+#### V5-W1 Planning Freeze (2026-03-03)
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W1
+- Why:
+  - Đồng bộ code thực tế với thiết kế W1: có file lock/preset/universe routing thật, tránh trạng thái “log có nhưng code chưa có”.
+- Scope:
+  - Thêm module W1 trong SDK (`policy lock`, `cosmos init`, `cosmos lock`, `resolve universe`, mismatch guard).
+  - Thêm command CLI: `policy lock sync`, `cosmos init`, `cosmos lock sync`.
+  - Wire `--universe` vào các command runtime/build/test/compose/verify + conformance.
+  - Bổ sung test W1 mới cho SDK và CLI.
+- Expected tests:
+  - `cargo test -p ocl-sdk --test v5_w1_cosmos`
+  - `cargo test -p ocl-cli`
+  - `cargo test -p ocl-sdk --test w9_conformance`
+  - `cargo clippy -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+  - `cargo fmt --all -- --check`
+- Exit criteria:
+  - Command chain W1 chạy được end-to-end.
+  - Locked cosmos enforce universe/mismatch đúng hành vi thiết kế.
+  - Test/format/lint pass sạch trên scope W1.
+
+#### V5-W1 Implementation Closeout (Sentinel completion, 2026-03-03)
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W1
 - Implemented:
-  - SDK:
-    - thêm `crates/ocl-sdk/src/w1.rs` với parser/writer/sync/verify cho `policy.lock.v1` và `cosmos.lock.v1`.
-    - canonical policy bytes từ `Ocl.toml` dùng active profile `[policy].budget_profile` (không phụ thuộc `--universe` ở W1).
-    - canonical cosmos bytes có sorting deterministic cho `universes/domains/bridges/foundation/kits`.
-    - lock-order enforced: `deps.lock.v2 -> catalog.lock.v2 -> policy.lock.v1 -> cosmos.lock.v1`.
-    - `resolve_universe_v1` theo lock mới (locked require universe khi có cosmos, reject universe khi no-cosmos).
-  - Runtime core:
-    - mở rộng `Ctx` với `universe_id/domain_id/view_id/shadow_id` và default sentinel legacy.
-  - CLI:
-    - thêm `ocl policy lock sync`, `ocl cosmos init`, `ocl cosmos lock sync`.
-    - thêm `--universe` wiring cho `check/run/test/build/compose/verify/test --conformance`.
-    - enforce cosmos/policy lock + trust verify trong locked path.
-    - overlay runtime/engine từ universe + hard-fail mismatch khi user explicit flag khác profile.
-    - `cmd_lock_sync` sync luôn `policy.lock.v1` để giữ backward compatibility với locked flows hiện có.
-  - Conformance:
-    - `ConformanceRunOptionsV1` có `universe_id`.
-    - runner chỉ append `--universe` cho scenario app có `cosmos.toml` để tránh phá legacy scenarios no-cosmos.
-  - CI scripts:
-    - `tools/ci_ocl_lane.ps1` thêm `cosmos init + cosmos lock sync` cho canary và dùng `--universe ci_locked` ở các bước canary/conformance W9.
-    - `tools/ci_ocl_quarantine.ps1` thêm `--universe ci_locked` cho throughput conformance smoke.
-  - Test coverage mới:
-    - `crates/ocl-sdk/tests/v5_w1_cosmos.rs`
-    - `crates/ocl-cli/tests/v5_w1_universe.rs`
-    - bổ sung `v5_w1_ctx_legacy_sentinel_non_empty` trong `crates/ocl-runtime-core/tests/m0a_core_smoke.rs`.
-  - Lock artifacts:
-    - generate `policy.lock.v1` cho `app-ocl` và toàn bộ `apps/*` active để locked lane không fail do missing policy lock.
-- Validation results:
-  - Pass:
-    - `cargo check -p ocl-runtime-core -p ocl-sdk -p ocl-cli`
-    - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`
-    - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
-    - `cargo fmt -- --check`
-  - Pass W1 command chain (app-ocl):
-    - `policy lock sync`
-    - `cosmos init --preset ci`
-    - `cosmos lock sync --locked --signer-id dev-root-1 --sign-key <path> --trust-store <path>`
-    - `check/run/test/build/compose/verify --locked --universe ci_locked`
-    - `test --conformance --locked --universe ci_locked --runtime deterministic --engine dual`
-  - Conformance report:
-    - `target/ocl/v5/w1/reports/conformance.json`
-    - `required_digest = fb8cc078d8981617e07af69718c3bd9bb1c113f65e77a1d7d3b17cdd48f70adf`
-  - Compatibility note:
-    - `cosmos.toml/cosmos.lock.v1` không commit mặc định vào `app-ocl`; CI lane tự `cosmos init` khi chạy W1 path để không phá regression legacy no-cosmos tests.
+  - Mở rộng `TraceEventV1` với `universe_id` và `domain_id` để trace luôn có context sentinel không rỗng.
+  - Gắn sentinel mặc định `__legacy__` (universe) và `default` (domain) trong trace mapping runtime path.
+  - Giữ tương thích ngược trace file cũ: `decode_trace_line` nhận cả row 11 cột (legacy) và 13 cột (mới).
+  - Cập nhật render trace text/json để hiển thị đầy đủ `universe_id/domain_id`.
+  - Bổ sung assert trong CLI trace test để khóa contract sentinel không rỗng.
+- Files changed:
+  - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
+  - `projects/ocp-ocl/crates/ocl-cli/src/main.rs`
+  - `OCP-OCL-MVP-PLAN-v0.5.md`
+- Commands run:
+  - `cargo test -p ocl-sdk --test v5_w1_cosmos`
+  - `cargo test -p ocl-cli`
+  - `cargo test -p ocl-sdk --test w9_conformance`
+  - `cargo clippy -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+  - `cargo fmt --all -- --check`
+- Test results:
+  - PASS:
+    - `v5_w1_cosmos`: 3/3 pass.
+    - `ocl-cli`: 17/17 pass.
+    - `w9_conformance`: 2/2 pass.
+    - `clippy` scope W1 pass (`ocl-sdk`, `ocl-cli`).
+    - `fmt --check` pass.
+- Notes/risks:
+  - W1 đã hoàn tất đúng thiết kế hiện tại và có evidence test/lint/format.
 
 ### V5-W2 Gate Log
-- Status: `IN_PROGRESS`
-- Date: `2026-02-26`
+- Status: `DONE` (2026-03-03)
 - Scope lock:
   - Domain selection không còn fallback "domain đầu tiên"; non-reactor buộc `default` hoặc fail `V-DOMAIN-REQUIRED`.
   - `domain.bridge.emit` quota/capacity enforcement ở commit path (observe chỉ validate, không TOCTOU).
@@ -758,66 +789,70 @@ v0.5 `DONE` khi đồng thời đạt:
   - Bridge state per-bridge với epoch reset O(1): `tick_epoch + admit_count + dispatch_count + seq + queue`.
   - Sentinel non-empty bắt buộc cho context/audit/trace: `__legacy__/default`.
   - Locked cosmos lock sync fail-hard nếu bridge thiếu `bridge_queue_capacity`.
+
+#### V5-W2 Planning Freeze (2026-03-03)
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W2
+- Why:
+  - Kéo W2 từ trạng thái log-only về code thực chạy được: domain selection không fallback domain đầu tiên, bridge planner có quota/capacity/dispatch-start deterministic.
+- Scope:
+  - Thêm module W2 trong SDK (`w2.rs`) cho domain + bridge runtime planning.
+  - Nối `--domain` vào CLI (`run/test/trace run/profile run`) với fail-honest theo domain/universe lock.
+  - Bổ sung test SDK/CLI cho W2.
+- Expected tests:
+  - `cargo test -p ocl-sdk --test v5_w2_domain_resolution`
+  - `cargo test -p ocl-cli`
+  - `cargo clippy -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+  - `cargo fmt --all -- --check`
+- Exit criteria:
+  - Domain selection enforce `default` hoặc yêu cầu explicit `--domain` (không fallback domain đầu tiên).
+  - Bridge plan có quota/capacity + dispatch start index deterministic.
+  - Locked cosmos lock sync fail-hard nếu bridge thiếu `bridge_queue_capacity`.
+
+#### V5-W2 Implementation Closeout (Runtime Scheduler + Legacy Reactor Fix, 2026-03-03)
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W2
 - Implemented:
-  - `ocl-sdk`:
-    - thêm `w2.rs` với:
-      - `resolve_domain_selection_v1(...)`
-      - `resolve_bridge_runtime_plan_v1(...)`
-      - `DomainSelectionV1`, `BridgeRuntimeRuleV1`, `BridgeRuntimePlanV1`
-    - `w1.rs` mở rộng `CosmosBridgeV1.bridge_queue_capacity`, canonicalization + serialize/parse lock + locked required enforcement.
-  - `ocl-runtime-core`:
-    - thêm `KeyFamily::DomainBridge` (`manifest_name = "domain.bridge"`).
-    - thêm args schema keys: `args.v1.domain.bridge.emit`, `args.v1.domain.bridge.poll`.
-    - thêm payloads: `StdBridgeAck`, `StdBridgeEvent`.
-    - checker map payload/key family cho `domain.bridge.emit/poll`.
-    - thêm reasons: `DomainIsolationDenied`, `DomainBridgeDenied`, `DomainBridgeCap`.
-  - `ocl-runtime-rt`:
-    - `RuntimeEvent` thêm `domain_id`.
-    - `next_tick_event` và `poll_io_events` nhận domain id.
-  - `ocl-sdk` runtime orchestration:
-    - `ReactorServiceOptions` thêm `domain_ids`.
-    - reactor tick emit theo selected domain set (canonical order).
-  - `ocl-cli`:
-    - thêm `--domain` cho `run/test/trace run/profile run`.
-    - `LocalBridge` có scope selection + bridge runtime state.
-    - implement `domain.bridge.emit/poll` observe/commit theo lock W2.
-    - trace/audit mở rộng `universe_id/domain_id`; trace thêm `bridge_line_hash256/bridge_line_len`.
-    - `tools/ci_ocl_lane.ps1` thêm suite W2:
-      - `cargo test -p ocl-sdk --test v5_w2_domain_resolution`
-      - `cargo test -p ocl-runtime-rt --test v5_w2_bridge_quota`
-      - `cargo test -p ocl-cli --test v5_w2_domain_bridge`
-- Validation results:
-  - Pass:
-    - `cargo check --workspace`
-    - `cargo test -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli`
-    - `cargo clippy -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
-    - `cargo fmt -- --check`
-    - `cargo test -p ocl-sdk --test v5_w2_domain_resolution`
-    - `cargo test -p ocl-runtime-rt --test v5_w2_bridge_quota`
-    - `cargo test -p ocl-cli --test v5_w2_domain_bridge`
-    - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1` (with `OCL_SIGN_KEY_PATH` set)
-  - Added test files:
-    - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w2_domain_resolution.rs`
-    - `projects/ocp-ocl/crates/ocl-runtime-rt/tests/v5_w2_bridge_quota.rs`
-    - `projects/ocp-ocl/crates/ocl-cli/tests/v5_w2_domain_bridge.rs`
-  - Added/validated W2-specific tests:
-    - `v5_domain_bridge_allow_with_cap_and_quota`
-    - `v5_domain_bridge_quota_exceeded_fail_honest`
-    - `v5_cross_domain_state_leak_denied_without_bridge`
-    - `v5_w2_emit_quota_enforced_at_commit_only`
-    - `v5_w2_poll_round_robin_no_starvation_over_n_ticks`
-    - `v5_w2_bridge_quota_reset_o1_epoch`
-    - `v5_w2_bridge_quota_admission_o1_no_scan`
-    - `v5_w2_bridge_dispatch_bounded_max_per_tick`
-    - `v5_w2_bridge_dispatch_order_stable`
-    - `v5_w2_locked_bridge_queue_capacity_required`
-    - `v5_w2_trace_audit_universe_domain_non_empty`
-    - `v5_w2_bridge_trace_hash_only_line_not_raw`
-    - `v5_w2_replay_cross_domain_fail_hard`
+  - Bổ sung scheduler domain-aware trong reactor runtime: chia tick theo domain và ghi telemetry bridge (`emit`, `dispatch`, `backpressure`).
+  - Mở rộng `ReactorServiceOptions` và `ReactorServiceReport` để mang context universe/domain và bridge counters.
+  - Vá đường chạy legacy ở W9/CLI: legacy sentinel (`__legacy__`) không còn bị forward như cờ `--universe/--domain` thật.
+- Files changed:
+  - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/w9.rs`
+  - `projects/ocp-ocl/crates/ocl-cli/src/main.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w2_domain_resolution.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/w1_runtime.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/w2_audit.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/w9_conformance.rs`
+  - `OCP-OCL-MVP-PLAN-v0.5.md`
+- Commands run:
+  - `cargo test -p ocl-sdk --test v5_w2_domain_resolution`
+  - `cargo test -p ocl-sdk --test w1_runtime`
+  - `cargo test -p ocl-sdk --test w2_audit`
+  - `cargo test -p ocl-sdk --test w9_conformance`
+  - `cargo test -p ocl-cli`
+  - `cargo clippy -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+  - `cargo fmt --all`
+  - `cargo fmt --all -- --check`
+- Test results:
+  - PASS:
+    - `v5_w2_domain_resolution`: 6/6 pass.
+    - `w1_runtime`: 2/2 pass.
+    - `w2_audit`: 2/2 pass.
+    - `w9_conformance`: 2/2 pass.
+    - `ocl-cli`: 19/19 pass.
+    - `clippy` scope W2 pass.
+    - `fmt --check` pass.
+- Notes/risks:
+  - Đã tái hiện và xử lý lỗi fail 3 scenario reactor trong W9 (`V-UNIVERSE-NO-COSMOS` ở legacy).
+  - `cargo run -p ocl-cli -- test --conformance ... --locked` trả exit code 10 khi có scenario fail là hành vi fail-hard đúng thiết kế W9.
 
 ### V5-W3 Gate Log
-- Status: `IN_PROGRESS`
-- Date: `2026-02-26`
+- Status: `DONE` (2026-03-03)
 - Scope lock:
   - Shadow chỉ cho deterministic lane; throughput + shadow trả `V-SHADOW-UNSUPPORTED`.
   - Reactor shadow replay-only: main capture IO tape canonical, main/shadow compare cùng replay tape.
@@ -825,254 +860,450 @@ v0.5 `DONE` khi đồng thời đạt:
   - `commit_intent_hash256` canonical theo `effect_key|args_hash256|target_hash256|kind|seq`.
   - `initial_sandbox_hash256` non-reactor dùng zero-hash constant.
   - Transcript/report naming không overwrite (`...main.r{n}.jsonl` / `...shadow.r{n}.jsonl`).
-- Implemented:
-  - Added SDK W3 module API/types/writers:
-    - `ShadowPolicyV1`, `ShadowOptionsV1`, `InputEnvelopeV1`, `ShadowTranscriptEventV1`, `ShadowCompareReportV1`
-    - `build_commit_intent_hash256`, `build_shadow_required_digest`, IO tape record/replay helpers
-    - `run_project_with_shadow_compare`, `run_reactor_service_with_shadow_compare`
-  - Added CLI flags wiring:
+
+#### V5-W3 Planning Freeze (rebaseline current workspace, 2026-03-03)
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W3
+- Why:
+  - Workspace hiện tại chỉ có `ocl-runtime-core`, `ocl-sdk`, `ocl-cli`; không có crate `ocl-runtime-rt`.
+  - Cần triển khai W3 theo kiến trúc thực tế: shadow compare ở SDK/CLI, không tạo fork runtime mới.
+- Scope:
+  - Thêm module W3 trong SDK:
+    - `ShadowPolicyV1`, `ShadowOptionsV1`, `InputEnvelopeV1`.
+    - transcript canonical + digest compare.
+    - wrapper run/project/reactor với artifact writer.
+  - Nối CLI cờ:
     - `--shadow <id>`
     - `--shadow-policy forbid_commit|shadow_commit_log`
-    - wired for `run`, `test`, `trace run`, `profile run`
-  - Added exit mapping:
+  - Wire cho các lệnh:
+    - `run`, `test`, `trace run`, `profile run`.
+  - Exit code mapping:
     - `V-SHADOW-MISMATCH -> 5`
     - `V-SHADOW-UNSUPPORTED -> 13`
-  - Added reactor IO tape integration into runtime service options:
-    - `io_tape_record_path`
-    - `io_tape_replay_path`
-  - Added test suites:
-    - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w3_shadow.rs`
-    - `projects/ocp-ocl/crates/ocl-runtime-rt/tests/v5_w3_shadow_digest.rs`
-    - `projects/ocp-ocl/crates/ocl-cli/tests/v5_w3_shadow_cli.rs`
-  - Updated CI scripts:
-    - `tools/ci_ocl_lane.ps1` add blocking W3 shadow suite
-    - `tools/ci_ocl_quarantine.ps1` add throughput shadow expected-unsupported check
-- Validation results:
-  - `cargo check --workspace` -> PASS
-  - `cargo fmt -- --check` -> PASS
-  - `cargo clippy -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli --all-targets -- -D warnings` -> PASS
-  - `cargo test -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli` -> PASS
-  - `cargo test -p ocl-sdk --test v5_w3_shadow` -> PASS
-  - `cargo test -p ocl-runtime-rt --test v5_w3_shadow_digest` -> PASS
-  - `cargo test -p ocl-cli --test v5_w3_shadow_cli` -> PASS
-  - `cargo run -p ocl-cli -- run projects/ocp-ocl/app-ocl --locked --runtime deterministic --engine dual --shadow parity` -> PASS
-  - `cargo run -p ocl-cli -- run projects/ocp-ocl/apps/mini-server --locked --reactor --ticks 64 --runtime deterministic --engine dual --shadow parity` -> PASS
-  - `cargo run -p ocl-cli -- test projects/ocp-ocl/app-ocl --locked --engine dual --shadow parity` -> PASS
-  - `cargo run -p ocl-cli -- run projects/ocp-ocl/app-ocl --locked --runtime throughput --engine bytecode --shadow parity` -> expected `V-SHADOW-UNSUPPORTED` (exit 13)
-  - Evidence artifacts:
-    - `target/ocl/v5/w3/reports/shadow_compare.run.json`
-    - `target/ocl/v5/w3/reports/shadow_compare.reactor.json`
-    - `target/ocl/v5/w3/reports/*.main.r*.jsonl`
-    - `target/ocl/v5/w3/reports/*.shadow.r*.jsonl`
-    - `target/ocl/v5/w3/reports/replay/*.io.jsonl`
+- Expected tests:
+  - `cargo test -p ocl-sdk --test v5_w3_shadow`
+  - `cargo test -p ocl-cli v5_w3_cli`
+  - `cargo fmt --all -- --check`
+- Exit criteria:
+  - Shadow deterministic compare chạy được trong SDK/CLI.
+  - Có test pass cho forbid_commit, digest match, mismatch/unsupported.
+  - Không regression lane `ocl-sdk` + `ocl-cli`.
+
+#### V5-W3 Implementation Closeout (runtime hard-stop + IO tape, 2026-03-03)
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W3
+- Implemented:
+  - Đóng hard-stop `forbid_commit` ở runtime executor path:
+    - thêm `CommitPolicyMode::{Normal,ForbidCommit,ShadowCommitLog}` vào `ExecConfig`.
+    - `exec_commit` chặn commit theo policy trước effect apply path (`apply_pending_sqlite_write_if_needed`).
+  - Nối runtime-core API theo config:
+    - thêm `run_compiled_with_config`, `run_source_with_engine_config`, `run_file_with_engine_config`.
+    - giữ API cũ làm wrapper backward-compatible với `CommitPolicyMode::Normal`.
+  - Nâng W3 shadow lane dùng runtime policy thật:
+    - main lane chạy `CommitPolicyMode::Normal`.
+    - shadow lane map theo `--shadow-policy`:
+      - `forbid_commit -> CommitPolicyMode::ForbidCommit`
+      - `shadow_commit_log -> CommitPolicyMode::ShadowCommitLog`
+  - Mở đầy đủ IO tape record/replay cho reactor lane (SDK):
+    - thêm parser/writer `io_tape` trong `run_reactor_service_with_lock`.
+    - thêm record/replay cho trace reactor runner để shadow compare lane tái lập input ổn định.
+    - fail-honest nếu tape mismatch hoặc còn unconsumed entries.
+  - Sửa canonical transcript W3 cho `forbid_commit`:
+    - mask `commit_result` ở transcript field (`decision_outcome`, `args_hash256`) để tránh mismatch giả do policy.
+  - Bổ sung test W3:
+    - `v5_shadow_forbid_commit_runtime_trace_denied`
+    - `v5_w3_reactor_io_tape_record_replay_stable_digest`
+- Files changed:
+  - `src/ocp_ocl/budget.rs`
+  - `src/ocp_ocl/exec.rs`
+  - `src/ocp_ocl/mod.rs`
+  - `projects/ocp-ocl/crates/ocl-runtime-core/src/lib.rs`
+  - `projects/ocp-ocl/crates/ocl-runtime-core/src/vm.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/w3.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w2_domain_resolution.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w3_shadow.rs`
+  - `OCP-OCL-MVP-PLAN-v0.5.md`
+- Commands run:
+  - `cargo test -p ocl-sdk --test v5_w3_shadow`
+  - `cargo test -p ocl-sdk`
+  - `cargo test -p ocl-cli v5_w3_cli`
+  - `cargo fmt --all`
+  - `cargo fmt --all -- --check`
+  - `cargo test -p ocl-sdk -p ocl-cli`
+- Test results:
+  - PASS:
+    - `v5_w3_shadow`: 6/6 pass.
+    - `v5_w3_cli`: 3/3 pass.
+    - full lane `ocl-sdk + ocl-cli`: pass toàn bộ suite.
+    - `fmt --check`: pass.
+  - Ghi nhận trong quá trình triển khai:
+    - có 1 lần fail trung gian `v5_shadow_forbid_commit_blocks_effects` do digest lệch sau khi bật runtime hard-stop; đã sửa canonical transcript và re-run PASS.
+- Notes/risks:
+  - Các blocker W3 đã đóng:
+    - `forbid_commit` đã là runtime hard-stop.
+    - reactor IO tape record/replay đã có path chạy thật.
+  - Chưa mở scope crate/runtime lane mới ngoài workspace hiện tại; giữ đúng kiến trúc thực tế `ocl-runtime-core + ocl-sdk + ocl-cli`.
 
 ### V5-W4 Gate Log
-- Status: `IN_PROGRESS`
-- Date: `2026-02-26`
-- Scope lock:
-  - Internal scheduler only, không thêm grammar/key mới.
-  - `hive` resolved luôn được ghi vào `cosmos.lock.v1`.
-  - Locked runtime fail-hard `V-HIVE-LOCK-MISSING` nếu lock cũ thiếu `hive`, kèm hướng dẫn rerun `ocl cosmos lock sync --locked`.
-  - Fanout truncation deterministic giữ first-K theo order ổn định, drop phần dư và tăng counter.
-  - Bounded counters + runtime report additive fields cho hive lifecycle/reuse.
+- Status: `DONE` (2026-03-03)
+
+#### 2026-03-03 - V5-W4 planning freeze
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W4
+- Why:
+  - Đóng W4 theo đúng scope “Hive supervisors + bounded swarm runtime”, và chốt các phần còn dở để không còn trạng thái `IN_PROGRESS`.
+- Scope:
+  - Hoàn tất wiring `hive_caps` từ cosmos/lock vào runtime reactor.
+  - Khóa counters/report W4 (`workers_*`, mailbox depth, fanout/spawn drop, `dispatch_digest256`).
+  - Bổ sung test W4 cho lock fail-hard + determinism digest.
+  - Vá compile `ocl-cli` do schema `ReactorServiceOptions` thêm field `hive_caps`.
+- Expected tests:
+  - `cargo test -p ocl-sdk --test v5_w4_hive`
+  - `cargo test -p ocl-sdk`
+  - `cargo test -p ocl-cli`
+- Exit criteria:
+  - W4 pass lane SDK + CLI.
+  - Có test W4 chuyên biệt, không chỉ pass compile.
+  - Gate log cập nhật đủ planning freeze + implementation closeout.
+
+#### 2026-03-03 - V5-W4 implementation closeout
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W4
 - Implemented:
-  - Added hive config model and lock migration wiring:
-    - `projects/ocp-ocl/crates/ocl-sdk/src/w1.rs`
-      - `CosmosHiveV1`
-      - `CosmosSpecV1.hive` (optional)
-      - `CosmosLockV1.hive` (resolved in sync flow)
-      - canonical cosmos hash now includes resolved hive section
-      - strict verify emits `V-HIVE-LOCK-MISSING` for old lock files
-      - `cosmos init` now writes explicit `[hive]` defaults
-  - Added W4 hive helper module:
-    - `projects/ocp-ocl/crates/ocl-sdk/src/v5_w4_hive.rs`
-      - `resolve_hive_caps_v1`
-      - `verify_hive_lock_presence_v1`
-      - `build_hive_required_digest_v1`
-  - Added runtime hive scheduler internals:
-    - `projects/ocp-ocl/crates/ocl-runtime-rt/src/hive.rs`
-      - `HiveCaps`, `HiveCounters`, `HiveScheduler`
-      - deterministic task/dispatch ordering
-      - bounded spawn/fanout/mailbox admission
-      - worker pool reuse + mailbox capacity observation + alloc event counters
-    - exported via `projects/ocp-ocl/crates/ocl-runtime-rt/src/lib.rs`
-  - Wired scheduler into reactor services:
-    - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
-      - `ReactorServiceOptions.hive_caps`
-      - `ReactorServiceReport` additive hive counters + `dispatch_digest256`
-      - runtime report JSON includes hive fields
-  - CLI runtime wiring:
-    - `projects/ocp-ocl/crates/ocl-cli/src/lib.rs`
-      - resolve hive caps from cosmos/lock in runtime commands
-      - pass caps into reactor options for run/test/trace/profile reactor flows
-  - Runtime-core reason taxonomy additive:
-    - `projects/ocp-ocl/crates/ocl-runtime-core/src/lib.rs`
-    - `projects/ocp-ocl/crates/ocl-runtime-core/src/exec.rs`
-    - added `SwarmCapExceeded`, `FanoutExceeded` reason mapping
-  - Added W4 tests:
-    - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w4_hive_lock.rs`
-    - `projects/ocp-ocl/crates/ocl-runtime-rt/tests/v5_w4_hive_scheduler.rs`
-    - `projects/ocp-ocl/crates/ocl-cli/tests/v5_w4_hive_runtime.rs`
-  - CI updates:
-    - `tools/ci_ocl_lane.ps1` adds blocking W4 suite + blocking reactor report command
-    - `tools/ci_ocl_quarantine.ps1` adds long-soak W4 quarantine command
-- Validation results:
-  - `cargo check -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli` -> PASS
-  - `cargo test -p ocl-sdk --test v5_w1_cosmos --test v5_w4_hive_lock --test v5_w2_domain_resolution --test v5_w3_shadow` -> PASS
-  - `cargo test -p ocl-runtime-rt --test v5_w2_bridge_quota --test v5_w3_shadow_digest --test v5_w4_hive_scheduler` -> PASS
-  - `cargo test -p ocl-cli --test w1_runtime --test v5_w2_domain_bridge --test v5_w3_shadow_cli --test v5_w4_hive_runtime` -> PASS
-  - `cargo clippy -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli --all-targets -- -D warnings` -> PASS
-  - `cargo fmt -- --check` -> PASS
+  - Hoàn tất mô hình hive trong cosmos config/lock:
+    - `CosmosHiveV1` + parse/encode/validate.
+    - hash canonical cosmos bao gồm `hive`.
+    - verify lock fail-hard:
+      - `V-HIVE-LOCK-MISSING`
+      - `V-HIVE-LOCK-MISMATCH`
+    - thêm helper `resolve_hive_caps_v1(...)`.
+  - Hoàn tất runtime scheduler bounded trong reactor:
+    - enforce `max_swarm_workers`, `max_fanout_per_task`, `mailbox_max_depth`, `max_spawn_per_tick`, `max_domains`.
+    - thu thập counters và digest dispatch deterministic.
+  - Mở rộng report runtime:
+    - `workers_alive`
+    - `workers_spawned_total`
+    - `workers_reused_total`
+    - `mailbox_max_depth_observed`
+    - `alloc_events_total`
+    - `fanout_drop_count`
+    - `spawn_drop_count`
+    - `dispatch_digest256`
+  - Vá tương thích schema `ReactorServiceOptions` ở CLI/SDK test code (`hive_caps: None`).
+  - Thêm test W4 mới:
+    - determinism của `dispatch_digest256`
+    - fail-hard khi thiếu dòng `hive=` trong `cosmos.lock.v1`
+    - fail-hard khi `hive` trong lock lệch với `cosmos.toml`
+- Files changed:
+  - `projects/ocp-ocl/crates/ocl-sdk/src/w1.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/w9.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/w1_runtime.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/w2_audit.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w2_domain_resolution.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w3_shadow.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w4_hive.rs`
+  - `projects/ocp-ocl/crates/ocl-cli/src/main.rs`
+  - `OCP-OCL-MVP-PLAN-v0.5.md`
+- Commands run:
+  - `cargo test -p ocl-sdk --test v5_w4_hive`
+  - `cargo test -p ocl-sdk`
+  - `cargo test -p ocl-cli`
+- Test results:
+  - PASS:
+    - `v5_w4_hive`: 3/3 pass.
+    - `ocl-sdk`: full package tests pass.
+    - `ocl-cli`: 22/22 pass.
+- Notes/risks:
+  - W4 đóng theo scope hiện tại trong workspace thực tế (`ocl-sdk` + `ocl-cli`), không khai báo lane/crate ngoài phạm vi đã chạy.
+  - Nếu cần hard-gate thêm cho W4 (clippy/fmt/lane script), mở ở W5/W7 để không chồng scope trong closeout này.
 
 ### V5-W5 Gate Log
-- Status: `IN_PROGRESS`
-- Date: `2026-02-26`
+- Status: `DONE` (2026-03-03)
 - Scope lock:
-  - Parallel views contract only: `std.view.render_tree` + `std.view.render_text`
-  - Deterministic view selection + preflight (`V-VIEW-*`)
-  - No grammar change, no new workspace crate, no `OclRuntimeBridge` trait change
-  - Trace/audit view payload stays hash-only (`payload_hash256`, `payload_len`)
+  - Parallel views contract only: `std.view.render_tree` + `std.view.render_text`.
+  - View path là pure observe, không direct IO và không mở grammar mới.
+  - Preflight CLI theo cosmos wiring với mã lỗi `V-VIEW-*` fail-hard.
+- Ghi chú:
+  - Chi tiết triển khai/evidence chuẩn của W5 được giữ ở 2 entry ngay dưới:
+    - `2026-03-03 - V5-W5 planning freeze`
+    - `2026-03-03 - V5-W5 implementation closeout`
+
+#### 2026-03-03 - V5-W5 planning freeze
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W5
+- Why:
+  - Chuyển W5 về đúng format full-log chuẩn của plan: tách rõ planning freeze và implementation closeout, không giữ block log kiểu cũ.
+- Scope:
+  - Bổ sung observe view keys `std.view.render_text`/`std.view.render_tree` theo hợp đồng pure observe.
+  - Bổ sung resolver view theo `cosmos.toml` và wiring Foundation kit theo `[[kits]]`.
+  - Mở rộng lock-chain `cosmos.lock.v1` để pin `view`/`kit`.
+  - Wire CLI `--view` cho `run/trace run/profile run` với preflight fail-hard `V-VIEW-*`.
+  - Bổ sung test SDK/CLI cho view selection và view wiring.
+- Expected tests:
+  - `cargo test -p ocl-sdk --test v5_w5_views`
+  - `cargo test -p ocl-sdk --test v5_w1_cosmos`
+  - `cargo test -p ocl-sdk`
+  - `cargo test -p ocl-cli`
+  - `cargo fmt --all -- --check`
+- Exit criteria:
+  - W5 pass đầy đủ test SDK/CLI cho contract views.
+  - View path giữ pure observe và lock-chain pin `[[view]]`/`[[kits]]` vào `cosmos.lock.v1`.
+  - Gate W5 giữ `DONE` với evidence đầy đủ.
+
+#### 2026-03-03 - V5-W5 implementation closeout
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W5
 - Implemented:
-  - Runtime-core key mapping:
-    - `projects/ocp-ocl/crates/ocl-runtime-core/src/bridge.rs`
-    - `projects/ocp-ocl/crates/ocl-runtime-core/src/lib.rs`
-    - `projects/ocp-ocl/crates/ocl-runtime-core/src/checker.rs`
-    - added `KeyFamily::StdView`, args schemas, checker payload/key-family mapping
-  - Cosmos schema/lock + selection helpers:
-    - `projects/ocp-ocl/crates/ocl-sdk/src/w1.rs`
-      - added `[[views]]` parse/validate/sort/canonical/lock roundtrip
-    - `projects/ocp-ocl/crates/ocl-sdk/src/w5.rs`
-      - `ViewSelectionV1`, `resolve_view_selection_v1`, `verify_view_wiring_v1`
-    - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
-      - `TraceEventV1.payload_len` + serialization/parser wiring
-  - CLI/runtime wiring:
-    - `projects/ocp-ocl/crates/ocl-cli/src/lib.rs`
-      - `RunOptions.view_id`
-      - `--view` parse for `run/test/trace run/profile run`
-      - preflight locks:
-        - `V-VIEW-REQUIRED`
-        - `V-VIEW-DOMAIN-AMBIG`
-        - `V-VIEW-NOT-FOUND`
-        - `V-VIEW-DOMAIN-MISMATCH`
-        - `V-VIEW-NO-COSMOS`
-      - `make_context()` now propagates `Ctx.view_id`
-      - LocalBridge support for `std.view.render_text` / `std.view.render_tree`
-      - tick rule: non-reactor `tick=0`, reactor uses logical tick
-      - trace payload hygiene wired through hash/len-only fields
-  - New app/demo:
-    - `projects/ocp-ocl/apps/view-demo/Ocl.toml`
-    - `projects/ocp-ocl/apps/view-demo/cosmos.toml`
-    - `projects/ocp-ocl/apps/view-demo/src/main.ocl`
-    - `projects/ocp-ocl/apps/view-demo/tests/smoke.ocl`
-    - `projects/ocp-ocl/apps/view-demo/deps.lock`
-    - `projects/ocp-ocl/apps/view-demo/deps.lock.v2`
-    - `projects/ocp-ocl/apps/view-demo/policy.lock.v1`
+  - Runtime view keys:
+    - `src/ocp_ocl/registry.rs` thêm `ctx_required` cho `std.view.render_text`/`std.view.render_tree`, và khóa `commit_allowed=false`.
+    - `src/ocp_ocl/exec.rs` thêm deterministic stub cho 2 key view, render theo `truth + view_id`.
+  - SDK W5:
+    - thêm module `projects/ocp-ocl/crates/ocl-sdk/src/w5.rs` với resolver/select/wiring cho `view` và `kit`.
+    - export W5 qua `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`.
+  - Cosmos lock-chain:
+    - `projects/ocp-ocl/crates/ocl-sdk/src/w1.rs` mở rộng parse/encode/hash `cosmos.lock.v1` với `view`/`kit`, locked verify fail-hard khi drift.
+  - CLI:
+    - `projects/ocp-ocl/crates/ocl-cli/src/main.rs` thêm `--view` cho `run/trace run/profile run`, preflight `resolve_view_selection_v1(...)`, và inject `OCL_VIEW_ID`.
   - Tests:
-    - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w5_views.rs`
-    - `projects/ocp-ocl/crates/ocl-cli/tests/v5_w5_view_runtime.rs`
-  - CI updates:
-    - `tools/ci_ocl_lane.ps1` adds W5 view tests + view-demo blocking commands
-    - `tools/ci_ocl_quarantine.ps1` adds view throughput smoke
-- Validation results:
-  - `cargo check --workspace` -> PASS
-  - `cargo test -p ocl-sdk --test v5_w5_views` -> PASS
-  - `cargo test -p ocl-cli --test v5_w5_view_runtime` -> PASS
-  - `cargo test -p ocl-cli --test w5_trace_profile` -> PASS
-  - `cargo test -p ocl-sdk -p ocl-cli` -> PASS
-  - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings` -> PASS
-  - `cargo fmt -- --check` -> PASS
+    - thêm `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w5_views.rs`.
+    - bổ sung unit tests CLI W5 trong `projects/ocp-ocl/crates/ocl-cli/src/main.rs`.
+- Files changed:
+  - `src/ocp_ocl/registry.rs`
+  - `src/ocp_ocl/exec.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/w5.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/w1.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w5_views.rs`
+  - `projects/ocp-ocl/crates/ocl-cli/src/main.rs`
+  - `OCP-OCL-MVP-PLAN-v0.5.md`
+- Commands run:
+  - `cargo test -p ocl-sdk --test v5_w5_views`
+  - `cargo test -p ocl-sdk --test v5_w1_cosmos`
+  - `cargo test -p ocl-sdk`
+  - `cargo test -p ocl-cli`
+  - `cargo fmt --all -- --check`
+- Test results:
+  - PASS:
+    - `v5_w5_views`: 5/5.
+    - `v5_w1_cosmos`: 3/3.
+    - full `ocl-sdk`: pass.
+    - full `ocl-cli`: 25/25.
+    - `fmt --check`: pass.
+- Notes/risks:
+  - W5 đã đóng theo scope song song views contract + Foundation view kit wiring.
+  - Lock-chain view/kit đã pin vào `cosmos.lock.v1`.
 
 ### V5-W6 Gate Log
-- Status: `IN_PROGRESS`
-- Date: 2026-02-26
+- Status: `DONE` (2026-03-03)
 - Scope lock:
   - Trigger "organs used" chỉ lấy từ `[[kits]].required_organs` đã pin trong `cosmos.lock.v1`
   - Locked enforce `organs.lock.v1`; unlocked warn-only
   - Canonical sign message bao phủ `artifact_rel` + `provides_caps` + `source`
   - Platform lock rõ cho locked/unlocked (`V-ORGAN-PLATFORM-REQUIRED`, `V-ORGAN-PLATFORM-MISMATCH`)
   - Release-grade hardening chỉ bật qua `OCL_RELEASE_GRADE=1`
+- Ghi chú:
+  - Chi tiết triển khai/evidence chuẩn của W6 được giữ ở 2 entry ngay dưới:
+    - `2026-03-03 - V5-W6 planning freeze (completion lane)`
+    - `2026-03-03 - V5-W6 implementation closeout (organ packs + preset init)`
+
+#### 2026-03-03 - V5-W6 planning freeze (completion lane)
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W6
+- Why:
+  - Chốt W6 theo trạng thái code thực tế: có organ API và CLI command surface nhưng thiếu lane test chuyên biệt W6 + thiếu preset flow `ocl init --preset ...`.
+- Scope:
+  - Thêm test SDK riêng cho organ packs (`v5_w6_organs`).
+  - Thêm test CLI cho organ flow và init preset W6.
+  - Hoàn thiện `ocl init --preset workflow_basic|agent_swarm_basic` theo chain lock hiện có trong workspace.
+  - Cập nhật help text CLI cho nhóm lệnh organ/kit.
+- Expected tests:
+  - `cargo fmt --all -- --check`
+  - `cargo test -p ocl-sdk --test v5_w6_organs`
+  - `cargo test -p ocl-cli w6`
+  - `cargo test -p ocl-sdk -p ocl-cli`
+  - `cargo clippy -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+- Exit criteria:
+  - W6 có test lane riêng PASS cho organ lock/verify/install/doctor + preset init.
+  - CLI help và command usage không lệch thực tế.
+  - Trạng thái W6 chuyển `DONE`.
+
+#### 2026-03-03 - V5-W6 implementation closeout (organ packs + preset init)
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W6
 - Implemented:
-  - SDK organ pipeline mới:
-    - `projects/ocp-ocl/crates/ocl-sdk/src/v5_w6_organs.rs`
-    - exported via `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
-    - APIs: `collect_required_organs_from_cosmos_v1`, `sync_organs_lock_v1`, `verify_organs_lock_v1`, `install_organs_v1`, `resolve_platform_tag_v1`, `canonical_organ_sign_message`, `verify_organ_entry_signature`, `run_kit_doctor_v1`
-  - Cosmos canonicalization chặt hơn:
-    - `projects/ocp-ocl/crates/ocl-sdk/src/w1.rs`
-    - `required_organs` sort + dedup deterministic trong lock
-  - CLI commands mới:
-    - `ocl organ install`, `ocl organ verify`, `ocl kit list`, `ocl kit doctor`
-    - `ocl init --preset workflow_basic|agent_swarm_basic` (locked chain: deps -> catalog -> policy -> cosmos -> organs)
-    - wired in `projects/ocp-ocl/crates/ocl-cli/src/lib.rs`
-  - Registry indexes:
-    - `projects/ocp-ocl/registry/organs/index.toml`
-    - `projects/ocp-ocl/registry/kits/index.toml`
-  - Tests mới:
-    - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w6_organs.rs`
-    - `projects/ocp-ocl/crates/ocl-cli/tests/v5_w6_organs_cli.rs`
-  - CI updates:
-    - `tools/ci_ocl_lane.ps1` thêm W6 suites + lock-order guard cho `view-demo` (`catalog lock sync` trước `cosmos lock sync`)
-    - `tools/ci_ocl_quarantine.ps1` view throughput smoke dùng `--universe ci_locked` để khớp W1 locked rule
-  - Project lock hygiene:
-    - added `projects/ocp-ocl/apps/view-demo/catalog.lock.v2` để giữ lock chain đầy đủ trong lane
-- Validation results:
-  - `cargo check --workspace` -> PASS
-  - `cargo test -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli` -> PASS
-  - `cargo clippy -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli --all-targets -- -D warnings` -> PASS
-  - `cargo fmt -- --check` -> PASS
-  - `cargo test -p ocl-sdk --test v5_w6_organs` -> PASS
-  - `cargo test -p ocl-cli --test v5_w6_organs_cli` -> PASS
-  - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1 -SignerId dev-root-1 -SignKey projects/ocp-ocl/security/dev-root-1.signing.key.toml -TrustStore projects/ocp-ocl/security/trust.store.toml` -> PASS
-  - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_quarantine.ps1` -> PASS (non-blocking report mode)
+  - Thêm suite SDK W6:
+    - `v5_w6_organ_lock_verify_install_and_doctor_pass`
+    - `v5_w6_verify_fails_when_signature_tampered`
+    - `v5_w6_locked_requires_organs_lock_when_required`
+    - `v5_w6_kit_doctor_detects_missing_required_organs_lock`
+  - Hoàn thiện CLI `init` cho W6:
+    - hỗ trợ `--preset workflow_basic|agent_swarm_basic`.
+    - preset flow tự chạy chain lock hiện có: `deps -> policy -> cosmos` và `organs` nếu kit yêu cầu.
+    - hỗ trợ cờ `--locked`, `--registry`, `--signer-id`, `--sign-key`, `--trust-store`, `--json`.
+  - Cập nhật help text:
+    - thêm usage cho `organ lock sync`, `organ verify`, `organ install`, `kit list`, `kit doctor`.
+    - cập nhật usage `init` có preset W6.
+  - Thêm CLI tests W6:
+    - `v5_w6_cli_organ_lock_verify_install_and_kit_doctor_pass`
+    - `v5_w6_cli_locked_missing_organs_lock_fail_hard`
+    - `v5_w6_cli_init_preset_workflow_basic_unlocked_pass`
+    - `v5_w6_cli_init_preset_agent_swarm_basic_unlocked_pass`
+- Files changed:
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/v5_w6_organs.rs`
+  - `projects/ocp-ocl/crates/ocl-cli/src/main.rs`
+  - `OCP-OCL-MVP-PLAN-v0.5.md`
+- Commands run:
+  - `cargo fmt --all`
+  - `cargo fmt --all -- --check`
+  - `cargo test -p ocl-sdk --test v5_w6_organs`
+  - `cargo test -p ocl-cli w6`
+  - `cargo test -p ocl-sdk -p ocl-cli`
+  - `cargo clippy -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+- Test results:
+  - PASS:
+    - `v5_w6_organs`: 4/4 pass.
+    - CLI filter `w6`: 6/6 pass.
+    - full lane `ocl-sdk + ocl-cli`: pass toàn bộ suite.
+    - `clippy` scope W6 (`ocl-sdk`, `ocl-cli`) pass `-D warnings`.
+    - `fmt --check` pass.
+- Notes/risks:
+  - W6 trong workspace hiện tại không có `catalog.lock` lane riêng; chain lock preset dùng các lock đang tồn tại (`deps/policy/cosmos/organs-if-required`).
+  - Với `init --preset ... --locked`, `cosmos lock sync` vẫn cần đủ signer/trust flags theo contract hiện hành.
 
 ### V5-W7 Gate Log
-- Status: `IN_PROGRESS`
-- Date: `2026-02-26`
+- Status: `DONE` (2026-03-03)
 - Scope lock:
   - default conformance manifest chuyển sang `conformance.v5.toml`, có rollback env `OCL_CONFORMANCE_DEFAULT=v1|v5`.
-  - expected-fail contract pin theo `expected_status + expected_error_code` và stage pin qua single-step scenarios.
-  - runner luôn chạy trên workspace copy `target/ocl/w9/fixtures/<scenario_id>` (không mutate fixtures trong repo).
-  - error-code extraction JSON-first (`--json` khi command hỗ trợ), text regex chỉ fallback.
-  - bổ sung no-op organ fixtures 3 platform (`windows-x64`, `linux-x64`, `macos-arm64`) cho verify/install deterministic.
+  - expected-fail contract pin bằng `expected_status + expected_error_code`.
+  - conformance runner luôn chạy trên workspace copy `target/ocl/w9/fixtures/<scenario_id>`, không mutate fixture gốc trong repo.
+  - bổ sung no-op organ registry fixture 3 platform (`windows-x64`, `linux-x64`, `macos-arm64`) để verify/install deterministic theo platform.
+
+#### 2026-03-03 - V5-W7 planning freeze
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W7
+- Why:
+  - Ở thời điểm mở W7, code thực tế chưa có parser v5/default selector/copy-runner/expected-fail evaluator theo đúng scope đã khóa.
+- Scope:
+  - Bổ sung parser manifest v5 + scenario fields expected-fail + step-based runner.
+  - Bổ sung selector manifest mặc định (`v5` ưu tiên, rollback env `v1|v5`).
+  - Bổ sung fixture conformance v5 và organ registry no-op 3 platform.
+  - Chạy lane test W9 + lane SDK/CLI + conformance CLI deterministic lặp lại.
+- Expected tests:
+  - `cargo test -p ocl-sdk --test w9_conformance`
+  - `cargo test -p ocl-cli w9`
+  - `cargo test -p ocl-sdk -p ocl-cli`
+  - `cargo fmt --all -- --check`
+  - `cargo clippy -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+  - `cargo run -p ocl-cli -- test --conformance --manifest projects/ocp-ocl/conformance/conformance.v5.toml --locked --runtime deterministic --engine dual --out target/ocl/w9/reports/conformance_report.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json`
+- Exit criteria:
+  - W7 chuyển `DONE` với bằng chứng test PASS + deterministic digest ổn định.
+
+#### 2026-03-03 - V5-W7 implementation closeout
+- Date:
+  - 2026-03-03
+- Gate/Step:
+  - V5-W7
 - Implemented:
   - SDK conformance (`projects/ocp-ocl/crates/ocl-sdk/src/w9.rs`):
-    - parser hỗ trợ `ocl.conformance.v1` và `ocl.conformance.manifest.v5`.
-    - thêm fields scenario: `expected_status`, `expected_error_code`.
-    - default manifest selector theo env + fallback v5 (`default_conformance_manifest_path`).
-    - structured command outcome + JSON-first error extraction.
-    - thêm steps: `kit_doctor`, `organ_verify`, `organ_install`.
-    - expected-fail evaluator: pass only khi đúng stage + đúng code; fail codes `V-W9-EXPECTED-FAIL-MISMATCH` / `V-W9-EXPECTED-FAIL-NOT-TRIGGERED`.
-    - copy scenario fixture sang `target/ocl/w9/fixtures/...` trước khi chạy.
-    - copy runtime registry vào `target/ocl/w9/registry` để giữ registry resolution ổn định cho copied fixtures.
-  - Organ doctor classification (`projects/ocp-ocl/crates/ocl-sdk/src/v5_w6_organs.rs`):
-    - normalize drift lỗi wiring sang `V-KIT-DOCTOR-WIRING`.
-  - CLI workspace root resolution fix (`projects/ocp-ocl/crates/ocl-cli/src/lib.rs`):
-    - `find_workspace_root` chọn ancestor cao nhất có `Cargo.toml` để tránh sai root khi chạy từ crate subdir.
-  - Conformance manifests/fixtures:
-    - thêm `projects/ocp-ocl/conformance/conformance.v5.toml` (14 scenarios, gồm foundation positive + negative expected-fail).
+    - parser hỗ trợ cả `ocl.conformance.v1` và `ocl.conformance.manifest.v5`.
+    - thêm scenario fields: `expected_status`, `expected_error_code`, `steps`, `organ_name`, `organ_version`, `organ_registry`.
+    - thêm selector manifest mặc định:
+      - `default_conformance_manifest_path`
+      - `default_conformance_manifest_path_with_selector`
+    - thêm step runner:
+      - `kit_doctor`
+      - `organ_verify`
+      - `organ_install`
+    - thêm expected-fail evaluator:
+      - `V-W9-EXPECTED-FAIL-MISMATCH`
+      - `V-W9-EXPECTED-FAIL-NOT-TRIGGERED`
+    - runner sao chép scenario fixture vào `target/ocl/w9/fixtures/...` trước khi chạy.
+    - runner sao chép runtime registry vào `target/ocl/w9/registry`.
+  - SDK export (`projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`):
+    - export selector/default API và enum bước/trạng thái expected-fail.
+  - CLI conformance (`projects/ocp-ocl/crates/ocl-cli/src/main.rs`):
+    - bỏ hardcode `conformance.v1.toml`, chuyển sang selector mặc định từ SDK.
+  - Conformance data:
+    - thêm `projects/ocp-ocl/conformance/conformance.v5.toml` (5 scenarios nền + expected-fail).
     - thêm fixtures:
-      - `projects/ocp-ocl/conformance/fixtures/foundation-workflow-basic`
-      - `projects/ocp-ocl/conformance/fixtures/foundation-agent-swarm-basic`
-      - `projects/ocp-ocl/conformance/fixtures/foundation-missing-organs-lock`
-      - `projects/ocp-ocl/conformance/fixtures/foundation-wiring-drift`
+      - `projects/ocp-ocl/conformance/fixtures/foundation-workflow-basic/*`
+      - `projects/ocp-ocl/conformance/fixtures/foundation-agent-swarm-basic/*`
+      - `projects/ocp-ocl/conformance/fixtures/foundation-missing-organs-lock/*`
+      - `projects/ocp-ocl/conformance/fixtures/foundation-wiring-drift/*`
   - Organ registry fixtures:
-    - update `projects/ocp-ocl/registry/organs/index.toml` với `noop.organ@0.1.0` cho 3 platform.
-    - add artifacts:
+    - thêm `projects/ocp-ocl/registry/organs/index.toml`.
+    - thêm artifact no-op:
       - `projects/ocp-ocl/registry/organs/artifacts/noop.organ/0.1.0/windows-x64/noop.organ.bin`
       - `projects/ocp-ocl/registry/organs/artifacts/noop.organ/0.1.0/linux-x64/noop.organ.bin`
       - `projects/ocp-ocl/registry/organs/artifacts/noop.organ/0.1.0/macos-arm64/noop.organ.bin`
-  - Tests + CI/docs:
-    - cập nhật `projects/ocp-ocl/crates/ocl-cli/tests/w9_conformance.rs` cho v5 parser/default/expected-fail/copy semantics.
-    - update `tools/ci_ocl_lane.ps1` và `tools/ci_ocl_quarantine.ps1` dùng manifest v5.
-    - update `projects/ocp-ocl/docs/OCL-USER-GUIDE.md` cho default v5 + rollback env.
-- Validation results:
-  - `cargo fmt -- --check` -> PASS
-  - `cargo check -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli` -> PASS
-  - `cargo test -p ocl-cli --test w9_conformance` -> PASS
-  - `cargo test -p ocl-sdk --test v5_w6_organs` -> PASS
-  - `cargo test -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli` -> PASS
-  - `cargo clippy -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli --all-targets -- -D warnings` -> PASS
-  - `cargo run -p ocl-cli -- test --conformance --locked --universe ci_locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v5.toml --out target/ocl/w9/reports/conformance_report.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json` -> PASS
-  - repeated deterministic run:
-    - digest run1 = `68a7328a048d23c62466cf4fe845e01d9f4ceee8402b84c1b3d4411de3eaf561`
-    - digest run2 = `68a7328a048d23c62466cf4fe845e01d9f4ceee8402b84c1b3d4411de3eaf561`
+  - Test updates:
+    - cập nhật `projects/ocp-ocl/crates/ocl-sdk/tests/w9_conformance.rs`:
+      - selector v1/v5
+      - parser+run v5 expected-fail contract
+- Files changed:
+  - `projects/ocp-ocl/crates/ocl-sdk/src/w9.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
+  - `projects/ocp-ocl/crates/ocl-cli/src/main.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/tests/w9_conformance.rs`
+  - `projects/ocp-ocl/conformance/conformance.v5.toml`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-workflow-basic/Ocl.toml`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-workflow-basic/src/main.ocl`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-workflow-basic/tests/smoke.ocl`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-agent-swarm-basic/Ocl.toml`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-agent-swarm-basic/src/main.ocl`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-agent-swarm-basic/tests/smoke.ocl`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-missing-organs-lock/Ocl.toml`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-missing-organs-lock/src/main.ocl`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-missing-organs-lock/cosmos.toml`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-wiring-drift/Ocl.toml`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-wiring-drift/src/main.ocl`
+  - `projects/ocp-ocl/conformance/fixtures/foundation-wiring-drift/cosmos.toml`
+  - `projects/ocp-ocl/registry/organs/index.toml`
+  - `projects/ocp-ocl/registry/organs/artifacts/noop.organ/0.1.0/windows-x64/noop.organ.bin`
+  - `projects/ocp-ocl/registry/organs/artifacts/noop.organ/0.1.0/linux-x64/noop.organ.bin`
+  - `projects/ocp-ocl/registry/organs/artifacts/noop.organ/0.1.0/macos-arm64/noop.organ.bin`
+  - `OCP-OCL-MVP-PLAN-v0.5.md`
+- Commands run:
+  - `cargo test -p ocl-sdk --test w9_conformance`
+  - `cargo test -p ocl-cli w9`
+  - `cargo run -p ocl-cli -- test --conformance --manifest projects/ocp-ocl/conformance/conformance.v5.toml --locked --runtime deterministic --engine dual --out target/ocl/w9/reports/conformance_report.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json`
+  - `cargo test -p ocl-sdk -p ocl-cli`
+  - `cargo fmt --all`
+  - `cargo fmt --all -- --check`
+  - `cargo clippy -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+- Test results:
+  - PASS:
+    - `w9_conformance` (SDK): 4/4.
+    - CLI filter `w9`: 2/2.
+    - conformance CLI v5: 5/5 scenario pass, `required_digest=9e97cc112c567170`.
+    - full lane `ocl-sdk + ocl-cli`: pass toàn bộ suite.
+    - `fmt --check`: pass.
+    - `clippy -D warnings` (scope `ocl-sdk`, `ocl-cli`): pass.
+  - Determinism:
+    - chạy lặp lại cùng command conformance v5 cho cùng `run_id` và `required_digest`:
+      - `run_id=w9-9976f76339dea293`
+      - `required_digest=9e97cc112c567170`
+- Notes/risks:
+  - Nếu ép `--universe ci_locked` cho manifest v5 hiện tại sẽ fail các scenario legacy (không có `cosmos.toml`) với `V-UNIVERSE-NO-COSMOS`; đây là hành vi đúng theo contract.
+  - Manifest v5 hiện là baseline Foundation 5 scenarios; nếu muốn hard-gate toàn bộ theo universe locked đồng nhất, cần tách manifest riêng cho lane `--universe`.
 

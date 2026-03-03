@@ -1,0 +1,26 @@
+version = 1
+
+[[universe]]
+id = "ci_locked"
+runtime_mode = "deterministic"
+engine = "dual"
+policy_profile_id = "default"
+audit = "hash_only"
+trace = "hash_only"
+
+[[domain]]
+id = "default"
+universe_id = "ci_locked"
+
+[[view]]
+id = "text_default"
+universe_id = "ci_locked"
+domain_id = "default"
+renderer = "text"
+
+[[kits]]
+kit_id = "std.kit.view_text_basic"
+universe_id = "ci_locked"
+bind_domain = "default"
+bind_view = "text_default"
+required_organs = ["noop.organ@0.1.0"]

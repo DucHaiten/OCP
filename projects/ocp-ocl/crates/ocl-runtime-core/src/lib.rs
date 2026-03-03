@@ -11,8 +11,8 @@ mod vm;
 
 pub use bytecode::{assemble as assemble_bytecode, BytecodeOp, BytecodeProgram};
 pub use engine::{
-    parse_program, typecheck_program, DiagPhase, Diagnostic, ErrorCode, ExecConfig, ExecOutput,
-    Expr, Program, ReasonCode, ResultKind, Span, Stmt, TraceEvent, Type,
+    parse_program, typecheck_program, CommitPolicyMode, DiagPhase, Diagnostic, ErrorCode,
+    ExecConfig, ExecOutput, Expr, Program, ReasonCode, ResultKind, Span, Stmt, TraceEvent, Type,
 };
 pub use ir::{lower_program as lower_to_ir, IrOp, IrOpKind, TypedIrProgram};
 pub use source_map::{build_source_map, SourceMap, SourceMapEntry};
@@ -99,7 +99,13 @@ pub fn check_source(source: &str, file_id: u32) -> Result<(), Diagnostic> {
 pub fn run_source(source: &str, file_id: u32, step_cap: u32) -> Result<ExecOutput, Diagnostic> {
     let program = parse_program(source, file_id)?;
     typecheck_program(&program)?;
-    engine::execute_program(&program, ExecConfig { step_cap })
+    engine::execute_program(
+        &program,
+        ExecConfig {
+            step_cap,
+            commit_policy: CommitPolicyMode::Normal,
+        },
+    )
 }
 
 pub fn compile_source(source: &str, file_id: u32) -> Result<CompiledProgram, Diagnostic> {
@@ -117,11 +123,24 @@ pub fn compile_source(source: &str, file_id: u32) -> Result<CompiledProgram, Dia
 }
 
 pub fn run_compiled(compiled: &CompiledProgram, step_cap: u32) -> Result<ExecOutput, Diagnostic> {
+    run_compiled_with_config(
+        compiled,
+        ExecConfig {
+            step_cap,
+            commit_policy: CommitPolicyMode::Normal,
+        },
+    )
+}
+
+pub fn run_compiled_with_config(
+    compiled: &CompiledProgram,
+    config: ExecConfig,
+) -> Result<ExecOutput, Diagnostic> {
     let vm_program = VmProgram {
         bytecode: compiled.bytecode.clone(),
         source_map: compiled.source_map.clone(),
     };
-    execute_vm(&compiled.program, &vm_program, step_cap)
+    execute_vm(&compiled.program, &vm_program, config)
 }
 
 pub fn run_source_with_engine(
@@ -130,16 +149,39 @@ pub fn run_source_with_engine(
     step_cap: u32,
     run_engine: RunEngine,
 ) -> Result<ExecOutput, Diagnostic> {
+    run_source_with_engine_config(
+        source,
+        file_id,
+        ExecConfig {
+            step_cap,
+            commit_policy: CommitPolicyMode::Normal,
+        },
+        run_engine,
+    )
+}
+
+pub fn run_source_with_engine_config(
+    source: &str,
+    file_id: u32,
+    config: ExecConfig,
+    run_engine: RunEngine,
+) -> Result<ExecOutput, Diagnostic> {
     match run_engine {
-        RunEngine::Interpreter => run_source(source, file_id, step_cap),
+        RunEngine::Interpreter => {
+            let program = parse_program(source, file_id)?;
+            typecheck_program(&program)?;
+            engine::execute_program(&program, config)
+        }
         RunEngine::Bytecode => {
             let compiled = compile_source(source, file_id)?;
-            run_compiled(&compiled, step_cap)
+            run_compiled_with_config(&compiled, config)
         }
         RunEngine::Dual => {
-            let interpreted = run_source(source, file_id, step_cap)?;
+            let program = parse_program(source, file_id)?;
+            typecheck_program(&program)?;
+            let interpreted = engine::execute_program(&program, config)?;
             let compiled = compile_source(source, file_id)?;
-            let bytecode = run_compiled(&compiled, step_cap)?;
+            let bytecode = run_compiled_with_config(&compiled, config)?;
             if interpreted.signature != bytecode.signature {
                 return Err(Diagnostic::new(
                     ErrorCode::ECapabilityDenied,
@@ -180,7 +222,24 @@ pub fn run_file_with_engine(
     step_cap: u32,
     run_engine: RunEngine,
 ) -> Result<ExecOutput, RuntimeCoreError> {
+    run_file_with_engine_config(
+        path,
+        file_id,
+        ExecConfig {
+            step_cap,
+            commit_policy: CommitPolicyMode::Normal,
+        },
+        run_engine,
+    )
+}
+
+pub fn run_file_with_engine_config(
+    path: &Path,
+    file_id: u32,
+    config: ExecConfig,
+    run_engine: RunEngine,
+) -> Result<ExecOutput, RuntimeCoreError> {
     let source = fs::read_to_string(path)?;
-    let out = run_source_with_engine(&source, file_id, step_cap, run_engine)?;
+    let out = run_source_with_engine_config(&source, file_id, config, run_engine)?;
     Ok(out)
 }

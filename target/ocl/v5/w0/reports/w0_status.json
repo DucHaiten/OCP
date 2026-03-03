@@ -1,0 +1,18 @@
+﻿{
+    "status":  "pass",
+    "signer_id":  "dev-root-1",
+    "trust_store":  "projects/ocp-ocl/security/trust.store.toml",
+    "sign_key":  "projects/ocp-ocl/security/dev-root-1.signing.key.toml",
+    "deterministic_digest_run1":  "",
+    "deterministic_digest_run2":  "",
+    "reports":  [
+                    "target\\ocl\\v5\\w0\\reports\\conformance.det.run1.json",
+                    "target\\ocl\\v5\\w0\\reports\\conformance.det.run2.json",
+                    "target\\ocl\\v5\\w0\\reports\\conformance.fail.intentional.json",
+                    "target\\ocl\\v5\\w0\\reports\\verify_supply.pass.json",
+                    "target\\ocl\\v5\\w0\\reports\\verify_supply.fail.tampered.json",
+                    "target\\ocl\\v5\\w0\\reports\\plugin.verify_supply.pass.json",
+                    "target\\ocl\\v5\\w0\\reports\\topology_freeze_before.json",
+                    "target\\ocl\\v5\\w0\\reports\\topology_freeze_hash_snapshot.json"
+                ]
+}

@@ -1,0 +1,7 @@
+version = 1
+
+[[scenario]]
+name = "single"
+path = "C:/Users/PC/AppData/Local/Temp/ocl_cli_w1_w9_single_1772551283688"
+reactor_ticks = 0
+composer = false

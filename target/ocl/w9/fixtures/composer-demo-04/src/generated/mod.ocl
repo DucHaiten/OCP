@@ -1,0 +1,4 @@
+module generated.mod;
+let component_count = 2;
+let generated_ready = true;
+condition(generated_ready);

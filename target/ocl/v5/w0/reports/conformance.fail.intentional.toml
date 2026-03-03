@@ -1,0 +1,7 @@
+version = 1
+
+[[scenario]]
+name = "intentional-fail"
+path = "projects/ocp-ocl/apps/__intentional_missing__"
+reactor_ticks = 0
+composer = false

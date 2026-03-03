@@ -9,6 +9,10 @@ use base64::Engine as _;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 
 pub mod m4;
+pub mod w1;
+pub mod w2;
+pub mod w3;
+pub mod w5;
 pub mod w6;
 pub mod w9;
 
@@ -18,18 +22,49 @@ pub use m4::{
 };
 use ocl_runtime_core::{
     check_file, normalize_text, parse_program, run_file, run_file_with_engine,
-    run_source_with_engine, Expr, RunEngine, RuntimeCoreError, Stmt, TraceEvent,
+    run_file_with_engine_config, run_source_with_engine, CommitPolicyMode, ExecConfig, Expr,
+    RunEngine, RuntimeCoreError, Stmt, TraceEvent,
+};
+pub use w1::{
+    enforce_universe_match_v1, init_cosmos_v1, resolve_hive_caps_v1, resolve_universe_v1,
+    sync_cosmos_lock_v1, sync_policy_lock_v1, CosmosHiveV1, CosmosInitSummary,
+    CosmosLockSyncSummary, CosmosLockV1, CosmosSpecV1, PolicyLockSyncSummary, PolicyLockV1,
+    UniverseProfileV1, UniverseSelectionV1,
+};
+pub use w2::{
+    admit_bridge_emit_v1, poll_bridge_event_v1, resolve_bridge_runtime_plan_v1,
+    resolve_domain_selection_v1, validate_locked_cosmos_bridge_config_v1, BridgeEnvelopeV1,
+    BridgeRuntimePlanV1, BridgeRuntimeRuleV1, BridgeRuntimeStateV1, DomainProfileV1,
+    DomainSelectionV1,
+};
+pub use w3::{
+    build_commit_intent_hash256, build_shadow_required_digest, build_shadow_transcript_v1,
+    compare_shadow_traces_v1, parse_shadow_policy_v1, run_project_with_shadow_compare,
+    run_reactor_service_with_shadow_compare, write_shadow_compare_artifacts_v1, InputEnvelopeV1,
+    ShadowArtifactPathsV1, ShadowCompareReportV1, ShadowOptionsV1, ShadowPolicyV1,
+    ShadowReactorRunSummaryV1, ShadowRunSummaryV1, ShadowTranscriptEventV1,
+    SHADOW_EMPTY_COMMIT_HASH256,
+};
+pub use w5::{
+    resolve_view_kit_bindings_v1, resolve_view_observe_key_v1, resolve_view_selection_v1,
+    ViewKitBindingV1, ViewProfileV1, ViewSelectionV1,
 };
 pub use w6::{
-    canonical_plugin_sign_message, collect_project_custom_keys, resolve_plugin_for_custom_key,
-    sync_plugin_lock_v1, verify_plugin_lock_v1, verify_plugin_signature, PluginLockEntryV1,
-    PluginLockSyncSummary, PluginRegistryEntryV1, PluginRegistryIndexV1, PluginVerifySummary,
+    canonical_organ_sign_message, canonical_plugin_sign_message, collect_project_custom_keys,
+    collect_required_organs_from_cosmos_v1, install_organs_v1, list_kits_from_cosmos_v1,
+    resolve_platform_tag_v1, resolve_plugin_for_custom_key, run_kit_doctor_v1, sync_organs_lock_v1,
+    sync_plugin_lock_v1, verify_organ_entry_signature, verify_organs_lock_v1,
+    verify_plugin_lock_v1, verify_plugin_signature, KitDoctorSummaryV1, OrganInstallSummaryV1,
+    OrganLockEntryV1, OrganLockSyncSummaryV1, OrganRegistryEntryV1, OrganRegistryIndexV1,
+    OrganVerifySummaryV1, PluginLockEntryV1, PluginLockSyncSummary, PluginRegistryEntryV1,
+    PluginRegistryIndexV1, PluginVerifySummary,
 };
 pub use w9::{
-    compute_conformance_required_digest, parse_conformance_manifest_v1,
+    compute_conformance_required_digest, default_conformance_manifest_path,
+    default_conformance_manifest_path_with_selector, parse_conformance_manifest_v1,
     render_conformance_report_json, run_conformance_v1, write_conformance_report_json,
-    ConformanceManifestV1, ConformanceReportV1, ConformanceRunOptionsV1,
-    ConformanceScenarioResultV1, ConformanceScenarioV1,
+    ConformanceExpectedStatusV1, ConformanceManifestV1, ConformanceReportV1,
+    ConformanceRunOptionsV1, ConformanceScenarioResultV1, ConformanceScenarioV1, ConformanceStepV1,
 };
 
 #[derive(Debug)]
@@ -43,6 +78,8 @@ pub enum SdkError {
     PermissionDenied(String),
     AuditChainInvalid(String),
     SupplyInvalid(String),
+    ShadowMismatch(String),
+    ShadowUnsupported(String),
 }
 
 impl Display for SdkError {
@@ -60,6 +97,8 @@ impl Display for SdkError {
             Self::PermissionDenied(msg) => write!(f, "{msg}"),
             Self::AuditChainInvalid(msg) => write!(f, "{msg}"),
             Self::SupplyInvalid(msg) => write!(f, "{msg}"),
+            Self::ShadowMismatch(msg) => write!(f, "{msg}"),
+            Self::ShadowUnsupported(msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -152,6 +191,11 @@ pub struct ReactorServiceOptions {
     pub socket_listen: Option<String>,
     pub runtime_report: Option<PathBuf>,
     pub replay_audit: Option<PathBuf>,
+    pub io_tape_record_path: Option<PathBuf>,
+    pub io_tape_replay_path: Option<PathBuf>,
+    pub hive_caps: Option<CosmosHiveV1>,
+    pub universe_id: Option<String>,
+    pub domain_id: Option<String>,
 }
 
 impl Default for ReactorServiceOptions {
@@ -162,6 +206,11 @@ impl Default for ReactorServiceOptions {
             socket_listen: None,
             runtime_report: None,
             replay_audit: None,
+            io_tape_record_path: None,
+            io_tape_replay_path: None,
+            hive_caps: None,
+            universe_id: None,
+            domain_id: None,
         }
     }
 }
@@ -181,6 +230,20 @@ pub struct ReactorServiceReport {
     pub runtime_report_written: bool,
     pub replay_audit_written: bool,
     pub audit_chain_hash: Option<String>,
+    pub universe_id: String,
+    pub domain_id: String,
+    pub domain_count: u32,
+    pub bridge_emit_count: u32,
+    pub bridge_dispatch_count: u32,
+    pub bridge_backpressure_count: u32,
+    pub workers_alive: u32,
+    pub workers_spawned_total: u32,
+    pub workers_reused_total: u32,
+    pub mailbox_max_depth_observed: u32,
+    pub alloc_events_total: u32,
+    pub fanout_drop_count: u32,
+    pub spawn_drop_count: u32,
+    pub dispatch_digest256: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -243,8 +306,13 @@ pub struct TraceEventV1 {
     pub allowed: Option<bool>,
     pub value: Option<bool>,
     pub steps: Option<u32>,
+    pub universe_id: String,
+    pub domain_id: String,
     pub payload_hash: String,
 }
+
+const TRACE_UNIVERSE_SENTINEL: &str = "__legacy__";
+const TRACE_DOMAIN_SENTINEL: &str = "default";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraceRunSummary {
@@ -1086,6 +1154,31 @@ fn enforce_locked_plugin_contract(layout: &ProjectLayout, locked: bool) -> Resul
     Ok(())
 }
 
+fn enforce_locked_organ_contract(layout: &ProjectLayout, locked: bool) -> Result<(), SdkError> {
+    if !locked {
+        return Ok(());
+    }
+    let doctor = run_kit_doctor_v1(&layout.root, true)?;
+    if doctor.required_organs.is_empty() {
+        return Ok(());
+    }
+    let verify = verify_organs_lock_v1(&layout.root, true)?;
+    if verify.organs_verified == 0 {
+        return Err(SdkError::SupplyInvalid(
+            "V-ORGANS-LOCK-EMPTY: organs.lock.v1 has no organ entries".to_string(),
+        ));
+    }
+    std::env::set_var(
+        "OCL_ORGANS_LOCK_PATH",
+        layout
+            .root
+            .join("organs.lock.v1")
+            .to_string_lossy()
+            .to_string(),
+    );
+    Ok(())
+}
+
 pub fn check_project(root: &Path) -> Result<CheckSummary, SdkError> {
     check_project_with_lock(root, false)
 }
@@ -1097,6 +1190,7 @@ pub fn check_project_with_lock(root: &Path, locked: bool) -> Result<CheckSummary
         verify_lock_consistency(&layout)?;
     }
     enforce_locked_plugin_contract(&layout, locked)?;
+    enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
     let files = gather_project_ocl_files(&layout)?;
     if files.is_empty() {
@@ -1136,6 +1230,7 @@ pub fn run_project_with_engine_and_lock(
         verify_lock_consistency(&layout)?;
     }
     enforce_locked_plugin_contract(&layout, locked)?;
+    enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
     let out = run_file_with_engine(&layout.src_main, 1, 4096, run_engine)?;
@@ -1233,6 +1328,169 @@ fn parse_runtime_budget_from_manifest(manifest_text: &str) -> RuntimeBudgetConfi
     out
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReactorIoTapeEntry {
+    tick: u32,
+    domain_id: String,
+    payload_hash256: String,
+}
+
+fn parse_reactor_io_tape_entry(line: &str) -> Result<ReactorIoTapeEntry, SdkError> {
+    let mut tick = None::<u32>;
+    let mut domain_id = None::<String>;
+    let mut payload_hash256 = None::<String>;
+
+    for part in line.split('|') {
+        let Some((k, v)) = part.split_once('=') else {
+            return Err(SdkError::MissingProject(
+                "invalid io tape line: expected key=value fields".to_string(),
+            ));
+        };
+        match k {
+            "tick" => {
+                let parsed = v.parse::<u32>().map_err(|_| {
+                    SdkError::MissingProject("invalid io tape tick value".to_string())
+                })?;
+                tick = Some(parsed);
+            }
+            "domain_id" => domain_id = Some(v.to_string()),
+            "payload_hash256" => payload_hash256 = Some(v.to_string()),
+            _ => {}
+        }
+    }
+
+    let Some(tick) = tick else {
+        return Err(SdkError::MissingProject(
+            "invalid io tape line: missing tick".to_string(),
+        ));
+    };
+    let Some(domain_id) = domain_id else {
+        return Err(SdkError::MissingProject(
+            "invalid io tape line: missing domain_id".to_string(),
+        ));
+    };
+    let Some(payload_hash256) = payload_hash256 else {
+        return Err(SdkError::MissingProject(
+            "invalid io tape line: missing payload_hash256".to_string(),
+        ));
+    };
+
+    Ok(ReactorIoTapeEntry {
+        tick,
+        domain_id,
+        payload_hash256,
+    })
+}
+
+fn read_reactor_io_tape(path: &Path) -> Result<Vec<ReactorIoTapeEntry>, SdkError> {
+    let raw = fs::read_to_string(path)?;
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        out.push(parse_reactor_io_tape_entry(trimmed)?);
+    }
+    Ok(out)
+}
+
+fn write_reactor_io_tape(path: &Path, entries: &[ReactorIoTapeEntry]) -> Result<(), SdkError> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    let mut out = String::new();
+    for entry in entries {
+        out.push_str("tick=");
+        out.push_str(&entry.tick.to_string());
+        out.push_str("|domain_id=");
+        out.push_str(&entry.domain_id);
+        out.push_str("|payload_hash256=");
+        out.push_str(&entry.payload_hash256);
+        out.push('\n');
+    }
+    fs::write(path, out)?;
+    Ok(())
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct HiveDomainRuntimeStateV1 {
+    next_worker_id: u32,
+    active_workers: u32,
+    idle_workers: Vec<u32>,
+    mailbox_seq: u64,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_hive_workload_for_event(
+    hive_caps: &CosmosHiveV1,
+    domain_state: &mut HiveDomainRuntimeStateV1,
+    domain_rank: usize,
+    tick: u32,
+    event_id: u64,
+    payload_hash256: &str,
+    spawn_count_tick: &mut u32,
+    mailbox_depth: &mut u32,
+    backpressure_count: &mut u32,
+    workers_spawned_total: &mut u32,
+    workers_reused_total: &mut u32,
+    alloc_events_total: &mut u32,
+    fanout_drop_count: &mut u32,
+    spawn_drop_count: &mut u32,
+    mailbox_max_depth_observed: &mut u32,
+    dispatch_rows: &mut Vec<String>,
+) {
+    let desired_fanout = 2u32;
+    let actual_fanout = desired_fanout.min(hive_caps.max_fanout_per_task);
+    *fanout_drop_count = fanout_drop_count.saturating_add(desired_fanout - actual_fanout);
+
+    for task_idx in 0..actual_fanout {
+        if *mailbox_depth >= hive_caps.mailbox_max_depth {
+            *backpressure_count = backpressure_count.saturating_add(1);
+            *spawn_drop_count = spawn_drop_count.saturating_add(1);
+            continue;
+        }
+
+        *mailbox_depth = mailbox_depth.saturating_add(1);
+        *mailbox_max_depth_observed = (*mailbox_max_depth_observed).max(*mailbox_depth);
+
+        let worker_id = if let Some(worker_id) = domain_state.idle_workers.pop() {
+            *workers_reused_total = workers_reused_total.saturating_add(1);
+            worker_id
+        } else if domain_state.active_workers < hive_caps.max_swarm_workers
+            && *spawn_count_tick < hive_caps.max_spawn_per_tick
+        {
+            domain_state.next_worker_id = domain_state.next_worker_id.saturating_add(1);
+            domain_state.active_workers = domain_state.active_workers.saturating_add(1);
+            *spawn_count_tick = spawn_count_tick.saturating_add(1);
+            *workers_spawned_total = workers_spawned_total.saturating_add(1);
+            *alloc_events_total = alloc_events_total.saturating_add(1);
+            domain_state.next_worker_id
+        } else {
+            *spawn_drop_count = spawn_drop_count.saturating_add(1);
+            *mailbox_depth = mailbox_depth.saturating_sub(1);
+            continue;
+        };
+
+        domain_state.mailbox_seq = domain_state.mailbox_seq.saturating_add(1);
+        dispatch_rows.push(format!(
+            "{}|{}|{}|{}|{}|{}|{}",
+            tick,
+            domain_rank,
+            worker_id,
+            domain_state.mailbox_seq,
+            event_id,
+            task_idx,
+            payload_hash256
+        ));
+
+        domain_state.idle_workers.push(worker_id);
+        *mailbox_depth = mailbox_depth.saturating_sub(1);
+    }
+}
+
 pub fn run_reactor_service_with_lock(
     root: &Path,
     options: &ReactorServiceOptions,
@@ -1244,6 +1502,7 @@ pub fn run_reactor_service_with_lock(
         verify_lock_consistency(&layout)?;
     }
     enforce_locked_plugin_contract(&layout, locked)?;
+    enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
 
@@ -1274,35 +1533,244 @@ pub fn run_reactor_service_with_lock(
         ReactorRuntimeMode::Throughput => runtime_budget.io_max_events_per_tick.max(1),
     };
 
+    let domain_selection = resolve_domain_selection_v1(
+        root,
+        locked,
+        options.universe_id.as_deref(),
+        options.domain_id.as_deref(),
+    )?;
+    let hive_caps = match &options.hive_caps {
+        Some(caps) => caps.clone(),
+        None => resolve_hive_caps_v1(root, locked, options.universe_id.as_deref())?,
+    };
+    let mut runtime_universe_id = domain_selection.universe_id.clone();
+    let runtime_domain_id = domain_selection.domain_id.clone();
+    let mut domain_count = 1u32;
+    let mut bridge_states: HashMap<String, BridgeRuntimeStateV1> = HashMap::new();
+    let mut hive_domain_states: HashMap<String, HiveDomainRuntimeStateV1> = HashMap::new();
+
     let mut total_steps = 0u32;
     let mut event_count = 0u32;
     let mut event_id = 0u64;
     let mut mailbox_high_water = 0u32;
     let mut backpressure_count = 0u32;
+    let mut bridge_emit_count = 0u32;
+    let mut bridge_dispatch_count = 0u32;
+    let mut bridge_backpressure_count = 0u32;
     let cancelled_count = 0u32;
     let mut deadline_exceeded_count = 0u32;
     let mut signatures = Vec::new();
+    let mut workers_spawned_total = 0u32;
+    let mut workers_reused_total = 0u32;
+    let mut alloc_events_total = 0u32;
+    let mut mailbox_max_depth_observed = 0u32;
+    let mut fanout_drop_count = 0u32;
+    let mut spawn_drop_count = 0u32;
+    let mut dispatch_rows = Vec::<String>::new();
+    let io_tape_replay_entries = match &options.io_tape_replay_path {
+        Some(path) => Some(read_reactor_io_tape(path)?),
+        None => None,
+    };
+    let mut io_tape_replay_cursor = 0usize;
+    let mut io_tape_record_entries = Vec::<ReactorIoTapeEntry>::new();
 
-    for _ in 0..options.ticks {
-        let mut mailbox_depth = 0u32;
-        for _ in 0..events_per_tick {
-            mailbox_depth = mailbox_depth.saturating_add(1);
-            if mailbox_depth > runtime_budget.mailbox_max_depth {
-                backpressure_count = backpressure_count.saturating_add(1);
-                break;
-            }
-            event_count = event_count.saturating_add(1);
-            event_id = event_id.saturating_add(1);
-            let out = run_file(&layout.src_main, 1, 4096)?;
-            total_steps = total_steps.saturating_add(out.steps);
-            signatures.push(out.signature);
+    for tick in 0..options.ticks {
+        let plan = resolve_bridge_runtime_plan_v1(
+            root,
+            locked,
+            options.universe_id.as_deref(),
+            options.domain_id.as_deref(),
+            u64::from(tick),
+        )?;
+        runtime_universe_id = plan.universe_id.clone();
+        let mut active_domains: Vec<String> = if options.domain_id.is_some() {
+            vec![plan.domain_id.clone()]
+        } else {
+            plan.domains.iter().map(|d| d.id.clone()).collect()
+        };
+        if active_domains.is_empty() {
+            active_domains.push(plan.domain_id.clone());
         }
-        mailbox_high_water = mailbox_high_water.max(mailbox_depth);
+        active_domains.sort();
+        active_domains.dedup();
+        domain_count = active_domains.len() as u32;
+        if domain_count > hive_caps.max_domains {
+            return Err(SdkError::LockMismatch(format!(
+                "V-HIVE-DOMAIN-CAP: active domain count {} exceeds max_domains {}",
+                domain_count, hive_caps.max_domains
+            )));
+        }
+        let mut spawn_count_tick = 0u32;
+
+        for (domain_rank, domain_id) in active_domains.iter().enumerate() {
+            let mut mailbox_depth = 0u32;
+            let domain_state = hive_domain_states.entry(domain_id.clone()).or_default();
+            if let Some(tape_entries) = io_tape_replay_entries.as_ref() {
+                while io_tape_replay_cursor < tape_entries.len() {
+                    let tape_entry = &tape_entries[io_tape_replay_cursor];
+                    if tape_entry.tick != tick || tape_entry.domain_id != *domain_id {
+                        break;
+                    }
+                    mailbox_depth = mailbox_depth.saturating_add(1);
+                    if mailbox_depth > runtime_budget.mailbox_max_depth {
+                        backpressure_count = backpressure_count.saturating_add(1);
+                        break;
+                    }
+                    event_count = event_count.saturating_add(1);
+                    event_id = event_id.saturating_add(1);
+                    let out = run_file(&layout.src_main, 1, 4096)?;
+                    total_steps = total_steps.saturating_add(out.steps);
+                    signatures.push(out.signature.clone());
+
+                    let payload_hash256 = fnv1a64_hex(&out.signature);
+                    if payload_hash256 != tape_entry.payload_hash256 {
+                        return Err(SdkError::MissingProject(format!(
+                            "io tape mismatch at tick={} domain={}: expected {} got {}",
+                            tick, domain_id, tape_entry.payload_hash256, payload_hash256
+                        )));
+                    }
+                    io_tape_record_entries.push(tape_entry.clone());
+                    apply_hive_workload_for_event(
+                        &hive_caps,
+                        domain_state,
+                        domain_rank,
+                        tick,
+                        event_id,
+                        &payload_hash256,
+                        &mut spawn_count_tick,
+                        &mut mailbox_depth,
+                        &mut backpressure_count,
+                        &mut workers_spawned_total,
+                        &mut workers_reused_total,
+                        &mut alloc_events_total,
+                        &mut fanout_drop_count,
+                        &mut spawn_drop_count,
+                        &mut mailbox_max_depth_observed,
+                        &mut dispatch_rows,
+                    );
+
+                    for bridge in plan
+                        .bridges
+                        .iter()
+                        .filter(|bridge| bridge.from_domain == *domain_id)
+                    {
+                        let state = bridge_states.entry(bridge.bridge_id.clone()).or_default();
+                        match admit_bridge_emit_v1(state, bridge, u64::from(tick), &payload_hash256)
+                        {
+                            Ok(_) => {
+                                bridge_emit_count = bridge_emit_count.saturating_add(1);
+                            }
+                            Err(err) => {
+                                backpressure_count = backpressure_count.saturating_add(1);
+                                if err.to_string().contains("V-DOMAIN-BRIDGE-BACKPRESSURE") {
+                                    bridge_backpressure_count =
+                                        bridge_backpressure_count.saturating_add(1);
+                                }
+                            }
+                        }
+                    }
+
+                    io_tape_replay_cursor = io_tape_replay_cursor.saturating_add(1);
+                }
+            } else {
+                for _ in 0..events_per_tick {
+                    mailbox_depth = mailbox_depth.saturating_add(1);
+                    if mailbox_depth > runtime_budget.mailbox_max_depth {
+                        backpressure_count = backpressure_count.saturating_add(1);
+                        break;
+                    }
+                    event_count = event_count.saturating_add(1);
+                    event_id = event_id.saturating_add(1);
+                    let out = run_file(&layout.src_main, 1, 4096)?;
+                    total_steps = total_steps.saturating_add(out.steps);
+                    signatures.push(out.signature.clone());
+
+                    let payload_hash256 = fnv1a64_hex(&out.signature);
+                    io_tape_record_entries.push(ReactorIoTapeEntry {
+                        tick,
+                        domain_id: domain_id.clone(),
+                        payload_hash256: payload_hash256.clone(),
+                    });
+                    apply_hive_workload_for_event(
+                        &hive_caps,
+                        domain_state,
+                        domain_rank,
+                        tick,
+                        event_id,
+                        &payload_hash256,
+                        &mut spawn_count_tick,
+                        &mut mailbox_depth,
+                        &mut backpressure_count,
+                        &mut workers_spawned_total,
+                        &mut workers_reused_total,
+                        &mut alloc_events_total,
+                        &mut fanout_drop_count,
+                        &mut spawn_drop_count,
+                        &mut mailbox_max_depth_observed,
+                        &mut dispatch_rows,
+                    );
+
+                    for bridge in plan
+                        .bridges
+                        .iter()
+                        .filter(|bridge| bridge.from_domain == *domain_id)
+                    {
+                        let state = bridge_states.entry(bridge.bridge_id.clone()).or_default();
+                        match admit_bridge_emit_v1(state, bridge, u64::from(tick), &payload_hash256)
+                        {
+                            Ok(_) => {
+                                bridge_emit_count = bridge_emit_count.saturating_add(1);
+                            }
+                            Err(err) => {
+                                backpressure_count = backpressure_count.saturating_add(1);
+                                if err.to_string().contains("V-DOMAIN-BRIDGE-BACKPRESSURE") {
+                                    bridge_backpressure_count =
+                                        bridge_backpressure_count.saturating_add(1);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            mailbox_high_water = mailbox_high_water.max(mailbox_depth);
+        }
+
+        if !plan.bridges.is_empty() {
+            let start = plan.dispatch_start_index;
+            for offset in 0..plan.bridges.len() {
+                let idx = (start + offset) % plan.bridges.len();
+                let bridge = &plan.bridges[idx];
+                let state = bridge_states.entry(bridge.bridge_id.clone()).or_default();
+                while poll_bridge_event_v1(state, bridge, u64::from(tick)).is_some() {
+                    bridge_dispatch_count = bridge_dispatch_count.saturating_add(1);
+                }
+            }
+        }
     }
 
-    if options.ticks.saturating_mul(events_per_tick) > runtime_budget.default_deadline_ms {
+    if let Some(tape_entries) = io_tape_replay_entries.as_ref() {
+        if io_tape_replay_cursor != tape_entries.len() {
+            return Err(SdkError::MissingProject(
+                "io tape has unconsumed entries for current reactor run".to_string(),
+            ));
+        }
+    }
+
+    if let Some(record_path) = &options.io_tape_record_path {
+        write_reactor_io_tape(record_path, &io_tape_record_entries)?;
+    }
+
+    if event_count > runtime_budget.default_deadline_ms {
         deadline_exceeded_count = 1;
     }
+    let workers_alive: u32 = hive_domain_states.values().map(|s| s.active_workers).sum();
+    let dispatch_digest256 = if dispatch_rows.is_empty() {
+        blake3::hash(b"dispatch.empty").to_hex().to_string()
+    } else {
+        blake3::hash(dispatch_rows.join("\n").as_bytes())
+            .to_hex()
+            .to_string()
+    };
 
     let mut runtime_report_written = false;
     if let Some(report_path) = &options.runtime_report {
@@ -1321,6 +1789,20 @@ pub fn run_reactor_service_with_lock(
                 "\"backpressure_count\":{},",
                 "\"cancelled_count\":{},",
                 "\"deadline_exceeded_count\":{},",
+                "\"universe_id\":\"{}\",",
+                "\"domain_id\":\"{}\",",
+                "\"domain_count\":{},",
+                "\"bridge_emit_count\":{},",
+                "\"bridge_dispatch_count\":{},",
+                "\"bridge_backpressure_count\":{},",
+                "\"workers_alive\":{},",
+                "\"workers_spawned_total\":{},",
+                "\"workers_reused_total\":{},",
+                "\"mailbox_max_depth_observed\":{},",
+                "\"alloc_events_total\":{},",
+                "\"fanout_drop_count\":{},",
+                "\"spawn_drop_count\":{},",
+                "\"dispatch_digest256\":\"{}\",",
                 "\"socket_listen\":{}",
                 "}}"
             ),
@@ -1333,6 +1815,20 @@ pub fn run_reactor_service_with_lock(
             backpressure_count,
             cancelled_count,
             deadline_exceeded_count,
+            runtime_universe_id,
+            runtime_domain_id,
+            domain_count,
+            bridge_emit_count,
+            bridge_dispatch_count,
+            bridge_backpressure_count,
+            workers_alive,
+            workers_spawned_total,
+            workers_reused_total,
+            mailbox_max_depth_observed,
+            alloc_events_total,
+            fanout_drop_count,
+            spawn_drop_count,
+            dispatch_digest256,
             match &options.socket_listen {
                 Some(v) => format!("\"{}\"", v.replace('\\', "\\\\").replace('"', "\\\"")),
                 None => "null".to_string(),
@@ -1366,6 +1862,20 @@ pub fn run_reactor_service_with_lock(
         runtime_report_written,
         replay_audit_written,
         audit_chain_hash,
+        universe_id: runtime_universe_id,
+        domain_id: runtime_domain_id,
+        domain_count,
+        bridge_emit_count,
+        bridge_dispatch_count,
+        bridge_backpressure_count,
+        workers_alive,
+        workers_spawned_total,
+        workers_reused_total,
+        mailbox_max_depth_observed,
+        alloc_events_total,
+        fanout_drop_count,
+        spawn_drop_count,
+        dispatch_digest256,
     })
 }
 
@@ -1406,6 +1916,7 @@ pub fn test_project_with_lock(root: &Path, locked: bool) -> Result<TestSummary, 
         verify_lock_consistency(&layout)?;
     }
     enforce_locked_plugin_contract(&layout, locked)?;
+    enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
     let mut tests = Vec::new();
     collect_ocl_files(&layout.tests_dir, &mut tests)?;
@@ -1456,6 +1967,7 @@ pub fn build_project_with_lock(root: &Path, locked: bool) -> Result<BuildSummary
     let layout = project_layout(root);
     verify_project_exists(&layout)?;
     enforce_locked_plugin_contract(&layout, locked)?;
+    enforce_locked_organ_contract(&layout, locked)?;
     let lock_deps = if locked {
         verify_lock_consistency(&layout)?
     } else {
@@ -1693,6 +2205,7 @@ pub fn build_oclpkg_with_lock(root: &Path, locked: bool) -> Result<BuildOclPkgSu
     let layout = project_layout(root);
     verify_project_exists(&layout)?;
     enforce_locked_plugin_contract(&layout, locked)?;
+    enforce_locked_organ_contract(&layout, locked)?;
     let lock_deps = if locked {
         verify_lock_consistency(&layout)?
     } else {
@@ -1995,20 +2508,45 @@ pub fn run_project_with_trace_engine_and_lock(
     run_engine: RunEngine,
     locked: bool,
 ) -> Result<TraceRunSummary, SdkError> {
+    run_project_with_trace_engine_config_and_lock(
+        root,
+        run_engine,
+        locked,
+        ExecConfig {
+            step_cap: 4096,
+            commit_policy: CommitPolicyMode::Normal,
+        },
+    )
+}
+
+pub fn run_project_with_trace_engine_config_and_lock(
+    root: &Path,
+    run_engine: RunEngine,
+    locked: bool,
+    config: ExecConfig,
+) -> Result<TraceRunSummary, SdkError> {
     let layout = project_layout(root);
     verify_project_exists(&layout)?;
     if locked {
         verify_lock_consistency(&layout)?;
     }
     enforce_locked_plugin_contract(&layout, locked)?;
+    enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
 
-    let out = run_file_with_engine(&layout.src_main, 1, 4096, run_engine)?;
+    let out = run_file_with_engine_config(&layout.src_main, 1, config, run_engine)?;
     let run_id = build_run_id_deterministic("project", root, run_engine, None, None);
     let mut seq = 1u64;
     let mut events = Vec::new();
-    append_trace_events(&run_id, &mut seq, &out.trace.events, &mut events);
+    append_trace_events(
+        &run_id,
+        TRACE_UNIVERSE_SENTINEL,
+        TRACE_DOMAIN_SENTINEL,
+        &mut seq,
+        &out.trace.events,
+        &mut events,
+    );
     Ok(TraceRunSummary {
         run_id,
         total_steps: out.steps,
@@ -2022,12 +2560,32 @@ pub fn run_reactor_service_with_trace_engine_and_lock(
     run_engine: RunEngine,
     locked: bool,
 ) -> Result<TraceRunSummary, SdkError> {
+    run_reactor_service_with_trace_engine_config_and_lock(
+        root,
+        options,
+        run_engine,
+        locked,
+        ExecConfig {
+            step_cap: 4096,
+            commit_policy: CommitPolicyMode::Normal,
+        },
+    )
+}
+
+pub fn run_reactor_service_with_trace_engine_config_and_lock(
+    root: &Path,
+    options: &ReactorServiceOptions,
+    run_engine: RunEngine,
+    locked: bool,
+    config: ExecConfig,
+) -> Result<TraceRunSummary, SdkError> {
     let layout = project_layout(root);
     verify_project_exists(&layout)?;
     if locked {
         verify_lock_consistency(&layout)?;
     }
     enforce_locked_plugin_contract(&layout, locked)?;
+    enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
 
@@ -2055,6 +2613,12 @@ pub fn run_reactor_service_with_trace_engine_and_lock(
         ReactorRuntimeMode::Deterministic => 1u32,
         ReactorRuntimeMode::Throughput => runtime_budget.io_max_events_per_tick.max(1),
     };
+    let domain_selection = resolve_domain_selection_v1(
+        root,
+        locked,
+        options.universe_id.as_deref(),
+        options.domain_id.as_deref(),
+    )?;
     let run_id = build_run_id_deterministic(
         "reactor",
         root,
@@ -2065,13 +2629,89 @@ pub fn run_reactor_service_with_trace_engine_and_lock(
     let mut seq = 1u64;
     let mut events = Vec::new();
     let mut total_steps = 0u32;
+    let io_tape_replay_entries = match &options.io_tape_replay_path {
+        Some(path) => Some(read_reactor_io_tape(path)?),
+        None => None,
+    };
+    let mut io_tape_replay_cursor = 0usize;
+    let mut io_tape_record_entries = Vec::<ReactorIoTapeEntry>::new();
 
-    for _ in 0..options.ticks {
-        for _ in 0..events_per_tick {
-            let out = run_file_with_engine(&layout.src_main, 1, 4096, run_engine)?;
-            total_steps = total_steps.saturating_add(out.steps);
-            append_trace_events(&run_id, &mut seq, &out.trace.events, &mut events);
+    for tick in 0..options.ticks {
+        let plan = resolve_bridge_runtime_plan_v1(
+            root,
+            locked,
+            options.universe_id.as_deref(),
+            options.domain_id.as_deref(),
+            u64::from(tick),
+        )?;
+        let mut active_domains: Vec<String> = if options.domain_id.is_some() {
+            vec![plan.domain_id.clone()]
+        } else {
+            plan.domains.iter().map(|d| d.id.clone()).collect()
+        };
+        if active_domains.is_empty() {
+            active_domains.push(domain_selection.domain_id.clone());
         }
+        active_domains.sort();
+        active_domains.dedup();
+        for domain_id in &active_domains {
+            if let Some(tape_entries) = io_tape_replay_entries.as_ref() {
+                while io_tape_replay_cursor < tape_entries.len() {
+                    let tape_entry = &tape_entries[io_tape_replay_cursor];
+                    if tape_entry.tick != tick || tape_entry.domain_id != *domain_id {
+                        break;
+                    }
+                    let out = run_file_with_engine_config(&layout.src_main, 1, config, run_engine)?;
+                    total_steps = total_steps.saturating_add(out.steps);
+                    let payload_hash256 = fnv1a64_hex(&out.signature);
+                    if payload_hash256 != tape_entry.payload_hash256 {
+                        return Err(SdkError::MissingProject(format!(
+                            "io tape mismatch at tick={} domain={}: expected {} got {}",
+                            tick, domain_id, tape_entry.payload_hash256, payload_hash256
+                        )));
+                    }
+                    io_tape_record_entries.push(tape_entry.clone());
+                    append_trace_events(
+                        &run_id,
+                        &plan.universe_id,
+                        domain_id,
+                        &mut seq,
+                        &out.trace.events,
+                        &mut events,
+                    );
+                    io_tape_replay_cursor = io_tape_replay_cursor.saturating_add(1);
+                }
+            } else {
+                for _ in 0..events_per_tick {
+                    let out = run_file_with_engine_config(&layout.src_main, 1, config, run_engine)?;
+                    total_steps = total_steps.saturating_add(out.steps);
+                    io_tape_record_entries.push(ReactorIoTapeEntry {
+                        tick,
+                        domain_id: domain_id.clone(),
+                        payload_hash256: fnv1a64_hex(&out.signature),
+                    });
+                    append_trace_events(
+                        &run_id,
+                        &plan.universe_id,
+                        domain_id,
+                        &mut seq,
+                        &out.trace.events,
+                        &mut events,
+                    );
+                }
+            }
+        }
+    }
+
+    if let Some(tape_entries) = io_tape_replay_entries.as_ref() {
+        if io_tape_replay_cursor != tape_entries.len() {
+            return Err(SdkError::MissingProject(
+                "io tape has unconsumed entries for current trace reactor run".to_string(),
+            ));
+        }
+    }
+    if let Some(record_path) = &options.io_tape_record_path {
+        write_reactor_io_tape(record_path, &io_tape_record_entries)?;
     }
 
     Ok(TraceRunSummary {
@@ -2347,7 +2987,7 @@ pub fn render_trace_view(events: &[TraceEventV1], options: TraceViewOptions) -> 
     rendered.push('\n');
     for event in selected {
         rendered.push_str(&format!(
-            "#{} {} key={} kind={} reason={} origin={} hash={}\n",
+            "#{} {} key={} kind={} reason={} origin={} universe={} domain={} hash={}\n",
             event.seq,
             event.event,
             event.key.as_deref().unwrap_or("-"),
@@ -2357,6 +2997,8 @@ pub fn render_trace_view(events: &[TraceEventV1], options: TraceViewOptions) -> 
                 .origin_id
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| "-".to_string()),
+            event.universe_id,
+            event.domain_id,
             event.payload_hash
         ));
     }
@@ -2453,18 +3095,26 @@ pub fn render_profile_view(report: &ProfileReportV1, options: ProfileViewOptions
 
 fn append_trace_events(
     run_id: &str,
+    universe_id: &str,
+    domain_id: &str,
     seq: &mut u64,
     input: &[TraceEvent],
     out: &mut Vec<TraceEventV1>,
 ) {
     for event in input {
-        let mapped = map_trace_event(*seq, run_id, event);
+        let mapped = map_trace_event(*seq, run_id, universe_id, domain_id, event);
         out.push(mapped);
         *seq = seq.saturating_add(1);
     }
 }
 
-fn map_trace_event(seq: u64, run_id: &str, event: &TraceEvent) -> TraceEventV1 {
+fn map_trace_event(
+    seq: u64,
+    run_id: &str,
+    universe_id: &str,
+    domain_id: &str,
+    event: &TraceEvent,
+) -> TraceEventV1 {
     let payload_hash = fnv1a64_hex(&canonical_trace_event_payload(event));
     match event {
         TraceEvent::ObserveStart { key, .. } => TraceEventV1 {
@@ -2478,6 +3128,8 @@ fn map_trace_event(seq: u64, run_id: &str, event: &TraceEvent) -> TraceEventV1 {
             allowed: None,
             value: None,
             steps: None,
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
             payload_hash,
         },
         TraceEvent::ObserveEnd {
@@ -2496,6 +3148,8 @@ fn map_trace_event(seq: u64, run_id: &str, event: &TraceEvent) -> TraceEventV1 {
             allowed: None,
             value: None,
             steps: None,
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
             payload_hash,
         },
         TraceEvent::MatchArmSelected { arm } => TraceEventV1 {
@@ -2509,6 +3163,8 @@ fn map_trace_event(seq: u64, run_id: &str, event: &TraceEvent) -> TraceEventV1 {
             allowed: None,
             value: None,
             steps: None,
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
             payload_hash,
         },
         TraceEvent::CommitAttempt { origin_id, kind } => TraceEventV1 {
@@ -2522,6 +3178,8 @@ fn map_trace_event(seq: u64, run_id: &str, event: &TraceEvent) -> TraceEventV1 {
             allowed: None,
             value: None,
             steps: None,
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
             payload_hash,
         },
         TraceEvent::CommitResult { allowed, reason } => TraceEventV1 {
@@ -2535,6 +3193,8 @@ fn map_trace_event(seq: u64, run_id: &str, event: &TraceEvent) -> TraceEventV1 {
             allowed: Some(*allowed),
             value: None,
             steps: None,
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
             payload_hash,
         },
         TraceEvent::ConditionCheck { value } => TraceEventV1 {
@@ -2548,6 +3208,8 @@ fn map_trace_event(seq: u64, run_id: &str, event: &TraceEvent) -> TraceEventV1 {
             allowed: None,
             value: Some(*value),
             steps: None,
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
             payload_hash,
         },
         TraceEvent::ProgramEnd { steps } => TraceEventV1 {
@@ -2561,6 +3223,8 @@ fn map_trace_event(seq: u64, run_id: &str, event: &TraceEvent) -> TraceEventV1 {
             allowed: None,
             value: None,
             steps: Some(*steps),
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
             payload_hash,
         },
     }
@@ -2618,7 +3282,7 @@ fn result_kind_label(kind: ocl_runtime_core::ResultKind) -> String {
 
 fn encode_trace_line(event: &TraceEventV1) -> String {
     format!(
-        "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+        "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
         event.seq,
         event.run_id,
         event.event,
@@ -2629,17 +3293,28 @@ fn encode_trace_line(event: &TraceEventV1) -> String {
         encode_opt_bool(event.allowed),
         encode_opt_bool(event.value),
         encode_opt_u32(event.steps),
+        event.universe_id,
+        event.domain_id,
         event.payload_hash
     )
 }
 
 fn decode_trace_line(line: &str) -> Result<TraceEventV1, SdkError> {
     let parts: Vec<&str> = line.split('|').collect();
-    if parts.len() != 11 {
+    if parts.len() != 11 && parts.len() != 13 {
         return Err(SdkError::MissingProject(
-            "invalid trace row (expected 11 columns)".to_string(),
+            "invalid trace row (expected 11 or 13 columns)".to_string(),
         ));
     }
+    let (universe_id, domain_id, payload_idx) = if parts.len() == 13 {
+        (parts[10].to_string(), parts[11].to_string(), 12usize)
+    } else {
+        (
+            TRACE_UNIVERSE_SENTINEL.to_string(),
+            TRACE_DOMAIN_SENTINEL.to_string(),
+            10usize,
+        )
+    };
     Ok(TraceEventV1 {
         seq: parts[0]
             .parse::<u64>()
@@ -2653,7 +3328,9 @@ fn decode_trace_line(line: &str) -> Result<TraceEventV1, SdkError> {
         allowed: decode_opt_bool(parts[7])?,
         value: decode_opt_bool(parts[8])?,
         steps: decode_opt_u32(parts[9])?,
-        payload_hash: parts[10].to_string(),
+        universe_id,
+        domain_id,
+        payload_hash: parts[payload_idx].to_string(),
     })
 }
 
@@ -2725,6 +3402,7 @@ fn trace_event_to_json(event: &TraceEventV1) -> String {
             "{{\"seq\":{},\"run_id\":\"{}\",\"event\":\"{}\",",
             "\"key\":{},\"kind\":{},\"reason\":{},",
             "\"origin_id\":{},\"allowed\":{},\"value\":{},\"steps\":{},",
+            "\"universe_id\":\"{}\",\"domain_id\":\"{}\",",
             "\"payload_hash\":\"{}\"}}"
         ),
         event.seq,
@@ -2737,6 +3415,8 @@ fn trace_event_to_json(event: &TraceEventV1) -> String {
         json_opt_bool(event.allowed),
         json_opt_bool(event.value),
         json_opt_u32(event.steps),
+        json_escape(&event.universe_id),
+        json_escape(&event.domain_id),
         event.payload_hash
     )
 }

@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use crate::ocp_ocl::ast::{Expr, MatchStmt, Program, Stmt};
 use crate::ocp_ocl::audit::{TraceEvent, TraceLog};
-use crate::ocp_ocl::budget::{BudgetMeter, ExecConfig};
+use crate::ocp_ocl::budget::{BudgetMeter, CommitPolicyMode, ExecConfig};
 use crate::ocp_ocl::diag::{DiagPhase, Diagnostic, ErrorCode, ReasonCode};
 use crate::ocp_ocl::registry::CapabilityRegistry;
 use crate::ocp_ocl::result_kind::{Result4, ResultKind};
@@ -90,6 +90,7 @@ enum Flow {
 pub struct Executor {
     env: HashMap<String, Value>,
     meter: BudgetMeter,
+    commit_policy: CommitPolicyMode,
     next_origin_id: u64,
     registry: CapabilityRegistry,
     observations: HashMap<u64, ObservationMeta>,
@@ -105,6 +106,7 @@ impl Executor {
         Self {
             env: HashMap::new(),
             meter: BudgetMeter::new(config),
+            commit_policy: config.commit_policy,
             next_origin_id: 1,
             registry: CapabilityRegistry::default(),
             observations: HashMap::new(),
@@ -120,6 +122,7 @@ impl Executor {
         Self {
             env: HashMap::new(),
             meter: BudgetMeter::new(config),
+            commit_policy: config.commit_policy,
             next_origin_id: 1,
             registry,
             observations: HashMap::new(),
@@ -627,17 +630,40 @@ impl Executor {
                         "commit policy denied for key",
                     ));
                 }
-                self.apply_pending_sqlite_write_if_needed(&meta, span)?;
-                self.commits.push(CommitEvent {
-                    origin_id,
-                    key: meta.key.clone(),
-                    kind: r.kind,
-                });
-                self.trace.push(TraceEvent::CommitResult {
-                    allowed: true,
-                    reason: None,
-                });
-                Ok(())
+                match self.commit_policy {
+                    CommitPolicyMode::Normal => {
+                        self.apply_pending_sqlite_write_if_needed(&meta, span)?;
+                        self.commits.push(CommitEvent {
+                            origin_id,
+                            key: meta.key.clone(),
+                            kind: r.kind,
+                        });
+                        self.trace.push(TraceEvent::CommitResult {
+                            allowed: true,
+                            reason: None,
+                        });
+                        Ok(())
+                    }
+                    CommitPolicyMode::ForbidCommit => {
+                        self.trace.push(TraceEvent::CommitResult {
+                            allowed: false,
+                            reason: Some(ReasonCode::PolicyDenied),
+                        });
+                        Ok(())
+                    }
+                    CommitPolicyMode::ShadowCommitLog => {
+                        self.commits.push(CommitEvent {
+                            origin_id,
+                            key: meta.key.clone(),
+                            kind: r.kind,
+                        });
+                        self.trace.push(TraceEvent::CommitResult {
+                            allowed: true,
+                            reason: None,
+                        });
+                        Ok(())
+                    }
+                }
             }
             ResultKind::Insufficient | ResultKind::Deferred => {
                 self.trace.push(TraceEvent::CommitResult {
@@ -1446,6 +1472,39 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             );
             Result4::ok(Value::Payload(map))
         }
+        "std.view.render_text" => {
+            let mut map = BTreeMap::new();
+            let truth = ctx.get("truth").cloned().unwrap_or_default();
+            let view_id = resolve_active_view_id(&ctx);
+            let renderer = "text";
+            let rendered = format!("[{view_id}] {truth}");
+            map.insert("truth".to_string(), truth);
+            map.insert("view_id".to_string(), view_id.clone());
+            map.insert("renderer".to_string(), renderer.to_string());
+            map.insert("rendered".to_string(), rendered);
+            map.insert(
+                "render_hash256".to_string(),
+                stable_hash256_hex(&format!("{renderer}|{view_id}|{}", map["truth"])),
+            );
+            Result4::ok(Value::Payload(map))
+        }
+        "std.view.render_tree" => {
+            let mut map = BTreeMap::new();
+            let truth = ctx.get("truth").cloned().unwrap_or_default();
+            let view_id = resolve_active_view_id(&ctx);
+            let renderer = "tree";
+            let tree_hash = stable_hash64_hex(&format!("tree|{view_id}|{truth}"));
+            let rendered = format!("root(view={view_id}, hash={tree_hash})");
+            map.insert("truth".to_string(), truth);
+            map.insert("view_id".to_string(), view_id.clone());
+            map.insert("renderer".to_string(), renderer.to_string());
+            map.insert("rendered".to_string(), rendered);
+            map.insert(
+                "render_hash256".to_string(),
+                stable_hash256_hex(&format!("{renderer}|{view_id}|{}", map["truth"])),
+            );
+            Result4::ok(Value::Payload(map))
+        }
         "std.ui.frame_info" => {
             let mut map = BTreeMap::new();
             let tick = ctx
@@ -1699,4 +1758,16 @@ fn parse_ctx_pairs(ctx_literal: &str) -> HashMap<String, String> {
         }
     }
     out
+}
+
+fn resolve_active_view_id(ctx: &HashMap<String, String>) -> String {
+    if let Some(view_id) = ctx.get("view_id") {
+        if !view_id.trim().is_empty() {
+            return view_id.to_string();
+        }
+    }
+    match env::var("OCL_VIEW_ID") {
+        Ok(value) if !value.trim().is_empty() => value,
+        _ => "default".to_string(),
+    }
 }

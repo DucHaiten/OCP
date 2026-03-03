@@ -1,0 +1,2 @@
+let swarm_ok = true;
+condition(swarm_ok);

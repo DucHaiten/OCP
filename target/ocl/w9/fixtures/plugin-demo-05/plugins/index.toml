@@ -1,0 +1,5 @@
+[[plugin]]
+id = "echo.local.v1"
+key_prefix = "custom.echo."
+platform = "windows-x64"
+command = "powershell -ExecutionPolicy Bypass -File plugins/bin/echo_plugin.ps1"

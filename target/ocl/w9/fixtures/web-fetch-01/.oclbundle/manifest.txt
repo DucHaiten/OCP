@@ -1,0 +1,6 @@
+version=1
+file=src/main.ocl
+file=tests/smoke.ocl
+dep=http|0.1.0|065991262a32dde6
+dep=json|0.1.0|ffc3e74138a139d4
+dep=std|0.1.0|7578c00340467769

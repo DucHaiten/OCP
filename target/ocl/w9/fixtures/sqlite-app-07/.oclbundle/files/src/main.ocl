@@ -1,0 +1,21 @@
+module apps.sqlite_app.main;
+
+observe("std.db.query_int", "tier2", ctx("dsn=file:demo.db;sql=SELECT count(*) FROM counters"), budget(5)) -> query_res;
+observe("std.db.exec", "tier2", ctx("dsn=file:demo.db;sql=UPDATE counters SET n=1"), budget(5)) -> write_res;
+commit(write_res);
+
+match query_res {
+  OK => { let ok = true; condition(ok); }
+  DEGRADED => { let ok = true; condition(ok); }
+  INSUFFICIENT => { let ok = true; condition(ok); }
+  DEFERRED => { let ok = true; condition(ok); }
+}
+
+match write_res {
+  OK => { let ok = true; condition(ok); }
+  DEGRADED => { let ok = true; condition(ok); }
+  INSUFFICIENT => { let ok = true; condition(ok); }
+  DEFERRED => { let ok = true; condition(ok); }
+}
+
+condition(true);

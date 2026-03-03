@@ -1,0 +1,10 @@
+﻿{
+    "status":  "pass",
+    "drift":  [
+
+              ],
+    "before_snapshot":  "target\\ocl\\v5\\w0\\reports\\topology_freeze_before.json",
+    "after_snapshot":  "target\\ocl\\v5\\w0\\reports\\topology_freeze_after.json",
+    "before_hash":  "2368609249b4b0edcc7663bd3c4854fc66fb2d0868d9d70a76e7864ec690ab6f",
+    "after_hash":  "2368609249b4b0edcc7663bd3c4854fc66fb2d0868d9d70a76e7864ec690ab6f"
+}

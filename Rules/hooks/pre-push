@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+set -eu
+
+python Rules/guard/guard_repo.py --mode all

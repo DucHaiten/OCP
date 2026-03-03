@@ -1,0 +1,2 @@
+version=1
+plugin=echo.local.v1	custom.echo.	windows-x64	powershell -ExecutionPolicy Bypass -File plugins/bin/echo_plugin.ps1	kcjs0SQ/YkfvuoUXMW46Qdub0e25akIWOqSRJthfb3+hMvtVR3WmoWiyRR5+UEEW7+VpPof5J6U0BPrcXY2BCA==	IzG61FRBJghny8Q7/JMsBzahrluGS5GyB/aaQMKbYnY=

@@ -11,7 +11,7 @@ pub struct VmProgram {
 pub fn execute_compiled(
     program: &Program,
     _vm_program: &VmProgram,
-    step_cap: u32,
+    config: ExecConfig,
 ) -> Result<ExecOutput, Diagnostic> {
-    execute_program(program, ExecConfig { step_cap })
+    execute_program(program, config)
 }

@@ -91,6 +91,11 @@ fn w2_reactor_replay_audit_written_and_deterministic() {
         socket_listen: Some("127.0.0.1:19091".to_string()),
         runtime_report: None,
         replay_audit: Some(audit_a.clone()),
+        io_tape_record_path: None,
+        io_tape_replay_path: None,
+        hive_caps: None,
+        universe_id: None,
+        domain_id: None,
     };
     let report_a = run_reactor_service_with_lock(&root, &opts_a, true).expect("run A");
     assert!(report_a.replay_audit_written);

@@ -1,0 +1,20 @@
+module apps.web_fetch.main;
+
+observe("std.http.get", "tier2", ctx("url=https://example.com"), budget(5)) -> http_res;
+observe("std.json.parse", "tier2", ctx("raw={\"ok\":true}"), budget(5)) -> json_res;
+
+match http_res {
+  OK => { let keep = true; condition(keep); }
+  DEGRADED => { let keep = true; condition(keep); }
+  INSUFFICIENT => { let keep = true; condition(keep); }
+  DEFERRED => { let keep = true; condition(keep); }
+}
+
+match json_res {
+  OK => { let parsed = true; condition(parsed); }
+  DEGRADED => { let parsed = true; condition(parsed); }
+  INSUFFICIENT => { let parsed = true; condition(parsed); }
+  DEFERRED => { let parsed = true; condition(parsed); }
+}
+
+condition(true);

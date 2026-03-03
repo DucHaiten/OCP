@@ -1,11 +1,22 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommitPolicyMode {
+    Normal,
+    ForbidCommit,
+    ShadowCommitLog,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExecConfig {
     pub step_cap: u32,
+    pub commit_policy: CommitPolicyMode,
 }
 
 impl Default for ExecConfig {
     fn default() -> Self {
-        Self { step_cap: 10_000 }
+        Self {
+            step_cap: 10_000,
+            commit_policy: CommitPolicyMode::Normal,
+        }
     }
 }
 

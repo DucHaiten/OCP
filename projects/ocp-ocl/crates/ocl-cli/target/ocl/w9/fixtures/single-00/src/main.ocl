@@ -1,0 +1,11 @@
+module tests.w1.cli;
+
+fn on_event(event) {
+  observe("std.net.listen", "tier2", ctx("addr=127.0.0.1:19091"), budget(5)) -> listen_res;
+  observe("std.net.reply", "tier2", ctx("conn=local;status=200;body=ok"), budget(5)) -> reply_res;
+  commit(reply_res);
+  return event;
+}
+
+let boot = true;
+condition(boot);

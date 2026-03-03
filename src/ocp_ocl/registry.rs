@@ -117,6 +117,14 @@ impl CapabilityRegistry {
             "std.game.tick_info".to_string(),
             vec!["ctx_tick".to_string()],
         );
+        ctx_required.insert(
+            "std.view.render_text".to_string(),
+            vec!["truth".to_string()],
+        );
+        ctx_required.insert(
+            "std.view.render_tree".to_string(),
+            vec!["truth".to_string()],
+        );
 
         let mut commit_allowed = HashMap::new();
         commit_allowed.insert("std.db.query_int".to_string(), false);
@@ -124,6 +132,8 @@ impl CapabilityRegistry {
         commit_allowed.insert("std.tls.handshake".to_string(), false);
         commit_allowed.insert("std.ui.frame_info".to_string(), false);
         commit_allowed.insert("std.game.tick_info".to_string(), false);
+        commit_allowed.insert("std.view.render_text".to_string(), false);
+        commit_allowed.insert("std.view.render_tree".to_string(), false);
 
         Self {
             enabled_families,
