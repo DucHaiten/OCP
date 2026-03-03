@@ -6,11 +6,11 @@ if (-not (Test-Path $workspace)) {
     exit 1
 }
 
-$forbidden = Get-ChildItem -Path $workspace -Recurse -File | Where-Object {
+$forbidden = @(Get-ChildItem -Path $workspace -Recurse -File | Where-Object {
     $_.Extension -in @(".rs", ".cpp", ".cc", ".cxx", ".c")
-}
+})
 
-if ($forbidden.Count -gt 0) {
+if (@($forbidden).Count -gt 0) {
     Write-Error "Boundary violation: host code detected in OCL app workspace."
     $forbidden | ForEach-Object { Write-Host $_.FullName }
     exit 1

@@ -85,3 +85,12 @@ fn key_pattern_matching_basics() {
     assert!(ex.matches("world.exists"));
     assert!(!ex.matches("world.exists.v2"));
 }
+
+#[test]
+fn registry_denies_std_net_poll_by_default() {
+    let reg = CapabilityRegistry::v1_baseline();
+    let err = reg
+        .check_observe("std.net.poll", "conn=local")
+        .expect_err("std.net.poll must be denied in user path");
+    assert_eq!(err.to_reason_code(), ReasonCode::CapabilityDenied);
+}

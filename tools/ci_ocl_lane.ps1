@@ -34,11 +34,20 @@ function New-IsolatedAppCopy {
 Invoke-Step "cargo test -p ocl-runtime-core"
 Invoke-Step "cargo test -p ocl-sdk"
 Invoke-Step "cargo test -p ocl-cli"
+Invoke-Step "cargo test -p ocl-runtime-core --test m1_language"
+Invoke-Step "cargo test -p ocl-runtime-core --test w3_bytecode"
+Invoke-Step "cargo test -p ocl-sdk --test w1_runtime"
+Invoke-Step "cargo test -p ocl-sdk --test w2_permissions"
+Invoke-Step "cargo test -p ocl-sdk --test w2_audit"
+Invoke-Step "cargo test -p ocl-sdk --test w3_engine"
+Invoke-Step "cargo test -p ocl-sdk --test w4_supply"
 
 $canaryPath = New-IsolatedAppCopy "projects/ocp-ocl/app-ocl"
 $canaryArg = Quote-PS $canaryPath
 Invoke-Step "cargo run -p ocl-cli -- check $canaryArg --json"
 Invoke-Step "cargo run -p ocl-cli -- run $canaryArg"
+Invoke-Step "cargo run -p ocl-cli -- run $canaryArg --engine bytecode"
+Invoke-Step "cargo run -p ocl-cli -- run $canaryArg --engine dual"
 Invoke-Step "cargo run -p ocl-cli -- run $canaryArg --reactor --ticks 32"
 Invoke-Step "cargo run -p ocl-cli -- fmt $canaryArg --check"
 Invoke-Step "cargo run -p ocl-cli -- test $canaryArg"
@@ -49,6 +58,8 @@ $demoApps = @(
     @{ Path = "projects/ocp-ocl/apps/web-fetch"; ReactorTicks = 0; Composer = $false },
     @{ Path = "projects/ocp-ocl/apps/mini-server"; ReactorTicks = 16; Composer = $false },
     @{ Path = "projects/ocp-ocl/apps/scheduler"; ReactorTicks = 16; Composer = $false },
+    @{ Path = "projects/ocp-ocl/apps/tls-client"; ReactorTicks = 0; Composer = $false },
+    @{ Path = "projects/ocp-ocl/apps/sqlite-app"; ReactorTicks = 0; Composer = $false },
     @{ Path = "projects/ocp-ocl/apps/composer-demo"; ReactorTicks = 0; Composer = $true }
 )
 
@@ -69,9 +80,19 @@ foreach ($app in $demoApps) {
 
     if ($app.ReactorTicks -gt 0) {
         Invoke-Step "cargo run -p ocl-cli -- run $pathArg --reactor --ticks $($app.ReactorTicks) --locked"
+        if ($app.Path -eq "projects/ocp-ocl/apps/mini-server") {
+            $reportDetArg = Quote-PS (Join-Path $path "target\\w1_runtime_det.json")
+            $reportThrArg = Quote-PS (Join-Path $path "target\\w1_runtime_thr.json")
+            $auditDetArg = Quote-PS (Join-Path $path "target\\w2_replay_det.audit.jsonl")
+            $auditThrArg = Quote-PS (Join-Path $path "target\\w2_replay_thr.audit.jsonl")
+            Invoke-Step "cargo run -p ocl-cli -- run $pathArg --reactor --ticks 16 --runtime deterministic --socket-listen 127.0.0.1:19091 --runtime-report $reportDetArg --replay-audit $auditDetArg --locked"
+            Invoke-Step "cargo run -p ocl-cli -- run $pathArg --reactor --ticks 16 --runtime throughput --socket-listen 127.0.0.1:19092 --runtime-report $reportThrArg --replay-audit $auditThrArg --locked"
+        }
     }
 
     Invoke-Step "cargo run -p ocl-cli -- fmt $pathArg --check"
     Invoke-Step "cargo run -p ocl-cli -- test $pathArg --locked"
     Invoke-Step "cargo run -p ocl-cli -- build $pathArg --locked"
 }
+
+Invoke-Step "cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v1.toml --out target/ocl/w9/reports/conformance_report.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json"

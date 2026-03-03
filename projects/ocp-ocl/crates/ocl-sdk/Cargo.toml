@@ -9,3 +9,6 @@ path = "src/lib.rs"
 
 [dependencies]
 ocl-runtime-core = { path = "../ocl-runtime-core" }
+base64 = "0.22"
+blake3 = "1.5"
+ed25519-dalek = { version = "2.1", features = ["std"] }

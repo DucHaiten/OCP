@@ -36,6 +36,8 @@ pub struct ComposeSummary {
     pub generated_files: usize,
     pub generated_module: PathBuf,
     pub proof_path: PathBuf,
+    pub cache_hit: bool,
+    pub cache_key_hash64: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -193,6 +195,36 @@ pub fn compose_phenotype(
     let layout = project_layout(project_root);
     let generated_dir = layout.root.join("src").join("generated");
     fs::create_dir_all(&generated_dir)?;
+    let module_path = generated_dir.join("mod.ocl");
+    let proof_path = layout.root.join("assembly_proof.toml");
+
+    let components: Vec<String> = selected.iter().map(|s| s.name.clone()).collect();
+    let catalog_hash64 = hash_catalog(&selected, registry_root)?;
+    let phenotype_hash64 = fnv1a64_hex(&components.join(","));
+    let cache_key_hash64 = fnv1a64_hex(&format!(
+        "{}|{}|{}",
+        catalog_hash64,
+        phenotype_hash64,
+        components.join(",")
+    ));
+
+    if let Some(existing_files) = try_compose_cache_hit(
+        &proof_path,
+        &generated_dir,
+        &components,
+        &catalog_hash64,
+        &phenotype_hash64,
+    )? {
+        write_compose_cache_marker(&layout.root, &cache_key_hash64, true)?;
+        return Ok(ComposeSummary {
+            selected_components: selected.len(),
+            generated_files: existing_files,
+            generated_module: module_path,
+            proof_path,
+            cache_hit: true,
+            cache_key_hash64,
+        });
+    }
 
     let mut generated_files = Vec::new();
     for spec in &selected {
@@ -211,7 +243,6 @@ pub fn compose_phenotype(
         generated_files.push(out_path);
     }
 
-    let module_path = generated_dir.join("mod.ocl");
     let mut module_body = String::from("module generated.mod;\n");
     module_body.push_str("let component_count = ");
     module_body.push_str(&selected.len().to_string());
@@ -220,21 +251,22 @@ pub fn compose_phenotype(
     fs::write(&module_path, module_body)?;
     generated_files.push(module_path.clone());
 
-    let components: Vec<String> = selected.iter().map(|s| s.name.clone()).collect();
     let proof = AssemblyProofV1 {
-        catalog_hash64: hash_catalog(&selected),
-        phenotype_hash64: fnv1a64_hex(&components.join(",")),
+        catalog_hash64: catalog_hash64.clone(),
+        phenotype_hash64: phenotype_hash64.clone(),
         generated_hash64: hash_generated_files(&generated_files)?,
         components,
     };
-    let proof_path = layout.root.join("assembly_proof.toml");
     fs::write(&proof_path, encode_proof(&proof))?;
+    write_compose_cache_marker(&layout.root, &cache_key_hash64, false)?;
 
     Ok(ComposeSummary {
         selected_components: selected.len(),
         generated_files: generated_files.len(),
         generated_module: module_path,
         proof_path,
+        cache_hit: false,
+        cache_key_hash64,
     })
 }
 
@@ -286,7 +318,7 @@ pub fn verify_assembly(
         ));
     }
 
-    let expected_catalog_hash = hash_catalog(&selected);
+    let expected_catalog_hash = hash_catalog(&selected, registry_root)?;
     if proof.catalog_hash64 != expected_catalog_hash {
         return Err(SdkError::LockMismatch(
             "assembly proof mismatch: catalog hash changed".to_string(),
@@ -384,19 +416,80 @@ fn sanitize_name(name: &str) -> String {
     out.trim_matches('_').to_string()
 }
 
-fn hash_catalog(selected: &[ComponentSpecV1]) -> String {
+fn hash_catalog(selected: &[ComponentSpecV1], registry_root: &Path) -> Result<String, SdkError> {
     let mut chunks = Vec::new();
     for spec in selected {
+        let template_path = registry_root.join(&spec.template_rel);
+        let template_hash64 = if template_path.exists() {
+            let body = fs::read_to_string(&template_path)?;
+            fnv1a64_hex(&body)
+        } else {
+            fnv1a64_hex("template-missing")
+        };
         chunks.push(format!(
-            "{}|{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}|{}|{}",
             spec.name,
             spec.phase,
             spec.provides.join(","),
             spec.requires.join(","),
-            spec.hash64
+            spec.hash64,
+            spec.template_rel,
+            template_hash64
         ));
     }
-    fnv1a64_hex(&chunks.join("\n"))
+    Ok(fnv1a64_hex(&chunks.join("\n")))
+}
+
+fn try_compose_cache_hit(
+    proof_path: &Path,
+    generated_dir: &Path,
+    expected_components: &[String],
+    expected_catalog_hash: &str,
+    expected_phenotype_hash: &str,
+) -> Result<Option<usize>, SdkError> {
+    if !proof_path.exists() || !generated_dir.exists() {
+        return Ok(None);
+    }
+    let proof_raw = fs::read_to_string(proof_path)?;
+    let proof = decode_proof(&proof_raw)?;
+    if proof.components != expected_components {
+        return Ok(None);
+    }
+    if proof.catalog_hash64 != expected_catalog_hash {
+        return Ok(None);
+    }
+    if proof.phenotype_hash64 != expected_phenotype_hash {
+        return Ok(None);
+    }
+    let generated_files = collect_generated_ocl_files(generated_dir)?;
+    if generated_files.is_empty() {
+        return Ok(None);
+    }
+    let generated_hash = hash_generated_files(&generated_files)?;
+    if generated_hash != proof.generated_hash64 {
+        return Ok(None);
+    }
+    Ok(Some(generated_files.len()))
+}
+
+fn write_compose_cache_marker(
+    project_root: &Path,
+    cache_key_hash64: &str,
+    cache_hit: bool,
+) -> Result<(), SdkError> {
+    let cache_dir = project_root.join("target").join("ocl").join("composer");
+    fs::create_dir_all(&cache_dir)?;
+    let cache_file = cache_dir.join("cache.v1");
+    let mut body = String::new();
+    body.push_str("version=1\n");
+    body.push_str("cache_key_hash64=");
+    body.push_str(cache_key_hash64);
+    body.push('\n');
+    body.push_str("cache_hit=");
+    body.push_str(if cache_hit { "true" } else { "false" });
+    body.push('\n');
+    fs::write(cache_file, body)?;
+    Ok(())
 }
 
 fn collect_generated_ocl_files(generated_dir: &Path) -> Result<Vec<PathBuf>, SdkError> {

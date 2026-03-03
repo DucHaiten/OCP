@@ -1,4 +1,10 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::env;
+use std::fs;
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpStream;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use crate::ocp_ocl::ast::{Expr, MatchStmt, Program, Stmt};
 use crate::ocp_ocl::audit::{TraceEvent, TraceLog};
@@ -32,6 +38,14 @@ pub struct CommitEvent {
 #[derive(Debug, Clone)]
 struct ObservationMeta {
     key: String,
+    pending_sqlite_write: Option<PendingSqliteWrite>,
+}
+
+#[derive(Debug, Clone)]
+struct PendingSqliteWrite {
+    dsn: String,
+    sql: String,
+    pending_write_id: String,
 }
 
 const CONDITION_TIME_BUDGET_NS: u64 = 20_000;
@@ -79,6 +93,7 @@ pub struct Executor {
     next_origin_id: u64,
     registry: CapabilityRegistry,
     observations: HashMap<u64, ObservationMeta>,
+    applied_sqlite_writes: HashSet<String>,
     commits: Vec<CommitEvent>,
     trace: TraceLog,
     constraints: ConstraintSession,
@@ -93,6 +108,7 @@ impl Executor {
             next_origin_id: 1,
             registry: CapabilityRegistry::default(),
             observations: HashMap::new(),
+            applied_sqlite_writes: HashSet::new(),
             commits: Vec::new(),
             trace: TraceLog::default(),
             constraints: ConstraintSession::default(),
@@ -107,6 +123,7 @@ impl Executor {
             next_origin_id: 1,
             registry,
             observations: HashMap::new(),
+            applied_sqlite_writes: HashSet::new(),
             commits: Vec::new(),
             trace: TraceLog::default(),
             constraints: ConstraintSession::default(),
@@ -269,10 +286,12 @@ impl Executor {
                 }
                 .with_origin_id(origin_id);
 
+                let pending_sqlite_write = extract_pending_sqlite_write(key_lit, &r);
                 self.observations.insert(
                     origin_id,
                     ObservationMeta {
                         key: key_lit.to_string(),
+                        pending_sqlite_write,
                     },
                 );
                 self.trace.push(TraceEvent::ObserveEnd {
@@ -581,7 +600,7 @@ impl Executor {
                 "commit(...) requires observe origin_id",
             ));
         };
-        let Some(meta) = self.observations.get(&origin_id) else {
+        let Some(meta) = self.observations.get(&origin_id).cloned() else {
             self.trace.push(TraceEvent::CommitResult {
                 allowed: false,
                 reason: Some(ReasonCode::PolicyDenied),
@@ -608,6 +627,7 @@ impl Executor {
                         "commit policy denied for key",
                     ));
                 }
+                self.apply_pending_sqlite_write_if_needed(&meta, span)?;
                 self.commits.push(CommitEvent {
                     origin_id,
                     key: meta.key.clone(),
@@ -632,6 +652,54 @@ impl Executor {
                 ))
             }
         }
+    }
+
+    fn apply_pending_sqlite_write_if_needed(
+        &mut self,
+        meta: &ObservationMeta,
+        span: Span,
+    ) -> Result<(), Diagnostic> {
+        let Some(pending) = meta.pending_sqlite_write.as_ref() else {
+            return Ok(());
+        };
+        if !db_local_real_enabled() {
+            return Ok(());
+        }
+        if self
+            .applied_sqlite_writes
+            .contains(&pending.pending_write_id)
+        {
+            return Ok(());
+        }
+
+        if pending
+            .sql
+            .trim_start()
+            .to_ascii_lowercase()
+            .starts_with("select")
+        {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "std.db.exec commit does not allow SELECT statement",
+            )
+            .with_root_reason(ReasonCode::PolicyDenied));
+        }
+
+        sqlite_exec_local_real(&pending.dsn, &pending.sql).map_err(|reason| {
+            Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "std.db.exec local-real apply failed",
+            )
+            .with_root_reason(reason)
+        })?;
+
+        self.applied_sqlite_writes
+            .insert(pending.pending_write_id.clone());
+        Ok(())
     }
 
     fn eval_expr(&mut self, expr: &Expr) -> Result<Value, Diagnostic> {
@@ -986,12 +1054,154 @@ fn validate_ctx_literal(raw: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn extract_pending_sqlite_write(key: &str, result: &Result4<Value>) -> Option<PendingSqliteWrite> {
+    if key != "std.db.exec" || !matches!(result.kind, ResultKind::Ok | ResultKind::Degraded) {
+        return None;
+    }
+    let Value::Payload(map) = result.payload.as_ref()? else {
+        return None;
+    };
+    let dsn = map.get("dsn")?.clone();
+    let sql = map.get("sql")?.clone();
+    let pending_write_id = map.get("pending_write_id")?.clone();
+    Some(PendingSqliteWrite {
+        dsn,
+        sql,
+        pending_write_id,
+    })
+}
+
+fn flag_enabled(var_name: &str) -> bool {
+    match env::var(var_name) {
+        Ok(raw) => matches!(
+            raw.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes"
+        ),
+        Err(_) => false,
+    }
+}
+
+fn tls_local_real_enabled() -> bool {
+    flag_enabled("OCL_W7_TLS_LOCAL_REAL")
+}
+
+fn db_local_real_enabled() -> bool {
+    flag_enabled("OCL_W7_DB_LOCAL_REAL")
+}
+
+fn tls_local_timeout() -> Duration {
+    let millis = env::var("OCL_W7_TLS_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(1_500);
+    Duration::from_millis(millis)
+}
+
+fn tls_local_probe(host: &str, port: &str) -> Result<(), ReasonCode> {
+    let addr = format!("{host}:{port}");
+    let mut addrs = std::net::ToSocketAddrs::to_socket_addrs(addr.as_str())
+        .map_err(|_| ReasonCode::AdapterFailed)?;
+    let socket = addrs.next().ok_or(ReasonCode::AdapterFailed)?;
+    TcpStream::connect_timeout(&socket, tls_local_timeout())
+        .map(|_| ())
+        .map_err(|_| ReasonCode::AdapterFailed)
+}
+
+fn sqlite_path_from_dsn(dsn: &str) -> Result<String, ReasonCode> {
+    let trimmed = dsn.trim();
+    if trimmed.is_empty() {
+        return Err(ReasonCode::CtxInvalid);
+    }
+    if trimmed == "memory:" || trimmed == ":memory:" {
+        return Ok(":memory:".to_string());
+    }
+    let Some(raw_path) = trimmed.strip_prefix("file:") else {
+        return Err(ReasonCode::CtxInvalid);
+    };
+    if raw_path.trim().is_empty() {
+        return Err(ReasonCode::CtxInvalid);
+    }
+    Ok(raw_path.to_string())
+}
+
+fn sqlite_query_int_local_real(dsn: &str, sql: &str) -> Result<i64, ReasonCode> {
+    let db_path = sqlite_path_from_dsn(dsn)?;
+    if db_path != ":memory:" {
+        let path = std::path::Path::new(&db_path);
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent).map_err(|_| ReasonCode::AdapterFailed)?;
+            }
+        }
+    }
+    let script = concat!(
+        "import sqlite3,sys\n",
+        "db,sql = sys.argv[1],sys.argv[2]\n",
+        "conn = sqlite3.connect(db)\n",
+        "try:\n",
+        "  cur = conn.execute(sql)\n",
+        "  row = cur.fetchone()\n",
+        "  if row is None or row[0] is None:\n",
+        "    print('0')\n",
+        "  else:\n",
+        "    print(str(row[0]))\n",
+        "finally:\n",
+        "  conn.close()\n",
+    );
+    let output = Command::new("python")
+        .args(["-c", script, db_path.as_str(), sql])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|_| ReasonCode::AdapterFailed)?;
+    if !output.status.success() {
+        return Err(ReasonCode::AdapterFailed);
+    }
+    let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    raw.parse::<i64>().map_err(|_| ReasonCode::AdapterFailed)
+}
+
+fn sqlite_exec_local_real(dsn: &str, sql: &str) -> Result<(), ReasonCode> {
+    let db_path = sqlite_path_from_dsn(dsn)?;
+    if db_path != ":memory:" {
+        let path = std::path::Path::new(&db_path);
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent).map_err(|_| ReasonCode::AdapterFailed)?;
+            }
+        }
+    }
+    let script = concat!(
+        "import sqlite3,sys\n",
+        "db,sql = sys.argv[1],sys.argv[2]\n",
+        "conn = sqlite3.connect(db)\n",
+        "try:\n",
+        "  conn.executescript(sql)\n",
+        "  conn.commit()\n",
+        "finally:\n",
+        "  conn.close()\n",
+    );
+    let status = Command::new("python")
+        .args(["-c", script, db_path.as_str(), sql])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|_| ReasonCode::AdapterFailed)?;
+    if !status.success() {
+        return Err(ReasonCode::AdapterFailed);
+    }
+    Ok(())
+}
+
 fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
     if key.starts_with("world.ok") {
         return Result4::ok(stub_payload(key));
     }
     if key.starts_with("world.degraded") {
         return Result4::degraded(stub_payload(key), ReasonCode::AdapterFailed);
+    }
+    if key.starts_with("custom.") {
+        return observe_custom_plugin_result(key, ctx_literal);
     }
 
     let ctx = parse_ctx_pairs(ctx_literal);
@@ -1100,8 +1310,370 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             map.insert("status".to_string(), "accepted".to_string());
             Result4::ok(Value::Payload(map))
         }
+        "std.net.listen" => {
+            let mut map = BTreeMap::new();
+            map.insert(
+                "addr".to_string(),
+                ctx.get("addr").cloned().unwrap_or_default(),
+            );
+            map.insert("state".to_string(), "listening".to_string());
+            map.insert("event_id".to_string(), "1".to_string());
+            Result4::ok(Value::Payload(map))
+        }
+        "std.net.reply" => {
+            let mut map = BTreeMap::new();
+            map.insert(
+                "conn".to_string(),
+                ctx.get("conn").cloned().unwrap_or_default(),
+            );
+            map.insert(
+                "status".to_string(),
+                ctx.get("status")
+                    .cloned()
+                    .unwrap_or_else(|| "200".to_string()),
+            );
+            map.insert(
+                "bytes".to_string(),
+                ctx.get("body")
+                    .map(|v| v.len().to_string())
+                    .unwrap_or_else(|| "0".to_string()),
+            );
+            map.insert("queued".to_string(), "true".to_string());
+            Result4::ok(Value::Payload(map))
+        }
+        "std.net.close" => {
+            let mut map = BTreeMap::new();
+            map.insert(
+                "conn".to_string(),
+                ctx.get("conn").cloned().unwrap_or_default(),
+            );
+            map.insert("closed".to_string(), "true".to_string());
+            Result4::degraded(Value::Payload(map), ReasonCode::AdapterFailed)
+        }
+        "std.tls.connect" => {
+            let mut map = BTreeMap::new();
+            let host = ctx.get("host").cloned().unwrap_or_default();
+            let port = ctx
+                .get("port")
+                .cloned()
+                .unwrap_or_else(|| "443".to_string());
+            let conn = format!("{host}:{port}");
+            if tls_local_real_enabled() {
+                if tls_local_probe(&host, &port).is_err() {
+                    return Result4::deferred(ReasonCode::AdapterFailed);
+                }
+                map.insert("mode".to_string(), "local_real".to_string());
+                map.insert("state".to_string(), "connected_local_real".to_string());
+            } else {
+                map.insert("mode".to_string(), "stub".to_string());
+                map.insert("state".to_string(), "connected".to_string());
+            }
+            map.insert("host".to_string(), host);
+            map.insert("port".to_string(), port);
+            map.insert("conn".to_string(), conn);
+            Result4::ok(Value::Payload(map))
+        }
+        "std.tls.handshake" => {
+            let mut map = BTreeMap::new();
+            let conn = ctx.get("conn").cloned().unwrap_or_default();
+            let (host, port) = match conn.split_once(':') {
+                Some((h, p)) => (h.to_string(), p.to_string()),
+                None => (conn.clone(), "443".to_string()),
+            };
+            if tls_local_real_enabled() && tls_local_probe(&host, &port).is_err() {
+                return Result4::deferred(ReasonCode::AdapterFailed);
+            }
+            map.insert("conn".to_string(), conn);
+            map.insert("protocol".to_string(), "TLS1.3".to_string());
+            map.insert("cipher".to_string(), "platform-default".to_string());
+            map.insert(
+                "mode".to_string(),
+                if tls_local_real_enabled() {
+                    "local_real".to_string()
+                } else {
+                    "stub".to_string()
+                },
+            );
+            map.insert(
+                "transcript_hash256".to_string(),
+                stable_hash256_hex(&format!("{}|{}|{}", host, port, tls_local_real_enabled())),
+            );
+            Result4::ok(Value::Payload(map))
+        }
+        "std.db.query_int" => {
+            let mut map = BTreeMap::new();
+            let sql = ctx.get("sql").cloned().unwrap_or_default();
+            let dsn = ctx.get("dsn").cloned().unwrap_or_default();
+            map.insert("dsn".to_string(), dsn);
+            map.insert("sql".to_string(), sql.clone());
+            let value = if db_local_real_enabled() {
+                match sqlite_query_int_local_real(&map["dsn"], &sql) {
+                    Ok(v) => v.to_string(),
+                    Err(reason) => return Result4::deferred(reason),
+                }
+            } else if sql.to_ascii_lowercase().contains("count") {
+                "1".to_string()
+            } else {
+                "0".to_string()
+            };
+            map.insert("value".to_string(), value);
+            map.insert(
+                "mode".to_string(),
+                if db_local_real_enabled() {
+                    "local_real".to_string()
+                } else {
+                    "stub".to_string()
+                },
+            );
+            Result4::ok(Value::Payload(map))
+        }
+        "std.db.exec" => {
+            let mut map = BTreeMap::new();
+            let dsn = ctx.get("dsn").cloned().unwrap_or_default();
+            let sql = ctx.get("sql").cloned().unwrap_or_default();
+            let pending_write_id = stable_hash64_hex(&format!("{dsn}|{sql}"));
+            map.insert("dsn".to_string(), dsn);
+            map.insert("sql".to_string(), sql);
+            map.insert("pending_write_id".to_string(), pending_write_id);
+            map.insert("applied".to_string(), "false".to_string());
+            map.insert(
+                "mode".to_string(),
+                if db_local_real_enabled() {
+                    "local_real".to_string()
+                } else {
+                    "stub".to_string()
+                },
+            );
+            Result4::ok(Value::Payload(map))
+        }
+        "std.ui.frame_info" => {
+            let mut map = BTreeMap::new();
+            let tick = ctx
+                .get("ctx_tick")
+                .cloned()
+                .unwrap_or_else(|| "0".to_string());
+            map.insert("ctx_tick".to_string(), tick.clone());
+            map.insert("frame".to_string(), tick);
+            Result4::ok(Value::Payload(map))
+        }
+        "std.game.tick_info" => {
+            let mut map = BTreeMap::new();
+            let tick = ctx
+                .get("ctx_tick")
+                .cloned()
+                .unwrap_or_else(|| "0".to_string());
+            map.insert("ctx_tick".to_string(), tick.clone());
+            map.insert("tick".to_string(), tick);
+            Result4::ok(Value::Payload(map))
+        }
         _ => Result4::deferred(ReasonCode::NotImplemented),
     }
+}
+
+#[derive(Debug, Clone)]
+struct PluginLockEntryRuntime {
+    id: String,
+    key_prefix: String,
+    command: String,
+}
+
+fn observe_custom_plugin_result(key: &str, ctx_literal: &str) -> Result4<Value> {
+    let entries = match load_plugin_lock_entries_from_env() {
+        Ok(v) => v,
+        Err(reason) => return Result4::deferred(reason),
+    };
+    if entries.is_empty() {
+        return Result4::deferred(ReasonCode::PluginUnavailable);
+    }
+
+    let selected = entries
+        .iter()
+        .filter(|entry| key.starts_with(&entry.key_prefix))
+        .max_by_key(|entry| entry.key_prefix.len());
+    let Some(entry) = selected else {
+        return Result4::insufficient(ReasonCode::KeyUnknown);
+    };
+
+    let response = match invoke_plugin_jsonl(entry, key, ctx_literal) {
+        Ok(v) => v,
+        Err(reason) => return Result4::deferred(reason),
+    };
+
+    let kind = json_field_string(&response, "kind")
+        .unwrap_or_else(|| "deferred".to_string())
+        .to_ascii_lowercase();
+    let reason = json_field_string(&response, "reason").and_then(|v| reason_code_from_str(&v));
+    let payload_text = json_field_string(&response, "payload").unwrap_or_default();
+
+    let mut payload = BTreeMap::new();
+    payload.insert("plugin_id".to_string(), entry.id.clone());
+    payload.insert("key".to_string(), key.to_string());
+    payload.insert("payload".to_string(), payload_text);
+
+    match kind.as_str() {
+        "ok" => Result4::ok(Value::Payload(payload)),
+        "degraded" => Result4::degraded(
+            Value::Payload(payload),
+            reason.unwrap_or(ReasonCode::AdapterFailed),
+        ),
+        "insufficient" => Result4::insufficient(reason.unwrap_or(ReasonCode::AdapterFailed)),
+        "deferred" => Result4::deferred(reason.unwrap_or(ReasonCode::AdapterFailed)),
+        _ => Result4::deferred(ReasonCode::PluginProtocolError),
+    }
+}
+
+fn load_plugin_lock_entries_from_env() -> Result<Vec<PluginLockEntryRuntime>, ReasonCode> {
+    let lock_path = env::var("OCL_PLUGIN_LOCK_PATH").map_err(|_| ReasonCode::PluginUnavailable)?;
+    let raw = std::fs::read_to_string(&lock_path).map_err(|_| ReasonCode::PluginUnavailable)?;
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') || trimmed == "version=1" {
+            continue;
+        }
+        let Some(row) = trimmed.strip_prefix("plugin=") else {
+            continue;
+        };
+        let parts: Vec<&str> = row.split('\t').collect();
+        if parts.len() != 6 {
+            return Err(ReasonCode::PluginProtocolError);
+        }
+        out.push(PluginLockEntryRuntime {
+            id: parts[0].to_string(),
+            key_prefix: parts[1].to_string(),
+            command: parts[3].to_string(),
+        });
+    }
+    Ok(out)
+}
+
+fn invoke_plugin_jsonl(
+    entry: &PluginLockEntryRuntime,
+    key: &str,
+    ctx_literal: &str,
+) -> Result<String, ReasonCode> {
+    let req_line = format!(
+        "{{\"id\":\"1\",\"key\":\"{}\",\"ctx\":\"{}\"}}\n",
+        json_escape_inline(key),
+        json_escape_inline(ctx_literal)
+    );
+    let started = Instant::now();
+
+    let mut command = spawn_shell_command(&entry.command);
+    if let Ok(root) = env::var("OCL_PLUGIN_ROOT") {
+        command.current_dir(root);
+    }
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| ReasonCode::PluginUnavailable)?;
+
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin
+            .write_all(req_line.as_bytes())
+            .map_err(|_| ReasonCode::PluginProtocolError)?;
+        stdin.flush().map_err(|_| ReasonCode::PluginProtocolError)?;
+    } else {
+        return Err(ReasonCode::PluginProtocolError);
+    }
+
+    let mut line = String::new();
+    if let Some(stdout) = child.stdout.take() {
+        let mut reader = BufReader::new(stdout);
+        let read = reader
+            .read_line(&mut line)
+            .map_err(|_| ReasonCode::PluginProtocolError)?;
+        if read == 0 {
+            return Err(ReasonCode::PluginProtocolError);
+        }
+    } else {
+        return Err(ReasonCode::PluginProtocolError);
+    }
+
+    let _ = child.wait();
+
+    if started.elapsed() > Duration::from_millis(500) {
+        return Err(ReasonCode::PluginTimeout);
+    }
+    Ok(line.trim().to_string())
+}
+
+fn spawn_shell_command(command_line: &str) -> Command {
+    #[cfg(target_os = "windows")]
+    {
+        let mut command = Command::new("cmd");
+        command.args(["/C", command_line]);
+        command
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mut command = Command::new("sh");
+        command.args(["-lc", command_line]);
+        command
+    }
+}
+
+fn json_field_string(line: &str, key: &str) -> Option<String> {
+    let needle = format!("\"{key}\":");
+    let idx = line.find(&needle)?;
+    let mut rest = line[idx + needle.len()..].trim_start();
+    if let Some(v) = rest.strip_prefix('"') {
+        rest = v;
+        let end = rest.find('"')?;
+        return Some(rest[..end].to_string());
+    }
+    None
+}
+
+fn reason_code_from_str(raw: &str) -> Option<ReasonCode> {
+    match raw {
+        "RC-BUDGET-EXCEEDED" => Some(ReasonCode::BudgetExceeded),
+        "RC-CAPABILITY-DENIED" => Some(ReasonCode::CapabilityDenied),
+        "RC-KEY-UNKNOWN" => Some(ReasonCode::KeyUnknown),
+        "RC-CTX-INVALID" => Some(ReasonCode::CtxInvalid),
+        "RC-POLICY-DENIED" => Some(ReasonCode::PolicyDenied),
+        "RC-ADAPTER-FAILED" => Some(ReasonCode::AdapterFailed),
+        "RC-NOT-IMPLEMENTED" => Some(ReasonCode::NotImplemented),
+        "RC-PLUGIN-PROTOCOL-ERROR" => Some(ReasonCode::PluginProtocolError),
+        "RC-PLUGIN-UNAVAILABLE" => Some(ReasonCode::PluginUnavailable),
+        "RC-PLUGIN-TIMEOUT" => Some(ReasonCode::PluginTimeout),
+        _ => None,
+    }
+}
+
+fn json_escape_inline(input: &str) -> String {
+    let mut out = String::new();
+    for ch in input.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_control() => out.push(' '),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+fn stable_hash256_hex(input: &str) -> String {
+    let a = stable_hash64_hex(&format!("0|{input}"));
+    let b = stable_hash64_hex(&format!("1|{input}"));
+    let c = stable_hash64_hex(&format!("2|{input}"));
+    let d = stable_hash64_hex(&format!("3|{input}"));
+    format!("{a}{b}{c}{d}")
+}
+
+fn stable_hash64_hex(input: &str) -> String {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for b in input.as_bytes() {
+        hash ^= u64::from(*b);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{hash:016x}")
 }
 
 fn stub_payload(key: &str) -> Value {

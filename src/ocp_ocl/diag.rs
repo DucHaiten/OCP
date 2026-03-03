@@ -94,6 +94,9 @@ pub enum ReasonCode {
     PolicyDenied,
     AdapterFailed,
     NotImplemented,
+    PluginProtocolError,
+    PluginUnavailable,
+    PluginTimeout,
 }
 
 impl ReasonCode {
@@ -106,6 +109,9 @@ impl ReasonCode {
             Self::PolicyDenied => "RC-POLICY-DENIED",
             Self::AdapterFailed => "RC-ADAPTER-FAILED",
             Self::NotImplemented => "RC-NOT-IMPLEMENTED",
+            Self::PluginProtocolError => "RC-PLUGIN-PROTOCOL-ERROR",
+            Self::PluginUnavailable => "RC-PLUGIN-UNAVAILABLE",
+            Self::PluginTimeout => "RC-PLUGIN-TIMEOUT",
         }
     }
 }

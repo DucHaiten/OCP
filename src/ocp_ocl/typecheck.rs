@@ -107,6 +107,15 @@ impl TypeChecker {
                 bind,
                 span,
             } => {
+                if let Expr::String { value, .. } = key {
+                    if value == "std.net.poll" {
+                        return Err(self.type_error(
+                            *span,
+                            "`std.net.poll` is runtime-only and forbidden in user OCL path",
+                        ));
+                    }
+                }
+
                 self.expect_expr_type(key, Type::String, *span, "observe key must be string")?;
                 self.expect_expr_type(tier, Type::String, *span, "observe tier must be string")?;
                 self.expect_expr_type(ctx, Type::Ctx, *span, "observe ctx must be ctx(...)")?;

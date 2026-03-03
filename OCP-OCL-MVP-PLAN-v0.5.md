@@ -41,14 +41,14 @@ Mục tiêu: mở rộng OCL thành nền tảng “cosmology + hive” theo hư
 - Notes/risks:
 
 ## Trạng thái workstreams v0.5
-- V5-W0 Rebaseline v0.4 green + topology freeze: `DONE` (Core `PASS` + Windows sub-gate `PASS`)
-- V5-W1 Cosmos config + lock/sign + universe wiring: `DONE`
-- V5-W2 Domain isolation + bridge quotas: `DONE`
-- V5-W3 Shadow execution + compare digest: `DONE`
-- V5-W4 Hive supervisors + bounded swarm runtime: `DONE`
-- V5-W5 Parallel views contract + renderer stub: `DONE`
-- V5-W6 Organ packs install/verify/lock: `DONE`
-- V5-W7 Conformance v0.5 SoT: `DONE`
+- V5-W0 Rebaseline v0.4 green + topology freeze: `IN_PROGRESS` (Core `PASS` + Windows sub-gate `PASS`)
+- V5-W1 Cosmos config + lock/sign + universe wiring: `IN_PROGRESS`
+- V5-W2 Domain isolation + bridge quotas: `IN_PROGRESS`
+- V5-W3 Shadow execution + compare digest: `IN_PROGRESS`
+- V5-W4 Hive supervisors + bounded swarm runtime: `IN_PROGRESS`
+- V5-W5 Parallel views contract + renderer stub: `IN_PROGRESS`
+- V5-W6 Organ packs install/verify/lock: `IN_PROGRESS`
+- V5-W7 Conformance v0.5 SoT: `IN_PROGRESS`
 
 ---
 
@@ -643,7 +643,7 @@ v0.5 `DONE` khi đồng thời đạt:
 ## 10) Gate log v0.5
 
 ### V5-W0 Gate Log
-- Status: `DONE` (`W0-Core PASS`, `Windows sub-gate PASS`)
+- Status: `IN_PROGRESS` (`W0-Core PASS`, `Windows sub-gate PASS`)
 - Date: `2026-02-26`
 - Scope lock:
   - Chỉ rebaseline v0.4 + hardened freeze, không mở feature v0.5 mới.
@@ -695,7 +695,7 @@ v0.5 `DONE` khi đồng thời đạt:
     - `target/ocl/v5/w0/reports/w0_status.json`
 
 ### V5-W1 Gate Log
-- Status: `DONE`
+- Status: `IN_PROGRESS`
 - Date: `2026-02-26`
 - Scope lock:
   - Ship policy lock thật (`policy.lock.v1`), cosmos lock thật (`cosmos.lock.v1`), universe overlay không tạo runtime fork.
@@ -749,7 +749,7 @@ v0.5 `DONE` khi đồng thời đạt:
     - `cosmos.toml/cosmos.lock.v1` không commit mặc định vào `app-ocl`; CI lane tự `cosmos init` khi chạy W1 path để không phá regression legacy no-cosmos tests.
 
 ### V5-W2 Gate Log
-- Status: `DONE`
+- Status: `IN_PROGRESS`
 - Date: `2026-02-26`
 - Scope lock:
   - Domain selection không còn fallback "domain đầu tiên"; non-reactor buộc `default` hoặc fail `V-DOMAIN-REQUIRED`.
@@ -816,7 +816,7 @@ v0.5 `DONE` khi đồng thời đạt:
     - `v5_w2_replay_cross_domain_fail_hard`
 
 ### V5-W3 Gate Log
-- Status: `DONE`
+- Status: `IN_PROGRESS`
 - Date: `2026-02-26`
 - Scope lock:
   - Shadow chỉ cho deterministic lane; throughput + shadow trả `V-SHADOW-UNSUPPORTED`.
@@ -867,7 +867,7 @@ v0.5 `DONE` khi đồng thời đạt:
     - `target/ocl/v5/w3/reports/replay/*.io.jsonl`
 
 ### V5-W4 Gate Log
-- Status: `DONE`
+- Status: `IN_PROGRESS`
 - Date: `2026-02-26`
 - Scope lock:
   - Internal scheduler only, không thêm grammar/key mới.
@@ -925,7 +925,7 @@ v0.5 `DONE` khi đồng thời đạt:
   - `cargo fmt -- --check` -> PASS
 
 ### V5-W5 Gate Log
-- Status: `DONE`
+- Status: `IN_PROGRESS`
 - Date: `2026-02-26`
 - Scope lock:
   - Parallel views contract only: `std.view.render_tree` + `std.view.render_text`
@@ -983,7 +983,7 @@ v0.5 `DONE` khi đồng thời đạt:
   - `cargo fmt -- --check` -> PASS
 
 ### V5-W6 Gate Log
-- Status: `DONE`
+- Status: `IN_PROGRESS`
 - Date: 2026-02-26
 - Scope lock:
   - Trigger "organs used" chỉ lấy từ `[[kits]].required_organs` đã pin trong `cosmos.lock.v1`
@@ -1025,7 +1025,7 @@ v0.5 `DONE` khi đồng thời đạt:
   - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_quarantine.ps1` -> PASS (non-blocking report mode)
 
 ### V5-W7 Gate Log
-- Status: `DONE`
+- Status: `IN_PROGRESS`
 - Date: `2026-02-26`
 - Scope lock:
   - default conformance manifest chuyển sang `conformance.v5.toml`, có rollback env `OCL_CONFORMANCE_DEFAULT=v1|v5`.

@@ -1,0 +1,6 @@
+version = 1
+
+[[signer]]
+id = "dev-root-1"
+alg = "ed25519"
+pub_b64 = "DEV_PLACEHOLDER"

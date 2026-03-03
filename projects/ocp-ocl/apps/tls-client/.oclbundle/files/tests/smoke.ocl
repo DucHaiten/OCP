@@ -1,0 +1,7 @@
+observe("std.tls.connect", "tier2", ctx("host=example.com;port=443"), budget(5)) -> conn_res;
+match conn_res {
+  OK => { let ok = true; condition(ok); }
+  DEGRADED => { let ok = true; condition(ok); }
+  INSUFFICIENT => { let ok = true; condition(ok); }
+  DEFERRED => { let ok = true; condition(ok); }
+}

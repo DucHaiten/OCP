@@ -7,3 +7,14 @@ default = "main"
 
 [dependencies]
 std = "0.1.0"
+
+[runtime]
+std_net = true
+mailbox_max_depth = 32
+io_max_events_per_tick = 8
+default_deadline_ms = 250
+actor_max = 1
+
+[permissions.package]
+allow = ["*"]
+deny = ["std.net.poll"]

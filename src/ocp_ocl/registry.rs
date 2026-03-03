@@ -67,7 +67,7 @@ impl CapabilityRegistry {
     pub fn v1_baseline() -> Self {
         let mut enabled_families = HashSet::new();
         for f in [
-            "world", "render", "mem", "dlg", "self", "rel", "plan", "std",
+            "world", "render", "mem", "dlg", "self", "rel", "plan", "std", "custom",
         ] {
             enabled_families.insert(f.to_string());
         }
@@ -90,13 +90,47 @@ impl CapabilityRegistry {
         ctx_required.insert("std.json.emit".to_string(), vec!["value".to_string()]);
         ctx_required.insert("std.time.sleep".to_string(), vec!["ms".to_string()]);
         ctx_required.insert("std.log.info".to_string(), vec!["message".to_string()]);
+        ctx_required.insert("std.net.listen".to_string(), vec!["addr".to_string()]);
+        ctx_required.insert(
+            "std.net.reply".to_string(),
+            vec!["conn".to_string(), "status".to_string(), "body".to_string()],
+        );
+        ctx_required.insert("std.net.close".to_string(), vec!["conn".to_string()]);
+        ctx_required.insert(
+            "std.tls.connect".to_string(),
+            vec!["host".to_string(), "port".to_string()],
+        );
+        ctx_required.insert("std.tls.handshake".to_string(), vec!["conn".to_string()]);
+        ctx_required.insert(
+            "std.db.query_int".to_string(),
+            vec!["dsn".to_string(), "sql".to_string()],
+        );
+        ctx_required.insert(
+            "std.db.exec".to_string(),
+            vec!["dsn".to_string(), "sql".to_string()],
+        );
+        ctx_required.insert(
+            "std.ui.frame_info".to_string(),
+            vec!["ctx_tick".to_string()],
+        );
+        ctx_required.insert(
+            "std.game.tick_info".to_string(),
+            vec!["ctx_tick".to_string()],
+        );
+
+        let mut commit_allowed = HashMap::new();
+        commit_allowed.insert("std.db.query_int".to_string(), false);
+        commit_allowed.insert("std.tls.connect".to_string(), false);
+        commit_allowed.insert("std.tls.handshake".to_string(), false);
+        commit_allowed.insert("std.ui.frame_info".to_string(), false);
+        commit_allowed.insert("std.game.tick_info".to_string(), false);
 
         Self {
             enabled_families,
             allow_patterns: vec![KeyPattern::Any],
-            deny_patterns: Vec::new(),
+            deny_patterns: vec![KeyPattern::Exact("std.net.poll".to_string())],
             ctx_required,
-            commit_allowed: HashMap::new(),
+            commit_allowed,
         }
     }
 

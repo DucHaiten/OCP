@@ -1,0 +1,13 @@
+[package]
+name = "plugin_demo"
+version = "0.1.0"
+
+[targets]
+default = "main"
+
+[dependencies]
+std = "0.1.0"
+
+[permissions.package]
+allow = ["*"]
+deny = []

@@ -1,0 +1,20 @@
+module apps.tls_client.main;
+
+observe("std.tls.connect", "tier2", ctx("host=example.com;port=443"), budget(5)) -> conn_res;
+observe("std.tls.handshake", "tier2", ctx("conn=example.com:443"), budget(5)) -> hs_res;
+
+match conn_res {
+  OK => { let ok = true; condition(ok); }
+  DEGRADED => { let ok = true; condition(ok); }
+  INSUFFICIENT => { let ok = true; condition(ok); }
+  DEFERRED => { let ok = true; condition(ok); }
+}
+
+match hs_res {
+  OK => { let ok = true; condition(ok); }
+  DEGRADED => { let ok = true; condition(ok); }
+  INSUFFICIENT => { let ok = true; condition(ok); }
+  DEFERRED => { let ok = true; condition(ok); }
+}
+
+condition(true);

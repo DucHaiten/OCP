@@ -12,6 +12,7 @@ fn temp_project_dir(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!("ocl_m4_{tag}_{stamp}"))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_component(
     registry_root: &Path,
     file_stem: &str,
@@ -77,12 +78,54 @@ fn m4_compose_and_verify_pass() {
     let compose = compose_phenotype(&root, &phenotype, &registry, false).expect("compose");
     assert_eq!(compose.selected_components, 2);
     assert!(compose.generated_files >= 3);
+    assert!(!compose.cache_hit);
     assert!(compose.generated_module.exists());
     assert!(compose.proof_path.exists());
 
     let verify = verify_assembly(&root, &phenotype, &registry, false).expect("verify");
     assert!(verify.ok);
     assert_eq!(verify.selected_components, 2);
+}
+
+#[test]
+fn m4_compose_incremental_cache_hit_and_stable_proof() {
+    let root = temp_project_dir("incremental_cache");
+    let registry = root.join("registry");
+    init_project(&root).expect("init");
+
+    write_component(
+        &registry,
+        "core_log",
+        "core.logging",
+        "render",
+        "cap.log.info",
+        "",
+        "templates/core_log.ocl",
+        "module generated.core_logging;\nlet ok = true;\ncondition(ok);\n",
+    );
+    write_component(
+        &registry,
+        "core_fetch",
+        "core.fetch",
+        "infer",
+        "cap.http.get",
+        "cap.log.info",
+        "templates/core_fetch.ocl",
+        "module generated.core_fetch;\nlet ok = true;\ncondition(ok);\n",
+    );
+
+    let phenotype = root.join("phenotype.toml");
+    write_phenotype(&phenotype, &["core.logging", "core.fetch"]);
+
+    let first = compose_phenotype(&root, &phenotype, &registry, false).expect("first compose");
+    let first_proof = fs::read_to_string(&first.proof_path).expect("read first proof");
+    assert!(!first.cache_hit);
+
+    let second = compose_phenotype(&root, &phenotype, &registry, false).expect("second compose");
+    let second_proof = fs::read_to_string(&second.proof_path).expect("read second proof");
+    assert!(second.cache_hit);
+    assert_eq!(first.cache_key_hash64, second.cache_key_hash64);
+    assert_eq!(first_proof, second_proof);
 }
 
 #[test]

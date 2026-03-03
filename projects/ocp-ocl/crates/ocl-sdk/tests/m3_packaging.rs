@@ -23,6 +23,7 @@ fn write_manifest_with_deps(root: &Path, deps: &[(&str, &str)]) {
         body.push_str(version);
         body.push_str("\"\n");
     }
+    body.push_str("\n[permissions.package]\nallow = [\"*\"]\ndeny = [\"std.net.poll\"]\n");
     fs::write(root.join("Ocl.toml"), body).expect("write manifest");
 }
 

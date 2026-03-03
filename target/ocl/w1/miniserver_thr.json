@@ -1,0 +1,1 @@
+{"mode":"throughput","ticks":128,"event_count":1024,"event_id_end":1024,"total_steps":6144,"mailbox_high_water":8,"backpressure_count":0,"cancelled_count":0,"deadline_exceeded_count":1,"socket_listen":"127.0.0.1:19092"}
