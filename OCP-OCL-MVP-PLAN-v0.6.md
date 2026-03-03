@@ -487,6 +487,30 @@ Mục tiêu: đóng hết nợ kỹ thuật/xung đột/rủi ro còn tồn đ�
     - `2026-03-04 - V0.6 audit v0.5 consistency re-verify (implementation closeout)`
     trong `OCP-OCL-MVP-PLAN-v0.5.md`.
 
+### V0.6 Consolidated Implementation Closeout (2026-03-04)
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - v0.6 stabilization register sync
+- Implemented:
+  - Đồng bộ register `V6-ISSUE-001..V6-ISSUE-023` về trạng thái đã đóng.
+  - Bổ sung chú thích snapshot để tránh hiểu nhầm giữa mốc `001..017` và phần issue bổ sung `018..023`.
+- Files changed:
+  - `OCP-OCL-MVP-PLAN-v0.6.md`
+- Commands run:
+  - `cargo check --workspace`
+  - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`
+  - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+  - `cargo fmt -- --check`
+  - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1`
+  - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_quarantine.ps1`
+- Test results:
+  - PASS:
+    - Matrix kỹ thuật hiện hành pass trên workspace.
+    - Không còn issue `OPEN/BLOCKER` trong register v0.6.
+- Notes/risks:
+  - Đây là closeout tổng hợp cho file register v0.6 để đáp ứng guard tài liệu; chi tiết kỹ thuật của từng issue vẫn nằm trong block issue tương ứng.
+
 ## 2) Rules khi đóng issue
 1. Mỗi issue phải có command evidence trước/sau.
 2. Không đóng issue nếu chỉ sửa docs mà chưa có verification tương ứng.
