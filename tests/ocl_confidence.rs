@@ -113,6 +113,7 @@ commit(r);
         ExecConfig {
             step_cap: 100,
             commit_policy: CommitPolicyMode::Normal,
+            ..ExecConfig::default()
         },
     )
     .expect("normal mode should pass");
@@ -123,6 +124,7 @@ commit(r);
         ExecConfig {
             step_cap: 100,
             commit_policy: CommitPolicyMode::ForbidCommit,
+            ..ExecConfig::default()
         },
     )
     .expect("forbid mode should still return exec success");
@@ -133,6 +135,7 @@ commit(r);
         ExecConfig {
             step_cap: 100,
             commit_policy: CommitPolicyMode::ShadowCommitLog,
+            ..ExecConfig::default()
         },
     )
     .expect("shadow mode should pass");

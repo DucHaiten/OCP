@@ -6,9 +6,16 @@ pub enum CommitPolicyMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GuardMode {
+    Return,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExecConfig {
     pub step_cap: u32,
     pub commit_policy: CommitPolicyMode,
+    pub guard_mode: GuardMode,
 }
 
 impl Default for ExecConfig {
@@ -16,6 +23,7 @@ impl Default for ExecConfig {
         Self {
             step_cap: 10_000,
             commit_policy: CommitPolicyMode::Normal,
+            guard_mode: GuardMode::Return,
         }
     }
 }

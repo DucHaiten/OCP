@@ -28,6 +28,10 @@ pub enum TraceEvent {
     ConditionCheck {
         value: bool,
     },
+    LoopIter {
+        loop_kind: String,
+        iter_index: u32,
+    },
     ProgramEnd {
         steps: u32,
     },
@@ -91,6 +95,10 @@ fn serialize_event(ev: &TraceEvent) -> String {
             reason.map(|r| r.as_str()).unwrap_or("-")
         ),
         TraceEvent::ConditionCheck { value } => format!("ConditionCheck|{value}"),
+        TraceEvent::LoopIter {
+            loop_kind,
+            iter_index,
+        } => format!("LoopIter|{loop_kind}|{iter_index}"),
         TraceEvent::ProgramEnd { steps } => format!("ProgramEnd|{steps}"),
     }
 }

@@ -234,6 +234,9 @@ dependencies = [
 [[package]]
 name = "ocp-ocl"
 version = "0.1.0"
+dependencies = [
+ "ocl-sdk",
+]
 
 [[package]]
 name = "pkcs8"

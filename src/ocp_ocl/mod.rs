@@ -18,7 +18,7 @@ pub mod value;
 
 pub use ast::{Expr, MatchStmt, Program, Stmt};
 pub use audit::{TraceEvent, TraceLog};
-pub use budget::{BudgetMeter, CommitPolicyMode, ExecConfig};
+pub use budget::{BudgetMeter, CommitPolicyMode, ExecConfig, GuardMode};
 pub use ctx_contract::{
     ConformanceProfile, CtxFieldType, CtxSchemaField, CORE_SEMANTIC_CTX_FIELDS,
 };

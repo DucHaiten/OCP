@@ -92,6 +92,22 @@ impl TypeChecker {
                 Ok(())
             }
             Stmt::Return { value, span } => self.check_return_stmt(value, *span),
+            Stmt::TryLet {
+                name,
+                value,
+                else_expr,
+                else_returns,
+                span,
+            } => self.check_try_let(name, value, else_expr, *else_returns, *span),
+            Stmt::Guard { value, span } => self.check_guard(value, *span),
+            Stmt::Repeat { count, body, span } => self.check_repeat(count, body, *span),
+            Stmt::ForEachCap {
+                var,
+                iter,
+                cap,
+                body,
+                span,
+            } => self.check_for_each_cap(var, iter, cap, body, *span),
             Stmt::ForRange {
                 var,
                 start,
@@ -223,10 +239,11 @@ impl TypeChecker {
     }
 
     fn check_return_stmt(&mut self, value: &Expr, span: Span) -> Result<(), Diagnostic> {
-        if !self.in_function {
-            return Err(self.type_error(span, "return is only allowed inside function body"));
-        }
         let ty = self.infer_expr(value)?;
+        if !self.in_function {
+            // v0.7.1 allows return-from-program at top-level.
+            return Ok(());
+        }
         match &self.current_return_ty {
             None => {
                 self.current_return_ty = Some(ty);
@@ -273,6 +290,130 @@ impl TypeChecker {
             var.to_string(),
             VarInfo {
                 ty: Type::Int,
+                from_observe: false,
+            },
+        );
+        for stmt in body {
+            self.check_stmt(stmt)?;
+        }
+        self.vars = snapshot;
+        Ok(())
+    }
+
+    fn check_try_let(
+        &mut self,
+        name: &str,
+        value: &Expr,
+        else_expr: &Expr,
+        else_returns: bool,
+        span: Span,
+    ) -> Result<(), Diagnostic> {
+        let value_ty = self.infer_expr(value)?;
+        let inner_ty = match value_ty {
+            Type::Result4(inner) => *inner,
+            other => {
+                return Err(Diagnostic::new(
+                    ErrorCode::TTryNotResult4,
+                    DiagPhase::Typecheck,
+                    span,
+                    format!("try/else expects Result4 input, got {}", other.as_str()),
+                ));
+            }
+        };
+
+        let snapshot = self.vars.clone();
+        self.vars.insert(
+            "r".to_string(),
+            VarInfo {
+                ty: Type::Result4(Box::new(inner_ty.clone())),
+                from_observe: false,
+            },
+        );
+        let else_ty = self.infer_expr(else_expr)?;
+        self.vars = snapshot;
+
+        if else_returns {
+            self.check_return_stmt(else_expr, else_expr.span())?;
+            self.vars.insert(
+                name.to_string(),
+                VarInfo {
+                    ty: inner_ty,
+                    from_observe: false,
+                },
+            );
+            return Ok(());
+        }
+
+        let final_ty = if type_compatible(&inner_ty, &else_ty) {
+            inner_ty
+        } else {
+            Type::Unknown
+        };
+        self.vars.insert(
+            name.to_string(),
+            VarInfo {
+                ty: final_ty,
+                from_observe: false,
+            },
+        );
+        Ok(())
+    }
+
+    fn check_guard(&mut self, value: &Expr, span: Span) -> Result<(), Diagnostic> {
+        let t = self.infer_expr(value)?;
+        if !matches!(t, Type::Result4(_)) {
+            return Err(Diagnostic::new(
+                ErrorCode::TGuardNotResult4,
+                DiagPhase::Typecheck,
+                span,
+                format!("guard expects Result4 value, got {}", t.as_str()),
+            ));
+        }
+        Ok(())
+    }
+
+    fn check_repeat(&mut self, count: &Expr, body: &[Stmt], span: Span) -> Result<(), Diagnostic> {
+        self.expect_expr_type(count, Type::Int, span, "repeat count must be int")?;
+        self.check_block(body)
+    }
+
+    fn check_for_each_cap(
+        &mut self,
+        var: &str,
+        iter: &Expr,
+        cap: &Expr,
+        body: &[Stmt],
+        span: Span,
+    ) -> Result<(), Diagnostic> {
+        let iter_ty = self.infer_expr(iter)?;
+        let item_ty = match iter_ty {
+            Type::List(inner) => *inner,
+            other => {
+                return Err(Diagnostic::new(
+                    ErrorCode::TForNotList,
+                    DiagPhase::Typecheck,
+                    span,
+                    format!("for ... cap expects list iterable, got {}", other.as_str()),
+                ));
+            }
+        };
+        match cap {
+            Expr::Int { value, .. } if *value >= 0 => {}
+            _ => {
+                return Err(Diagnostic::new(
+                    ErrorCode::TCapNotIntLit,
+                    DiagPhase::Typecheck,
+                    cap.span(),
+                    "for ... cap requires non-negative int literal",
+                ));
+            }
+        }
+
+        let snapshot = self.vars.clone();
+        self.vars.insert(
+            var.to_string(),
+            VarInfo {
+                ty: item_ty,
                 from_observe: false,
             },
         );
@@ -397,7 +538,7 @@ impl TypeChecker {
                 match base_ty {
                     Type::Payload | Type::Unknown => Ok(Type::Unknown),
                     Type::Map(_, _) => Ok(Type::Unknown),
-                    Type::Result4(inner) if *inner == Type::Payload => Ok(Type::Unknown),
+                    Type::Result4(_) => Ok(Type::Unknown),
                     other => Err(self.type_error(
                         expr.span(),
                         format!("field access is not allowed on type {}", other.as_str()),
@@ -418,6 +559,92 @@ impl TypeChecker {
                     return Err(self.type_error(span, "budget(...) argument must be int"));
                 }
                 Ok(Type::Budget)
+            }
+            "len" => {
+                if args.len() != 1 {
+                    return Err(self.type_error(span, "len(...) expects exactly 1 argument"));
+                }
+                let arg_ty = self.infer_expr(&args[0])?;
+                match arg_ty {
+                    Type::List(_) | Type::Map(_, _) | Type::String | Type::Payload => Ok(Type::Int),
+                    other => Err(self.type_error(
+                        span,
+                        format!(
+                            "len(...) expects list/map/string/payload, got {}",
+                            other.as_str()
+                        ),
+                    )),
+                }
+            }
+            "keys" => {
+                if args.len() != 2 {
+                    return Err(self.type_error(span, "keys(...) expects exactly 2 arguments"));
+                }
+                let map_ty = self.infer_expr(&args[0])?;
+                let cap_ty = self.infer_expr(&args[1])?;
+                if cap_ty != Type::Int {
+                    return Err(self.type_error(span, "keys(...) cap argument must be int"));
+                }
+                match map_ty {
+                    Type::Map(_, _) | Type::Payload => Ok(Type::List(Box::new(Type::String))),
+                    other => Err(self.type_error(
+                        span,
+                        format!("keys(...) expects map/payload, got {}", other.as_str()),
+                    )),
+                }
+            }
+            "merge" => {
+                if args.len() != 3 {
+                    return Err(self.type_error(span, "merge(...) expects exactly 3 arguments"));
+                }
+                let left_ty = self.infer_expr(&args[0])?;
+                let right_ty = self.infer_expr(&args[1])?;
+                let cap_ty = self.infer_expr(&args[2])?;
+                if cap_ty != Type::Int {
+                    return Err(self.type_error(span, "merge(...) cap argument must be int"));
+                }
+                if !matches!(left_ty, Type::Map(_, _) | Type::Payload) {
+                    return Err(self.type_error(
+                        span,
+                        format!(
+                            "merge(...) left argument expects map/payload, got {}",
+                            left_ty.as_str()
+                        ),
+                    ));
+                }
+                if !matches!(right_ty, Type::Map(_, _) | Type::Payload) {
+                    return Err(self.type_error(
+                        span,
+                        format!(
+                            "merge(...) right argument expects map/payload, got {}",
+                            right_ty.as_str()
+                        ),
+                    ));
+                }
+                Ok(Type::Map(Box::new(Type::String), Box::new(Type::Unknown)))
+            }
+            "std.json.parse" => {
+                if args.len() != 1 {
+                    return Err(
+                        self.type_error(span, "std.json.parse(...) expects exactly 1 argument")
+                    );
+                }
+                let arg_ty = self.infer_expr(&args[0])?;
+                if arg_ty != Type::String {
+                    return Err(
+                        self.type_error(span, "std.json.parse(...) argument must be string")
+                    );
+                }
+                Ok(Type::Result4(Box::new(Type::Unknown)))
+            }
+            "std.json.stringify" => {
+                if args.len() != 1 {
+                    return Err(
+                        self.type_error(span, "std.json.stringify(...) expects exactly 1 argument")
+                    );
+                }
+                let _ = self.infer_expr(&args[0])?;
+                Ok(Type::String)
             }
             "ctx" => {
                 if args.len() != 1 {
@@ -479,6 +706,10 @@ impl TypeChecker {
             message,
         )
     }
+}
+
+fn type_compatible(expected: &Type, got: &Type) -> bool {
+    expected == got || *expected == Type::Unknown || *got == Type::Unknown
 }
 
 impl Default for TypeChecker {

@@ -59,3 +59,41 @@ match r {
         err.message
     );
 }
+
+#[test]
+fn parse_repeat_and_for_cap_ok() {
+    let src = r#"
+let xs = [1, 2, 3];
+repeat 2 { let a = 1; }
+for item in xs cap 2 { let b = item; }
+"#;
+    let program = parse_program(src, 1).expect("loop forms should parse");
+    assert_eq!(program.statements.len(), 3);
+    match &program.statements[1] {
+        Stmt::Repeat { .. } => {}
+        other => panic!("expected repeat statement, got {other:?}"),
+    }
+    match &program.statements[2] {
+        Stmt::ForEachCap { .. } => {}
+        other => panic!("expected for-cap statement, got {other:?}"),
+    }
+}
+
+#[test]
+fn parse_try_else_and_guard_ok() {
+    let src = r#"
+observe("world.exists", "tier2", ctx("scene=lab"), budget(5)) -> rs;
+let msg = try rs else { r.reason_code };
+guard rs;
+"#;
+    let program = parse_program(src, 1).expect("sugar statements should parse");
+    assert_eq!(program.statements.len(), 3);
+    match &program.statements[1] {
+        Stmt::TryLet { .. } => {}
+        other => panic!("expected try-let statement, got {other:?}"),
+    }
+    match &program.statements[2] {
+        Stmt::Guard { .. } => {}
+        other => panic!("expected guard statement, got {other:?}"),
+    }
+}

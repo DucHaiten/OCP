@@ -102,6 +102,17 @@ Mục tiêu: giảm tối đa rủi ro mất dữ liệu khi trợ lý làm vi�
 - Nếu vô tình làm ngắn hơn chuẩn full log:
   - Phải khôi phục ngay về chuẩn full log trong cùng phiên làm việc, không chờ nhắc lần sau.
 
+## 11) Quy tắc bắt buộc về kiểm tra mojibake/encoding
+- Không được kết luận file bị lỗi mã hóa chỉ dựa trên output shell/tool.
+- Nguồn sự thật ưu tiên cao nhất là nội dung hiển thị trong IDE của người dùng.
+- Nếu tool hiển thị mojibake nhưng IDE của người dùng hiển thị đúng:
+  - Kết luận đây là lỗi decode/view của tool.
+  - Không được tự ý sửa file.
+- Chỉ được sửa nội dung vì lý do encoding khi người dùng xác nhận rõ ràng dòng/đoạn bị lỗi trong IDE.
+- Khi báo cáo tình trạng encoding phải ghi rõ:
+  - `Tool-view issue` (lỗi hiển thị từ phía tool), hoặc
+  - `File-content issue` (lỗi thật trong file đã được người dùng xác nhận).
+
 ## 11) Ưu tiên chuẩn thiết kế 100% (bắt buộc)
 - Mặc định mọi triển khai phải theo `DESIGN_100_MODE`:
   - Bám đúng thiết kế đã khóa trong plan hiện hành.

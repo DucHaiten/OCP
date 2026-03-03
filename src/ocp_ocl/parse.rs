@@ -34,7 +34,9 @@ impl Parser {
             TokenKind::Enum => self.parse_enum_decl(),
             TokenKind::Fn => self.parse_fn_def(),
             TokenKind::Return => self.parse_return(),
-            TokenKind::For => self.parse_for_range(),
+            TokenKind::Guard => self.parse_guard(),
+            TokenKind::Repeat => self.parse_repeat(),
+            TokenKind::For => self.parse_for_stmt(),
             TokenKind::Let => self.parse_let(),
             TokenKind::Observe => self.parse_observe(),
             TokenKind::Commit => self.parse_commit(),
@@ -164,19 +166,55 @@ impl Parser {
         })
     }
 
-    fn parse_for_range(&mut self) -> Result<Stmt, Diagnostic> {
+    fn parse_guard(&mut self) -> Result<Stmt, Diagnostic> {
+        let start = self.expect(TokenKind::Guard, "expected `guard`")?.span;
+        let value = self.parse_expr()?;
+        let end = self.expect(TokenKind::Semi, "expected `;` after guard")?;
+        Ok(Stmt::Guard {
+            value,
+            span: merge_span(start, end.span),
+        })
+    }
+
+    fn parse_repeat(&mut self) -> Result<Stmt, Diagnostic> {
+        let start = self.expect(TokenKind::Repeat, "expected `repeat`")?.span;
+        let count = self.parse_expr()?;
+        let body = self.parse_block()?;
+        let end_span = body.last().map(stmt_span).unwrap_or(count.span());
+        Ok(Stmt::Repeat {
+            count,
+            body,
+            span: merge_span(start, end_span),
+        })
+    }
+
+    fn parse_for_stmt(&mut self) -> Result<Stmt, Diagnostic> {
         let start = self.expect(TokenKind::For, "expected `for`")?.span;
         let var = self.expect_ident("expected loop variable after `for`")?;
         self.expect(TokenKind::In, "expected `in` after loop variable")?;
-        let start_expr = self.parse_expr()?;
-        self.expect(TokenKind::Range, "expected `..` in for-range")?;
-        let end_expr = self.parse_expr()?;
+        let first_expr = self.parse_expr()?;
+
+        if self.consume_if(TokenKind::Range) {
+            let end_expr = self.parse_expr()?;
+            let body = self.parse_block()?;
+            let end_span = body.last().map(stmt_span).unwrap_or(first_expr.span());
+            return Ok(Stmt::ForRange {
+                var,
+                start: first_expr,
+                end: end_expr,
+                body,
+                span: merge_span(start, end_span),
+            });
+        }
+
+        self.expect(TokenKind::Cap, "expected `cap` in bounded for loop")?;
+        let cap = self.parse_expr()?;
         let body = self.parse_block()?;
-        let end_span = body.last().map(stmt_span).unwrap_or(start_expr.span());
-        Ok(Stmt::ForRange {
+        let end_span = body.last().map(stmt_span).unwrap_or(first_expr.span());
+        Ok(Stmt::ForEachCap {
             var,
-            start: start_expr,
-            end: end_expr,
+            iter: first_expr,
+            cap,
             body,
             span: merge_span(start, end_span),
         })
@@ -186,11 +224,43 @@ impl Parser {
         let start = self.expect(TokenKind::Let, "expected `let`")?.span;
         let name = self.expect_ident("expected variable name after `let`")?;
         self.expect(TokenKind::Eq, "expected `=` after let name")?;
+        if self.at(TokenKind::TryKw) {
+            return self.parse_try_let(name, start);
+        }
         let value = self.parse_expr()?;
         let end = self.expect(TokenKind::Semi, "expected `;` after let statement")?;
         Ok(Stmt::Let {
             name,
             value,
+            span: merge_span(start, end.span),
+        })
+    }
+
+    fn parse_try_let(&mut self, name: String, start: Span) -> Result<Stmt, Diagnostic> {
+        self.expect(TokenKind::TryKw, "expected `try` after `let <name> =`")?;
+        let value = self.parse_expr()?;
+        self.expect(TokenKind::Else, "expected `else` in try/else let")?;
+        self.expect(TokenKind::LBrace, "expected `{` to open try/else block")?;
+
+        let (else_returns, else_expr) = if self.consume_if(TokenKind::Return) {
+            let expr = self.parse_expr()?;
+            self.expect(
+                TokenKind::Semi,
+                "expected `;` after return expression in try/else block",
+            )?;
+            (true, expr)
+        } else {
+            let expr = self.parse_expr()?;
+            (false, expr)
+        };
+
+        self.expect(TokenKind::RBrace, "expected `}` to close try/else block")?;
+        let end = self.expect(TokenKind::Semi, "expected `;` after try/else let")?;
+        Ok(Stmt::TryLet {
+            name,
+            value,
+            else_expr,
+            else_returns,
             span: merge_span(start, end.span),
         })
     }
@@ -416,6 +486,34 @@ impl Parser {
                         args,
                         span: merge_span(tok.span, rparen.span),
                     })
+                } else if self.lookahead_namespaced_call_after_ident() {
+                    let mut callee = tok.text;
+                    while self.consume_if(TokenKind::Dot) {
+                        let seg =
+                            self.expect_kind(TokenKind::Ident, "expected name segment after `.`")?;
+                        callee.push('.');
+                        callee.push_str(&seg.text);
+                    }
+                    self.expect(
+                        TokenKind::LParen,
+                        "expected `(` after namespaced call target",
+                    )?;
+                    let mut args = Vec::new();
+                    if !self.at(TokenKind::RParen) {
+                        loop {
+                            args.push(self.parse_expr()?);
+                            if self.consume_if(TokenKind::Comma) {
+                                continue;
+                            }
+                            break;
+                        }
+                    }
+                    let rparen = self.expect(TokenKind::RParen, "expected `)` after call args")?;
+                    Ok(Expr::Call {
+                        callee,
+                        args,
+                        span: merge_span(tok.span, rparen.span),
+                    })
                 } else {
                     Ok(Expr::Ident {
                         name: tok.text,
@@ -524,8 +622,25 @@ impl Parser {
         Ok(path)
     }
 
+    fn lookahead_namespaced_call_after_ident(&self) -> bool {
+        let mut i = self.idx;
+        let mut saw_dot = false;
+        while i + 1 < self.tokens.len() {
+            if self.tokens[i].kind != TokenKind::Dot {
+                break;
+            }
+            if self.tokens[i + 1].kind != TokenKind::Ident {
+                return false;
+            }
+            saw_dot = true;
+            i += 2;
+        }
+        saw_dot && i < self.tokens.len() && self.tokens[i].kind == TokenKind::LParen
+    }
+
     fn error_here(&self, code: ErrorCode, message: impl Into<String>) -> Diagnostic {
         Diagnostic::new(code, DiagPhase::Parse, self.peek().span, message)
+            .with_hint("check syntax near current token")
     }
 }
 
@@ -561,6 +676,10 @@ fn stmt_span(stmt: &Stmt) -> Span {
         | Stmt::FnDef { span, .. }
         | Stmt::Let { span, .. }
         | Stmt::Return { span, .. }
+        | Stmt::TryLet { span, .. }
+        | Stmt::Guard { span, .. }
+        | Stmt::Repeat { span, .. }
+        | Stmt::ForEachCap { span, .. }
         | Stmt::ForRange { span, .. }
         | Stmt::Observe { span, .. }
         | Stmt::Commit { span, .. }

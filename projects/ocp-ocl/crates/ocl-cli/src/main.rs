@@ -5,21 +5,23 @@ use ocl_runtime_core::RunEngine;
 use ocl_runtime_core::RuntimeCoreError;
 use ocl_sdk::{
     build_oclpkg_with_lock, build_profile_from_trace, build_project_with_lock,
-    check_project_with_lock, compare_shadow_traces_v1, compose_phenotype,
-    default_conformance_manifest_path, enforce_universe_match_v1, fetch_artifact, fmt_project,
-    init_cosmos_v1, init_project, install_organs_v1, list_kits_from_cosmos_v1,
-    parse_conformance_manifest_v1, parse_shadow_policy_v1, publish_artifact, read_profile_json,
-    read_trace_jsonl, render_conformance_report_json, render_profile_view, render_trace_view,
-    resolve_domain_selection_v1, resolve_universe_v1, resolve_view_selection_v1, run_artifact,
-    run_conformance_v1, run_kit_doctor_v1, run_project_with_engine_and_lock,
-    run_project_with_shadow_compare, run_project_with_trace_engine_and_lock,
-    run_reactor_service_with_lock, run_reactor_service_with_shadow_compare,
-    run_reactor_service_with_trace_engine_and_lock, sync_cosmos_lock_v1, sync_deps_lock_v1,
-    sync_organs_lock_v1, sync_plugin_lock_v1, sync_policy_lock_v1, test_project_with_lock,
-    verify_assembly, verify_organs_lock_v1, verify_plugin_lock_v1, verify_supply_artifact,
+    build_run_id_deterministic, check_project_with_lock, compare_shadow_traces_v1,
+    compose_phenotype, default_conformance_manifest_path, enforce_universe_match_v1,
+    fetch_artifact, fmt_project, init_cosmos_v1, init_project, install_organs_v1,
+    list_kits_from_cosmos_v1, parse_conformance_manifest_v1, parse_shadow_policy_v1,
+    publish_artifact, read_profile_json, read_trace_jsonl, render_conformance_report_json,
+    render_profile_view, render_trace_view, resolve_domain_selection_v1, resolve_universe_v1,
+    resolve_view_selection_v1, run_artifact, run_conformance_v1, run_kit_doctor_v1,
+    run_project_with_engine_and_lock, run_project_with_shadow_compare,
+    run_project_with_trace_engine_and_lock, run_reactor_service_with_lock,
+    run_reactor_service_with_shadow_compare, run_reactor_service_with_trace_engine_and_lock,
+    sync_cosmos_lock_v1, sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1,
+    sync_policy_lock_v1, test_project_with_lock, trace_required_digest, verify_assembly,
+    verify_organs_lock_v1, verify_plugin_lock_v1, verify_supply_artifact,
     write_conformance_report_json, write_profile_json, write_shadow_compare_artifacts_v1,
     write_trace_jsonl, ConformanceRunOptionsV1, InputEnvelopeV1, ProfileViewOptions,
-    ReactorRuntimeMode, ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceViewOptions,
+    ReactorRuntimeMode, ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1,
+    TraceViewOptions,
 };
 
 fn main() {
@@ -495,6 +497,15 @@ fn run_cli(args: &[String]) -> i32 {
                     match run_project_with_shadow_compare(path_ref, run_engine, locked, shadow_cfg)
                     {
                         Ok(summary) => {
+                            let artifact_dir = match emit_v071_artifacts_for_project_run(
+                                path_ref, run_engine, locked, None,
+                            ) {
+                                Ok(path) => path,
+                                Err(err) => {
+                                    eprintln!("{err}");
+                                    return 1;
+                                }
+                            };
                             println!(
                                 "run ok (engine={}, steps={}, universe={}, domain={}, shadow={}, shadow_digest={})",
                                 run_engine.as_str(),
@@ -514,16 +525,34 @@ fn run_cli(args: &[String]) -> i32 {
                                 "shadow report written: {}",
                                 summary.artifacts.report_path.display()
                             );
+                            println!("v0.7.1 artifacts written: {}", artifact_dir.display());
                             0
                         }
                         Err(err) => {
                             eprintln!("{err}");
+                            if let Ok(path) = emit_v071_artifacts_for_project_run(
+                                path_ref,
+                                run_engine,
+                                locked,
+                                Some(&err),
+                            ) {
+                                println!("v0.7.1 artifacts written: {}", path.display());
+                            }
                             exit_code_for_sdk_error(&err)
                         }
                     }
                 } else {
                     match run_project_with_engine_and_lock(path_ref, run_engine, locked) {
                         Ok(summary) => {
+                            let artifact_dir = match emit_v071_artifacts_for_project_run(
+                                path_ref, run_engine, locked, None,
+                            ) {
+                                Ok(path) => path,
+                                Err(err) => {
+                                    eprintln!("{err}");
+                                    return 1;
+                                }
+                            };
                             println!(
                                 "run ok (engine={}, steps={}, universe={}, domain={})",
                                 run_engine.as_str(),
@@ -537,15 +566,40 @@ fn run_cli(args: &[String]) -> i32 {
                                     .map(|v| v.domain_id.as_str())
                                     .unwrap_or("default")
                             );
+                            println!("v0.7.1 artifacts written: {}", artifact_dir.display());
                             0
                         }
                         Err(err) => {
                             eprintln!("{err}");
+                            if let Ok(path) = emit_v071_artifacts_for_project_run(
+                                path_ref,
+                                run_engine,
+                                locked,
+                                Some(&err),
+                            ) {
+                                println!("v0.7.1 artifacts written: {}", path.display());
+                            }
                             1
                         }
                     }
                 }
             })
+        }
+        "replay" => {
+            let Some(path) = args.get(1) else {
+                eprintln!("usage: ocl replay <artifact_dir>");
+                return 2;
+            };
+            match replay_v071(Path::new(path)) {
+                Ok(signature) => {
+                    println!("replay ok (signature match: {signature})");
+                    0
+                }
+                Err(err) => {
+                    eprintln!("{err}");
+                    1
+                }
+            }
         }
         "trace" => {
             let Some(subcmd) = args.get(1).map(String::as_str) else {
@@ -2143,6 +2197,377 @@ fn apply_foundation_preset_v5(root: &Path, preset: &str) -> Result<(), SdkError>
     Ok(())
 }
 
+fn manifest_path_for_v071(root: &Path) -> PathBuf {
+    let lower = root.join("ocl.toml");
+    if lower.exists() {
+        return lower;
+    }
+    root.join("Ocl.toml")
+}
+
+fn read_lane_and_entry_for_v071(root: &Path) -> (String, String) {
+    let manifest_path = manifest_path_for_v071(root);
+    let mut lane = "locked_v071".to_string();
+    let mut entry = "src/main.ocl".to_string();
+    let Ok(raw) = fs::read_to_string(manifest_path) else {
+        return (lane, entry);
+    };
+
+    let mut section = String::new();
+    for raw_line in raw.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            section = line[1..line.len() - 1].trim().to_string();
+            continue;
+        }
+        let Some((k_raw, v_raw)) = line.split_once('=') else {
+            continue;
+        };
+        let key = k_raw.trim();
+        let value = v_raw.trim().trim_matches('"');
+        if section == "project" {
+            if key == "lane" && !value.is_empty() {
+                lane = value.to_string();
+            } else if key == "entry" && !value.is_empty() {
+                entry = value.to_string();
+            }
+        } else if section == "targets"
+            && key == "default"
+            && !value.is_empty()
+            && entry == "src/main.ocl"
+        {
+            entry = format!("src/{value}.ocl");
+        }
+    }
+
+    (lane, entry)
+}
+
+#[derive(Debug, Clone)]
+struct ReplaySpecV071 {
+    root: PathBuf,
+    lane: String,
+    engine: RunEngine,
+    signature: String,
+}
+
+fn parse_run_engine_literal(raw: &str) -> Result<RunEngine, SdkError> {
+    match raw {
+        "interpreter" => Ok(RunEngine::Interpreter),
+        "bytecode" => Ok(RunEngine::Bytecode),
+        "dual" => Ok(RunEngine::Dual),
+        other => Err(SdkError::MissingProject(format!(
+            "V-REPLAY-ENGINE-INVALID: unsupported engine `{other}` in replay.toml"
+        ))),
+    }
+}
+
+fn parse_replay_toml_v071(path: &Path) -> Result<ReplaySpecV071, SdkError> {
+    let raw = fs::read_to_string(path)?;
+    let mut section = String::new();
+    let mut root = None::<PathBuf>;
+    let mut lane = "locked_v071".to_string();
+    let mut engine = None::<RunEngine>;
+    let mut signature = None::<String>;
+
+    for raw_line in raw.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            section = line[1..line.len() - 1].trim().to_string();
+            continue;
+        }
+        if section != "replay" {
+            continue;
+        }
+        let Some((k_raw, v_raw)) = line.split_once('=') else {
+            continue;
+        };
+        let key = k_raw.trim();
+        let value = v_raw.trim().trim_matches('"');
+        match key {
+            "root" if !value.is_empty() => {
+                root = Some(PathBuf::from(value));
+            }
+            "lane" if !value.is_empty() => {
+                lane = value.to_string();
+            }
+            "engine" if !value.is_empty() => {
+                engine = Some(parse_run_engine_literal(value)?);
+            }
+            "signature" if !value.is_empty() => {
+                signature = Some(value.to_string());
+            }
+            _ => {}
+        }
+    }
+
+    let Some(root) = root else {
+        return Err(SdkError::MissingProject(
+            "V-REPLAY-MISSING-ROOT: replay.toml missing `[replay].root`".to_string(),
+        ));
+    };
+    let Some(engine) = engine else {
+        return Err(SdkError::MissingProject(
+            "V-REPLAY-MISSING-ENGINE: replay.toml missing `[replay].engine`".to_string(),
+        ));
+    };
+    let Some(signature) = signature else {
+        return Err(SdkError::MissingProject(
+            "V-REPLAY-MISSING-SIGNATURE: replay.toml missing `[replay].signature`".to_string(),
+        ));
+    };
+
+    Ok(ReplaySpecV071 {
+        root,
+        lane,
+        engine,
+        signature,
+    })
+}
+
+fn locked_from_lane_v071(lane: &str) -> bool {
+    lane != "locked_v06"
+}
+
+fn replay_v071(artifact_dir: &Path) -> Result<String, SdkError> {
+    let replay_toml = artifact_dir.join("replay.toml");
+    if !replay_toml.exists() {
+        return Err(SdkError::MissingProject(format!(
+            "V-REPLAY-MISSING: {}",
+            replay_toml.display()
+        )));
+    }
+
+    let spec = parse_replay_toml_v071(&replay_toml)?;
+    let locked = locked_from_lane_v071(&spec.lane);
+    let trace = run_project_with_trace_engine_and_lock(&spec.root, spec.engine, locked)?;
+    let actual = trace_required_digest(&trace.events);
+    if actual != spec.signature {
+        return Err(SdkError::MissingProject(format!(
+            "V-REPLAY-SIGNATURE-MISMATCH: expected={} actual={} lane={} root={}",
+            spec.signature,
+            actual,
+            spec.lane,
+            spec.root.display()
+        )));
+    }
+    Ok(actual)
+}
+
+fn json_opt_str(value: Option<&str>) -> String {
+    match value {
+        Some(v) => format!("\"{}\"", json_escape(v)),
+        None => "null".to_string(),
+    }
+}
+
+fn json_opt_u64(value: Option<u64>) -> String {
+    match value {
+        Some(v) => v.to_string(),
+        None => "null".to_string(),
+    }
+}
+
+fn json_opt_u32(value: Option<u32>) -> String {
+    match value {
+        Some(v) => v.to_string(),
+        None => "null".to_string(),
+    }
+}
+
+fn json_opt_bool(value: Option<bool>) -> String {
+    match value {
+        Some(v) => {
+            if v {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
+        }
+        None => "null".to_string(),
+    }
+}
+
+fn encode_v071_trace_event_line(index: usize, event: &TraceEventV1) -> String {
+    format!(
+        concat!(
+            "{{\"t\":\"TraceEvent\",\"i\":{},\"tick\":0,\"seed\":0,\"data\":{{",
+            "\"seq\":{},\"run_id\":\"{}\",\"event\":\"{}\",",
+            "\"key\":{},\"kind\":{},\"reason\":{},",
+            "\"origin_id\":{},\"allowed\":{},\"value\":{},\"steps\":{},",
+            "\"universe_id\":\"{}\",\"domain_id\":\"{}\",\"payload_hash\":\"{}\"",
+            "}}}}"
+        ),
+        index + 1,
+        event.seq,
+        json_escape(&event.run_id),
+        json_escape(&event.event),
+        json_opt_str(event.key.as_deref()),
+        json_opt_str(event.kind.as_deref()),
+        json_opt_str(event.reason.as_deref()),
+        json_opt_u64(event.origin_id),
+        json_opt_bool(event.allowed),
+        json_opt_bool(event.value),
+        json_opt_u32(event.steps),
+        json_escape(&event.universe_id),
+        json_escape(&event.domain_id),
+        json_escape(&event.payload_hash)
+    )
+}
+
+fn extract_error_fields_for_v071(
+    err: &SdkError,
+) -> (String, String, String, Option<String>, Option<String>) {
+    match err {
+        SdkError::Runtime(RuntimeCoreError::Diagnostic(diag)) => (
+            diag.code.as_str().to_string(),
+            phase_to_str(diag.phase).to_string(),
+            diag.message.clone(),
+            diag.hint.clone(),
+            diag.root_reason.map(|r| r.as_str().to_string()),
+        ),
+        _ => (
+            "CLI-ERROR".to_string(),
+            "runtime".to_string(),
+            err.to_string(),
+            None,
+            None,
+        ),
+    }
+}
+
+fn encode_v071_error_line(
+    code: &str,
+    phase: &str,
+    message: &str,
+    hint: Option<&str>,
+    root_reason: Option<&str>,
+) -> String {
+    format!(
+        concat!(
+            "{{\"t\":\"Error\",\"i\":1,\"tick\":0,\"seed\":0,\"data\":{{",
+            "\"code\":\"{}\",\"phase\":\"{}\",\"message\":\"{}\",",
+            "\"hint\":{},\"root_reason\":{}",
+            "}}}}"
+        ),
+        json_escape(code),
+        json_escape(phase),
+        json_escape(message),
+        json_opt_str(hint),
+        json_opt_str(root_reason)
+    )
+}
+
+fn fnv1a64_hex(input: &str) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for b in input.as_bytes() {
+        hash ^= u64::from(*b);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{hash:016x}")
+}
+
+fn build_v071_replay_toml(
+    root: &Path,
+    run_id: &str,
+    lane: &str,
+    entry: &str,
+    engine: RunEngine,
+    signature: &str,
+) -> String {
+    let root_norm = root.to_string_lossy().replace('\\', "/");
+    format!(
+        concat!(
+            "[replay]\n",
+            "run_id = \"{}\"\n",
+            "root = \"{}\"\n",
+            "entry = \"{}\"\n",
+            "lane = \"{}\"\n",
+            "engine = \"{}\"\n",
+            "signature = \"{}\"\n"
+        ),
+        run_id,
+        root_norm,
+        entry,
+        lane,
+        engine.as_str(),
+        signature
+    )
+}
+
+fn emit_v071_artifacts_for_project_run(
+    project_root: &Path,
+    run_engine: RunEngine,
+    locked: bool,
+    primary_error: Option<&SdkError>,
+) -> Result<PathBuf, SdkError> {
+    let run_id = build_run_id_deterministic("project", project_root, run_engine, None, None);
+    let artifact_dir = project_root.join(".ocl_artifacts").join(&run_id);
+    fs::create_dir_all(&artifact_dir)?;
+
+    let audit_path = artifact_dir.join("audit.jsonl");
+    let signature_path = artifact_dir.join("signature.txt");
+    let replay_path = artifact_dir.join("replay.toml");
+    let (lane, entry) = read_lane_and_entry_for_v071(project_root);
+
+    match run_project_with_trace_engine_and_lock(project_root, run_engine, locked) {
+        Ok(trace_summary) => {
+            let signature = trace_required_digest(&trace_summary.events);
+            let mut audit_text = String::new();
+            for (idx, event) in trace_summary.events.iter().enumerate() {
+                audit_text.push_str(&encode_v071_trace_event_line(idx, event));
+                audit_text.push('\n');
+            }
+            fs::write(&audit_path, audit_text)?;
+            fs::write(&signature_path, format!("{signature}\n"))?;
+            fs::write(
+                &replay_path,
+                build_v071_replay_toml(
+                    project_root,
+                    &run_id,
+                    &lane,
+                    &entry,
+                    run_engine,
+                    &signature,
+                ),
+            )?;
+        }
+        Err(trace_err) => {
+            let err_ref = primary_error.unwrap_or(&trace_err);
+            let (code, phase, message, hint, root_reason) = extract_error_fields_for_v071(err_ref);
+            let line = encode_v071_error_line(
+                &code,
+                &phase,
+                &message,
+                hint.as_deref(),
+                root_reason.as_deref(),
+            );
+            let signature = fnv1a64_hex(&line);
+            fs::write(&audit_path, format!("{line}\n"))?;
+            fs::write(&signature_path, format!("{signature}\n"))?;
+            fs::write(
+                &replay_path,
+                build_v071_replay_toml(
+                    project_root,
+                    &run_id,
+                    &lane,
+                    &entry,
+                    run_engine,
+                    &signature,
+                ),
+            )?;
+        }
+    }
+
+    Ok(artifact_dir)
+}
+
 fn exit_code_for_sdk_error(err: &SdkError) -> i32 {
     match err {
         SdkError::ShadowMismatch(_) => 5,
@@ -2227,6 +2652,7 @@ fn print_help() {
     eprintln!(
         "  run   <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen ADDR --runtime-report FILE --replay-audit FILE] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"
     );
+    eprintln!("  replay <artifact_dir>");
     eprintln!(
         "  trace run  <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"
     );
@@ -2330,6 +2756,107 @@ condition(boot);
         fs::write(root.join("src").join("main.ocl"), source).expect("write source");
 
         sync_deps_lock_v1(root).expect("sync lock");
+    }
+
+    fn assert_v071_artifacts_written(root: &Path) {
+        let artifacts_root = root.join(".ocl_artifacts");
+        assert!(artifacts_root.exists(), "missing .ocl_artifacts directory");
+        assert!(
+            artifacts_root.is_dir(),
+            ".ocl_artifacts must be a directory"
+        );
+
+        let mut found_bundle = false;
+        let entries = fs::read_dir(&artifacts_root).expect("read .ocl_artifacts");
+        for entry in entries {
+            let path = entry.expect("read dir entry").path();
+            if !path.is_dir() {
+                continue;
+            }
+            let audit = path.join("audit.jsonl");
+            let sig = path.join("signature.txt");
+            let replay = path.join("replay.toml");
+            if audit.exists() && sig.exists() && replay.exists() {
+                found_bundle = true;
+                break;
+            }
+        }
+        assert!(
+            found_bundle,
+            "missing v0.7.1 artifact bundle audit.jsonl/signature.txt/replay.toml"
+        );
+    }
+
+    fn first_v071_artifact_bundle(root: &Path) -> PathBuf {
+        let artifacts_root = root.join(".ocl_artifacts");
+        let entries = fs::read_dir(&artifacts_root).expect("read .ocl_artifacts");
+        for entry in entries {
+            let path = entry.expect("read dir entry").path();
+            if !path.is_dir() {
+                continue;
+            }
+            if path.join("audit.jsonl").exists()
+                && path.join("signature.txt").exists()
+                && path.join("replay.toml").exists()
+            {
+                return path;
+            }
+        }
+        panic!("missing v0.7.1 artifact bundle in {}", artifacts_root.display());
+    }
+
+    #[test]
+    fn v7_a_cli_run_emits_artifacts_on_success() {
+        let root = temp_project_dir("v7_a_run_success");
+        prepare_runtime_project(&root);
+        let args = vec!["run".to_string(), root.to_string_lossy().to_string()];
+        assert_eq!(run_cli(&args), 0);
+        assert_v071_artifacts_written(&root);
+    }
+
+    #[test]
+    fn v7_a_cli_run_emits_artifacts_on_fail() {
+        let root = temp_project_dir("v7_a_run_fail");
+        prepare_runtime_project(&root);
+        fs::write(root.join("src").join("main.ocl"), "let = 1;\n").expect("write invalid source");
+        let args = vec!["run".to_string(), root.to_string_lossy().to_string()];
+        assert_ne!(run_cli(&args), 0);
+        assert_v071_artifacts_written(&root);
+    }
+
+    #[test]
+    fn v7_g_cli_replay_signature_match_pass() {
+        let root = temp_project_dir("v7_g_replay_pass");
+        prepare_runtime_project(&root);
+        let run_args = vec!["run".to_string(), root.to_string_lossy().to_string()];
+        assert_eq!(run_cli(&run_args), 0);
+        let bundle = first_v071_artifact_bundle(&root);
+        let replay_args = vec!["replay".to_string(), bundle.to_string_lossy().to_string()];
+        assert_eq!(run_cli(&replay_args), 0);
+    }
+
+    #[test]
+    fn v7_g_cli_replay_signature_mismatch_fail() {
+        let root = temp_project_dir("v7_g_replay_mismatch");
+        prepare_runtime_project(&root);
+        let run_args = vec!["run".to_string(), root.to_string_lossy().to_string()];
+        assert_eq!(run_cli(&run_args), 0);
+        let bundle = first_v071_artifact_bundle(&root);
+        let replay_path = bundle.join("replay.toml");
+        let replay_text = fs::read_to_string(&replay_path).expect("read replay.toml");
+        let mut patched = String::new();
+        for line in replay_text.lines() {
+            if line.trim_start().starts_with("signature = ") {
+                patched.push_str("signature = \"0000000000000000\"\n");
+            } else {
+                patched.push_str(line);
+                patched.push('\n');
+            }
+        }
+        fs::write(&replay_path, patched).expect("write tampered replay.toml");
+
+        let replay_args = vec!["replay".to_string(), bundle.to_string_lossy().to_string()];
+        assert_eq!(run_cli(&replay_args), 1);
     }
 
     fn prepare_v5_w1_universe_project(root: &Path) {

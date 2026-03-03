@@ -9,7 +9,11 @@ pub enum IrOpKind {
     EnumDecl,
     FnDef,
     Let,
+    TryLet,
+    Guard,
     Return,
+    Repeat,
+    ForEachCap,
     ForRange,
     Observe,
     Commit,
@@ -75,10 +79,32 @@ fn lower_stmts(stmts: &[Stmt], out: &mut Vec<IrOp>) {
                 kind: IrOpKind::Let,
                 span: *span,
             }),
+            Stmt::TryLet { span, .. } => out.push(IrOp {
+                kind: IrOpKind::TryLet,
+                span: *span,
+            }),
+            Stmt::Guard { span, .. } => out.push(IrOp {
+                kind: IrOpKind::Guard,
+                span: *span,
+            }),
             Stmt::Return { span, .. } => out.push(IrOp {
                 kind: IrOpKind::Return,
                 span: *span,
             }),
+            Stmt::Repeat { span, body, .. } => {
+                out.push(IrOp {
+                    kind: IrOpKind::Repeat,
+                    span: *span,
+                });
+                lower_stmts(body, out);
+            }
+            Stmt::ForEachCap { span, body, .. } => {
+                out.push(IrOp {
+                    kind: IrOpKind::ForEachCap,
+                    span: *span,
+                });
+                lower_stmts(body, out);
+            }
             Stmt::ForRange { span, body, .. } => {
                 out.push(IrOp {
                     kind: IrOpKind::ForRange,

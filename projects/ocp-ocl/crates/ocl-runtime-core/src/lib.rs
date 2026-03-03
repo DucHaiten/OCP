@@ -12,7 +12,8 @@ mod vm;
 pub use bytecode::{assemble as assemble_bytecode, BytecodeOp, BytecodeProgram};
 pub use engine::{
     parse_program, typecheck_program, CommitPolicyMode, DiagPhase, Diagnostic, ErrorCode,
-    ExecConfig, ExecOutput, Expr, Program, ReasonCode, ResultKind, Span, Stmt, TraceEvent, Type,
+    ExecConfig, ExecOutput, Expr, GuardMode, Program, ReasonCode, ResultKind, Span, Stmt,
+    TraceEvent, Type,
 };
 pub use ir::{lower_program as lower_to_ir, IrOp, IrOpKind, TypedIrProgram};
 pub use source_map::{build_source_map, SourceMap, SourceMapEntry};
@@ -104,6 +105,7 @@ pub fn run_source(source: &str, file_id: u32, step_cap: u32) -> Result<ExecOutpu
         ExecConfig {
             step_cap,
             commit_policy: CommitPolicyMode::Normal,
+            ..ExecConfig::default()
         },
     )
 }
@@ -128,6 +130,7 @@ pub fn run_compiled(compiled: &CompiledProgram, step_cap: u32) -> Result<ExecOut
         ExecConfig {
             step_cap,
             commit_policy: CommitPolicyMode::Normal,
+            ..ExecConfig::default()
         },
     )
 }
@@ -155,6 +158,7 @@ pub fn run_source_with_engine(
         ExecConfig {
             step_cap,
             commit_policy: CommitPolicyMode::Normal,
+            ..ExecConfig::default()
         },
         run_engine,
     )
@@ -228,6 +232,7 @@ pub fn run_file_with_engine(
         ExecConfig {
             step_cap,
             commit_policy: CommitPolicyMode::Normal,
+            ..ExecConfig::default()
         },
         run_engine,
     )

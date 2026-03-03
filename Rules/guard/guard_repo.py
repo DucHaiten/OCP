@@ -52,6 +52,42 @@ DONE_STATUS_RE = re.compile(
     re.MULTILINE,
 )
 
+CONTROL_DOC_RELS = {
+    "README.md",
+    "AGENTS.md",
+    "Rules/AGENTS.md",
+    "Rules/README.md",
+    "Rules/COVERAGE.md",
+}
+
+GENERATED_PATH_MARKERS = (
+    "/target/",
+    "\\target\\",
+    "/.fingerprint/",
+    "\\.fingerprint\\",
+)
+
+GENERATED_NAME_SET = {
+    ".rustc_info.json",
+    "invoked.timestamp",
+}
+
+GENERATED_EXT_SET = {
+    ".exe",
+    ".pdb",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".o",
+    ".obj",
+    ".rlib",
+    ".rmeta",
+    ".a",
+    ".lib",
+    ".pyc",
+    ".pyo",
+}
+
 
 def run_git(*args: str) -> str:
     proc = subprocess.run(
@@ -103,6 +139,28 @@ def is_agents_file(path: Path) -> bool:
     return rel == "AGENTS.md" or rel == "Rules/AGENTS.md"
 
 
+def is_control_doc_file(path: Path) -> bool:
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    if rel in CONTROL_DOC_RELS:
+        return True
+    if is_plan_file(path):
+        return True
+    return False
+
+
+def is_generated_artifact_path(path: Path) -> bool:
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    rel_lower = rel.lower()
+    for marker in GENERATED_PATH_MARKERS:
+        if marker.lower() in rel_lower:
+            return True
+    if path.name in GENERATED_NAME_SET:
+        return True
+    if path.suffix.lower() in GENERATED_EXT_SET:
+        return True
+    return False
+
+
 def read_utf8_strict(path: Path) -> str:
     data = path.read_bytes()
     try:
@@ -132,23 +190,64 @@ def extract_blocks(lines: list[str], heading_pattern: re.Pattern[str]) -> list[t
     return blocks
 
 
+def check_closeout_block_evidence(path: Path, title: str, block: str) -> list[str]:
+    errors: list[str] = []
+    commands_match = re.search(
+        r"-\s*Commands run:\s*(.*?)(?:\n-\s*[A-Za-z][^:\n]*:|\Z)",
+        block,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if commands_match is not None:
+        if re.search(r"`[^`]+`", commands_match.group(1)) is None:
+            errors.append(f"{path}: `{title}` missing command literals in `Commands run`")
+
+    tests_match = re.search(
+        r"-\s*Test results:\s*(.*?)(?:\n-\s*[A-Za-z][^:\n]*:|\Z)",
+        block,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if tests_match is not None:
+        if re.search(r"\bPASS\b|\bFAIL\b", tests_match.group(1), flags=re.IGNORECASE) is None:
+            errors.append(
+                f"{path}: `{title}` must include PASS/FAIL in `Test results`"
+            )
+    return errors
+
+
 def check_done_gates_have_entries(path: Path, text: str) -> list[str]:
     errors: list[str] = []
     done_gates = sorted(set(DONE_STATUS_RE.findall(text)))
+    lines = text.splitlines()
+    closeout_blocks = extract_blocks(
+        lines,
+        re.compile(
+            r"^#{3,}\s+.*(implementation closeout|completion closeout|closeout)",
+            re.IGNORECASE,
+        ),
+    )
+    closeout_texts = ["\n".join(lines[start:end]) for start, end in closeout_blocks]
     for gate in done_gates:
         has_plan = re.search(
             rf"{re.escape(gate)}.*planning freeze", text, flags=re.IGNORECASE
         ) is not None
-        has_closeout = re.search(
-            rf"{re.escape(gate)}.*(?:implementation closeout|completion closeout|closeout)",
-            text,
-            flags=re.IGNORECASE,
-        ) is not None
         if not has_plan:
             errors.append(f"{path}: gate `{gate}` = DONE but missing Planning Freeze entry")
-        if not has_closeout:
+
+        gate_closeouts = [
+            block for block in closeout_texts if re.search(rf"\b{re.escape(gate)}\b", block, re.IGNORECASE)
+        ]
+        if not gate_closeouts:
             errors.append(
                 f"{path}: gate `{gate}` = DONE but missing Implementation Closeout entry"
+            )
+            continue
+        has_pass = any(
+            re.search(r"\bPASS\b", block, flags=re.IGNORECASE) is not None
+            for block in gate_closeouts
+        )
+        if not has_pass:
+            errors.append(
+                f"{path}: gate `{gate}` = DONE but closeout has no PASS evidence"
             )
     return errors
 
@@ -183,10 +282,11 @@ def check_plan_structure(path: Path, text: str) -> list[str]:
     else:
         for start, end in closeout_blocks:
             block = "\n".join(lines[start:end])
+            title = lines[start].strip()
             for field in CLOSEOUT_REQUIRED_FIELDS:
                 if field not in block:
-                    title = lines[start].strip()
                     errors.append(f"{path}: `{title}` missing field `{field}`")
+            errors.extend(check_closeout_block_evidence(path, title, block))
 
     errors.extend(check_done_gates_have_entries(path, text))
     return errors
@@ -244,6 +344,25 @@ def check_large_plan_rewrite(path: Path) -> list[str]:
     return []
 
 
+def check_change_scope(candidates: Iterable[Path]) -> list[str]:
+    errors: list[str] = []
+    if os.environ.get("OCL_RULES_ALLOW_GENERATED", "").strip() == "1":
+        return errors
+    for path in candidates:
+        if not path.exists():
+            continue
+        if not path.is_file():
+            continue
+        if is_generated_artifact_path(path):
+            errors.append(
+                (
+                    f"{path}: generated/build artifact is staged. "
+                    "Unstage build outputs (target, .exe, .pdb, fingerprints)."
+                )
+            )
+    return errors
+
+
 def unique_existing(paths: Iterable[Path]) -> list[Path]:
     seen: set[Path] = set()
     out: list[Path] = []
@@ -280,15 +399,18 @@ def main() -> int:
         print(f"[rules] guard cannot read git state: {exc}", file=sys.stderr)
         return 2
 
+    errors: list[str] = []
+    if args.mode == "changed":
+        errors.extend(check_change_scope(candidates))
+
     targets = unique_existing(
         p for p in candidates if is_plan_file(p) or is_agents_file(p)
     )
 
-    if not targets:
+    if not targets and not errors:
         print("[rules] no target files to validate")
         return 0
 
-    errors: list[str] = []
     for path in targets:
         try:
             text = read_utf8_strict(path)

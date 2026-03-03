@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use crate::ocp_ocl::ast::{Expr, MatchStmt, Program, Stmt};
 use crate::ocp_ocl::audit::{TraceEvent, TraceLog};
-use crate::ocp_ocl::budget::{BudgetMeter, CommitPolicyMode, ExecConfig};
+use crate::ocp_ocl::budget::{BudgetMeter, CommitPolicyMode, ExecConfig, GuardMode};
 use crate::ocp_ocl::diag::{DiagPhase, Diagnostic, ErrorCode, ReasonCode};
 use crate::ocp_ocl::registry::CapabilityRegistry;
 use crate::ocp_ocl::result_kind::{Result4, ResultKind};
@@ -51,9 +51,11 @@ struct PendingSqliteWrite {
 const CONDITION_TIME_BUDGET_NS: u64 = 20_000;
 const CONDITION_MAX_STEPS: usize = 64;
 const CONDITION_MAX_CONSTRAINTS: usize = 256;
+const LOOP_CAP: u32 = 10_000;
 const ENTANGLE_MAX_EDGES_PER_SESSION: usize = 128;
 const ENTANGLE_MAX_DEGREE_PER_BINDING: usize = 16;
 const ENTANGLE_PROPAGATION_BUDGET_NS: u64 = 20_000;
+const VALUE_KEYS_CAP: usize = 2_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ConditionOutcome {
@@ -91,6 +93,7 @@ pub struct Executor {
     env: HashMap<String, Value>,
     meter: BudgetMeter,
     commit_policy: CommitPolicyMode,
+    guard_mode: GuardMode,
     next_origin_id: u64,
     registry: CapabilityRegistry,
     observations: HashMap<u64, ObservationMeta>,
@@ -107,6 +110,7 @@ impl Executor {
             env: HashMap::new(),
             meter: BudgetMeter::new(config),
             commit_policy: config.commit_policy,
+            guard_mode: config.guard_mode,
             next_origin_id: 1,
             registry: CapabilityRegistry::default(),
             observations: HashMap::new(),
@@ -123,6 +127,7 @@ impl Executor {
             env: HashMap::new(),
             meter: BudgetMeter::new(config),
             commit_policy: config.commit_policy,
+            guard_mode: config.guard_mode,
             next_origin_id: 1,
             registry,
             observations: HashMap::new(),
@@ -153,13 +158,9 @@ impl Executor {
         for stmt in &program.statements {
             match self.exec_stmt_inner(stmt, false)? {
                 Flow::Continue => {}
-                Flow::Return(_) => {
-                    return Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        stmt_span(stmt),
-                        "return is only allowed inside function body",
-                    ));
+                Flow::Return(v) => {
+                    self.env.insert("__program_return".to_string(), v);
+                    break;
                 }
             }
         }
@@ -200,18 +201,26 @@ impl Executor {
                 self.env.insert(name.clone(), v);
                 Ok(Flow::Continue)
             }
-            Stmt::Return { value, span } => {
-                if !in_function {
-                    return Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        *span,
-                        "return is only allowed inside function body",
-                    ));
-                }
+            Stmt::Return { value, span: _ } => {
                 let v = self.eval_expr(value)?;
                 Ok(Flow::Return(v))
             }
+            Stmt::TryLet {
+                name,
+                value,
+                else_expr,
+                else_returns,
+                span,
+            } => self.exec_try_let(name, value, else_expr, *else_returns, *span, in_function),
+            Stmt::Guard { value, span } => self.exec_guard(value, *span, in_function),
+            Stmt::Repeat { count, body, span } => self.exec_repeat(count, body, *span, in_function),
+            Stmt::ForEachCap {
+                var,
+                iter,
+                cap,
+                body,
+                span,
+            } => self.exec_for_each_cap(var, iter, cap, body, *span, in_function),
             Stmt::ForRange {
                 var,
                 start,
@@ -430,6 +439,215 @@ impl Executor {
         Ok(())
     }
 
+    fn exec_try_let(
+        &mut self,
+        name: &str,
+        value: &Expr,
+        else_expr: &Expr,
+        else_returns: bool,
+        span: Span,
+        _in_function: bool,
+    ) -> Result<Flow, Diagnostic> {
+        let base = self.eval_expr(value)?;
+        let Value::Result4(result) = base else {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "try/else expects Result4 runtime value",
+            ));
+        };
+
+        self.trace.push(TraceEvent::MatchArmSelected { arm: result.kind });
+        match result.kind {
+            ResultKind::Ok | ResultKind::Degraded => {
+                // Keep sugar trace/step parity with canonical desugar:
+                // match { ... => { let x = rs?; } }
+                self.tick(span)?;
+                let unwrapped = self.eval_expr(&Expr::Try {
+                    value: Box::new(value.clone()),
+                    span: value.span(),
+                })?;
+                self.env.insert(name.to_string(), unwrapped);
+                Ok(Flow::Continue)
+            }
+            ResultKind::Insufficient | ResultKind::Deferred => {
+                // Keep sugar trace/step parity with canonical desugar:
+                // match { ... => { let x = <else>; } / { return <else>; } }
+                self.tick(span)?;
+                let prev_r = self.env.insert(
+                    "r".to_string(),
+                    Value::Result4(Box::new((*result).clone())),
+                );
+                let else_value = self.eval_expr(else_expr);
+                match prev_r {
+                    Some(v) => {
+                        self.env.insert("r".to_string(), v);
+                    }
+                    None => {
+                        self.env.remove("r");
+                    }
+                }
+                let else_value = else_value?;
+                if else_returns {
+                    Ok(Flow::Return(else_value))
+                } else {
+                    self.env.insert(name.to_string(), else_value);
+                    Ok(Flow::Continue)
+                }
+            }
+        }
+    }
+
+    fn exec_guard(
+        &mut self,
+        value: &Expr,
+        span: Span,
+        _in_function: bool,
+    ) -> Result<Flow, Diagnostic> {
+        let base = self.eval_expr(value)?;
+        let Value::Result4(result) = base else {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "guard expects Result4 runtime value",
+            ));
+        };
+
+        self.trace.push(TraceEvent::MatchArmSelected { arm: result.kind });
+        match result.kind {
+            ResultKind::Ok | ResultKind::Degraded => Ok(Flow::Continue),
+            ResultKind::Insufficient | ResultKind::Deferred => match self.guard_mode {
+                GuardMode::Return => {
+                    // Keep sugar trace/step parity with canonical desugar:
+                    // match { INSUFFICIENT/DEFERRED => { return rs; } }
+                    self.tick(span)?;
+                    let ret = self.eval_expr(value)?;
+                    Ok(Flow::Return(ret))
+                }
+                GuardMode::Error => Err(
+                    Diagnostic::new(
+                        ErrorCode::XGuardFailed,
+                        DiagPhase::Exec,
+                        span,
+                        "guard failed on non-success Result4",
+                    )
+                    .with_root_reason(result.reason.unwrap_or(ReasonCode::PolicyDenied)),
+                ),
+            },
+        }
+    }
+
+    fn exec_repeat(
+        &mut self,
+        count: &Expr,
+        body: &[Stmt],
+        span: Span,
+        in_function: bool,
+    ) -> Result<Flow, Diagnostic> {
+        let count_v = self.eval_expr(count)?;
+        let Value::Int(count_i) = count_v else {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "repeat count must evaluate to int",
+            ));
+        };
+        if count_i < 0 {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "repeat count must be non-negative",
+            ));
+        }
+        let count_u = count_i as u32;
+        if count_u > LOOP_CAP {
+            return Err(loop_cap_exceeded(
+                span,
+                "repeat count exceeds configured loop cap",
+            ));
+        }
+
+        let snapshot = self.env.clone();
+        for i in 0..count_u {
+            self.trace.push(TraceEvent::LoopIter {
+                loop_kind: "repeat".to_string(),
+                iter_index: i,
+            });
+            if let Flow::Return(v) = self.exec_block(body, in_function)? {
+                self.env = snapshot;
+                return Ok(Flow::Return(v));
+            }
+        }
+        self.env = snapshot;
+        Ok(Flow::Continue)
+    }
+
+    fn exec_for_each_cap(
+        &mut self,
+        var: &str,
+        iter: &Expr,
+        cap: &Expr,
+        body: &[Stmt],
+        span: Span,
+        in_function: bool,
+    ) -> Result<Flow, Diagnostic> {
+        let iter_v = self.eval_expr(iter)?;
+        let Value::List(items) = iter_v else {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "for ... cap iterable must evaluate to list",
+            ));
+        };
+
+        let cap_v = self.eval_expr(cap)?;
+        let Value::Int(cap_i) = cap_v else {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "for ... cap must evaluate to int",
+            ));
+        };
+        if cap_i < 0 {
+            return Err(Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "for ... cap must be non-negative",
+            ));
+        }
+
+        let cap_u = cap_i as u32;
+        if cap_u > LOOP_CAP {
+            return Err(loop_cap_exceeded(
+                span,
+                "for ... cap exceeds configured loop cap",
+            ));
+        }
+
+        let limit = usize::min(items.len(), cap_u as usize);
+        let snapshot = self.env.clone();
+        for (idx, item) in items.into_iter().take(limit).enumerate() {
+            self.trace.push(TraceEvent::LoopIter {
+                loop_kind: "for_cap".to_string(),
+                iter_index: idx as u32,
+            });
+            self.env.insert(var.to_string(), item);
+            if let Flow::Return(v) = self.exec_block(body, in_function)? {
+                self.env = snapshot;
+                return Ok(Flow::Return(v));
+            }
+        }
+        self.env = snapshot;
+        Ok(Flow::Continue)
+    }
+
     fn exec_for_range(
         &mut self,
         var: &str,
@@ -465,16 +683,18 @@ impl Executor {
                 "for-range end must be >= start",
             ));
         }
-        if (end_i - start_i) > 10_000 {
-            return Err(Diagnostic::new(
-                ErrorCode::XBudgetExceeded,
-                DiagPhase::Exec,
+        if (end_i - start_i) > i64::from(LOOP_CAP) {
+            return Err(loop_cap_exceeded(
                 span,
-                "for-range exceeds bounded cap (max 10000 iterations)",
+                "for-range exceeds configured loop cap",
             ));
         }
         let snapshot = self.env.clone();
-        for i in start_i..end_i {
+        for (idx, i) in (start_i..end_i).enumerate() {
+            self.trace.push(TraceEvent::LoopIter {
+                loop_kind: "for_range".to_string(),
+                iter_index: idx as u32,
+            });
             self.env.insert(var.to_string(), Value::Int(i));
             if let Flow::Return(v) = self.exec_block(body, in_function)? {
                 self.env = snapshot;
@@ -788,6 +1008,21 @@ impl Executor {
                         .unwrap_or(Value::Unknown)),
                     Value::Map(map) => Ok(map.get(field).cloned().unwrap_or(Value::Unknown)),
                     Value::List(items) if field == "len" => Ok(Value::Int(items.len() as i64)),
+                    Value::Result4(r) if field == "kind" => {
+                        let text = match r.kind {
+                            ResultKind::Ok => "OK",
+                            ResultKind::Degraded => "DEGRADED",
+                            ResultKind::Insufficient => "INSUFFICIENT",
+                            ResultKind::Deferred => "DEFERRED",
+                        };
+                        Ok(Value::String(text.to_string()))
+                    }
+                    Value::Result4(r) if field == "reason_code" => Ok(Value::String(
+                        r.reason
+                            .map(|rc| rc.as_str().to_string())
+                            .unwrap_or_default(),
+                    )),
+                    Value::Result4(_) if field == "audit" => Ok(Value::Map(BTreeMap::new())),
                     Value::Result4(r) => match r.payload {
                         Some(Value::Payload(map)) => Ok(map
                             .get(field)
@@ -827,6 +1062,140 @@ impl Executor {
                         "budget(...) expects non-negative int",
                     )),
                 }
+            }
+            "len" => {
+                if args.len() != 1 {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "len(...) expects 1 argument",
+                    ));
+                }
+                let arg = self.eval_expr(&args[0])?;
+                let len = match arg {
+                    Value::List(items) => items.len(),
+                    Value::Map(map) => map.len(),
+                    Value::Payload(map) => map.len(),
+                    Value::String(s) => s.chars().count(),
+                    _ => {
+                        return Err(Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "len(...) expects list/map/payload/string",
+                        ))
+                    }
+                };
+                Ok(Value::Int(len as i64))
+            }
+            "keys" => {
+                if args.len() != 2 {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "keys(...) expects 2 arguments",
+                    ));
+                }
+                let map_value = self.eval_expr(&args[0])?;
+                let cap_value = self.eval_expr(&args[1])?;
+                let cap = as_non_negative_int_runtime(&cap_value).ok_or_else(|| {
+                    Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "keys(...) cap must be non-negative int",
+                    )
+                })?;
+                if cap as usize > VALUE_KEYS_CAP {
+                    return Err(value_keys_cap_exceeded(
+                        span,
+                        "keys(...) cap exceeds value_keys_cap",
+                    ));
+                }
+                let map = into_mapish_runtime(map_value, "keys(...)", span)?;
+                let mut out = Vec::new();
+                for key in map.keys().take(cap as usize) {
+                    out.push(Value::String(key.clone()));
+                }
+                Ok(Value::List(out))
+            }
+            "merge" => {
+                if args.len() != 3 {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "merge(...) expects 3 arguments",
+                    ));
+                }
+                let left = self.eval_expr(&args[0])?;
+                let right = self.eval_expr(&args[1])?;
+                let cap_value = self.eval_expr(&args[2])?;
+                let cap = as_non_negative_int_runtime(&cap_value).ok_or_else(|| {
+                    Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "merge(...) cap must be non-negative int",
+                    )
+                })?;
+                if cap as usize > VALUE_KEYS_CAP {
+                    return Err(value_keys_cap_exceeded(
+                        span,
+                        "merge(...) cap exceeds value_keys_cap",
+                    ));
+                }
+
+                let mut merged = into_mapish_runtime(left, "merge(...)", span)?;
+                let right_map = into_mapish_runtime(right, "merge(...)", span)?;
+                for (k, v) in right_map {
+                    merged.insert(k, v);
+                }
+                if merged.len() > cap as usize {
+                    return Err(value_keys_cap_exceeded(
+                        span,
+                        "merge(...) result key count exceeds cap",
+                    ));
+                }
+                Ok(Value::Map(merged))
+            }
+            "std.json.parse" => {
+                if args.len() != 1 {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "std.json.parse(...) expects 1 argument",
+                    ));
+                }
+                let arg = self.eval_expr(&args[0])?;
+                let raw = as_string_runtime(&arg).ok_or_else(|| {
+                    Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "std.json.parse(...) argument must evaluate to string",
+                    )
+                })?;
+                let result = match parse_json_value(raw) {
+                    Ok(v) => Result4::ok(v),
+                    Err(()) => Result4::insufficient(ReasonCode::JsonInvalid),
+                };
+                Ok(Value::Result4(Box::new(result)))
+            }
+            "std.json.stringify" => {
+                if args.len() != 1 {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "std.json.stringify(...) expects 1 argument",
+                    ));
+                }
+                let arg = self.eval_expr(&args[0])?;
+                Ok(Value::String(stringify_json_value(&arg)))
             }
             "ctx" => {
                 if args.len() != 1 {
@@ -959,6 +1328,10 @@ fn stmt_span(stmt: &Stmt) -> Span {
         | Stmt::FnDef { span, .. }
         | Stmt::Let { span, .. }
         | Stmt::Return { span, .. }
+        | Stmt::TryLet { span, .. }
+        | Stmt::Guard { span, .. }
+        | Stmt::Repeat { span, .. }
+        | Stmt::ForEachCap { span, .. }
         | Stmt::ForRange { span, .. }
         | Stmt::Observe { span, .. }
         | Stmt::Commit { span, .. }
@@ -987,6 +1360,49 @@ fn as_budget_runtime(value: &Value) -> Option<u32> {
         Value::Budget(v) => Some(*v),
         _ => None,
     }
+}
+
+fn as_non_negative_int_runtime(value: &Value) -> Option<u32> {
+    match value {
+        Value::Int(v) if *v >= 0 => Some(*v as u32),
+        _ => None,
+    }
+}
+
+fn into_mapish_runtime(
+    value: Value,
+    fn_name: &str,
+    span: Span,
+) -> Result<BTreeMap<String, Value>, Diagnostic> {
+    match value {
+        Value::Map(map) => Ok(map),
+        Value::Payload(map) => Ok(map
+            .into_iter()
+            .map(|(k, v)| (k, Value::String(v)))
+            .collect()),
+        _ => Err(Diagnostic::new(
+            ErrorCode::XCommitForbidden,
+            DiagPhase::Exec,
+            span,
+            format!("{fn_name} expects map/payload arguments"),
+        )),
+    }
+}
+
+fn value_keys_cap_exceeded(span: Span, message: &'static str) -> Diagnostic {
+    Diagnostic::new(ErrorCode::XKeysCapExceeded, DiagPhase::Exec, span, message)
+        .with_root_reason(ReasonCode::PolicyDenied)
+        .with_alias("X-LIMIT-EXCEEDED")
+        .with_limit_kind("value_keys_cap")
+        .with_hint("reduce cap/result key count to fit value_keys_cap")
+}
+
+fn loop_cap_exceeded(span: Span, message: &'static str) -> Diagnostic {
+    Diagnostic::new(ErrorCode::XLoopCapExceeded, DiagPhase::Exec, span, message)
+        .with_root_reason(ReasonCode::PolicyDenied)
+        .with_alias("X-LIMIT-EXCEEDED")
+        .with_limit_kind("loop_cap")
+        .with_hint("reduce loop iteration cap to fit configured loop_cap")
 }
 
 fn condition_budget_stats(expr: &Expr) -> ConditionBudgetStats {
@@ -1686,6 +2102,274 @@ fn json_field_string(line: &str, key: &str) -> Option<String> {
     None
 }
 
+fn parse_json_value(raw: &str) -> Result<Value, ()> {
+    let mut p = JsonParser {
+        src: raw.as_bytes(),
+        idx: 0,
+    };
+    p.skip_ws();
+    let v = p.parse_value()?;
+    p.skip_ws();
+    if p.idx != p.src.len() {
+        return Err(());
+    }
+    Ok(v)
+}
+
+struct JsonParser<'a> {
+    src: &'a [u8],
+    idx: usize,
+}
+
+impl<'a> JsonParser<'a> {
+    fn peek(&self) -> Option<u8> {
+        self.src.get(self.idx).copied()
+    }
+
+    fn bump(&mut self) -> Option<u8> {
+        let b = self.peek()?;
+        self.idx += 1;
+        Some(b)
+    }
+
+    fn skip_ws(&mut self) {
+        while let Some(b) = self.peek() {
+            if matches!(b, b' ' | b'\n' | b'\r' | b'\t') {
+                self.idx += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn parse_value(&mut self) -> Result<Value, ()> {
+        self.skip_ws();
+        match self.peek() {
+            Some(b'{') => self.parse_object(),
+            Some(b'[') => self.parse_array(),
+            Some(b'"') => self.parse_string().map(Value::String),
+            Some(b't') => {
+                self.expect_keyword(b"true")?;
+                Ok(Value::Bool(true))
+            }
+            Some(b'f') => {
+                self.expect_keyword(b"false")?;
+                Ok(Value::Bool(false))
+            }
+            Some(b'n') => {
+                self.expect_keyword(b"null")?;
+                Ok(Value::Unit)
+            }
+            Some(b'-') | Some(b'0'..=b'9') => self.parse_int().map(Value::Int),
+            _ => Err(()),
+        }
+    }
+
+    fn expect_keyword(&mut self, kw: &[u8]) -> Result<(), ()> {
+        if self.src.get(self.idx..self.idx + kw.len()) == Some(kw) {
+            self.idx += kw.len();
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+
+    fn parse_string(&mut self) -> Result<String, ()> {
+        if self.bump() != Some(b'"') {
+            return Err(());
+        }
+        let mut out = String::new();
+        loop {
+            let b = self.bump().ok_or(())?;
+            match b {
+                b'"' => return Ok(out),
+                b'\\' => {
+                    let esc = self.bump().ok_or(())?;
+                    match esc {
+                        b'"' => out.push('"'),
+                        b'\\' => out.push('\\'),
+                        b'/' => out.push('/'),
+                        b'b' => out.push('\u{0008}'),
+                        b'f' => out.push('\u{000c}'),
+                        b'n' => out.push('\n'),
+                        b'r' => out.push('\r'),
+                        b't' => out.push('\t'),
+                        _ => return Err(()),
+                    }
+                }
+                b if b < 0x20 => return Err(()),
+                b => out.push(b as char),
+            }
+        }
+    }
+
+    fn parse_int(&mut self) -> Result<i64, ()> {
+        let start = self.idx;
+        if self.peek() == Some(b'-') {
+            self.idx += 1;
+        }
+        let mut has_digit = false;
+        while let Some(b'0'..=b'9') = self.peek() {
+            has_digit = true;
+            self.idx += 1;
+        }
+        if !has_digit {
+            return Err(());
+        }
+        if matches!(self.peek(), Some(b'.' | b'e' | b'E')) {
+            return Err(());
+        }
+        let s = std::str::from_utf8(&self.src[start..self.idx]).map_err(|_| ())?;
+        s.parse::<i64>().map_err(|_| ())
+    }
+
+    fn parse_array(&mut self) -> Result<Value, ()> {
+        if self.bump() != Some(b'[') {
+            return Err(());
+        }
+        self.skip_ws();
+        let mut items = Vec::new();
+        if self.peek() == Some(b']') {
+            self.idx += 1;
+            return Ok(Value::List(items));
+        }
+        loop {
+            items.push(self.parse_value()?);
+            self.skip_ws();
+            match self.bump() {
+                Some(b',') => {
+                    self.skip_ws();
+                }
+                Some(b']') => break,
+                _ => return Err(()),
+            }
+        }
+        Ok(Value::List(items))
+    }
+
+    fn parse_object(&mut self) -> Result<Value, ()> {
+        if self.bump() != Some(b'{') {
+            return Err(());
+        }
+        self.skip_ws();
+        let mut map = BTreeMap::new();
+        if self.peek() == Some(b'}') {
+            self.idx += 1;
+            return Ok(Value::Map(map));
+        }
+        loop {
+            let key = self.parse_string()?;
+            self.skip_ws();
+            if self.bump() != Some(b':') {
+                return Err(());
+            }
+            self.skip_ws();
+            let value = self.parse_value()?;
+            map.insert(key, value);
+            self.skip_ws();
+            match self.bump() {
+                Some(b',') => {
+                    self.skip_ws();
+                }
+                Some(b'}') => break,
+                _ => return Err(()),
+            }
+        }
+        Ok(Value::Map(map))
+    }
+}
+
+fn stringify_json_value(value: &Value) -> String {
+    match value {
+        Value::Int(v) => v.to_string(),
+        Value::Bool(v) => {
+            if *v {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
+        }
+        Value::String(v) => format!("\"{}\"", escape_json_string(v)),
+        Value::List(items) => {
+            let mut out = String::from("[");
+            for (idx, item) in items.iter().enumerate() {
+                if idx > 0 {
+                    out.push(',');
+                }
+                out.push_str(&stringify_json_value(item));
+            }
+            out.push(']');
+            out
+        }
+        Value::Map(map) => {
+            let mut out = String::from("{");
+            for (idx, (k, v)) in map.iter().enumerate() {
+                if idx > 0 {
+                    out.push(',');
+                }
+                out.push('"');
+                out.push_str(&escape_json_string(k));
+                out.push_str("\":");
+                out.push_str(&stringify_json_value(v));
+            }
+            out.push('}');
+            out
+        }
+        Value::Payload(map) => {
+            let mut out = String::from("{");
+            for (idx, (k, v)) in map.iter().enumerate() {
+                if idx > 0 {
+                    out.push(',');
+                }
+                out.push('"');
+                out.push_str(&escape_json_string(k));
+                out.push_str("\":\"");
+                out.push_str(&escape_json_string(v));
+                out.push('"');
+            }
+            out.push('}');
+            out
+        }
+        Value::Result4(r) => {
+            let kind = match r.kind {
+                ResultKind::Ok => "OK",
+                ResultKind::Degraded => "DEGRADED",
+                ResultKind::Insufficient => "INSUFFICIENT",
+                ResultKind::Deferred => "DEFERRED",
+            };
+            let reason = r.reason.map(|v| v.as_str()).unwrap_or("");
+            let payload = r
+                .payload
+                .as_ref()
+                .map(stringify_json_value)
+                .unwrap_or_else(|| "null".to_string());
+            format!(
+                "{{\"kind\":\"{}\",\"reason_code\":\"{}\",\"payload\":{}}}",
+                kind, reason, payload
+            )
+        }
+        Value::Budget(v) => v.to_string(),
+        Value::Ctx(v) => format!("\"{}\"", escape_json_string(v)),
+        Value::Unit | Value::Unknown => "null".to_string(),
+    }
+}
+
+fn escape_json_string(input: &str) -> String {
+    let mut out = String::new();
+    for ch in input.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_control() => out.push(' '),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 fn reason_code_from_str(raw: &str) -> Option<ReasonCode> {
     match raw {
         "RC-BUDGET-EXCEEDED" => Some(ReasonCode::BudgetExceeded),
@@ -1694,6 +2378,7 @@ fn reason_code_from_str(raw: &str) -> Option<ReasonCode> {
         "RC-CTX-INVALID" => Some(ReasonCode::CtxInvalid),
         "RC-POLICY-DENIED" => Some(ReasonCode::PolicyDenied),
         "RC-ADAPTER-FAILED" => Some(ReasonCode::AdapterFailed),
+        "RC-JSON-INVALID" => Some(ReasonCode::JsonInvalid),
         "RC-NOT-IMPLEMENTED" => Some(ReasonCode::NotImplemented),
         "RC-PLUGIN-PROTOCOL-ERROR" => Some(ReasonCode::PluginProtocolError),
         "RC-PLUGIN-UNAVAILABLE" => Some(ReasonCode::PluginUnavailable),

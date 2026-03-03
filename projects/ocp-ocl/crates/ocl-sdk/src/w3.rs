@@ -486,6 +486,7 @@ pub fn run_project_with_shadow_compare(
         ExecConfig {
             step_cap: 4096,
             commit_policy: CommitPolicyMode::Normal,
+            ..ExecConfig::default()
         },
     )?;
     let shadow = run_project_with_trace_engine_config_and_lock(
@@ -495,6 +496,7 @@ pub fn run_project_with_shadow_compare(
         ExecConfig {
             step_cap: 4096,
             commit_policy: shadow_commit_policy_mode(options.policy),
+            ..ExecConfig::default()
         },
     )?;
     let envelope = InputEnvelopeV1 {
@@ -544,6 +546,7 @@ pub fn run_reactor_service_with_shadow_compare(
         ExecConfig {
             step_cap: 4096,
             commit_policy: CommitPolicyMode::Normal,
+            ..ExecConfig::default()
         },
     )?;
     let shadow = run_reactor_service_with_trace_engine_config_and_lock(
@@ -554,6 +557,7 @@ pub fn run_reactor_service_with_shadow_compare(
         ExecConfig {
             step_cap: 4096,
             commit_policy: shadow_commit_policy_mode(shadow_options.policy),
+            ..ExecConfig::default()
         },
     )?;
     let envelope = InputEnvelopeV1 {

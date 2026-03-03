@@ -17,3 +17,4 @@ members = [
 resolver = "2"
 
 [dev-dependencies]
+ocl-sdk = { path = "projects/ocp-ocl/crates/ocl-sdk" }

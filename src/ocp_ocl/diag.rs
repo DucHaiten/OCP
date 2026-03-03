@@ -16,6 +16,13 @@ pub enum ErrorCode {
     TUnknownIdentifier,
     TTypeMismatch,
     TMatchArmsIncomplete,
+    TImportNotFound,
+    TImportCycle,
+    TForNotList,
+    TCapNotIntLit,
+    TTryNotResult4,
+    TGuardNotResult4,
+    TTryElseNoValue,
     XConditionFalse,
     XConditionDeferred,
     XConditionInsufficient,
@@ -25,6 +32,9 @@ pub enum ErrorCode {
     XEntangleEdgeCap,
     XEntangleDegreeCap,
     XEntangleDeferred,
+    XLoopCapExceeded,
+    XKeysCapExceeded,
+    XGuardFailed,
     XBudgetExceeded,
     XCommitForbidden,
     RCapabilityDenied,
@@ -54,6 +64,13 @@ impl ErrorCode {
             Self::TUnknownIdentifier => "T-UNKNOWN-IDENTIFIER",
             Self::TTypeMismatch => "T-TYPE-MISMATCH",
             Self::TMatchArmsIncomplete => "T-MATCH-ARMS-INCOMPLETE",
+            Self::TImportNotFound => "T-IMPORT-NOT-FOUND",
+            Self::TImportCycle => "T-IMPORT-CYCLE",
+            Self::TForNotList => "T-FOR-NOT-LIST",
+            Self::TCapNotIntLit => "T-CAP-NOT-INT-LIT",
+            Self::TTryNotResult4 => "T-TRY-NOT-RESULT4",
+            Self::TGuardNotResult4 => "T-GUARD-NOT-RESULT4",
+            Self::TTryElseNoValue => "T-TRY-ELSE-NO-VALUE",
             Self::XConditionFalse => "X-COND-FALSE",
             Self::XConditionDeferred => "X-COND-DEFERRED",
             Self::XConditionInsufficient => "X-COND-INSUFFICIENT",
@@ -63,6 +80,9 @@ impl ErrorCode {
             Self::XEntangleEdgeCap => "X-ENTANGLE-EDGE-CAP",
             Self::XEntangleDegreeCap => "X-ENTANGLE-DEGREE-CAP",
             Self::XEntangleDeferred => "X-ENTANGLE-DEFERRED",
+            Self::XLoopCapExceeded => "X-LOOP-CAP-EXCEEDED",
+            Self::XKeysCapExceeded => "X-KEYS-CAP-EXCEEDED",
+            Self::XGuardFailed => "X-GUARD-FAILED",
             Self::XBudgetExceeded => "X-BUDGET-EXCEEDED",
             Self::XCommitForbidden => "X-COMMIT-FORBIDDEN",
             Self::RCapabilityDenied => "R-CAPABILITY-DENIED",
@@ -93,6 +113,7 @@ pub enum ReasonCode {
     CtxInvalid,
     PolicyDenied,
     AdapterFailed,
+    JsonInvalid,
     NotImplemented,
     PluginProtocolError,
     PluginUnavailable,
@@ -108,6 +129,7 @@ impl ReasonCode {
             Self::CtxInvalid => "RC-CTX-INVALID",
             Self::PolicyDenied => "RC-POLICY-DENIED",
             Self::AdapterFailed => "RC-ADAPTER-FAILED",
+            Self::JsonInvalid => "RC-JSON-INVALID",
             Self::NotImplemented => "RC-NOT-IMPLEMENTED",
             Self::PluginProtocolError => "RC-PLUGIN-PROTOCOL-ERROR",
             Self::PluginUnavailable => "RC-PLUGIN-UNAVAILABLE",
@@ -124,6 +146,8 @@ pub struct Diagnostic {
     pub message: String,
     pub hint: Option<String>,
     pub root_reason: Option<ReasonCode>,
+    pub aliases: Vec<String>,
+    pub limit_kind: Option<String>,
 }
 
 impl Diagnostic {
@@ -135,6 +159,8 @@ impl Diagnostic {
             message: message.into(),
             hint: None,
             root_reason: None,
+            aliases: Vec::new(),
+            limit_kind: None,
         }
     }
 
@@ -145,6 +171,19 @@ impl Diagnostic {
 
     pub fn with_root_reason(mut self, reason: ReasonCode) -> Self {
         self.root_reason = Some(reason);
+        self
+    }
+
+    pub fn with_alias(mut self, alias: impl Into<String>) -> Self {
+        let alias = alias.into();
+        if !self.aliases.iter().any(|v| v == &alias) {
+            self.aliases.push(alias);
+        }
+        self
+    }
+
+    pub fn with_limit_kind(mut self, limit_kind: impl Into<String>) -> Self {
+        self.limit_kind = Some(limit_kind.into());
         self
     }
 }

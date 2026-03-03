@@ -44,6 +44,29 @@ pub enum Stmt {
         value: Expr,
         span: Span,
     },
+    TryLet {
+        name: String,
+        value: Expr,
+        else_expr: Expr,
+        else_returns: bool,
+        span: Span,
+    },
+    Guard {
+        value: Expr,
+        span: Span,
+    },
+    Repeat {
+        count: Expr,
+        body: Vec<Stmt>,
+        span: Span,
+    },
+    ForEachCap {
+        var: String,
+        iter: Expr,
+        cap: Expr,
+        body: Vec<Stmt>,
+        span: Span,
+    },
     ForRange {
         var: String,
         start: Expr,

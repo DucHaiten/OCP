@@ -21,9 +21,8 @@ pub use m4::{
     AssemblyProofV1, ComponentSpecV1, ComposeSummary, PhenotypeSpecV1, VerifySummary,
 };
 use ocl_runtime_core::{
-    check_file, normalize_text, parse_program, run_file, run_file_with_engine,
-    run_file_with_engine_config, run_source_with_engine, CommitPolicyMode, ExecConfig, Expr,
-    RunEngine, RuntimeCoreError, Stmt, TraceEvent,
+    check_file, normalize_text, parse_program, run_file_with_engine_config, run_source_with_engine,
+    CommitPolicyMode, ExecConfig, Expr, GuardMode, RunEngine, RuntimeCoreError, Stmt, TraceEvent,
 };
 pub use w1::{
     enforce_universe_match_v1, init_cosmos_v1, resolve_hive_caps_v1, resolve_universe_v1,
@@ -137,6 +136,21 @@ pub struct PermissionRules {
 pub struct ProjectPermissions {
     pub package: Option<PermissionRules>,
     pub modules: HashMap<String, PermissionRules>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectLanguageConfigV071 {
+    pub lane: String,
+    pub guard_mode: GuardMode,
+}
+
+impl Default for ProjectLanguageConfigV071 {
+    fn default() -> Self {
+        Self {
+            lane: "locked_v071".to_string(),
+            guard_mode: GuardMode::Return,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -465,6 +479,43 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
     out
 }
 
+pub fn parse_project_language_config_v071(manifest_text: &str) -> ProjectLanguageConfigV071 {
+    let mut out = ProjectLanguageConfigV071::default();
+    let mut current_section = String::new();
+
+    for raw in manifest_text.lines() {
+        let line = raw.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        if line.starts_with('[') && line.ends_with(']') {
+            current_section = line[1..line.len() - 1].trim().to_string();
+            continue;
+        }
+
+        let Some((key_raw, value_raw)) = line.split_once('=') else {
+            continue;
+        };
+        let key = key_raw.trim();
+        let value = value_raw.trim().trim_matches('"');
+
+        if current_section == "project" && key == "lane" && !value.is_empty() {
+            out.lane = value.to_string();
+            continue;
+        }
+
+        if current_section == "language" && key == "guard_mode" {
+            out.guard_mode = match value {
+                "error" => GuardMode::Error,
+                _ => GuardMode::Return,
+            };
+        }
+    }
+
+    out
+}
+
 fn permission_pattern_matches(pattern: &str, key: &str) -> bool {
     if pattern == "*" {
         return true;
@@ -475,24 +526,27 @@ fn permission_pattern_matches(pattern: &str, key: &str) -> bool {
     key == pattern
 }
 
-fn permission_rule_decision(rules: &PermissionRules, key: &str) -> Option<PermissionDecision> {
-    if rules
+fn permission_rule_decision(
+    rules: &PermissionRules,
+    key: &str,
+) -> Option<(PermissionDecision, String)> {
+    if let Some(matched) = rules
         .deny
         .iter()
-        .any(|pattern| permission_pattern_matches(pattern, key))
+        .find(|pattern| permission_pattern_matches(pattern, key))
     {
-        return Some(PermissionDecision::Deny);
+        return Some((PermissionDecision::Deny, matched.clone()));
     }
 
     if !rules.allow.is_empty() {
-        if rules
+        if let Some(matched) = rules
             .allow
             .iter()
-            .any(|pattern| permission_pattern_matches(pattern, key))
+            .find(|pattern| permission_pattern_matches(pattern, key))
         {
-            return Some(PermissionDecision::Allow);
+            return Some((PermissionDecision::Allow, matched.clone()));
         }
-        return Some(PermissionDecision::Deny);
+        return Some((PermissionDecision::Deny, "<implicit-deny-not-in-allow>".to_string()));
     }
 
     None
@@ -502,22 +556,30 @@ fn permission_decision_for_key(
     permissions: &ProjectPermissions,
     module_path: Option<&str>,
     key: &str,
-) -> PermissionDecision {
+) -> (PermissionDecision, Option<String>, Option<String>) {
     if let Some(module_path) = module_path {
         if let Some(module_rules) = permissions.modules.get(module_path) {
-            if let Some(decision) = permission_rule_decision(module_rules, key) {
-                return decision;
+            if let Some((decision, pattern)) = permission_rule_decision(module_rules, key) {
+                return (
+                    decision,
+                    Some(pattern),
+                    Some(format!("permissions.module.{module_path}")),
+                );
             }
         }
     }
 
     if let Some(package_rules) = permissions.package.as_ref() {
-        if let Some(decision) = permission_rule_decision(package_rules, key) {
-            return decision;
+        if let Some((decision, pattern)) = permission_rule_decision(package_rules, key) {
+            return (
+                decision,
+                Some(pattern),
+                Some("permissions.package".to_string()),
+            );
         }
     }
 
-    PermissionDecision::Allow
+    (PermissionDecision::Allow, None, None)
 }
 
 fn module_path_from_program(stmts: &[Stmt]) -> Option<String> {
@@ -570,17 +632,30 @@ fn verify_permissions_for_source(
     collect_observe_keys(&program.statements, &mut observe_keys);
 
     for key in observe_keys {
-        if permission_decision_for_key(permissions, module_path.as_deref(), &key)
-            == PermissionDecision::Deny
-        {
+        let (decision, matched_rule, section) =
+            permission_decision_for_key(permissions, module_path.as_deref(), &key);
+        if decision == PermissionDecision::Deny {
+            let section_name = section.unwrap_or_else(|| "permissions.package".to_string());
+            let matched = matched_rule.unwrap_or_else(|| "<none>".to_string());
+            let hint = if section_name.starts_with("permissions.module.") {
+                format!(
+                    "Hint: add key to `[{}].allow` or remove from `[{}].deny`.",
+                    section_name, section_name
+                )
+            } else {
+                "Hint: add key to `[permissions.package].allow` or remove from `[permissions.package].deny`.".to_string()
+            };
             return Err(SdkError::PermissionDenied(format!(
-                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}",
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; matched deny rule=`{}` in [{}]. {}",
                 key,
                 file_path.display(),
                 module_path
                     .as_ref()
                     .map(|m| format!(" (module `{m}`)"))
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
+                matched,
+                section_name,
+                hint
             )));
         }
     }
@@ -603,6 +678,22 @@ fn load_permissions_for_layout(
     }
 
     Ok(permissions)
+}
+
+fn load_project_language_config_for_layout(
+    layout: &ProjectLayout,
+) -> Result<ProjectLanguageConfigV071, SdkError> {
+    let manifest = fs::read_to_string(&layout.manifest)?;
+    Ok(parse_project_language_config_v071(&manifest))
+}
+
+fn default_exec_config_for_layout(layout: &ProjectLayout) -> Result<ExecConfig, SdkError> {
+    let cfg = load_project_language_config_for_layout(layout)?;
+    Ok(ExecConfig {
+        step_cap: 4096,
+        commit_policy: CommitPolicyMode::Normal,
+        guard_mode: cfg.guard_mode,
+    })
 }
 
 pub fn build_audit_entries(signatures: &[String]) -> Vec<AuditEntry> {
@@ -1233,7 +1324,8 @@ pub fn run_project_with_engine_and_lock(
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
-    let out = run_file_with_engine(&layout.src_main, 1, 4096, run_engine)?;
+    let config = default_exec_config_for_layout(&layout)?;
+    let out = run_file_with_engine_config(&layout.src_main, 1, config, run_engine)?;
     Ok(RunSummary { steps: out.steps })
 }
 
@@ -1504,6 +1596,7 @@ pub fn run_reactor_service_with_lock(
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    let exec_config = default_exec_config_for_layout(&layout)?;
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
 
     let source = fs::read_to_string(&layout.src_main)?;
@@ -1618,7 +1711,12 @@ pub fn run_reactor_service_with_lock(
                     }
                     event_count = event_count.saturating_add(1);
                     event_id = event_id.saturating_add(1);
-                    let out = run_file(&layout.src_main, 1, 4096)?;
+                    let out = run_file_with_engine_config(
+                        &layout.src_main,
+                        1,
+                        exec_config,
+                        RunEngine::Interpreter,
+                    )?;
                     total_steps = total_steps.saturating_add(out.steps);
                     signatures.push(out.signature.clone());
 
@@ -1681,7 +1779,12 @@ pub fn run_reactor_service_with_lock(
                     }
                     event_count = event_count.saturating_add(1);
                     event_id = event_id.saturating_add(1);
-                    let out = run_file(&layout.src_main, 1, 4096)?;
+                    let out = run_file_with_engine_config(
+                        &layout.src_main,
+                        1,
+                        exec_config,
+                        RunEngine::Interpreter,
+                    )?;
                     total_steps = total_steps.saturating_add(out.steps);
                     signatures.push(out.signature.clone());
 
@@ -1918,12 +2021,13 @@ pub fn test_project_with_lock(root: &Path, locked: bool) -> Result<TestSummary, 
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    let exec_config = default_exec_config_for_layout(&layout)?;
     let mut tests = Vec::new();
     collect_ocl_files(&layout.tests_dir, &mut tests)?;
     tests.sort();
     for (idx, test_file) in tests.iter().enumerate() {
         verify_permissions_for_file(test_file, idx as u32 + 100, &permissions)?;
-        run_file(test_file, idx as u32 + 100, 4096)?;
+        run_file_with_engine_config(test_file, idx as u32 + 100, exec_config, RunEngine::Interpreter)?;
     }
     Ok(TestSummary {
         tests_run: tests.len(),
@@ -2515,6 +2619,7 @@ pub fn run_project_with_trace_engine_and_lock(
         ExecConfig {
             step_cap: 4096,
             commit_policy: CommitPolicyMode::Normal,
+            ..ExecConfig::default()
         },
     )
 }
@@ -2534,8 +2639,10 @@ pub fn run_project_with_trace_engine_config_and_lock(
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
+    let mut runtime_config = config;
+    runtime_config.guard_mode = load_project_language_config_for_layout(&layout)?.guard_mode;
 
-    let out = run_file_with_engine_config(&layout.src_main, 1, config, run_engine)?;
+    let out = run_file_with_engine_config(&layout.src_main, 1, runtime_config, run_engine)?;
     let run_id = build_run_id_deterministic("project", root, run_engine, None, None);
     let mut seq = 1u64;
     let mut events = Vec::new();
@@ -2568,6 +2675,7 @@ pub fn run_reactor_service_with_trace_engine_and_lock(
         ExecConfig {
             step_cap: 4096,
             commit_policy: CommitPolicyMode::Normal,
+            ..ExecConfig::default()
         },
     )
 }
@@ -2588,6 +2696,8 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
+    let mut runtime_config = config;
+    runtime_config.guard_mode = load_project_language_config_for_layout(&layout)?.guard_mode;
 
     let source = fs::read_to_string(&layout.src_main)?;
     if !source.contains("on_event") {
@@ -2661,7 +2771,12 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
                     if tape_entry.tick != tick || tape_entry.domain_id != *domain_id {
                         break;
                     }
-                    let out = run_file_with_engine_config(&layout.src_main, 1, config, run_engine)?;
+                    let out = run_file_with_engine_config(
+                        &layout.src_main,
+                        1,
+                        runtime_config,
+                        run_engine,
+                    )?;
                     total_steps = total_steps.saturating_add(out.steps);
                     let payload_hash256 = fnv1a64_hex(&out.signature);
                     if payload_hash256 != tape_entry.payload_hash256 {
@@ -2683,7 +2798,12 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
                 }
             } else {
                 for _ in 0..events_per_tick {
-                    let out = run_file_with_engine_config(&layout.src_main, 1, config, run_engine)?;
+                    let out = run_file_with_engine_config(
+                        &layout.src_main,
+                        1,
+                        runtime_config,
+                        run_engine,
+                    )?;
                     total_steps = total_steps.saturating_add(out.steps);
                     io_tape_record_entries.push(ReactorIoTapeEntry {
                         tick,
@@ -3212,6 +3332,24 @@ fn map_trace_event(
             domain_id: domain_id.to_string(),
             payload_hash,
         },
+        TraceEvent::LoopIter {
+            loop_kind,
+            iter_index,
+        } => TraceEventV1 {
+            seq,
+            run_id: run_id.to_string(),
+            event: "loop_iter".to_string(),
+            key: Some(loop_kind.clone()),
+            kind: None,
+            reason: None,
+            origin_id: None,
+            allowed: None,
+            value: None,
+            steps: Some(*iter_index),
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload_hash,
+        },
         TraceEvent::ProgramEnd { steps } => TraceEventV1 {
             seq,
             run_id: run_id.to_string(),
@@ -3267,6 +3405,10 @@ fn canonical_trace_event_payload(event: &TraceEvent) -> String {
             reason.map(|r| r.as_str()).unwrap_or("-")
         ),
         TraceEvent::ConditionCheck { value } => format!("ConditionCheck|{value}"),
+        TraceEvent::LoopIter {
+            loop_kind,
+            iter_index,
+        } => format!("LoopIter|{loop_kind}|{iter_index}"),
         TraceEvent::ProgramEnd { steps } => format!("ProgramEnd|{steps}"),
     }
 }
