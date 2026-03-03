@@ -1,6 +1,6 @@
 # OCP-OCL
 
-**Bản tiếng Việt**
+**Bản tiếng Việt:**
 
 OCP-OCL (Observation-Collapse Programming / Observation Collapse Language) là DSL + runtime cho mô hình observe → 4-kind → commit, deterministic và commit-gated I/O.
 
@@ -10,7 +10,9 @@ Từ v0.15, OCP-OCL mở rộng thành nền tảng capability/permission-driven
 
 Nền tảng ý tưởng tổng hợp từ TSS, ELW, RGOK, SHSM, hướng Biologic, vũ trụ học (song song/chồng chập/chân trời) và Hive.
 
-**English version**
+#
+
+**English version:**
 
 OCP-OCL (Observation-Collapse Programming / Observation Collapse Language) is a DSL + runtime built around observe → 4-kind → commit, with deterministic execution and commit-gated I/O.
 
