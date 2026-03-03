@@ -14,7 +14,14 @@ match r {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
 
-    let out = execute_program(&program, ExecConfig { step_cap: 300 }).expect("exec should pass");
+    let out = execute_program(
+        &program,
+        ExecConfig {
+            step_cap: 300,
+            ..ExecConfig::default()
+        },
+    )
+    .expect("exec should pass");
     assert_eq!(out.commits.len(), 1);
 }
 
@@ -29,7 +36,14 @@ condition(true);
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
 
-    let out = execute_program(&program, ExecConfig { step_cap: 300 }).expect("exec should pass");
+    let out = execute_program(
+        &program,
+        ExecConfig {
+            step_cap: 300,
+            ..ExecConfig::default()
+        },
+    )
+    .expect("exec should pass");
     assert_eq!(out.env.get("a"), Some(&Value::Int(1)));
     assert_eq!(out.env.get("b"), Some(&Value::Int(2)));
 }
@@ -38,7 +52,13 @@ condition(true);
 fn toy_program_failure_honest_on_unknown_condition_payload() {
     let src = "condition(payload().x);";
     let program = parse_program(src, 1).expect("parse should pass");
-    let err =
-        execute_program(&program, ExecConfig { step_cap: 300 }).expect_err("exec should fail");
+    let err = execute_program(
+        &program,
+        ExecConfig {
+            step_cap: 300,
+            ..ExecConfig::default()
+        },
+    )
+    .expect_err("exec should fail");
     assert_eq!(err.code.as_str(), "X-COND-INSUFFICIENT");
 }

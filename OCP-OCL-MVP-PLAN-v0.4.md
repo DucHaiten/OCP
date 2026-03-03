@@ -484,6 +484,7 @@ v0.4 chỉ được `DONE` khi đồng thời đạt:
 - W7 Stdlib expanded baseline: `DONE` (2026-03-03)
 - W8 Composer v0.4 (cost/incremental): `DONE` (2026-03-03)
 - W9 Platform conformance + 10 demos: `DONE` (2026-03-03)
+- Re-verify mới nhất: `2026-03-04` theo matrix v0.4 + W9 explicit, kết quả `PASS`.
 
 ## W0 Gate Log (Final Revised)
 
@@ -1589,5 +1590,37 @@ v0.4 chỉ được `DONE` khi đồng thời đạt:
 - Notes/risks:
   - Trust/sign files trong `security/` hiện là placeholder phục vụ flow W9 local; chưa phải production key management.
   - Manifest W9 đang dùng path tương đối từ repo root (`projects/ocp-ocl/apps/...`) để ổn định khi chạy từ root.
+
+### 2026-03-04 - V0.6 audit v0.4 consistency re-verify
+
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - W0..W9 re-verify (v0.6 audit)
+- Implemented:
+  - Rerun đầy đủ matrix kiểm chứng chính của v0.4 trên baseline hiện tại.
+  - Chạy thêm bộ W9 explicit để khóa bằng chứng conformance độc lập với lane tổng.
+- Files changed:
+  - `OCP-OCL-MVP-PLAN-v0.4.md`
+- Commands run:
+  - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`
+  - `cargo fmt -- --check`
+  - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+  - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1`
+  - `cargo test -p ocl-sdk --test w9_conformance`
+  - `cargo test -p ocl-cli w9_cli_`
+  - `cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v1.toml --out target/ocl/w9/reports/conformance_report.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json`
+- Test results:
+  - PASS:
+    - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`: PASS toàn bộ suite liên quan.
+    - `cargo fmt -- --check`: PASS.
+    - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`: PASS.
+    - `tools/ci_ocl_lane.ps1`: PASS toàn bộ lane e2e.
+    - `cargo test -p ocl-sdk --test w9_conformance`: PASS (4/4).
+    - `cargo test -p ocl-cli w9_cli_`: PASS (2/2).
+    - `ocl test --conformance --locked ...`: PASS (10/10), `required_digest=10deff71c24ef729`.
+- Notes/risks:
+  - Không phát hiện drift thực thi giữa lock thiết kế v0.4 và code/toolchain hiện tại.
+  - Trust/sign placeholder ở `projects/ocp-ocl/security/*` vẫn là local-flow evidence, chưa phải production key management.
 
 ---

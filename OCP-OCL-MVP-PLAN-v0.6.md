@@ -1,7 +1,3 @@
-> [!WARNING]
-> ARCHIVED PLAN: file này chỉ dùng cho mục đích lịch sử/audit.
-> Nguồn sự thật active: `projects/ocp-ocl/OCL-PLAN.md`.
-
 # OCL MVP PLAN v0.6 (Stabilization-Only)
 
 Ngày tạo: 2026-02-26  
@@ -12,6 +8,7 @@ Mục tiêu: đóng hết nợ kỹ thuật/xung đột/rủi ro còn tồn đ�
 - Unified release gate đã PASS trên clean checkout tại commit `1de5a285e7f16456cba0d2a39cef19c0435749ad`.
 - Evidence signoff cuối: `projects/ocp-ocl/release/evidence/u10-final-signoff.md`.
 - File này được giữ làm hồ sơ lịch sử của v0.6; trạng thái điều hành active chỉ đọc từ `OCL-PLAN.md`.
+- Ghi chú bổ sung (2026-03-04): sau snapshot `001..017`, đã bổ sung các issue audit `018..023`; toàn bộ đều đã `DONE`, nên trạng thái tổng hiện tại vẫn `OPEN=0`.
 
 ## Quy ước cập nhật bắt buộc (áp dụng từ v0.6)
 - Mọi thay đổi kế hoạch phải cập nhật file này trước khi triển khai.
@@ -310,6 +307,185 @@ Mục tiêu: đóng hết nợ kỹ thuật/xung đột/rủi ro còn tồn đ�
      - hoặc chuyển lane sang fixture copy hoàn toàn ngoài working tree và ghi evidence path cố định.
   2. Không còn bước mutate/xóa trực tiếp file governance trong source app khi chạy lane chính.
   3. Replay lane từ clean checkout cho cùng commit cho ra cùng input governance mà không cần generate in-place.
+
+### V6-ISSUE-018 - Drift tương thích test v0.1 sau thay đổi `ExecConfig`
+- Severity: `MAJOR`
+- Status: `DONE`
+- Evidence:
+  - Khi rerun matrix v0.1, nhiều suite fail compile `E0063`:
+    - `tests/ocl_exec.rs`
+    - `tests/ocl_registry.rs`
+    - `tests/ocl_determinism.rs`
+    - `tests/ocl_pilot.rs`
+  - Nguyên nhân: `ExecConfig` hiện có thêm field `commit_policy` (`src/ocp_ocl/budget.rs`) nhưng test literals vẫn dùng dạng cũ chỉ có `step_cap`.
+- Impact:
+  - Mất khả năng verify lại baseline v0.1 một cách ổn định.
+  - Tăng rủi ro drift “doc DONE nhưng test matrix không chạy lại được”.
+- Exit criteria:
+  1. Toàn bộ test literals `ExecConfig { step_cap: ... }` trong nhóm v0.1 được cập nhật hợp lệ.
+  2. Rerun matrix v0.1 pass đầy đủ:
+     - targeted suites,
+     - `cargo test` full,
+     - `cargo clippy --all-targets -- -D warnings`,
+     - `cargo fmt -- --check`.
+  3. Ghi nhận thay đổi vào `OCP-OCL-MVP-PLAN-v0.1.md` và giữ dấu vết trong v0.6.
+- Resolution (2026-03-03):
+  - Đã vá test literals sang:
+    - `ExecConfig { step_cap: ..., ..ExecConfig::default() }`
+  - Đã rerun matrix và pass:
+    - `cargo test --test ocl_parser`
+    - `cargo test --test ocl_typecheck`
+    - `cargo test --test ocl_exec`
+    - `cargo test --test ocl_registry`
+    - `cargo test --test ocl_determinism`
+    - `cargo test --test ocl_pilot`
+    - `cargo test`
+    - `cargo clippy --all-targets -- -D warnings`
+  - `cargo fmt -- --check`
+  - Đã cập nhật bổ sung audit entry vào `OCP-OCL-MVP-PLAN-v0.1.md`.
+
+### V6-ISSUE-019 - Re-verify v0.2: chuẩn hóa full-log và đối chiếu thực thi
+- Severity: `MAJOR`
+- Status: `DONE`
+- Evidence:
+  - Matrix v0.2 rerun PASS trong cùng phiên:
+    - `cargo test --test ocl_parser` (4/4)
+    - `cargo test --test ocl_typecheck` (6/6)
+    - `cargo test --test ocl_exec` (9/9)
+    - `cargo test --test ocl_toy_programs` (3/3)
+    - `cargo test --test ocl_pilot` (4/4)
+    - `cargo test --bin soak_compare` (1/1)
+    - `cargo test` (full suite PASS)
+    - `cargo clippy --all-targets -- -D warnings` (PASS)
+    - `cargo fmt -- --check` (PASS)
+  - Đối chiếu code trục khóa v0.2:
+    - `src/ocp_ocl/exec.rs` có caps bounded `condition`/`entangle` (`CONDITION_*`, `ENTANGLE_*`).
+    - `src/ocp_ocl/diag.rs` và `src/ocp_ocl/exec.rs` giữ canonical `X-*`/`R-*` + `root_reason`.
+    - `tests/ocl_ctx_validation.rs` assert `R-CTX-INVALID` + `RC-CTX-INVALID`.
+  - Chuẩn hóa tài liệu:
+    - `OCP-OCL-MVP-PLAN-v0.2.md` đã bổ sung planning freeze bị thiếu cho V2-B..V2-E.
+    - Thêm entry `V0.6 audit v0.2 consistency re-verify` ở nhật ký v0.2.
+- Impact:
+  - Xác nhận `DONE` của v0.2 là done thực, có bằng chứng rerun mới nhất.
+  - Loại bỏ rủi ro “log đủ closeout nhưng thiếu planning pair” trong chuẩn full-log hiện hành.
+- Exit criteria:
+  1. Toàn bộ matrix v0.2 pass lại trong một phiên audit thống nhất.
+  2. v0.2 plan có đủ cặp planning freeze + implementation closeout cho mọi gate.
+  3. Có entry audit mới trong v0.2 và issue log tương ứng trong v0.6.
+- Resolution (2026-03-03):
+  - Đã đạt đủ 3 tiêu chí trên.
+
+### V6-ISSUE-020 - Mức tự tin cuối cho v0.2 chưa có confidence-suite chuyên biệt
+- Severity: `MAJOR`
+- Status: `DONE`
+- Evidence:
+  - Trước khi vá, v0.2 đã có matrix targeted/full pass nhưng chưa có suite chuyên cho:
+    - lặp deterministic nhiều vòng trong một test,
+    - lock hành vi `commit_policy` theo mode,
+    - assert explicit “không rò rỉ legacy `E-*`” ở runtime surface.
+  - Đã thêm file test mới:
+    - `tests/ocl_confidence.rs`.
+  - Nội dung suite mới:
+    - `confidence_v1_core_flow_is_deterministic_over_many_runs` (64 runs),
+    - `confidence_v2_condition_reason_mapping_is_strict`,
+    - `confidence_commit_policy_modes_are_explicit`,
+    - `confidence_runtime_error_surface_is_canonical_not_legacy_e_prefix`.
+- Impact:
+  - Tăng mức tự tin “không quay lại nữa” cho v0.2 nhờ một lớp kiểm thử tập trung vào invariant cốt lõi.
+  - Giảm rủi ro lệch hành vi do thay đổi runtime nhỏ nhưng chưa lộ qua targeted suites cũ.
+- Exit criteria:
+  1. Suite confidence riêng chạy pass độc lập.
+  2. Full regression sau khi thêm suite vẫn pass.
+  3. Lint/format vẫn pass.
+  4. Có log cập nhật tương ứng trong `OCP-OCL-MVP-PLAN-v0.2.md`.
+- Resolution (2026-03-04):
+  - Đã chạy pass:
+    - `cargo test --test ocl_confidence` (4/4)
+    - `cargo test` (full suite pass)
+    - `cargo clippy --all-targets -- -D warnings` (pass)
+    - `cargo fmt -- --check` (pass sau `cargo fmt`)
+  - Đã cập nhật entry `2026-03-04 - V0.6 confidence hardening append` trong `OCP-OCL-MVP-PLAN-v0.2.md`.
+
+### V6-ISSUE-021 - Re-verify v0.3: xác nhận `DONE` thực thi trên workspace hiện tại
+- Severity: `MAJOR`
+- Status: `DONE`
+- Evidence:
+  - Rerun đúng matrix `Operational Commands` của v0.3:
+    - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`
+    - `cargo fmt -- --check`
+    - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+    - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1`
+  - Kết quả lane e2e:
+    - conformance JSON: `scenarios_total=10`, `scenarios_passed=10`, `scenarios_failed=0`,
+    - `required_digest=10deff71c24ef729`.
+- Impact:
+  - Xác nhận trạng thái `DONE` của M0-A..M5 là done thực ở baseline hiện tại, không chỉ log lịch sử.
+  - Giảm rủi ro sai lệch giữa plan v0.3 và toolchain/runtime đã tích lũy sau các bản v0.4/v0.5.
+- Exit criteria:
+  1. Matrix v0.3 pass lại đầy đủ trong một phiên audit.
+  2. Có entry re-verify trong `OCP-OCL-MVP-PLAN-v0.3.md`.
+  3. Không phát sinh regression mới ở lane e2e và conformance.
+- Resolution (2026-03-04):
+  - Đã đạt đủ 3 tiêu chí trên.
+  - Đã cập nhật entry `2026-03-04 - V0.6 audit v0.3 consistency re-verify` trong `OCP-OCL-MVP-PLAN-v0.3.md`.
+
+### V6-ISSUE-022 - Re-verify v0.4: xác nhận toàn bộ W0..W9 `DONE` thực trên baseline hiện tại
+- Severity: `MAJOR`
+- Status: `DONE`
+- Evidence:
+  - Rerun matrix v0.4:
+    - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`
+    - `cargo fmt -- --check`
+    - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+    - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1`
+  - Chạy thêm W9 explicit:
+    - `cargo test -p ocl-sdk --test w9_conformance` (4/4)
+    - `cargo test -p ocl-cli w9_cli_` (2/2)
+    - `cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v1.toml --out target/ocl/w9/reports/conformance_report.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json` (10/10, `required_digest=10deff71c24ef729`)
+- Impact:
+  - Xác nhận trạng thái `DONE` v0.4 là done thực thi được, không phụ thuộc log cũ.
+  - Khóa lại bằng chứng W9 theo cả lane tổng và command explicit.
+- Exit criteria:
+  1. Matrix v0.4 pass lại đầy đủ trong một phiên audit.
+  2. W9 explicit pass độc lập (SDK test, CLI test, conformance command).
+  3. Có entry re-verify mới trong `OCP-OCL-MVP-PLAN-v0.4.md`.
+- Resolution (2026-03-04):
+  - Đã đạt đủ 3 tiêu chí trên.
+  - Đã cập nhật entry `2026-03-04 - V0.6 audit v0.4 consistency re-verify` trong `OCP-OCL-MVP-PLAN-v0.4.md`.
+
+### V6-ISSUE-023 - Re-verify v0.5: chuẩn hóa validation matrix và xác nhận `DONE` thực thi
+- Severity: `MAJOR`
+- Status: `DONE`
+- Evidence:
+  - Đã rerun đầy đủ nhóm lệnh v0.5 hiện hành:
+    - `cargo check --workspace`
+    - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`
+    - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+    - `cargo fmt -- --check`
+    - `cargo test -p ocl-sdk --test v5_w2_domain_resolution` (6/6)
+    - `cargo test -p ocl-sdk --test v5_w3_shadow` (6/6)
+    - `cargo test -p ocl-sdk --test v5_w4_hive` (3/3)
+    - `cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v1.toml --out target/ocl/w9/reports/conformance_report.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json` (10/10, `required_digest=10deff71c24ef729`)
+    - `cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v5.toml --out target/ocl/w9/reports/conformance_report.v5.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json` (5/5, `required_digest=9e97cc112c567170`)
+    - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1` (PASS)
+    - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_quarantine.ps1` (PASS)
+  - Đã tái hiện drift trong matrix cũ:
+    - `-p ocl-runtime-rt` fail vì package không tồn tại.
+    - conformance locked command thiếu signer/trust fail `W9-CONFORMANCE-SIGN-REQUIRED`.
+  - Đã cập nhật thủ công `OCP-OCL-MVP-PLAN-v0.5.md` section `Validation matrix v0.5` để phản ánh command thực chạy.
+- Impact:
+  - Xác nhận trạng thái `DONE` của v0.5 là done thực, không phụ thuộc log cũ.
+  - Loại bỏ rủi ro “matrix trong plan lệch workspace” gây PASS giả hoặc tái hiện sai.
+- Exit criteria:
+  1. Matrix v0.5 hiện hành pass lại đầy đủ trên workspace hiện tại.
+  2. Drift command cũ được ghi nhận rõ và thay bằng command chuẩn.
+  3. Có entry audit mới trong `OCP-OCL-MVP-PLAN-v0.5.md` theo cặp planning/closeout.
+- Resolution (2026-03-04):
+  - Đã đạt đủ 3 tiêu chí trên.
+  - Đã cập nhật entry:
+    - `2026-03-04 - V0.6 audit v0.5 consistency re-verify (planning freeze)`
+    - `2026-03-04 - V0.6 audit v0.5 consistency re-verify (implementation closeout)`
+    trong `OCP-OCL-MVP-PLAN-v0.5.md`.
 
 ## 2) Rules khi đóng issue
 1. Mỗi issue phải có command evidence trước/sau.

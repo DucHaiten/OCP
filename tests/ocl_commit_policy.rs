@@ -10,9 +10,12 @@ commit(r);
 "#;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let out = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
     assert_eq!(out.commits.len(), 1);
     assert_eq!(out.commits[0].key, "world.ok");
     assert_eq!(out.commits[0].kind, ResultKind::Ok);
@@ -26,9 +29,12 @@ commit(r);
 "#;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let out = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
     assert_eq!(out.commits.len(), 1);
     assert_eq!(out.commits[0].key, "world.degraded");
     assert_eq!(out.commits[0].kind, ResultKind::Degraded);
@@ -45,9 +51,15 @@ commit(r);
 
     let mut reg = CapabilityRegistry::v1_baseline();
     reg.set_commit_allowed_for_key("world.ok", false);
-    let err = Executor::with_registry(ExecConfig { step_cap: 100 }, reg)
-        .run(&p)
-        .expect_err("exec should fail");
+    let err = Executor::with_registry(
+        ExecConfig {
+            step_cap: 100,
+            ..ExecConfig::default()
+        },
+        reg,
+    )
+    .run(&p)
+    .expect_err("exec should fail");
     assert_eq!(err.code.as_str(), "X-COMMIT-FORBIDDEN");
 }
 
@@ -65,8 +77,11 @@ match r {
 "#;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let out = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
     assert_eq!(out.env.get("marker"), Some(&Value::Int(1)));
 }

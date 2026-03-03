@@ -17,7 +17,14 @@ fn taxonomy_typecheck_is_t_namespace() {
 fn taxonomy_exec_is_x_namespace() {
     let p = parse_program("condition(false);", 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let err = execute_program(&p, ExecConfig { step_cap: 100 }).expect_err("exec should fail");
+    let err = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 100,
+            ..ExecConfig::default()
+        },
+    )
+    .expect_err("exec should fail");
     assert!(err.code.as_str().starts_with("X-"));
 }
 
@@ -28,6 +35,13 @@ observe("world.ok", "tier2", ctx("scene=lab;scene=again"), budget(5)) -> r;
 "#;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let err = execute_program(&p, ExecConfig { step_cap: 100 }).expect_err("exec should fail");
+    let err = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 100,
+            ..ExecConfig::default()
+        },
+    )
+    .expect_err("exec should fail");
     assert!(err.code.as_str().starts_with("R-"));
 }

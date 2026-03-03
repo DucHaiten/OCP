@@ -1,10 +1,10 @@
 ﻿{
-    "generated_at":  "2026-03-03T10:49:52.1611472+07:00",
+    "generated_at":  "2026-03-04T00:27:54.8965421+07:00",
     "suite":  "ocl_quarantine_non_blocking",
     "blocking":  false,
     "summary":  {
-                    "total":  3,
-                    "pass":  3,
+                    "total":  4,
+                    "pass":  4,
                     "fail":  0
                 },
     "results":  [
@@ -12,14 +12,14 @@
                         "name":  "hello_cli_run_locked",
                         "status":  "pass",
                         "exit_code":  0,
-                        "duration_ms":  112,
+                        "duration_ms":  114,
                         "error":  null
                     },
                     {
                         "name":  "mini_server_reactor_smoke",
                         "status":  "pass",
                         "exit_code":  0,
-                        "duration_ms":  99,
+                        "duration_ms":  100,
                         "error":  null
                     },
                     {
@@ -27,6 +27,13 @@
                         "status":  "pass",
                         "exit_code":  0,
                         "duration_ms":  100,
+                        "error":  null
+                    },
+                    {
+                        "name":  "w9_conformance_throughput_bytecode",
+                        "status":  "pass",
+                        "exit_code":  0,
+                        "duration_ms":  673,
                         "error":  null
                     }
                 ]

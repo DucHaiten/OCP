@@ -47,9 +47,15 @@ observe("world.exists", "tier2", ctx("scene=lab"), budget(5)) -> r;
 
     let mut reg = CapabilityRegistry::v1_baseline();
     reg.add_deny_pattern("world.exists");
-    let out = Executor::with_registry(ExecConfig { step_cap: 100 }, reg)
-        .run(&p)
-        .expect("exec should pass with insufficient result");
+    let out = Executor::with_registry(
+        ExecConfig {
+            step_cap: 100,
+            ..ExecConfig::default()
+        },
+        reg,
+    )
+    .run(&p)
+    .expect("exec should pass with insufficient result");
 
     let Some(Value::Result4(r)) = out.env.get("r") else {
         panic!("expected result4 binding");
@@ -65,7 +71,14 @@ observe("world.exists", "tier2", ctx("scene=lab"), budget(5)) -> r;
 "#;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let out = execute_program(&p, ExecConfig { step_cap: 100 }).expect("exec should pass");
+    let out = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 100,
+            ..ExecConfig::default()
+        },
+    )
+    .expect("exec should pass");
     let Some(Value::Result4(r)) = out.env.get("r") else {
         panic!("expected result4 binding");
     };

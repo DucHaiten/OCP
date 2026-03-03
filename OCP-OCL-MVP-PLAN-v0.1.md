@@ -1,7 +1,7 @@
 OCP-OCL v0.1 Master Plan + Execution Log (Core Language + Runtime Kernel)
 
 Ngày tạo: 2026-02-21
-Trạng thái: `ACTIVE`
+Trạng thái: `DONE` (historical baseline; re-verified 2026-03-03)
 Mục tiêu: Kế hoạch + nhật ký triển khai cho **OCP-OCL v0.1**. Đây là dự án **ngôn ngữ/runtime OCL thuần**.
 
 ---
@@ -93,12 +93,13 @@ Template cập nhật triển khai (sau khi làm)
 - `src/ocp_ocl/value.rs`           (Runtime values)
 - `src/ocp_ocl/result_kind.rs`     (4-kind result model)
 - `src/ocp_ocl/budget.rs`          (Budget)
-- `src/ocp_ocl/ctx.rs`             (`ctx("k=v;...")` parse/validate)
+- `src/ocp_ocl/ctx_contract.rs`    (`ctx("k=v;...")` contract parse/validate)
 - `src/ocp_ocl/keys.rs`            (Key parse/canonicalize)
 - `src/ocp_ocl/registry.rs`        (Capabilities/permissions/schema/policies)
-- `src/ocp_ocl/runtime.rs`         (Runtime observe/commit dispatch)
 - `src/ocp_ocl/exec.rs`            (Executor)
 - `src/ocp_ocl/audit.rs`           (TraceEvent + Signature)
+- `src/ocp_ocl/runner.rs`          (Fixture runner)
+- `src/ocp_ocl/pilot.rs`           (Pilot/replay + closeout report)
 - `src/ocp_ocl/mod.rs`
 - `src/lib.rs`
 
@@ -200,12 +201,20 @@ Reason codes baseline:
 - `cargo test --test ocl_exec`
 - `cargo test --test ocl_registry`
 - `cargo test --test ocl_determinism`
+- `cargo test --test ocl_commit_policy`
+- `cargo test --test ocl_fixture_runner`
+- `cargo test --test ocl_pilot`
 - `cargo clippy --all-targets -- -D warnings`
 - `cargo fmt -- --check`
 
 ---
 
 7) Execution Log
+
+- Lưu ý:
+  - Các entry `implementation update (chưa verify test)` là snapshot trung gian theo thời điểm triển khai.
+  - Trạng thái chốt của từng gate phải đọc ở entry `implementation closeout` tương ứng.
+  - Trạng thái current-head sau audit v0.6 được chốt ở entry `V0.6 audit v0.1 consistency patch` ở cuối file.
 
 ### 2026-03-03 - V1-A planning freeze
 - Date:
@@ -783,3 +792,59 @@ Reason codes baseline:
     - tất cả pass.
 - Notes/risks:
 - V1-H đã đóng; v0.1 gate A→H hoàn tất theo kế hoạch hiện tại.
+
+### 2026-03-03 - V0.6 audit v0.1 consistency patch
+- Date:
+- 2026-03-03
+- Gate/Step:
+- V0.6 / Audit v0.1
+- Implemented:
+- Rà soát lại v0.1 theo code thực tế và matrix test hiện hành.
+- Phát hiện drift compile ở test do `ExecConfig` đã thêm field `commit_policy` nhưng nhiều test v0.1 còn dùng literal cũ chỉ có `step_cap`.
+- Vá toàn bộ test affected sang cú pháp có default:
+  - `ExecConfig { step_cap: ..., ..ExecConfig::default() }`.
+- Cập nhật tài liệu v0.1:
+  - đổi trạng thái tổng sang `DONE` (đã re-verify),
+  - sửa kiến trúc `ctx.rs` -> `ctx_contract.rs`,
+  - bỏ dòng `runtime.rs` không còn đúng với cấu trúc hiện tại,
+  - bổ sung `runner.rs` và `pilot.rs`,
+  - mở rộng mục Operational Commands cho `ocl_commit_policy`, `ocl_fixture_runner`, `ocl_pilot`.
+- Files changed:
+- `tests/ocl_exec.rs`
+- `tests/ocl_registry.rs`
+- `tests/ocl_determinism.rs`
+- `tests/ocl_pilot.rs`
+- `tests/ocl_toy_programs.rs`
+- `tests/ocl_stdlib.rs`
+- `tests/ocl_fixture_runner.rs`
+- `tests/ocl_ctx_validation.rs`
+- `tests/ocl_commit_policy.rs`
+- `tests/ocl_diag_taxonomy.rs`
+- `OCP-OCL-MVP-PLAN-v0.1.md`
+- Commands run:
+- `cargo test --test ocl_parser`
+- `cargo test --test ocl_typecheck`
+- `cargo test --test ocl_exec`
+- `cargo test --test ocl_registry`
+- `cargo test --test ocl_determinism`
+- `cargo test --test ocl_pilot`
+- `cargo test`
+- `cargo clippy --all-targets -- -D warnings`
+- `cargo fmt`
+- `cargo fmt -- --check`
+- Test results:
+- PASS (sau khi vá):
+  - `ocl_parser`: 4/4
+  - `ocl_typecheck`: 6/6
+  - `ocl_exec`: 9/9
+  - `ocl_registry`: 8/8
+  - `ocl_determinism`: 2/2
+  - `ocl_pilot`: 4/4
+  - `cargo test` full suite: PASS
+  - `cargo clippy --all-targets -- -D warnings`: PASS
+  - `cargo fmt -- --check`: PASS
+- FAIL tạm thời đã xử lý:
+  - compile fail nhiều suite với `E0063` (`ExecConfig` thiếu `commit_policy` trong test literals).
+- Notes/risks:
+- Đây là drift tương thích test, không thay đổi semantics runtime.
+- Log closeout lịch sử của v0.1 vẫn giữ nguyên theo mốc thời gian gốc; entry này là lớp audit bổ sung từ v0.6.

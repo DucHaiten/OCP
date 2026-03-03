@@ -8,6 +8,7 @@ Mục tiêu: đưa OCL thành nền tảng lập trình độc lập cho ứng d
   - Khóa baseline OCL-only platform MVP theo các gate M0-A -> M5.
 - Trạng thái hiện tại:
   - `DONE` (chi tiết ở mục Trạng thái Gate).
+  - Re-verify mới nhất: `2026-03-04` theo matrix v0.3, kết quả `PASS`.
 - Luồng làm việc chuẩn:
   - Cập nhật kế hoạch -> code -> chạy test -> cập nhật closeout.
 - Bằng chứng kỹ thuật bắt buộc:
@@ -384,6 +385,33 @@ Trạng thái: `PASS`.
 - Notes/risks:
   - Không tự động cleanup temp folder để tránh thao tác xóa tự động.
   - Temp copies làm tăng disk usage tạm thời; chấp nhận được để đổi lấy an toàn source workspace.
+
+### 2026-03-04 - V0.6 audit v0.3 consistency re-verify
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - M0-A..M5 re-verify (v0.6 audit)
+- Implemented:
+  - Rerun đầy đủ ma trận `Operational Commands` của v0.3 trên baseline hiện tại.
+  - Xác nhận lại lane e2e cho canary + demo apps + conformance locked flow.
+- Files changed:
+  - `OCP-OCL-MVP-PLAN-v0.3.md`
+- Commands run:
+  - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`
+  - `cargo fmt -- --check`
+  - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+  - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1`
+- Test results:
+  - PASS:
+  - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`: PASS toàn bộ suite liên quan.
+  - `cargo fmt -- --check`: PASS.
+  - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`: PASS.
+  - `tools/ci_ocl_lane.ps1`: PASS toàn bộ lane;
+    - conformance report: `scenarios_total=10`, `scenarios_passed=10`, `scenarios_failed=0`,
+    - `required_digest=10deff71c24ef729`.
+- Notes/risks:
+  - Lane tạo workspace tạm trong `%TEMP%` để chạy e2e; không cleanup tự động theo policy an toàn hiện hành.
+  - Không phát hiện drift thực thi giữa plan v0.3 và code/toolchain hiện tại.
 
 ---
 

@@ -18,7 +18,14 @@ condition(true);
 "#;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let out = execute_program(&p, ExecConfig { step_cap: 100 }).expect("exec should pass");
+    let out = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 100,
+            ..ExecConfig::default()
+        },
+    )
+    .expect("exec should pass");
     assert_eq!(out.env.get("x"), Some(&Value::Int(1)));
 }
 
@@ -36,7 +43,14 @@ match r {
 "#;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let out = execute_program(&p, ExecConfig { step_cap: 200 }).expect("exec should pass");
+    let out = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 200,
+            ..ExecConfig::default()
+        },
+    )
+    .expect("exec should pass");
     assert_eq!(out.env.get("marker"), Some(&Value::Int(4)));
 }
 
@@ -45,7 +59,14 @@ fn exec_condition_false_fails() {
     let src = "condition(false);";
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let err = execute_program(&p, ExecConfig { step_cap: 100 }).expect_err("exec should fail");
+    let err = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 100,
+            ..ExecConfig::default()
+        },
+    )
+    .expect_err("exec should fail");
     assert_eq!(err.code.as_str(), ErrorCode::XConditionFalse.as_str());
 }
 
@@ -57,7 +78,14 @@ let b = 2;
 "#;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let err = execute_program(&p, ExecConfig { step_cap: 1 }).expect_err("exec should fail");
+    let err = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 1,
+            ..ExecConfig::default()
+        },
+    )
+    .expect_err("exec should fail");
     assert_eq!(err.code.as_str(), ErrorCode::XBudgetExceeded.as_str());
 }
 
@@ -69,7 +97,14 @@ commit(r);
 "#;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let err = execute_program(&p, ExecConfig { step_cap: 100 }).expect_err("exec should fail");
+    let err = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 100,
+            ..ExecConfig::default()
+        },
+    )
+    .expect_err("exec should fail");
     assert_eq!(err.code.as_str(), ErrorCode::XCommitForbidden.as_str());
 }
 
@@ -79,7 +114,14 @@ fn exec_condition_deferred_when_condition_budget_exceeded() {
     let p = parse_program(&src, 1).expect("parse should pass");
 
     // V2-C: runtime bounded evaluator may defer before bool proof, independent from typecheck.
-    let err = execute_program(&p, ExecConfig { step_cap: 2_000 }).expect_err("exec should fail");
+    let err = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 2_000,
+            ..ExecConfig::default()
+        },
+    )
+    .expect_err("exec should fail");
     assert_eq!(err.code.as_str(), ErrorCode::XConditionDeferred.as_str());
     assert_eq!(
         err.root_reason.map(|r| r.as_str()),
@@ -93,7 +135,14 @@ fn exec_condition_insufficient_when_constraint_cap_exceeded() {
     let p = parse_program(&src, 1).expect("parse should pass");
 
     // V2-C: oversized condition graph becomes insufficient with explicit root reason.
-    let err = execute_program(&p, ExecConfig { step_cap: 4_000 }).expect_err("exec should fail");
+    let err = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 4_000,
+            ..ExecConfig::default()
+        },
+    )
+    .expect_err("exec should fail");
     assert_eq!(
         err.code.as_str(),
         ErrorCode::XConditionInsufficient.as_str()
@@ -114,7 +163,14 @@ entangle(a, b, true);
 "#;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let out = execute_program(&p, ExecConfig { step_cap: 500 }).expect("exec should pass");
+    let out = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 500,
+            ..ExecConfig::default()
+        },
+    )
+    .expect("exec should pass");
     assert_eq!(out.env.get("a"), Some(&Value::Int(1)));
 }
 
@@ -127,7 +183,14 @@ fn exec_entangle_degree_cap_fails() {
 
     let p = parse_program(&src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let err = execute_program(&p, ExecConfig { step_cap: 5000 }).expect_err("exec should fail");
+    let err = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 5000,
+            ..ExecConfig::default()
+        },
+    )
+    .expect_err("exec should fail");
     assert_eq!(err.code.as_str(), "X-ENTANGLE-DEGREE-CAP");
     assert_eq!(
         err.root_reason.map(|r| r.as_str()),

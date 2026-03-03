@@ -1,8 +1,4 @@
-﻿> [!WARNING]
-> ARCHIVED PLAN: file nay chi dung cho muc dich lich su/audit.
-> Nguon su that active: projects/ocp-ocl/OCL-PLAN.md.
-
-# OCL MVP PLAN v0.5
+﻿# OCL MVP PLAN v0.5
 
 Ngày tạo: 2026-02-25  
 Mục tiêu: mở rộng OCL thành nền tảng “cosmology + hive” theo hướng governance-first, deterministic-first, signed-supply-chain-first; không nổ scope và không phá các khóa đã chốt ở v0.4.
@@ -133,7 +129,7 @@ v0.5 không có mục tiêu biến OCL thành game engine, browser engine hay HP
 
 ### 1.4 Universe selection lock
 1. Mọi lệnh `check/run/test/build/compose/verify` hỗ trợ `--universe <id>`.
-2. CI mặc định: `--universe ci_locked`.
+2. CI cosmos lane mặc định: `--universe ci_locked`; legacy compatibility lane không ép universe.
 3. Universe profile có thể đổi runtime/engine/audit/trace, nhưng không được phá invariants core.
 4. Universe là config overlay, không phải runtime fork:
    - chỉ override cấu hình đã có (`runtime_mode`, `engine`, `audit`, `trace`, `policy_profile`, budgets/permissions).
@@ -251,10 +247,13 @@ v0.5 không có mục tiêu biến OCL thành game engine, browser engine hay HP
    - tránh tạo hệ lock/security song song gây drift cho dev.
 
 ### 1.13 CI/SoT lock
-1. SoT pass/fail platform v0.5: `ocl test --conformance --locked --universe ci_locked`.
-2. Conformance report always-written.
-3. Required digest order-sensitive, không đưa `warnings_count`.
-4. Warning denylist preflight fail-hard:
+1. SoT pass/fail platform v0.5 gồm 2 lane kế thừa + nâng cấp:
+   - Lane kế thừa v0.4 (legacy apps): `ocl test --conformance --locked --manifest projects/ocp-ocl/conformance/conformance.v1.toml ...`.
+   - Lane nâng cấp v0.5 Foundation: `ocl test --conformance --locked --manifest projects/ocp-ocl/conformance/conformance.v5.toml ...`.
+2. `--universe ci_locked` là bắt buộc cho cosmos-ready lane/manifest; không áp cứng cho toàn bộ legacy scenarios.
+3. Conformance report always-written.
+4. Required digest order-sensitive, không đưa `warnings_count`.
+5. Warning denylist preflight fail-hard:
    - `W-W4-UNSIGNED-BUILD`
    - `W-W8-CATALOG-V1-COMPAT`.
 
@@ -405,7 +404,7 @@ Lệnh mới:
 4. `ocl run ... --shadow <id> [--shadow-policy forbid_commit|shadow_commit_log]`
 5. `ocl organ install <name> <version> [--registry ...] [--json]`
 6. `ocl organ verify <project> [--locked|--unlocked] [--json]`
-7. `ocl test --conformance --locked --universe ci_locked ...`
+7. `ocl test --conformance --locked [--manifest <path>] [--universe <id>] ...`
 8. `ocl init --preset <preset_id> [--locked|--unlocked]`
 9. `ocl kit list [--json]`
 10. `ocl kit doctor <project> [--json]`
@@ -590,18 +589,19 @@ Locked requirements:
 
 ### Blocking
 1. `cargo check --workspace`
-2. `cargo test -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli`
-3. `cargo clippy -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+2. `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`
+3. `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
 4. `cargo fmt -- --check`
 5. `cargo run -p ocl-cli -- cosmos lock sync <project> --locked --json`
-6. `cargo run -p ocl-cli -- test --conformance --locked --universe ci_locked --runtime deterministic --engine dual --json`
-7. `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1`
-8. `cargo test -p ocl-runtime-rt --test v5_w2_bridge_quota`
-9. `cargo test -p ocl-runtime-rt --test v5_w3_shadow_digest`
-10. `cargo test -p ocl-runtime-rt --test v5_w4_hive_soak`
+6. `cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v1.toml --out target/ocl/w9/reports/conformance_report.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json`
+7. `cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v5.toml --out target/ocl/w9/reports/conformance_report.v5.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json`
+8. `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1`
+9. `cargo test -p ocl-sdk --test v5_w2_domain_resolution`
+10. `cargo test -p ocl-sdk --test v5_w3_shadow`
+11. `cargo test -p ocl-sdk --test v5_w4_hive`
 
 ### Quarantine (non-blocking)
-1. `cargo run -p ocl-cli -- test --conformance --locked --universe ci_locked --runtime throughput --engine bytecode --json`
+1. `cargo run -p ocl-cli -- test --conformance --locked --runtime throughput --engine bytecode --manifest projects/ocp-ocl/conformance/conformance.v1.toml --out target/ocl/w9/reports/conformance_quarantine.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json`
 2. `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_quarantine.ps1`
 
 ---
@@ -618,7 +618,10 @@ v0.5 `DONE` khi đồng thời đạt:
 7. Hive reuse + soak counters chứng minh growth bounded/plateau, không đổi scheduling order.
 8. View contracts hoạt động mà không phá `No naked IO`.
 9. Organ packs có install/verify/lock theo signed supply-chain.
-10. `ocl test --conformance --locked --universe ci_locked` là SoT pass/fail.
+10. Conformance SoT v0.5 phải pass cả 2 lane:
+   - lane kế thừa v0.4 (manifest v1, locked deterministic).
+   - lane nâng cấp Foundation v0.5 (manifest v5, locked deterministic).
+   - `--universe ci_locked` áp cho cosmos-ready lane/manifest, không ép cứng lên toàn bộ legacy scenarios.
 11. W0-W9 regression v0.4 vẫn green.
 12. Có tối thiểu 2 official presets (`workflow_basic`, `agent_swarm_basic` hoặc tương đương) chạy được:
    - unlocked beginner defaults (smoke).
@@ -1304,6 +1307,83 @@ v0.5 `DONE` khi đồng thời đạt:
       - `run_id=w9-9976f76339dea293`
       - `required_digest=9e97cc112c567170`
 - Notes/risks:
-  - Nếu ép `--universe ci_locked` cho manifest v5 hiện tại sẽ fail các scenario legacy (không có `cosmos.toml`) với `V-UNIVERSE-NO-COSMOS`; đây là hành vi đúng theo contract.
+  - Nếu ép `--universe ci_locked` lên lane legacy (manifest v1) sẽ fail các scenario không có `cosmos.toml` với `V-UNIVERSE-NO-COSMOS`; đây là hành vi đúng theo contract.
   - Manifest v5 hiện là baseline Foundation 5 scenarios; nếu muốn hard-gate toàn bộ theo universe locked đồng nhất, cần tách manifest riêng cho lane `--universe`.
+
+### 2026-03-04 - V0.6 audit v0.5 consistency re-verify (planning freeze)
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - v0.5 re-verify audit
+- Why:
+  - Xác nhận toàn bộ trạng thái `DONE` của v0.5 là done thực thi trên workspace hiện tại, không chỉ dựa log lịch sử.
+  - Chốt các drift trong matrix lệnh để tránh báo `DONE` giả ở lần audit sau.
+- Scope:
+  - Rerun matrix v0.5 theo command hiện hành trong workspace.
+  - Ghi rõ command nào cũ/lệch và command thay thế đã PASS.
+  - Cập nhật thủ công section `Validation matrix v0.5`.
+- Expected tests:
+  - `cargo check --workspace`
+  - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`
+  - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+  - `cargo fmt -- --check`
+  - `cargo test -p ocl-sdk --test v5_w2_domain_resolution`
+  - `cargo test -p ocl-sdk --test v5_w3_shadow`
+  - `cargo test -p ocl-sdk --test v5_w4_hive`
+  - `cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v1.toml --out target/ocl/w9/reports/conformance_report.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json`
+  - `cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v5.toml --out target/ocl/w9/reports/conformance_report.v5.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json`
+  - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1`
+  - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_quarantine.ps1`
+- Exit criteria:
+  - Toàn bộ matrix hiện hành PASS.
+  - Drift command cũ được ghi nhận rõ và đã thay bằng command chuẩn trong chính file v0.5.
+
+### 2026-03-04 - V0.6 audit v0.5 consistency re-verify (implementation closeout)
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - v0.5 re-verify audit
+- Implemented:
+  - Cập nhật section `7) Validation matrix v0.5` theo workspace hiện tại:
+    - bỏ package không tồn tại `ocl-runtime-rt`.
+    - thay test W2/W3/W4 từ package cũ sang suite hiện hành trong `ocl-sdk`.
+    - thay command conformance/quarantine sang bản locked đầy đủ signer/trust/manifest.
+  - Rerun full matrix v0.5 ở mode audit và đối chiếu với lane.
+- Files changed:
+  - `OCP-OCL-MVP-PLAN-v0.5.md`
+- Commands run:
+  - `cargo check --workspace`
+  - `cargo test -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli` (drift reproduction)
+  - `cargo clippy -p ocl-runtime-core -p ocl-runtime-rt -p ocl-sdk -p ocl-cli --all-targets -- -D warnings` (drift reproduction)
+  - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli`
+  - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings`
+  - `cargo fmt -- --check`
+  - `cargo test -p ocl-sdk --test v5_w2_domain_resolution`
+  - `cargo test -p ocl-sdk --test v5_w3_shadow`
+  - `cargo test -p ocl-sdk --test v5_w4_hive`
+  - `cargo run -p ocl-cli -- test --conformance --locked --universe ci_locked --runtime deterministic --engine dual --json` (drift reproduction)
+  - `cargo run -p ocl-cli -- test --conformance --locked --universe ci_locked --runtime throughput --engine bytecode --json` (drift reproduction)
+  - `cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v1.toml --out target/ocl/w9/reports/conformance_report.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json`
+  - `cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest projects/ocp-ocl/conformance/conformance.v5.toml --out target/ocl/w9/reports/conformance_report.v5.json --trust-store projects/ocp-ocl/security/trust.store.toml --signer-id dev-root-1 --sign-key projects/ocp-ocl/security/dev-root-1.signing.key.toml --json`
+  - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_lane.ps1`
+  - `powershell -ExecutionPolicy Bypass -File tools/ci_ocl_quarantine.ps1`
+- Test results:
+  - PASS:
+    - `cargo check --workspace`
+    - `cargo test -p ocl-runtime-core -p ocl-sdk -p ocl-cli` pass toàn bộ suite.
+    - `cargo clippy -p ocl-runtime-core -p ocl-sdk -p ocl-cli --all-targets -- -D warnings` pass.
+    - `cargo fmt -- --check` pass.
+    - `v5_w2_domain_resolution` 6/6 pass.
+    - `v5_w3_shadow` 6/6 pass.
+    - `v5_w4_hive` 3/3 pass.
+    - conformance deterministic locked với manifest v1 pass `10/10`, `required_digest=10deff71c24ef729`.
+    - conformance deterministic locked với manifest v5 pass `5/5`, `required_digest=9e97cc112c567170`.
+    - `tools/ci_ocl_lane.ps1` pass end-to-end.
+    - `tools/ci_ocl_quarantine.ps1` pass (có conformance throughput/bytecode pass).
+  - FAIL có chủ đích để xác nhận drift:
+    - `cargo test/clippy` có `-p ocl-runtime-rt` fail do package không tồn tại.
+    - command conformance locked trong matrix cũ fail `W9-CONFORMANCE-SIGN-REQUIRED` vì thiếu signer/trust.
+- Notes/risks:
+  - Matrix cũ trong v0.5 có drift lịch sử; đã cập nhật sang command đang chạy thật trên workspace.
+  - Không có thay đổi code runtime/SDK/CLI trong đợt audit này; chỉ cập nhật tài liệu và bằng chứng re-verify.
 

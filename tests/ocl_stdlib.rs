@@ -67,9 +67,12 @@ observe("std.fs.read", "tier2", ctx("path=notes.txt"), budget(5)) -> r;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
 
-    let out = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
     let Some(Value::Result4(r)) = out.env.get("r") else {
         panic!("expected result4 binding");
     };
@@ -92,9 +95,12 @@ observe("std.http.post", "tier2", ctx("url=https://example.com;body={}"), budget
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
 
-    let out = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
     let Some(Value::Result4(r)) = out.env.get("r") else {
         panic!("expected result4 binding");
     };
@@ -110,9 +116,12 @@ observe("std.json.parse", "tier2", ctx("raw={\"a\":1}"), budget(5)) -> r;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
 
-    let out = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
     let Some(Value::Result4(r)) = out.env.get("r") else {
         panic!("expected result4 binding");
     };
@@ -134,9 +143,12 @@ commit(r);
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
 
-    let err = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect_err("commit on deferred result must fail");
+    let err = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect_err("commit on deferred result must fail");
     assert_eq!(err.code.as_str(), "X-COMMIT-FORBIDDEN");
 }
 
@@ -149,9 +161,12 @@ commit(r);
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
 
-    let out = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
     assert_eq!(out.commits.len(), 1);
     assert_eq!(out.commits[0].key, "std.log.info");
     assert_eq!(out.commits[0].kind, ResultKind::Ok);
@@ -185,9 +200,12 @@ observe("std.tls.handshake", "tier2", ctx("conn=example.com:443"), budget(5)) ->
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
 
-    let out = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
     let Some(Value::Result4(r)) = out.env.get("hs") else {
         panic!("expected handshake result");
     };
@@ -216,9 +234,12 @@ commit(w);
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
 
-    let out = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
 
     let Some(Value::Result4(query_res)) = out.env.get("q") else {
         panic!("expected query result");
@@ -261,9 +282,12 @@ commit(q);
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
 
-    let err = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect_err("commit on std.db.query_int must be denied by policy");
+    let err = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect_err("commit on std.db.query_int must be denied by policy");
     assert_eq!(err.code.as_str(), "X-COMMIT-FORBIDDEN");
 }
 
@@ -276,9 +300,12 @@ observe("std.game.tick_info", "tier2", ctx("ctx_tick=42"), budget(5)) -> game;
     let p = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
 
-    let out = Executor::new(ExecConfig { step_cap: 100 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
 
     let Some(Value::Result4(ui_res)) = out.env.get("ui") else {
         panic!("expected ui result");
@@ -327,9 +354,12 @@ fn exec_w7_local_real_sqlite_apply_once() {
 
     let p = parse_program(&src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let out = Executor::new(ExecConfig { step_cap: 1000 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 1000,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
 
     let Some(Value::Result4(r)) = out.env.get("q") else {
         panic!("expected query result");
@@ -375,9 +405,12 @@ fn exec_w7_local_real_tls_probe() {
 
     let p = parse_program(&src, 1).expect("parse should pass");
     typecheck_program(&p).expect("typecheck should pass");
-    let out = Executor::new(ExecConfig { step_cap: 1000 })
-        .run(&p)
-        .expect("exec should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 1000,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
 
     let Some(Value::Result4(h)) = out.env.get("h") else {
         panic!("expected handshake result");

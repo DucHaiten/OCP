@@ -31,6 +31,8 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
   - Khóa core semantics v0.2 theo hướng core-first, bounded, fail-honest.
 - Trạng thái tổng quan:
   - Xem `Trạng thái Gate v0.2` ngay bên dưới.
+- Trạng thái kiểm chứng mới nhất:
+  - Re-verify + confidence hardening ngày `2026-03-04` (v0.6 audit): `PASS`.
 - Trình tự làm việc chuẩn:
   - Planning freeze -> Implementation -> Test -> Closeout.
 - Bằng chứng kỹ thuật phải có cho từng gate:
@@ -348,6 +350,28 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 - Notes/risks:
 - Executor vẫn còn tạo một số `ErrorCode::E*` nội bộ; output canonical đã được khóa qua `as_str()`.
 
+### 2026-03-03 - V2-B planning freeze
+- Date:
+- 2026-03-03
+- Gate/Step:
+- V2-B
+- Why:
+- Đồng bộ parser/typecheck/exec/bridge theo taxonomy canonical vừa chốt ở V2-A.
+- Scope:
+- Chuẩn hóa mã lỗi runtime/context sang canonical `X-*`/`R-*`.
+- Bổ sung `root_reason` cho nhánh fail-honest liên quan context/runtime.
+- Cập nhật test taxonomy + ctx validation theo contract canonical.
+- Expected tests:
+- `cargo test --test ocl_parser`
+- `cargo test --test ocl_typecheck`
+- `cargo test --test ocl_exec`
+- `cargo test --test ocl_ctx_validation`
+- `cargo test --test ocl_diag_taxonomy`
+- `cargo test`
+- Exit criteria:
+- Runtime/context không còn surfacing `E-*` ở output public.
+- Tests taxonomy/context pass theo canonical contract.
+
 ### 2026-03-03 - V2-B implementation closeout
 - Date:
 - 2026-03-03
@@ -389,6 +413,25 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 - Full `cargo test`: toàn bộ suite pass.
 - Notes/risks:
 - Alias `E-*` vẫn còn ở mức migration enum; output canonical đã khóa theo `as_str()`.
+
+### 2026-03-03 - V2-C planning freeze
+- Date:
+- 2026-03-03
+- Gate/Step:
+- V2-C
+- Why:
+- Chuyển `condition` từ no-op trace-only sang evaluator bounded deterministic, fail-honest.
+- Scope:
+- Ship internal outcome `Pass/Fail/Deferred/Insufficient`.
+- Map canonical executor-visible `X-COND-*` + `root_reason=RC-*` cho nhánh insufficient.
+- Bổ sung fixtures/test cho pass/fail/deferred/insufficient.
+- Expected tests:
+- `cargo test --test ocl_exec`
+- `cargo test --test ocl_diag`
+- `cargo test`
+- Exit criteria:
+- `condition` không còn no-op.
+- Có bằng chứng pass/fail/deferred/insufficient qua test.
 
 ### 2026-03-03 - V2-C implementation closeout
 - Date:
@@ -438,6 +481,26 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 - full `cargo test`: toàn bộ suite pass.
 - Notes/risks:
 - Hai nhánh `DEFERRED/INSUFFICIENT` có thể xuất hiện cả khi bỏ qua typecheck (exec-only path), đây là hành vi chủ đích để test runtime bounded evaluator.
+
+### 2026-03-03 - V2-D planning freeze
+- Date:
+- 2026-03-03
+- Gate/Step:
+- V2-D
+- Why:
+- Đưa `entangle` từ no-op sang semantics bounded/session-local, deterministic, fail-honest.
+- Scope:
+- Mở syntax/parser/typecheck/runtime cho `entangle(left,right,constraint)`.
+- Enforce caps session-local: edge cap, degree cap, propagation budget cap.
+- Thêm canonical error path `X-ENTANGLE-*`.
+- Expected tests:
+- `cargo test --test ocl_parser`
+- `cargo test --test ocl_typecheck`
+- `cargo test --test ocl_exec`
+- `cargo test`
+- Exit criteria:
+- `entangle` có semantics runtime thật, không còn no-op marker.
+- Cap violation surfaced bằng canonical errors.
 
 ### 2026-03-03 - V2-D implementation closeout
 - Date:
@@ -489,6 +552,31 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 - Notes/risks:
 - Propagation budget dùng pseudo-time deterministic để giữ replay ổn định; chưa dùng đồng hồ thực.
 
+### 2026-03-03 - V2-E planning freeze
+- Date:
+- 2026-03-03
+- Gate/Step:
+- V2-E
+- Why:
+- Chốt regression/docs closeout để xác nhận v0.2 không phá trục v0.1 và đủ evidence release.
+- Scope:
+- Chạy full test matrix + lint/fmt.
+- Bổ sung artifacts còn thiếu cho closeout (`soak_compare`, `ocl_toy_programs`, reports/spec freeze).
+- Cập nhật checklist và log closeout cuối v0.2.
+- Expected tests:
+- `cargo test`
+- `cargo test --test ocl_parser`
+- `cargo test --test ocl_typecheck`
+- `cargo test --test ocl_exec`
+- `cargo test --test ocl_toy_programs`
+- `cargo test --test ocl_pilot`
+- `cargo test --test ocl_confidence`
+- `cargo test --bin soak_compare`
+- `cargo clippy --all-targets -- -D warnings`
+- `cargo fmt -- --check`
+- Exit criteria:
+- Matrix pass đầy đủ, docs/reports closeout tồn tại, known limits ghi rõ.
+
 ### 2026-03-03 - V2-E implementation closeout
 - Date:
 - 2026-03-03
@@ -534,3 +622,74 @@ Mục tiêu: một file duy nhất để theo dõi kế hoạch + nhật ký tri
 - Notes/risks:
 - Không có regression mới ở các suite đã tồn tại.
 - Soak compare hiện là binary baseline tối thiểu cho matrix v0.2; có thể mở rộng logic ở v0.2.1+ nếu cần so sánh artifact chi tiết.
+
+### 2026-03-03 - V0.6 audit v0.2 consistency re-verify
+- Date:
+- 2026-03-03
+- Gate/Step:
+- V2-A..V2-E re-verify (v0.6 audit)
+- Implemented:
+- Rerun đầy đủ matrix kiểm chứng v0.2 theo `Operational Commands`.
+- Đối chiếu trực tiếp code cho các trục khóa v0.2:
+- caps bounded `condition` và `entangle`,
+- taxonomy canonical `X-*`/`R-*`,
+- `root_reason=RC-*` cho runtime fail-honest.
+- Chuẩn hóa nhật ký để đủ cặp planning freeze + implementation closeout cho từng gate V2-B..V2-E.
+- Files changed:
+- `OCP-OCL-MVP-PLAN-v0.2.md`
+- Commands run:
+- `cargo test --test ocl_parser`
+- `cargo test --test ocl_typecheck`
+- `cargo test --test ocl_exec`
+- `cargo test --test ocl_toy_programs`
+- `cargo test --test ocl_pilot`
+- `cargo test --bin soak_compare`
+- `cargo test`
+- `cargo clippy --all-targets -- -D warnings`
+- `cargo fmt -- --check`
+- `rg -n "COND|ENTANGLE|condition|entangle" src/ocp_ocl/exec.rs`
+- `rg -n "R-CTX-INVALID|RC-CTX-INVALID|root_reason" src/ocp_ocl/exec.rs src/ocp_ocl/diag.rs tests/ocl_ctx_validation.rs tests/ocl_diag_taxonomy.rs`
+- Test results:
+- PASS:
+- `ocl_parser`: 4/4
+- `ocl_typecheck`: 6/6
+- `ocl_exec`: 9/9
+- `ocl_toy_programs`: 3/3
+- `ocl_pilot`: 4/4
+- `soak_compare` (bin test): 1/1
+- `cargo test` full: PASS toàn bộ suite hiện có.
+- `cargo clippy --all-targets -- -D warnings`: PASS.
+- `cargo fmt -- --check`: PASS.
+- Notes/risks:
+- Không phát hiện drift thực thi giữa plan v0.2 và code hiện tại.
+- Các số test trong closeout lịch sử của từng gate là ảnh chụp theo thời điểm gate đóng; trạng thái mới nhất được khóa bởi entry audit này.
+
+### 2026-03-04 - V0.6 confidence hardening append (final-confidence pass)
+- Date:
+- 2026-03-04
+- Gate/Step:
+- V2-A..V2-E confidence hardening (v0.6 audit append)
+- Implemented:
+- Thêm suite `tests/ocl_confidence.rs` để tăng mức tự tin cuối, tập trung vào:
+- determinism lặp nhiều vòng cho core flow v1 (`64` runs),
+- mapping strict `condition` deferred/insufficient + `root_reason`,
+- hành vi `commit_policy` theo từng mode (`Normal/ForbidCommit/ShadowCommitLog`),
+- kiểm tra runtime surface không rò rỉ mã legacy `E-*`.
+- Rerun full regression + lint + format sau khi thêm suite mới.
+- Files changed:
+- `tests/ocl_confidence.rs`
+- `OCP-OCL-MVP-PLAN-v0.2.md`
+- Commands run:
+- `cargo test --test ocl_confidence`
+- `cargo test`
+- `cargo clippy --all-targets -- -D warnings`
+- `cargo fmt`
+- `cargo fmt -- --check`
+- Test results:
+- PASS:
+- `ocl_confidence`: 4/4
+- `cargo test` full: PASS toàn bộ suite hiện có.
+- `cargo clippy --all-targets -- -D warnings`: PASS.
+- `cargo fmt -- --check`: PASS (sau khi chạy `cargo fmt`).
+- Notes/risks:
+- Suite confidence tăng độ bao phủ hành vi quan trọng nhưng vẫn là kiểm thử hữu hạn; chưa phải chứng minh hình thức (formal proof).
