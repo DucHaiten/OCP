@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/bin/sh
 set -eu
 
 python Rules/guard/guard_repo.py --mode changed --staged

@@ -136,6 +136,72 @@ pub struct PermissionRules {
 pub struct ProjectPermissions {
     pub package: Option<PermissionRules>,
     pub modules: HashMap<String, PermissionRules>,
+    pub std_fs: Option<StdFsPermissionConfig>,
+    pub std_kv: Option<StdKvPermissionConfig>,
+    pub std_time: Option<StdTimePermissionConfig>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StdFsPermissionConfig {
+    pub read: Vec<String>,
+    pub write: Vec<String>,
+    pub remove: Vec<String>,
+    pub rename: Vec<String>,
+    pub list: Vec<String>,
+    pub max_read_bytes: u64,
+    pub max_write_bytes: u64,
+    pub max_list_entries: u32,
+}
+
+impl Default for StdFsPermissionConfig {
+    fn default() -> Self {
+        Self {
+            read: Vec::new(),
+            write: Vec::new(),
+            remove: Vec::new(),
+            rename: Vec::new(),
+            list: Vec::new(),
+            max_read_bytes: 1_048_576,
+            max_write_bytes: 1_048_576,
+            max_list_entries: 500,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StdKvPermissionConfig {
+    pub enabled: bool,
+    pub max_keys: u32,
+    pub max_value_bytes: u64,
+    pub key_prefix: Option<String>,
+}
+
+impl Default for StdKvPermissionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_keys: 5_000,
+            max_value_bytes: 65_536,
+            key_prefix: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StdTimePermissionConfig {
+    pub enabled: bool,
+    pub tick_mode: String,
+    pub dt_ms: u32,
+}
+
+impl Default for StdTimePermissionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            tick_mode: "logical".to_string(),
+            dt_ms: 16,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -429,6 +495,11 @@ fn normalize_permission_rules(rules: &mut PermissionRules) {
     rules.deny.dedup();
 }
 
+fn normalize_string_list(values: &mut Vec<String>) {
+    values.sort();
+    values.dedup();
+}
+
 fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
     let mut out = ProjectPermissions::default();
     let mut current_section = String::new();
@@ -449,6 +520,7 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
         };
         let key = key_raw.trim();
         let values = parse_string_array_literal(value_raw);
+        let scalar_value = value_raw.trim().trim_matches('"');
 
         if current_section == "permissions.package" {
             let rules = out.package.get_or_insert_with(PermissionRules::default);
@@ -473,10 +545,231 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
                 _ => {}
             }
             normalize_permission_rules(rules);
+            continue;
+        }
+
+        if current_section == "permissions.std_fs" {
+            let cfg = out.std_fs.get_or_insert_with(StdFsPermissionConfig::default);
+            match key {
+                "read" => cfg.read = values,
+                "write" => cfg.write = values,
+                "remove" => cfg.remove = values,
+                "rename" => cfg.rename = values,
+                "list" => cfg.list = values,
+                "max_read_bytes" => {
+                    if let Ok(parsed) = scalar_value.parse::<u64>() {
+                        cfg.max_read_bytes = parsed.max(1);
+                    }
+                }
+                "max_write_bytes" => {
+                    if let Ok(parsed) = scalar_value.parse::<u64>() {
+                        cfg.max_write_bytes = parsed.max(1);
+                    }
+                }
+                "max_list_entries" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.max_list_entries = parsed.max(1);
+                    }
+                }
+                _ => {}
+            }
+            normalize_string_list(&mut cfg.read);
+            normalize_string_list(&mut cfg.write);
+            normalize_string_list(&mut cfg.remove);
+            normalize_string_list(&mut cfg.rename);
+            normalize_string_list(&mut cfg.list);
+            continue;
+        }
+
+        if current_section == "permissions.std_kv" {
+            let cfg = out.std_kv.get_or_insert_with(StdKvPermissionConfig::default);
+            match key {
+                "enabled" => {
+                    if let Some(parsed) = parse_bool_literal(scalar_value) {
+                        cfg.enabled = parsed;
+                    }
+                }
+                "max_keys" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.max_keys = parsed.max(1);
+                    }
+                }
+                "max_value_bytes" => {
+                    if let Ok(parsed) = scalar_value.parse::<u64>() {
+                        cfg.max_value_bytes = parsed.max(1);
+                    }
+                }
+                "key_prefix" => {
+                    if scalar_value.is_empty() {
+                        cfg.key_prefix = None;
+                    } else {
+                        cfg.key_prefix = Some(scalar_value.to_string());
+                    }
+                }
+                _ => {}
+            }
+            continue;
+        }
+
+        if current_section == "permissions.std_time" {
+            let cfg = out
+                .std_time
+                .get_or_insert_with(StdTimePermissionConfig::default);
+            match key {
+                "enabled" => {
+                    if let Some(parsed) = parse_bool_literal(scalar_value) {
+                        cfg.enabled = parsed;
+                    }
+                }
+                "tick_mode" => {
+                    if scalar_value == "logical" {
+                        cfg.tick_mode = scalar_value.to_string();
+                    }
+                }
+                "dt_ms" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.dt_ms = parsed.max(1);
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
     out
+}
+
+fn std_fs_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "std.fs.read_text" | "std.fs.stat" => Some("read"),
+        "std.fs.list_dir" => Some("list"),
+        "std.fs.write_text" | "std.fs.mkdir" => Some("write"),
+        "std.fs.remove" => Some("remove"),
+        "std.fs.rename" => Some("rename"),
+        _ if key.starts_with("std.fs.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn build_permission_hint_for_std_fs(action: &str) -> String {
+    match action {
+        "read" => {
+            "Hint: add `[permissions.std_fs]` with `read = [\"./data/**\"]` in Ocl.toml."
+                .to_string()
+        }
+        "list" => {
+            "Hint: add `[permissions.std_fs]` with `list = [\"./data/**\"]` in Ocl.toml."
+                .to_string()
+        }
+        "write" => {
+            "Hint: add `[permissions.std_fs]` with `write = [\"./out/**\"]` in Ocl.toml."
+                .to_string()
+        }
+        "remove" => {
+            "Hint: add `[permissions.std_fs]` with `remove = [\"./out/**\"]` in Ocl.toml."
+                .to_string()
+        }
+        "rename" => {
+            "Hint: add `[permissions.std_fs]` with `rename = [\"./out/**\"]` in Ocl.toml."
+                .to_string()
+        }
+        _ => "Hint: use supported std.fs keys: read_text/stat/list_dir/write_text/mkdir/remove/rename."
+            .to_string(),
+    }
+}
+
+fn verify_pack_permissions_for_key(
+    permissions: &ProjectPermissions,
+    module_path: Option<&str>,
+    file_path: &Path,
+    key: &str,
+) -> Result<(), SdkError> {
+    if let Some(action) = std_fs_action_from_key(key) {
+        let Some(cfg) = permissions.std_fs.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-FS-PERMISSION-DENIED`; missing section `[permissions.std_fs]`. {}",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+                build_permission_hint_for_std_fs(action),
+            )));
+        };
+
+        let allowed = match action {
+            "read" => !cfg.read.is_empty(),
+            "list" => !cfg.list.is_empty(),
+            "write" => !cfg.write.is_empty(),
+            "remove" => !cfg.remove.is_empty(),
+            "rename" => !cfg.rename.is_empty(),
+            _ => false,
+        };
+
+        if !allowed {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-FS-PERMISSION-DENIED`; action=`{}` has empty allowlist in `[permissions.std_fs]`. {}",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+                action,
+                build_permission_hint_for_std_fs(action),
+            )));
+        }
+        return Ok(());
+    }
+
+    if key.starts_with("std.kv.") {
+        let Some(cfg) = permissions.std_kv.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-KV-PERMISSION-DENIED`; missing section `[permissions.std_kv]`. Hint: add `[permissions.std_kv]` with `enabled = true` in Ocl.toml.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-KV-PERMISSION-DENIED`; `[permissions.std_kv].enabled = false`. Hint: set `enabled = true` in `[permissions.std_kv]`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        return Ok(());
+    }
+
+    if key.starts_with("std.time.") {
+        let Some(cfg) = permissions.std_time.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-TIME-DISABLED`; missing section `[permissions.std_time]`. Hint: add `[permissions.std_time]` with `enabled = true` in Ocl.toml.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-TIME-DISABLED`; `[permissions.std_time].enabled = false`. Hint: set `enabled = true` in `[permissions.std_time]`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        return Ok(());
+    }
+
+    Ok(())
 }
 
 pub fn parse_project_language_config_v071(manifest_text: &str) -> ProjectLanguageConfigV071 {
@@ -622,7 +915,12 @@ fn verify_permissions_for_source(
     file_path: &Path,
     permissions: &ProjectPermissions,
 ) -> Result<(), SdkError> {
-    if permissions.package.is_none() && permissions.modules.is_empty() {
+    if permissions.package.is_none()
+        && permissions.modules.is_empty()
+        && permissions.std_fs.is_none()
+        && permissions.std_kv.is_none()
+        && permissions.std_time.is_none()
+    {
         return Ok(());
     }
 
@@ -658,6 +956,8 @@ fn verify_permissions_for_source(
                 hint
             )));
         }
+
+        verify_pack_permissions_for_key(permissions, module_path.as_deref(), file_path, &key)?;
     }
 
     Ok(())

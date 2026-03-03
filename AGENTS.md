@@ -204,3 +204,12 @@ Mục tiêu: giảm tối đa rủi ro mất dữ liệu khi trợ lý làm vi�
   - DỪNG NGAY,
   - không sửa tiếp bằng lệnh tắt,
   - báo người dùng trước khi làm bước tiếp theo.
+
+## 17) Lệnh commit mặc định (để không quên)
+- Luôn dùng đúng 1 lệnh này khi commit:
+  - `powershell -ExecutionPolicy Bypass -File tools/commit_safe.ps1 "Noi-dung-commit"`
+- Lệnh trên tự:
+  - bỏ stage các build artifacts thường gặp (`target`, `.../ocl-cli/target`, `Rules/guard/__pycache__`),
+  - chạy guard staged,
+  - commit khi guard pass.
+- Không dùng commit trực tiếp nếu đang có nhiều file build/generated trong danh sách thay đổi.
