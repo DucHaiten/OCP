@@ -1,1 +1,0 @@
-{"mode":"deterministic","ticks":128,"event_count":128,"event_id_end":128,"total_steps":768,"mailbox_high_water":1,"backpressure_count":0,"cancelled_count":0,"deadline_exceeded_count":0,"socket_listen":"127.0.0.1:19091"}

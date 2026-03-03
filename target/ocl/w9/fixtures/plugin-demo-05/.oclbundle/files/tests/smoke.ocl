@@ -1,9 +1,0 @@
-module apps.plugin_demo.tests.smoke;
-
-observe("custom.echo.ping", "tier2", ctx("msg=smoke"), budget(5)) -> plugin_res;
-match plugin_res {
-  OK => { let smoke_ok = true; }
-  DEGRADED => { let smoke_ok = true; }
-  INSUFFICIENT => { condition(false); }
-  DEFERRED => { condition(false); }
-}

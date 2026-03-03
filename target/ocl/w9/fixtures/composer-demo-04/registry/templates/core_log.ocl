@@ -1,9 +1,0 @@
-module generated.core_log;
-
-observe("std.log.info", "tier2", ctx("message=composer-demo"), budget(5)) -> log_res;
-match log_res {
-  OK => { let ok = true; condition(ok); }
-  DEGRADED => { let ok = true; condition(ok); }
-  INSUFFICIENT => { let ok = true; condition(ok); }
-  DEFERRED => { let ok = true; condition(ok); }
-}

@@ -1,9 +1,0 @@
-module generated.core_fetch;
-
-observe("std.http.get", "tier2", ctx("url=https://example.com/composer"), budget(5)) -> fetch_res;
-match fetch_res {
-  OK => { let ok = true; condition(ok); }
-  DEGRADED => { let ok = true; condition(ok); }
-  INSUFFICIENT => { let ok = true; condition(ok); }
-  DEFERRED => { let ok = true; condition(ok); }
-}

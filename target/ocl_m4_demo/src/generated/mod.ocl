@@ -1,4 +1,0 @@
-module generated.mod;
-let component_count = 1;
-let generated_ready = true;
-condition(generated_ready);

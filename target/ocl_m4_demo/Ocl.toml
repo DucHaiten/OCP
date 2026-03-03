@@ -1,8 +1,0 @@
-[package]
-name = "ocl_m4_demo"
-version = "0.1.0"
-
-[targets]
-default = "main"
-
-[dependencies]

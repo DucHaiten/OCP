@@ -1,7 +1,0 @@
-observe("std.time.sleep", "tier2", ctx("ms=1"), budget(1)) -> tick;
-match tick {
-  OK => { let ok = true; condition(ok); }
-  DEGRADED => { let ok = true; condition(ok); }
-  INSUFFICIENT => { let ok = true; condition(ok); }
-  DEFERRED => { let ok = true; condition(ok); }
-}

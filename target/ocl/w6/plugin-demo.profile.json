@@ -1,9 +1,0 @@
-version=1
-run_id=4d3ca5d83fbf42ba
-event_count=4
-observe_count=1
-eval_steps_est=4
-alloc_units_est=4
-total_steps=12
-required_digest=305ad03b0cdf2df2
-key_cost=custom.echo.ping|1|1|0|0|0

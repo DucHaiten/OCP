@@ -1,2 +1,0 @@
-let smoke_ok = true;
-condition(smoke_ok);

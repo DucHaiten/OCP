@@ -1,7 +1,0 @@
-observe("std.http.get", "tier2", ctx("url=https://example.com/ping"), budget(5)) -> ping;
-match ping {
-  OK => { let ok = true; condition(ok); }
-  DEGRADED => { let ok = true; condition(ok); }
-  INSUFFICIENT => { let ok = true; condition(ok); }
-  DEFERRED => { let ok = true; condition(ok); }
-}

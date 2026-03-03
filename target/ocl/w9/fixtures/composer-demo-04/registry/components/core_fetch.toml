@@ -1,5 +1,0 @@
-name="core.fetch"
-phase="infer"
-provides="cap.http.get"
-requires=""
-template="templates/core_fetch.ocl"

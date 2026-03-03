@@ -1,9 +1,0 @@
-module apps.plugin_demo.main;
-
-observe("custom.echo.ping", "tier2", ctx("msg=hello-plugin"), budget(5)) -> plugin_res;
-match plugin_res {
-  OK => { let plugin_ok = true; }
-  DEGRADED => { let plugin_ok = true; }
-  INSUFFICIENT => { condition(false); }
-  DEFERRED => { condition(false); }
-}

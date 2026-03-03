@@ -1,5 +1,0 @@
-name="core.logging"
-phase="render"
-provides="cap.log.info"
-requires=""
-template="templates/core_log.ocl"

@@ -1,3 +1,0 @@
-module generated.core_logging;
-let ok = true;
-condition(ok);
