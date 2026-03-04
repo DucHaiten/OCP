@@ -3,6 +3,7 @@ use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
+use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -39,6 +40,8 @@ pub struct CommitEvent {
 struct ObservationMeta {
     key: String,
     pending_sqlite_write: Option<PendingSqliteWrite>,
+    pending_kv_write: Option<PendingKvWrite>,
+    pending_fs_write: Option<PendingFsWrite>,
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +49,55 @@ struct PendingSqliteWrite {
     dsn: String,
     sql: String,
     pending_write_id: String,
+}
+
+#[derive(Debug, Clone)]
+struct PendingKvWrite {
+    op: KvCommitOp,
+    pending_write_id: String,
+}
+
+#[derive(Debug, Clone)]
+enum KvCommitOp {
+    Put {
+        key: String,
+        value: Value,
+        overwrite: bool,
+    },
+    Del {
+        key: String,
+    },
+    Clear {
+        prefix: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct PendingFsWrite {
+    op: FsCommitOp,
+    pending_write_id: String,
+}
+
+#[derive(Debug, Clone)]
+enum FsCommitOp {
+    WriteText {
+        path: String,
+        text: String,
+        overwrite: bool,
+    },
+    Mkdir {
+        path: String,
+        recursive: bool,
+    },
+    Remove {
+        path: String,
+        recursive: bool,
+    },
+    Rename {
+        from: String,
+        to: String,
+        overwrite: bool,
+    },
 }
 
 const CONDITION_TIME_BUDGET_NS: u64 = 20_000;
@@ -98,6 +150,8 @@ pub struct Executor {
     registry: CapabilityRegistry,
     observations: HashMap<u64, ObservationMeta>,
     applied_sqlite_writes: HashSet<String>,
+    applied_kv_writes: HashSet<String>,
+    applied_fs_writes: HashSet<String>,
     commits: Vec<CommitEvent>,
     trace: TraceLog,
     constraints: ConstraintSession,
@@ -115,6 +169,8 @@ impl Executor {
             registry: CapabilityRegistry::default(),
             observations: HashMap::new(),
             applied_sqlite_writes: HashSet::new(),
+            applied_kv_writes: HashSet::new(),
+            applied_fs_writes: HashSet::new(),
             commits: Vec::new(),
             trace: TraceLog::default(),
             constraints: ConstraintSession::default(),
@@ -132,6 +188,8 @@ impl Executor {
             registry,
             observations: HashMap::new(),
             applied_sqlite_writes: HashSet::new(),
+            applied_kv_writes: HashSet::new(),
+            applied_fs_writes: HashSet::new(),
             commits: Vec::new(),
             trace: TraceLog::default(),
             constraints: ConstraintSession::default(),
@@ -299,11 +357,15 @@ impl Executor {
                 .with_origin_id(origin_id);
 
                 let pending_sqlite_write = extract_pending_sqlite_write(key_lit, &r);
+                let pending_kv_write = extract_pending_kv_write(key_lit, &r);
+                let pending_fs_write = extract_pending_fs_write(key_lit, &r);
                 self.observations.insert(
                     origin_id,
                     ObservationMeta {
                         key: key_lit.to_string(),
                         pending_sqlite_write,
+                        pending_kv_write,
+                        pending_fs_write,
                     },
                 );
                 self.trace.push(TraceEvent::ObserveEnd {
@@ -458,7 +520,8 @@ impl Executor {
             ));
         };
 
-        self.trace.push(TraceEvent::MatchArmSelected { arm: result.kind });
+        self.trace
+            .push(TraceEvent::MatchArmSelected { arm: result.kind });
         match result.kind {
             ResultKind::Ok | ResultKind::Degraded => {
                 // Keep sugar trace/step parity with canonical desugar:
@@ -475,10 +538,9 @@ impl Executor {
                 // Keep sugar trace/step parity with canonical desugar:
                 // match { ... => { let x = <else>; } / { return <else>; } }
                 self.tick(span)?;
-                let prev_r = self.env.insert(
-                    "r".to_string(),
-                    Value::Result4(Box::new((*result).clone())),
-                );
+                let prev_r = self
+                    .env
+                    .insert("r".to_string(), Value::Result4(Box::new((*result).clone())));
                 let else_value = self.eval_expr(else_expr);
                 match prev_r {
                     Some(v) => {
@@ -515,7 +577,8 @@ impl Executor {
             ));
         };
 
-        self.trace.push(TraceEvent::MatchArmSelected { arm: result.kind });
+        self.trace
+            .push(TraceEvent::MatchArmSelected { arm: result.kind });
         match result.kind {
             ResultKind::Ok | ResultKind::Degraded => Ok(Flow::Continue),
             ResultKind::Insufficient | ResultKind::Deferred => match self.guard_mode {
@@ -526,15 +589,13 @@ impl Executor {
                     let ret = self.eval_expr(value)?;
                     Ok(Flow::Return(ret))
                 }
-                GuardMode::Error => Err(
-                    Diagnostic::new(
-                        ErrorCode::XGuardFailed,
-                        DiagPhase::Exec,
-                        span,
-                        "guard failed on non-success Result4",
-                    )
-                    .with_root_reason(result.reason.unwrap_or(ReasonCode::PolicyDenied)),
-                ),
+                GuardMode::Error => Err(Diagnostic::new(
+                    ErrorCode::XGuardFailed,
+                    DiagPhase::Exec,
+                    span,
+                    "guard failed on non-success Result4",
+                )
+                .with_root_reason(result.reason.unwrap_or(ReasonCode::PolicyDenied))),
             },
         }
     }
@@ -853,6 +914,8 @@ impl Executor {
                 match self.commit_policy {
                     CommitPolicyMode::Normal => {
                         self.apply_pending_sqlite_write_if_needed(&meta, span)?;
+                        self.apply_pending_kv_write_if_needed(&meta, span)?;
+                        self.apply_pending_fs_write_if_needed(&meta, span)?;
                         self.commits.push(CommitEvent {
                             origin_id,
                             key: meta.key.clone(),
@@ -944,6 +1007,187 @@ impl Executor {
         })?;
 
         self.applied_sqlite_writes
+            .insert(pending.pending_write_id.clone());
+        Ok(())
+    }
+
+    fn apply_pending_kv_write_if_needed(
+        &mut self,
+        meta: &ObservationMeta,
+        span: Span,
+    ) -> Result<(), Diagnostic> {
+        let Some(pending) = meta.pending_kv_write.as_ref() else {
+            return Ok(());
+        };
+        if self.applied_kv_writes.contains(&pending.pending_write_id) {
+            return Ok(());
+        }
+
+        let mut store = load_kv_store().map_err(|reason| {
+            Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "std.kv commit cannot load state store",
+            )
+            .with_root_reason(reason)
+        })?;
+
+        match &pending.op {
+            KvCommitOp::Put {
+                key,
+                value,
+                overwrite,
+            } => {
+                if !overwrite && store.contains_key(key) {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "std.kv.put commit denied: key exists and overwrite=false",
+                    )
+                    .with_root_reason(ReasonCode::PolicyDenied));
+                }
+                if !store.contains_key(key) && store.len() >= kv_max_keys() {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "std.kv.put commit deferred: max_keys exceeded",
+                    )
+                    .with_root_reason(ReasonCode::KvCapExceeded));
+                }
+                if stringify_json_value(value).len() > kv_max_value_bytes() {
+                    return Err(Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "std.kv.put commit deferred: value exceeds max_value_bytes",
+                    )
+                    .with_root_reason(ReasonCode::KvCapExceeded));
+                }
+                store.insert(key.clone(), value.clone());
+            }
+            KvCommitOp::Del { key } => {
+                store.remove(key);
+            }
+            KvCommitOp::Clear { prefix } => {
+                if let Some(prefix) = prefix {
+                    store.retain(|k, _| !k.starts_with(prefix));
+                } else {
+                    store.clear();
+                }
+            }
+        }
+
+        save_kv_store(&store).map_err(|reason| {
+            Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "std.kv commit cannot persist state store",
+            )
+            .with_root_reason(reason)
+        })?;
+
+        self.applied_kv_writes
+            .insert(pending.pending_write_id.clone());
+        Ok(())
+    }
+
+    fn apply_pending_fs_write_if_needed(
+        &mut self,
+        meta: &ObservationMeta,
+        span: Span,
+    ) -> Result<(), Diagnostic> {
+        let Some(pending) = meta.pending_fs_write.as_ref() else {
+            return Ok(());
+        };
+        if self.applied_fs_writes.contains(&pending.pending_write_id) {
+            return Ok(());
+        }
+
+        let apply_result: Result<(), ReasonCode> = (|| match &pending.op {
+            FsCommitOp::WriteText {
+                path,
+                text,
+                overwrite,
+            } => {
+                let (full_path, _) = resolve_fs_path("write", path)?;
+                if full_path.exists() && !overwrite {
+                    Err(ReasonCode::PolicyDenied)
+                } else if text.as_bytes().len() > fs_max_write_bytes() {
+                    Err(ReasonCode::LimitExceeded)
+                } else {
+                    fs_write_text_atomic(&full_path, text)
+                }
+            }
+            FsCommitOp::Mkdir { path, recursive } => {
+                let (full_path, _) = resolve_fs_path("write", path)?;
+                if *recursive {
+                    fs::create_dir_all(&full_path).map_err(|_| ReasonCode::FsIoError)
+                } else {
+                    fs::create_dir(&full_path).map_err(|_| ReasonCode::FsIoError)
+                }
+            }
+            FsCommitOp::Remove { path, recursive } => {
+                let (full_path, _) = resolve_fs_path("remove", path)?;
+                if !full_path.exists() {
+                    Ok(())
+                } else {
+                    let meta = fs::metadata(&full_path).map_err(|_| ReasonCode::FsIoError)?;
+                    if meta.is_dir() {
+                        if *recursive {
+                            fs::remove_dir_all(&full_path).map_err(|_| ReasonCode::FsIoError)
+                        } else {
+                            fs::remove_dir(&full_path).map_err(|_| ReasonCode::FsIoError)
+                        }
+                    } else {
+                        fs::remove_file(&full_path).map_err(|_| ReasonCode::FsIoError)
+                    }
+                }
+            }
+            FsCommitOp::Rename {
+                from,
+                to,
+                overwrite,
+            } => {
+                let (from_full, _) = resolve_fs_path("rename", from)?;
+                let (to_full, _) = resolve_fs_path("rename", to)?;
+                if !from_full.exists() {
+                    Err(ReasonCode::FsNotFound)
+                } else if to_full.exists() && !overwrite {
+                    Err(ReasonCode::PolicyDenied)
+                } else {
+                    if to_full.exists() {
+                        let to_meta = fs::metadata(&to_full).map_err(|_| ReasonCode::FsIoError)?;
+                        if to_meta.is_dir() {
+                            fs::remove_dir_all(&to_full).map_err(|_| ReasonCode::FsIoError)?;
+                        } else {
+                            fs::remove_file(&to_full).map_err(|_| ReasonCode::FsIoError)?;
+                        }
+                    }
+                    if let Some(parent) = to_full.parent() {
+                        if !parent.as_os_str().is_empty() {
+                            fs::create_dir_all(parent).map_err(|_| ReasonCode::FsIoError)?;
+                        }
+                    }
+                    fs::rename(&from_full, &to_full).map_err(|_| ReasonCode::FsIoError)
+                }
+            }
+        })();
+
+        apply_result.map_err(|reason| {
+            Diagnostic::new(
+                ErrorCode::XCommitForbidden,
+                DiagPhase::Exec,
+                span,
+                "std.fs commit apply failed",
+            )
+            .with_root_reason(reason)
+        })?;
+
+        self.applied_fs_writes
             .insert(pending.pending_write_id.clone());
         Ok(())
     }
@@ -1513,6 +1757,342 @@ fn extract_pending_sqlite_write(key: &str, result: &Result4<Value>) -> Option<Pe
     })
 }
 
+fn extract_pending_kv_write(_key: &str, result: &Result4<Value>) -> Option<PendingKvWrite> {
+    if !matches!(result.kind, ResultKind::Ok | ResultKind::Degraded) {
+        return None;
+    }
+    let payload = result.payload.as_ref()?;
+    let Value::Map(map) = payload else {
+        return None;
+    };
+    let op = map.get("op")?.as_string()?;
+    let pending_write_id = map.get("pending_write_id")?.as_string()?;
+
+    let op = match op.as_str() {
+        "put" => {
+            let key = map.get("key")?.as_string()?;
+            let value = map.get("value")?.clone();
+            let overwrite = map
+                .get("overwrite")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            KvCommitOp::Put {
+                key,
+                value,
+                overwrite,
+            }
+        }
+        "del" => KvCommitOp::Del {
+            key: map.get("key")?.as_string()?,
+        },
+        "clear" => {
+            let prefix = match map.get("prefix") {
+                Some(Value::String(v)) => Some(v.clone()),
+                _ => None,
+            };
+            KvCommitOp::Clear { prefix }
+        }
+        _ => return None,
+    };
+
+    Some(PendingKvWrite {
+        op,
+        pending_write_id,
+    })
+}
+
+fn extract_pending_fs_write(key: &str, result: &Result4<Value>) -> Option<PendingFsWrite> {
+    if !matches!(result.kind, ResultKind::Ok | ResultKind::Degraded) {
+        return None;
+    }
+    let Value::Map(map) = result.payload.as_ref()? else {
+        return None;
+    };
+    let pending_write_id = map.get("pending_write_id")?.as_string()?;
+    let op = match key {
+        "std.fs.write_text" => FsCommitOp::WriteText {
+            path: map.get("path")?.as_string()?,
+            text: map.get("text")?.as_string()?,
+            overwrite: map
+                .get("overwrite")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        },
+        "std.fs.mkdir" => FsCommitOp::Mkdir {
+            path: map.get("path")?.as_string()?,
+            recursive: map
+                .get("recursive")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        },
+        "std.fs.remove" => FsCommitOp::Remove {
+            path: map.get("path")?.as_string()?,
+            recursive: map
+                .get("recursive")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        },
+        "std.fs.rename" => FsCommitOp::Rename {
+            from: map.get("from")?.as_string()?,
+            to: map.get("to")?.as_string()?,
+            overwrite: map
+                .get("overwrite")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        },
+        _ => return None,
+    };
+    Some(PendingFsWrite {
+        op,
+        pending_write_id,
+    })
+}
+
+fn kv_store_path() -> PathBuf {
+    if let Ok(raw) = env::var("OCL_STD_KV_PATH") {
+        let trimmed = raw.trim();
+        if !trimmed.is_empty() {
+            return PathBuf::from(trimmed);
+        }
+    }
+    PathBuf::from(".ocl_state/kv.json")
+}
+
+fn kv_max_keys() -> usize {
+    env::var("OCL_STD_KV_MAX_KEYS")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(5_000)
+}
+
+fn kv_max_value_bytes() -> usize {
+    env::var("OCL_STD_KV_MAX_VALUE_BYTES")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(65_536)
+}
+
+fn load_kv_store() -> Result<BTreeMap<String, Value>, ReasonCode> {
+    let path = kv_store_path();
+    if !path.exists() {
+        return Ok(BTreeMap::new());
+    }
+    let raw = fs::read_to_string(&path).map_err(|_| ReasonCode::KvIoError)?;
+    if raw.trim().is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let parsed = parse_json_value(&raw).map_err(|_| ReasonCode::KvIoError)?;
+    let Value::Map(map) = parsed else {
+        return Err(ReasonCode::KvIoError);
+    };
+    Ok(map)
+}
+
+fn save_kv_store(store: &BTreeMap<String, Value>) -> Result<(), ReasonCode> {
+    let path = kv_store_path();
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).map_err(|_| ReasonCode::KvIoError)?;
+        }
+    }
+    let tmp_path = path.with_extension("tmp");
+    let content = stringify_json_value(&Value::Map(store.clone()));
+    fs::write(&tmp_path, content).map_err(|_| ReasonCode::KvIoError)?;
+    fs::rename(&tmp_path, &path).map_err(|_| ReasonCode::KvIoError)?;
+    Ok(())
+}
+
+fn fs_sandbox_root() -> PathBuf {
+    if let Ok(raw) = env::var("OCL_STD_FS_ROOT") {
+        let trimmed = raw.trim();
+        if !trimmed.is_empty() {
+            return PathBuf::from(trimmed);
+        }
+    }
+    PathBuf::from(".")
+}
+
+fn fs_max_read_bytes() -> usize {
+    env::var("OCL_STD_FS_MAX_READ_BYTES")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(1_048_576)
+}
+
+fn fs_max_write_bytes() -> usize {
+    env::var("OCL_STD_FS_MAX_WRITE_BYTES")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(1_048_576)
+}
+
+fn fs_max_list_entries() -> usize {
+    env::var("OCL_STD_FS_MAX_LIST_ENTRIES")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(500)
+}
+
+fn fs_allow_patterns_for_action(action: &str) -> Vec<String> {
+    let var_name = match action {
+        "read" => "OCL_STD_FS_ALLOW_READ",
+        "list" => "OCL_STD_FS_ALLOW_LIST",
+        "write" => "OCL_STD_FS_ALLOW_WRITE",
+        "remove" => "OCL_STD_FS_ALLOW_REMOVE",
+        "rename" => "OCL_STD_FS_ALLOW_RENAME",
+        _ => return Vec::new(),
+    };
+    let Ok(raw) = env::var(var_name) else {
+        return Vec::new();
+    };
+    raw.split([';', ','])
+        .filter_map(normalize_fs_pattern)
+        .collect()
+}
+
+fn normalize_fs_pattern(raw: &str) -> Option<String> {
+    let mut pattern = raw.trim().replace('\\', "/");
+    while pattern.starts_with("./") {
+        pattern = pattern[2..].to_string();
+    }
+    while pattern.ends_with('/') && pattern.len() > 1 {
+        pattern.pop();
+    }
+    if pattern.is_empty() {
+        None
+    } else {
+        Some(pattern)
+    }
+}
+
+fn normalize_fs_logical_path(raw: &str) -> Result<String, ReasonCode> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(ReasonCode::FsInvalidPath);
+    }
+    let input = trimmed.replace('\\', "/");
+    if input.contains('\0') {
+        return Err(ReasonCode::FsInvalidPath);
+    }
+    if Path::new(&input).is_absolute() || input.starts_with('/') {
+        return Err(ReasonCode::FsPathOutsideSandbox);
+    }
+
+    let mut out: Vec<String> = Vec::new();
+    for comp in Path::new(&input).components() {
+        match comp {
+            Component::CurDir => {}
+            Component::Normal(seg) => {
+                let seg = seg.to_string_lossy();
+                if seg.contains(':') {
+                    return Err(ReasonCode::FsInvalidPath);
+                }
+                out.push(seg.to_string());
+            }
+            Component::ParentDir => return Err(ReasonCode::FsPathOutsideSandbox),
+            Component::RootDir | Component::Prefix(_) => {
+                return Err(ReasonCode::FsPathOutsideSandbox);
+            }
+        }
+    }
+    Ok(out.join("/"))
+}
+
+fn fs_match_pattern(pattern: &str, logical_path: &str) -> bool {
+    if pattern == "*" || pattern == "**" {
+        return true;
+    }
+    if let Some(prefix) = pattern.strip_suffix("/**") {
+        return logical_path == prefix || logical_path.starts_with(&format!("{prefix}/"));
+    }
+    logical_path == pattern
+}
+
+fn fs_is_allowed(action: &str, logical_path: &str) -> bool {
+    let patterns = fs_allow_patterns_for_action(action);
+    if patterns.is_empty() {
+        return false;
+    }
+    patterns
+        .iter()
+        .any(|pattern| fs_match_pattern(pattern, logical_path))
+}
+
+fn fs_contains_symlink_components(path: &Path, root: &Path) -> Result<bool, ReasonCode> {
+    if !root.exists() {
+        return Ok(false);
+    }
+    let root_abs = root.canonicalize().map_err(|_| ReasonCode::FsIoError)?;
+    let path_abs = if path.exists() {
+        path.to_path_buf()
+    } else {
+        path.parent().unwrap_or(path).to_path_buf()
+    };
+    let mut cursor = root_abs.clone();
+    for comp in path_abs.components() {
+        if let Component::Normal(seg) = comp {
+            cursor.push(seg);
+            if !cursor.exists() {
+                break;
+            }
+            let meta = fs::symlink_metadata(&cursor).map_err(|_| ReasonCode::FsIoError)?;
+            if meta.file_type().is_symlink() {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn resolve_fs_path(action: &str, raw_path: &str) -> Result<(PathBuf, String), ReasonCode> {
+    let logical_path = normalize_fs_logical_path(raw_path)?;
+    if !fs_is_allowed(action, &logical_path) {
+        return Err(ReasonCode::FsPermissionDenied);
+    }
+    let root = fs_sandbox_root();
+    let full = if logical_path.is_empty() {
+        root.clone()
+    } else {
+        root.join(&logical_path)
+    };
+    if fs_contains_symlink_components(&full, &root)? {
+        return Err(ReasonCode::FsSymlinkDisallowed);
+    }
+    Ok((full, logical_path))
+}
+
+fn fs_write_text_atomic(path: &Path, text: &str) -> Result<(), ReasonCode> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).map_err(|_| ReasonCode::FsIoError)?;
+        }
+    }
+    let tmp_path = path.with_extension("tmp");
+    fs::write(&tmp_path, text.as_bytes()).map_err(|_| ReasonCode::FsIoError)?;
+    if path.exists() {
+        let meta = fs::metadata(path).map_err(|_| ReasonCode::FsIoError)?;
+        if meta.is_dir() {
+            return Err(ReasonCode::FsInvalidPath);
+        }
+        fs::remove_file(path).map_err(|_| ReasonCode::FsIoError)?;
+    }
+    fs::rename(&tmp_path, path).map_err(|_| ReasonCode::FsIoError)?;
+    Ok(())
+}
+
+fn to_i64_saturated(value: u64) -> i64 {
+    if value > i64::MAX as u64 {
+        i64::MAX
+    } else {
+        value as i64
+    }
+}
+
 fn flag_enabled(var_name: &str) -> bool {
     match env::var(var_name) {
         Ok(raw) => matches!(
@@ -1659,6 +2239,260 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             map.insert("value".to_string(), format!("arg:{name}"));
             Result4::ok(Value::Payload(map))
         }
+        "std.fs.read_text" => {
+            let raw_path = ctx.get("path").cloned().unwrap_or_default();
+            let (full_path, _logical_path) = match resolve_fs_path("read", &raw_path) {
+                Ok(v) => v,
+                Err(reason) => return Result4::insufficient(reason),
+            };
+
+            if !full_path.exists() {
+                return Result4::insufficient(ReasonCode::FsNotFound);
+            }
+            let meta = match fs::metadata(&full_path) {
+                Ok(v) => v,
+                Err(_) => return Result4::insufficient(ReasonCode::FsIoError),
+            };
+            if meta.is_dir() {
+                return Result4::insufficient(ReasonCode::FsInvalidPath);
+            }
+
+            let bytes = match fs::read(&full_path) {
+                Ok(v) => v,
+                Err(_) => return Result4::insufficient(ReasonCode::FsIoError),
+            };
+            let ctx_max =
+                parse_nonnegative_usize(ctx.get("max_bytes")).unwrap_or(fs_max_read_bytes());
+            let effective_max = ctx_max.min(fs_max_read_bytes());
+            let truncated = bytes.len() > effective_max;
+            let used = if truncated {
+                &bytes[..effective_max]
+            } else {
+                bytes.as_slice()
+            };
+            let text = String::from_utf8_lossy(used).to_string();
+
+            let mut map = BTreeMap::new();
+            map.insert("text".to_string(), Value::String(text));
+            map.insert("truncated".to_string(), Value::Bool(truncated));
+            map.insert("bytes".to_string(), Value::Int(used.len() as i64));
+            if truncated {
+                Result4::degraded(Value::Map(map), ReasonCode::FsTooLarge)
+            } else {
+                Result4::ok(Value::Map(map))
+            }
+        }
+        "std.fs.list_dir" => {
+            let raw_path = ctx.get("path").cloned().unwrap_or_default();
+            let (full_path, _logical_path) = match resolve_fs_path("list", &raw_path) {
+                Ok(v) => v,
+                Err(reason) => return Result4::insufficient(reason),
+            };
+            if !full_path.exists() {
+                return Result4::insufficient(ReasonCode::FsNotFound);
+            }
+            if !full_path.is_dir() {
+                return Result4::insufficient(ReasonCode::FsInvalidPath);
+            }
+
+            let requested_cap =
+                parse_nonnegative_usize(ctx.get("cap")).unwrap_or(fs_max_list_entries());
+            let effective_cap = requested_cap.min(fs_max_list_entries());
+            let mut entries: Vec<Value> = Vec::new();
+            let iter = match fs::read_dir(&full_path) {
+                Ok(v) => v,
+                Err(_) => return Result4::insufficient(ReasonCode::FsIoError),
+            };
+            for item in iter {
+                let item = match item {
+                    Ok(v) => v,
+                    Err(_) => return Result4::insufficient(ReasonCode::FsIoError),
+                };
+                let name = item.file_name().to_string_lossy().to_string();
+                let meta = match item.metadata() {
+                    Ok(v) => v,
+                    Err(_) => return Result4::insufficient(ReasonCode::FsIoError),
+                };
+                let is_dir = meta.is_dir();
+                let size = if is_dir {
+                    0
+                } else {
+                    to_i64_saturated(meta.len())
+                };
+                let mut row = BTreeMap::new();
+                row.insert("name".to_string(), Value::String(name));
+                row.insert("is_dir".to_string(), Value::Bool(is_dir));
+                row.insert("size".to_string(), Value::Int(size));
+                entries.push(Value::Map(row));
+            }
+            entries.sort_by(|a, b| {
+                let an = match a {
+                    Value::Map(map) => map
+                        .get("name")
+                        .and_then(Value::as_string)
+                        .unwrap_or_default(),
+                    _ => String::new(),
+                };
+                let bn = match b {
+                    Value::Map(map) => map
+                        .get("name")
+                        .and_then(Value::as_string)
+                        .unwrap_or_default(),
+                    _ => String::new(),
+                };
+                an.cmp(&bn)
+            });
+
+            let truncated = entries.len() > effective_cap;
+            if truncated {
+                entries.truncate(effective_cap);
+            }
+            let mut map = BTreeMap::new();
+            map.insert("entries".to_string(), Value::List(entries));
+            map.insert("truncated".to_string(), Value::Bool(truncated));
+            if truncated {
+                Result4::degraded(Value::Map(map), ReasonCode::LimitExceeded)
+            } else {
+                Result4::ok(Value::Map(map))
+            }
+        }
+        "std.fs.stat" => {
+            let raw_path = ctx.get("path").cloned().unwrap_or_default();
+            let (full_path, _logical_path) = match resolve_fs_path("read", &raw_path) {
+                Ok(v) => v,
+                Err(reason) => return Result4::insufficient(reason),
+            };
+
+            let mut map = BTreeMap::new();
+            if !full_path.exists() {
+                map.insert("exists".to_string(), Value::Bool(false));
+                map.insert("is_dir".to_string(), Value::Bool(false));
+                map.insert("size".to_string(), Value::Int(0));
+                return Result4::ok(Value::Map(map));
+            }
+            let meta = match fs::metadata(&full_path) {
+                Ok(v) => v,
+                Err(_) => return Result4::insufficient(ReasonCode::FsIoError),
+            };
+            let is_dir = meta.is_dir();
+            let size = if is_dir {
+                0
+            } else {
+                to_i64_saturated(meta.len())
+            };
+            map.insert("exists".to_string(), Value::Bool(true));
+            map.insert("is_dir".to_string(), Value::Bool(is_dir));
+            map.insert("size".to_string(), Value::Int(size));
+            Result4::ok(Value::Map(map))
+        }
+        "std.fs.write_text" => {
+            let path = ctx.get("path").cloned().unwrap_or_default();
+            let text = ctx.get("text").cloned().unwrap_or_default();
+            let overwrite = parse_bool_ctx(ctx.get("overwrite")).unwrap_or(false);
+            let (full_path, _logical_path) = match resolve_fs_path("write", &path) {
+                Ok(v) => v,
+                Err(reason) => return Result4::insufficient(reason),
+            };
+            if full_path.exists() && !overwrite {
+                return Result4::insufficient(ReasonCode::PolicyDenied);
+            }
+            if text.as_bytes().len() > fs_max_write_bytes() {
+                return Result4::deferred(ReasonCode::LimitExceeded);
+            }
+            let mut map = BTreeMap::new();
+            map.insert("op".to_string(), Value::String("write_text".to_string()));
+            map.insert("path".to_string(), Value::String(path.clone()));
+            map.insert("text".to_string(), Value::String(text.clone()));
+            map.insert("overwrite".to_string(), Value::Bool(overwrite));
+            map.insert(
+                "pending_write_id".to_string(),
+                Value::String(stable_hash64_hex(&format!(
+                    "fs_write_text|{path}|{overwrite}|{}",
+                    stable_hash64_hex(&text)
+                ))),
+            );
+            Result4::ok(Value::Map(map))
+        }
+        "std.fs.mkdir" => {
+            let path = ctx.get("path").cloned().unwrap_or_default();
+            let recursive = parse_bool_ctx(ctx.get("recursive")).unwrap_or(false);
+            let (full_path, _logical_path) = match resolve_fs_path("write", &path) {
+                Ok(v) => v,
+                Err(reason) => return Result4::insufficient(reason),
+            };
+            if full_path.exists() {
+                let meta = match fs::metadata(&full_path) {
+                    Ok(v) => v,
+                    Err(_) => return Result4::insufficient(ReasonCode::FsIoError),
+                };
+                if !meta.is_dir() {
+                    return Result4::insufficient(ReasonCode::FsInvalidPath);
+                }
+            }
+            let mut map = BTreeMap::new();
+            map.insert("op".to_string(), Value::String("mkdir".to_string()));
+            map.insert("path".to_string(), Value::String(path.clone()));
+            map.insert("recursive".to_string(), Value::Bool(recursive));
+            map.insert(
+                "pending_write_id".to_string(),
+                Value::String(stable_hash64_hex(&format!("fs_mkdir|{path}|{recursive}"))),
+            );
+            Result4::ok(Value::Map(map))
+        }
+        "std.fs.remove" => {
+            let path = ctx.get("path").cloned().unwrap_or_default();
+            let recursive = parse_bool_ctx(ctx.get("recursive")).unwrap_or(false);
+            let (full_path, _logical_path) = match resolve_fs_path("remove", &path) {
+                Ok(v) => v,
+                Err(reason) => return Result4::insufficient(reason),
+            };
+            if full_path.exists() {
+                let meta = match fs::metadata(&full_path) {
+                    Ok(v) => v,
+                    Err(_) => return Result4::insufficient(ReasonCode::FsIoError),
+                };
+                if meta.is_dir() && !recursive {
+                    return Result4::insufficient(ReasonCode::PolicyDenied);
+                }
+            }
+            let mut map = BTreeMap::new();
+            map.insert("op".to_string(), Value::String("remove".to_string()));
+            map.insert("path".to_string(), Value::String(path.clone()));
+            map.insert("recursive".to_string(), Value::Bool(recursive));
+            map.insert(
+                "pending_write_id".to_string(),
+                Value::String(stable_hash64_hex(&format!("fs_remove|{path}|{recursive}"))),
+            );
+            Result4::ok(Value::Map(map))
+        }
+        "std.fs.rename" => {
+            let from = ctx.get("from").cloned().unwrap_or_default();
+            let to = ctx.get("to").cloned().unwrap_or_default();
+            let overwrite = parse_bool_ctx(ctx.get("overwrite")).unwrap_or(false);
+            let (from_full, _from_logical) = match resolve_fs_path("rename", &from) {
+                Ok(v) => v,
+                Err(reason) => return Result4::insufficient(reason),
+            };
+            let (_to_full, _to_logical) = match resolve_fs_path("rename", &to) {
+                Ok(v) => v,
+                Err(reason) => return Result4::insufficient(reason),
+            };
+            if !from_full.exists() {
+                return Result4::insufficient(ReasonCode::FsNotFound);
+            }
+            let mut map = BTreeMap::new();
+            map.insert("op".to_string(), Value::String("rename".to_string()));
+            map.insert("from".to_string(), Value::String(from.clone()));
+            map.insert("to".to_string(), Value::String(to.clone()));
+            map.insert("overwrite".to_string(), Value::Bool(overwrite));
+            map.insert(
+                "pending_write_id".to_string(),
+                Value::String(stable_hash64_hex(&format!(
+                    "fs_rename|{from}|{to}|{overwrite}"
+                ))),
+            );
+            Result4::ok(Value::Map(map))
+        }
         "std.fs.read" => {
             let mut map = BTreeMap::new();
             let path = ctx
@@ -1691,16 +2525,6 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
                 ctx.get("path").cloned().unwrap_or_default(),
             );
             map.insert("items".to_string(), "a.txt,b.txt".to_string());
-            Result4::ok(Value::Payload(map))
-        }
-        "std.fs.stat" => {
-            let mut map = BTreeMap::new();
-            map.insert(
-                "path".to_string(),
-                ctx.get("path").cloned().unwrap_or_default(),
-            );
-            map.insert("exists".to_string(), "true".to_string());
-            map.insert("kind".to_string(), "file".to_string());
             Result4::ok(Value::Payload(map))
         }
         "std.http.get" => {
@@ -1737,9 +2561,124 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             map.insert("json".to_string(), format!("{{\"value\":\"{value}\"}}"));
             Result4::ok(Value::Payload(map))
         }
+        "std.kv.get" => {
+            let key = ctx.get("key").cloned().unwrap_or_default();
+            let store = match load_kv_store() {
+                Ok(v) => v,
+                Err(reason) => return Result4::insufficient(reason),
+            };
+            let mut map = BTreeMap::new();
+            if let Some(value) = store.get(&key) {
+                map.insert("found".to_string(), Value::Bool(true));
+                map.insert("value".to_string(), value.clone());
+            } else {
+                map.insert("found".to_string(), Value::Bool(false));
+                map.insert("value".to_string(), Value::Unit);
+            }
+            Result4::ok(Value::Map(map))
+        }
+        "std.kv.keys" => {
+            let requested_cap = parse_nonnegative_usize(ctx.get("cap")).unwrap_or(100);
+            let effective_cap = requested_cap.min(kv_max_keys());
+            let store = match load_kv_store() {
+                Ok(v) => v,
+                Err(reason) => return Result4::insufficient(reason),
+            };
+            let mut keys: Vec<String> = store.keys().cloned().collect();
+            keys.sort();
+
+            let truncated = keys.len() > effective_cap;
+            if truncated {
+                keys.truncate(effective_cap);
+            }
+            let mut map = BTreeMap::new();
+            map.insert(
+                "keys".to_string(),
+                Value::List(keys.into_iter().map(Value::String).collect()),
+            );
+            map.insert("truncated".to_string(), Value::Bool(truncated));
+            if truncated {
+                Result4::degraded(Value::Map(map), ReasonCode::KvCapExceeded)
+            } else {
+                Result4::ok(Value::Map(map))
+            }
+        }
+        "std.kv.put" => {
+            let key = ctx.get("key").cloned().unwrap_or_default();
+            let overwrite = parse_bool_ctx(ctx.get("overwrite")).unwrap_or(false);
+            let value = parse_kv_value_from_ctx(&ctx);
+            if stringify_json_value(&value).len() > kv_max_value_bytes() {
+                return Result4::deferred(ReasonCode::KvCapExceeded);
+            }
+            let store = match load_kv_store() {
+                Ok(v) => v,
+                Err(reason) => return Result4::insufficient(reason),
+            };
+            if !overwrite && store.contains_key(&key) {
+                return Result4::insufficient(ReasonCode::PolicyDenied);
+            }
+            if !store.contains_key(&key) && store.len() >= kv_max_keys() {
+                return Result4::deferred(ReasonCode::KvCapExceeded);
+            }
+            let mut map = BTreeMap::new();
+            map.insert("op".to_string(), Value::String("put".to_string()));
+            map.insert("key".to_string(), Value::String(key.clone()));
+            map.insert("value".to_string(), value);
+            map.insert("overwrite".to_string(), Value::Bool(overwrite));
+            map.insert(
+                "pending_write_id".to_string(),
+                Value::String(stable_hash64_hex(&format!("kv_put|{key}|{overwrite}"))),
+            );
+            Result4::ok(Value::Map(map))
+        }
+        "std.kv.del" => {
+            let key = ctx.get("key").cloned().unwrap_or_default();
+            let mut map = BTreeMap::new();
+            map.insert("op".to_string(), Value::String("del".to_string()));
+            map.insert("key".to_string(), Value::String(key.clone()));
+            map.insert(
+                "pending_write_id".to_string(),
+                Value::String(stable_hash64_hex(&format!("kv_del|{key}"))),
+            );
+            Result4::ok(Value::Map(map))
+        }
+        "std.kv.clear" => {
+            let prefix = ctx.get("prefix").cloned();
+            let mut map = BTreeMap::new();
+            map.insert("op".to_string(), Value::String("clear".to_string()));
+            if let Some(prefix) = prefix.clone() {
+                map.insert("prefix".to_string(), Value::String(prefix));
+            }
+            map.insert(
+                "pending_write_id".to_string(),
+                Value::String(stable_hash64_hex(&format!(
+                    "kv_clear|{}",
+                    prefix.unwrap_or_default()
+                ))),
+            );
+            Result4::ok(Value::Map(map))
+        }
         "std.time.now" => {
             let mut map = BTreeMap::new();
             map.insert("unix_ms".to_string(), "1700000000000".to_string());
+            Result4::ok(Value::Payload(map))
+        }
+        "std.time.tick_info" => {
+            let mut map = BTreeMap::new();
+            let tick =
+                parse_nonnegative_i64(ctx.get("tick").or_else(|| ctx.get("ctx_tick"))).unwrap_or(0);
+            let dt_ms = parse_nonnegative_i64(ctx.get("dt_ms")).unwrap_or(16).max(1);
+            map.insert("tick".to_string(), tick.to_string());
+            map.insert("dt_ms".to_string(), dt_ms.to_string());
+            Result4::ok(Value::Payload(map))
+        }
+        "std.time.now_logical" => {
+            let mut map = BTreeMap::new();
+            let tick =
+                parse_nonnegative_i64(ctx.get("tick").or_else(|| ctx.get("ctx_tick"))).unwrap_or(0);
+            let dt_ms = parse_nonnegative_i64(ctx.get("dt_ms")).unwrap_or(16).max(1);
+            let logical_t = tick.saturating_mul(dt_ms);
+            map.insert("t".to_string(), logical_t.to_string());
             Result4::ok(Value::Payload(map))
         }
         "std.time.sleep" => Result4::deferred(ReasonCode::BudgetExceeded),
@@ -2378,6 +3317,19 @@ fn reason_code_from_str(raw: &str) -> Option<ReasonCode> {
         "RC-CTX-INVALID" => Some(ReasonCode::CtxInvalid),
         "RC-POLICY-DENIED" => Some(ReasonCode::PolicyDenied),
         "RC-ADAPTER-FAILED" => Some(ReasonCode::AdapterFailed),
+        "RC-FS-NOT-FOUND" => Some(ReasonCode::FsNotFound),
+        "RC-FS-PERMISSION-DENIED" => Some(ReasonCode::FsPermissionDenied),
+        "RC-FS-PATH-OUTSIDE-SANDBOX" => Some(ReasonCode::FsPathOutsideSandbox),
+        "RC-FS-SYMLINK-DISALLOWED" => Some(ReasonCode::FsSymlinkDisallowed),
+        "RC-FS-INVALID-PATH" => Some(ReasonCode::FsInvalidPath),
+        "RC-FS-TOO-LARGE" => Some(ReasonCode::FsTooLarge),
+        "RC-FS-IO-ERROR" => Some(ReasonCode::FsIoError),
+        "RC-KV-NOT-FOUND" => Some(ReasonCode::KvNotFound),
+        "RC-KV-PERMISSION-DENIED" => Some(ReasonCode::KvPermissionDenied),
+        "RC-KV-CAP-EXCEEDED" => Some(ReasonCode::KvCapExceeded),
+        "RC-KV-IO-ERROR" => Some(ReasonCode::KvIoError),
+        "RC-TIME-DISABLED" => Some(ReasonCode::TimeDisabled),
+        "RC-LIMIT-EXCEEDED" => Some(ReasonCode::LimitExceeded),
         "RC-JSON-INVALID" => Some(ReasonCode::JsonInvalid),
         "RC-NOT-IMPLEMENTED" => Some(ReasonCode::NotImplemented),
         "RC-PLUGIN-PROTOCOL-ERROR" => Some(ReasonCode::PluginProtocolError),
@@ -2443,6 +3395,44 @@ fn parse_ctx_pairs(ctx_literal: &str) -> HashMap<String, String> {
         }
     }
     out
+}
+
+fn parse_nonnegative_i64(raw: Option<&String>) -> Option<i64> {
+    let parsed = raw?.trim().parse::<i64>().ok()?;
+    if parsed < 0 {
+        None
+    } else {
+        Some(parsed)
+    }
+}
+
+fn parse_nonnegative_usize(raw: Option<&String>) -> Option<usize> {
+    let parsed = raw?.trim().parse::<usize>().ok()?;
+    if parsed == 0 {
+        None
+    } else {
+        Some(parsed)
+    }
+}
+
+fn parse_bool_ctx(raw: Option<&String>) -> Option<bool> {
+    match raw?.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" => Some(true),
+        "0" | "false" | "no" => Some(false),
+        _ => None,
+    }
+}
+
+fn parse_kv_value_from_ctx(ctx: &HashMap<String, String>) -> Value {
+    if let Some(raw_json) = ctx.get("value_json") {
+        if let Ok(parsed) = parse_json_value(raw_json) {
+            return parsed;
+        }
+    }
+    if let Some(raw_value) = ctx.get("value") {
+        return Value::String(raw_value.clone());
+    }
+    Value::Unit
 }
 
 fn resolve_active_view_id(ctx: &HashMap<String, String>) -> String {

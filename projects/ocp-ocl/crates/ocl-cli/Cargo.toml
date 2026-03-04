@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 ocl-sdk = { path = "../ocl-sdk" }
 ocl-runtime-core = { path = "../ocl-runtime-core" }
+sha2 = "0.10"

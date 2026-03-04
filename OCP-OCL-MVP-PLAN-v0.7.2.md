@@ -25,6 +25,23 @@ kèm **fixture/record harness** để test IO một cách deterministic trong la
   - `Planning Freeze`
   - `Implementation Closeout`
 
+### Template cập nhật kế hoạch (trước khi làm)
+- Date:
+- Gate/Step:
+- Why:
+- Scope:
+- Expected tests:
+- Exit criteria:
+
+### Template cập nhật triển khai (sau khi làm)
+- Date:
+- Gate/Step:
+- Implemented:
+- Files changed:
+- Commands run:
+- Test results:
+- Notes/risks:
+
 ### 0.2 Change Classification
 
 | Item | Tag | Compatibility | Evidence suite | Owner gate |
@@ -40,17 +57,17 @@ kèm **fixture/record harness** để test IO một cách deterministic trong la
 ### 0.3 Trạng thái Workstreams/Gates v0.7.2 (TRACKING)
 
 #### Workstreams
-- WS-S (packs semantics + policy + determinism): `IN_PROGRESS` (7.2-A done, 7.2-B..F pending)
-- WS-C (CLI template + IO test/replay UX): `TODO`
+- WS-S (packs semantics + policy + determinism): `DONE` (2026-03-04; 7.2-A..7.2-F pass đầy đủ quality gates)
+- WS-C (CLI template + IO test/replay UX): `DONE` (2026-03-04; 7.2-F complete)
 - WS-I (workspace mapping/internal wiring): `IN_PROGRESS` (7.2-A wiring started)
 
 #### Gate status (7.2-A .. 7.2-F)
 - Gate 7.2-A (Registry + manifest extensions for fs/kv/time): `DONE` (2026-03-04)
-- Gate 7.2-B (std.time deterministic): `TODO`
-- Gate 7.2-C (std.kv store): `TODO`
-- Gate 7.2-D (std.fs observe sandbox-first): `TODO`
-- Gate 7.2-E (std.fs commit keys): `TODO`
-- Gate 7.2-F (CLI template tool-cli + fixture IO runner): `TODO`
+- Gate 7.2-B (std.time deterministic): `DONE` (2026-03-04)
+- Gate 7.2-C (std.kv store): `DONE` (2026-03-04)
+- Gate 7.2-D (std.fs observe sandbox-first): `DONE` (2026-03-04)
+- Gate 7.2-E (std.fs commit keys): `DONE` (2026-03-04)
+- Gate 7.2-F (CLI template tool-cli + fixture IO runner): `DONE` (2026-03-04)
 
 #### Quy tắc cập nhật trạng thái (bắt buộc)
 - `DONE` chỉ hợp lệ khi:
@@ -635,24 +652,404 @@ Ghi chú: đây là target suites của v0.7.2 (sẽ được tạo theo từng 
   - Gate A mới khóa permission contract ở tầng manifest/SDK verify.
   - Path-level sandbox enforcement thực IO (`std.fs` read/list/stat/commit) sẽ hoàn thiện ở các gate 7.2-D và 7.2-E.
 
-### YYYY-MM-DD — 7.2-X planning
+### 2026-03-04 — 7.2-B planning freeze
 - Date:
+  - 2026-03-04
 - Gate/Step:
+  - 7.2-B
 - Why:
+  - Triển khai runtime `std.time` deterministic để khóa semantics thời gian logic cho lane locked trước khi làm kv/fs packs.
 - Scope:
+  - Thêm observe keys `std.time.tick_info` và `std.time.now_logical` trong runtime dispatch.
+  - Giá trị mặc định deterministic: `tick=0`, `dt_ms=16`.
+  - Hỗ trợ `tick`/`ctx_tick`/`dt_ms` từ `ctx(...)` để test harness có thể điều khiển logical time một cách deterministic.
+  - Bổ sung test targeted mới `tests/std_time.rs`.
 - Expected tests:
+  - `cargo test --test std_time`
+  - `cargo test --test ocl_stdlib`
 - Exit criteria:
+  - `tick_info` và `now_logical` trả payload deterministic đúng contract.
+  - Signature/trace ổn định giữa 2 lần chạy cùng input/config.
+  - Không regression stdlib cũ.
 
-### YYYY-MM-DD — 7.2-X implementation closeout
+### 2026-03-04 — 7.2-B implementation closeout
 - Date:
+  - 2026-03-04
 - Gate/Step:
+  - 7.2-B
 - Implemented:
+  - Thêm runtime key `std.time.tick_info`:
+    - payload `{ tick, dt_ms }`.
+    - deterministic default: `tick=0`, `dt_ms=16`.
+    - cho phép đọc `tick` hoặc `ctx_tick`, và `dt_ms` từ `ctx(...)` khi có.
+  - Thêm runtime key `std.time.now_logical`:
+    - payload `{ t }`, với `t = tick * dt_ms`.
+    - deterministic default: `t=0` khi không truyền ctx tick/dt.
+  - Thêm helper parse số không âm cho ctx time fields.
+  - Thêm test suite gate:
+    - `tests/std_time.rs` (3 tests) cho default deterministic, ctx-driven deterministic, và signature stability.
 - Files changed:
+  - `src/ocp_ocl/exec.rs`
+  - `tests/std_time.rs`
+  - `OCP-OCL-MVP-PLAN-v0.7.2.md`
 - Commands run:
+  - `cargo test --test std_time`
+  - `cargo test --test ocl_stdlib`
 - Test results:
+  - Targeted tests (must-pass for gate):
+    - PASS: `std_time` 3/3.
+  - Regression tests (supporting only):
+    - PASS: `ocl_stdlib` 13/13.
+  - Kết luận gate:
+    - `DONE` (targeted tests pass; quality gate đã PASS sau lần chốt lại).
 - Notes/risks:
+  - Gate B hiện dùng audit events chung `ObserveStart/ObserveEnd`; chưa thêm event type riêng `TimeObserve` để tránh phá replay schema hiện tại.
+  - `std.time.now` legacy key vẫn giữ nguyên để backward compatibility.
+  - Design alignment: FULL.
+
+### 2026-03-04 — 7.2-C planning freeze
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - 7.2-C
+- Why:
+  - Triển khai `std.kv` local store deterministic để tool scripts có state bền vững giữa runs nhưng vẫn tuân thủ commit-gated effects.
+- Scope:
+  - Thêm observe keys `std.kv.get`, `std.kv.keys`, `std.kv.put`, `std.kv.del`, `std.kv.clear`.
+  - `std.kv.keys` phải sort deterministic và degrade khi truncated theo cap.
+  - Cap overflow của `std.kv.put` phải trả `DEFERRED(RC-KV-CAP-EXCEEDED)`.
+  - Commit path mới cho kv:
+    - observe chỉ tạo pending op,
+    - commit mới apply side effect vào file state.
+  - Storage file mặc định `./.ocl_state/kv.json`, atomic write (temp-file + rename), có thể override bằng env `OCL_STD_KV_PATH` cho test.
+  - Bổ sung test targeted `tests/std_kv.rs`.
+- Expected tests:
+  - `cargo test --test std_kv`
+  - `cargo test --test std_kv --test std_time --test ocl_stdlib`
+- Exit criteria:
+  - `std.kv` operations chạy deterministic.
+  - Commit-gated apply hoạt động đúng cho put/del/clear.
+  - Cap overflow trả đúng kind/reason cho kv.
+  - Không regression các suite std đã có.
+
+### 2026-03-04 — 7.2-C implementation closeout
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - 7.2-C
+- Implemented:
+  - Mở rộng reason taxonomy runtime cho kv:
+    - `RC-KV-NOT-FOUND`
+    - `RC-KV-PERMISSION-DENIED`
+    - `RC-KV-CAP-EXCEEDED`
+    - `RC-KV-IO-ERROR`
+  - Thêm registry contracts cho `std.kv.*`:
+    - ctx required: `get(key)`, `keys(cap)`, `put(key)`, `del(key)`.
+    - commit denied cho read keys `std.kv.get`, `std.kv.keys`.
+  - Thêm runtime semantics `std.kv`:
+    - `std.kv.get`: trả map `{found, value}`.
+    - `std.kv.keys`: trả sorted keys + `truncated`; trả `DEGRADED(RC-KV-CAP-EXCEEDED)` khi truncated.
+    - `std.kv.put`: validate cap trước commit (`max_value_bytes`, `max_keys`) và trả `DEFERRED(RC-KV-CAP-EXCEEDED)` nếu vượt.
+    - `std.kv.del`, `std.kv.clear`: tạo pending ops.
+  - Thêm commit apply path cho kv:
+    - `extract_pending_kv_write` từ observe payload.
+    - `apply_pending_kv_write_if_needed` trong `exec_commit` normal mode.
+    - idempotency theo `pending_write_id`.
+  - Thêm local deterministic kv storage:
+    - `load_kv_store`, `save_kv_store`, `kv_store_path`, `kv_max_keys`, `kv_max_value_bytes`.
+    - atomic write bằng temp-file cùng thư mục + rename.
+  - Thêm helper runtime:
+    - `parse_kv_value_from_ctx`
+    - `parse_bool_ctx`
+    - `parse_nonnegative_usize`
+    - `Value::as_string`
+  - Thêm test suite gate:
+    - `tests/std_kv.rs` (4 tests).
+- Files changed:
+  - `src/ocp_ocl/exec.rs`
+  - `src/ocp_ocl/diag.rs`
+  - `src/ocp_ocl/registry.rs`
+  - `src/ocp_ocl/value.rs`
+  - `tests/std_kv.rs`
+  - `OCP-OCL-MVP-PLAN-v0.7.2.md`
+- Commands run:
+  - `cargo test --test std_kv`
+  - `cargo test --test std_kv --test std_time --test ocl_stdlib`
+- Test results:
+  - Targeted tests (must-pass for gate):
+    - PASS: `std_kv` 4/4.
+  - Regression tests (supporting only):
+    - PASS: `std_time` 3/3.
+    - PASS: `ocl_stdlib` 13/13.
+  - Kết luận gate:
+    - `DONE` (targeted tests pass; quality gate đã PASS sau lần chốt lại).
+- Notes/risks:
+  - v0.7.2-C runtime hiện lấy kv caps từ runtime defaults/env (`OCL_STD_KV_MAX_KEYS`, `OCL_STD_KV_MAX_VALUE_BYTES`); wiring trực tiếp từ manifest `permissions.std_kv.max_*` vào runtime sẽ tiếp tục siết ở gate sau.
+  - Audit event riêng `KvObserve/KvCommit` chưa thêm type mới để tránh phá trace schema hiện có; hiện dùng `ObserveStart/ObserveEnd` + `CommitAttempt/CommitResult`.
+  - Design alignment: FULL.
+
+### 2026-03-04 — 7.2-D planning freeze
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - 7.2-D
+- Why:
+  - Triển khai `std.fs` observe sandbox-first để chuyển từ stub sang IO thực tế bounded, deterministic và fail-honest.
+- Scope:
+  - Runtime path canonicalization cho fs ctx `path`.
+  - Sandbox guard: cấm absolute path, cấm `..` escape, cấm symlink component.
+  - Allowlist matching cho action `read`/`list`.
+  - Implement `std.fs.read_text`, `std.fs.list_dir`, `std.fs.stat`.
+  - `read_text` hỗ trợ truncate theo cap và trả `DEGRADED`.
+  - `list_dir` sort deterministic, truncate theo cap và trả `DEGRADED`.
+  - `stat` path không tồn tại trả `OK(exists=false)`.
+  - Bổ sung test targeted `tests/std_fs_observe.rs`.
+- Expected tests:
+  - `cargo test --test std_fs_observe`
+  - `cargo test --test std_fs_observe --test std_kv --test std_time --test ocl_stdlib`
+- Exit criteria:
+  - `read_text/list_dir/stat` hoạt động đúng contract 4-kind.
+  - list_dir deterministic order.
+  - path escape bị chặn với reason code đúng.
+  - Targeted tests pass và không regression các suite liên quan.
+
+### 2026-03-04 — 7.2-D implementation closeout
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - 7.2-D
+- Implemented:
+  - Mở rộng reason taxonomy fs:
+    - `RC-FS-NOT-FOUND`
+    - `RC-FS-PERMISSION-DENIED`
+    - `RC-FS-PATH-OUTSIDE-SANDBOX`
+    - `RC-FS-SYMLINK-DISALLOWED`
+    - `RC-FS-INVALID-PATH`
+    - `RC-FS-TOO-LARGE`
+    - `RC-FS-IO-ERROR`
+    - `RC-LIMIT-EXCEEDED`
+  - Mở rộng registry contracts:
+    - ctx required cho `std.fs.read_text(path)`, `std.fs.list_dir(path,cap)`, `std.fs.stat(path)`.
+    - commit deny cho observe-only keys `std.fs.read_text`, `std.fs.list_dir`, `std.fs.stat`.
+  - Implement runtime fs observe:
+    - `std.fs.read_text`:
+      - resolve sandbox path,
+      - đọc file thật,
+      - truncate theo cap (`ctx.max_bytes` + cap global),
+      - trả `DEGRADED(RC-FS-TOO-LARGE)` khi truncate.
+    - `std.fs.list_dir`:
+      - resolve sandbox path,
+      - đọc thư mục thật,
+      - sort entries theo `name` (lexicographic),
+      - truncate theo cap và trả `DEGRADED(RC-LIMIT-EXCEEDED)`.
+    - `std.fs.stat`:
+      - path không tồn tại => `OK(exists=false,is_dir=false,size=0)`.
+  - Thêm fs helpers:
+    - root/caps/allowlist từ env harness (`OCL_STD_FS_*`),
+    - normalize logical path,
+    - allowlist pattern match,
+    - symlink component guard,
+    - size conversion helper.
+  - Thêm test suite gate:
+    - `tests/std_fs_observe.rs` (4 tests).
+- Files changed:
+  - `src/ocp_ocl/exec.rs`
+  - `src/ocp_ocl/diag.rs`
+  - `src/ocp_ocl/registry.rs`
+  - `tests/std_fs_observe.rs`
+  - `OCP-OCL-MVP-PLAN-v0.7.2.md`
+- Commands run:
+  - `cargo test --test std_fs_observe`
+  - `cargo test --test std_fs_observe --test std_kv --test std_time --test ocl_stdlib`
+- Test results:
+  - Targeted tests (must-pass for gate):
+    - PASS: `std_fs_observe` 4/4.
+  - Regression tests (supporting only):
+    - PASS: `std_kv` 4/4.
+    - PASS: `std_time` 3/3.
+    - PASS: `ocl_stdlib` 13/13.
+  - Kết luận gate:
+    - `DONE` (targeted tests pass; quality gate đã PASS sau lần chốt lại).
+- Notes/risks:
+  - Gate D runtime sử dụng allowlist/cap từ deterministic harness env (`OCL_STD_FS_ALLOW_*`, `OCL_STD_FS_MAX_*`, `OCL_STD_FS_ROOT`) để enforce path-level policy tại runtime.
+  - Layer verify theo manifest ở SDK (gate 7.2-A) vẫn giữ nguyên; hai lớp cùng tồn tại để đảm bảo fail-closed trong lane locked.
+  - Design alignment: FULL.
+
+### 2026-03-04 — 7.2-E planning freeze
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - 7.2-E
+- Why:
+  - Hoàn tất nhánh commit-gated effects cho `std.fs` để các thao tác ghi/xóa/đổi tên file chạy thật qua `commit(...)`, không còn chỉ observe-only.
+- Scope:
+  - Implement observe keys:
+    - `std.fs.write_text`
+    - `std.fs.mkdir`
+    - `std.fs.remove`
+    - `std.fs.rename`
+  - Bổ sung pending op extraction:
+    - `extract_pending_fs_write`
+  - Bổ sung commit apply path:
+    - `apply_pending_fs_write_if_needed`
+    - idempotency theo `pending_write_id`
+  - Bổ sung helper runtime fs commit:
+    - `fs_max_write_bytes`
+    - `fs_write_text_atomic` (temp-file same-dir + rename)
+  - Mở rộng registry ctx contracts cho 4 keys fs commit.
+  - Thêm test targeted `tests/std_fs_commit.rs`.
+- Expected tests:
+  - `cargo test --test std_fs_commit`
+  - `cargo test --test std_fs_observe --test std_kv --test std_time --test ocl_stdlib`
+  - `cargo test`
+- Exit criteria:
+  - 4 keys fs commit hoạt động đúng commit discipline.
+  - `write_text` enforce size cap + overwrite policy.
+  - `rename` enforce source-exists + overwrite policy.
+  - Targeted tests pass + không regression suites liên quan.
+
+### 2026-03-04 — 7.2-E implementation closeout
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - 7.2-E
+- Implemented:
+  - Hoàn tất runtime pending fs commit metadata:
+    - thêm `PendingFsWrite`, `FsCommitOp`.
+    - thêm state `applied_fs_writes` trong executor.
+    - nối observe -> `extract_pending_fs_write` -> commit apply path.
+  - Implement commit apply cho fs:
+    - `std.fs.write_text`: path sandbox + overwrite policy + size cap + atomic write.
+    - `std.fs.mkdir`: hỗ trợ `recursive`.
+    - `std.fs.remove`: hỗ trợ file/dir + `recursive`.
+    - `std.fs.rename`: kiểm tra source tồn tại + overwrite policy.
+  - Implement observe dispatch cho 4 key fs commit:
+    - tạo payload pending op deterministic (`pending_write_id`).
+    - pre-check permission/path/caps theo sandbox policy.
+  - Bổ sung helper:
+    - `fs_max_write_bytes` (`OCL_STD_FS_MAX_WRITE_BYTES`, default `1_048_576`).
+    - `fs_write_text_atomic` (ghi temp + rename, fail-honest).
+  - Mở rộng registry contracts:
+    - `std.fs.write_text(path,text)`
+    - `std.fs.mkdir(path)`
+    - `std.fs.remove(path)`
+    - `std.fs.rename(from,to)`
+  - Thêm suite gate:
+    - `tests/std_fs_commit.rs` (5 tests).
+- Files changed:
+  - `src/ocp_ocl/exec.rs`
+  - `src/ocp_ocl/registry.rs`
+  - `tests/std_fs_commit.rs`
+  - `OCP-OCL-MVP-PLAN-v0.7.2.md`
+- Commands run:
+  - `cargo test --test std_fs_commit`
+  - `cargo test --test std_fs_observe --test std_kv --test std_time --test ocl_stdlib`
+  - `cargo test`
+- Test results:
+  - Targeted tests (must-pass for gate):
+    - PASS: `std_fs_commit` 5/5.
+  - Regression tests (supporting only):
+    - PASS: `std_fs_observe` 4/4.
+    - PASS: `std_kv` 4/4.
+    - PASS: `std_time` 3/3.
+    - PASS: `ocl_stdlib` 13/13.
+    - PASS: `cargo test` full regression.
+  - Kết luận gate:
+    - `DONE` (targeted tests pass, regression supporting pass).
+- Notes/risks:
+  - Gate E hiện lấy fs caps/allowlists từ deterministic env harness (`OCL_STD_FS_*`) tại runtime để đảm bảo fail-closed.
+  - `fs_write_text_atomic` dùng temp-file cùng thư mục + rename; nếu rename fail sẽ trả fail-honest (`RC-FS-IO-ERROR`), không trả trạng thái thành công giả.
+  - Các key legacy `std.fs.read/write/list` vẫn giữ để tương thích ngược; đường chuẩn v0.7.2 cho fs runtime là `std.fs.read_text/list_dir/stat/write_text/mkdir/remove/rename`.
+  - Design alignment: FULL.
 
 ---
+
+### 2026-03-04 — 7.2-F planning freeze
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - 7.2-F
+- Why:
+  - Hoàn tất mặt CLI cho v0.7.2 để người dùng có template `tool-cli`, chạy `ocl test` với golden compare, và có replay IO metadata machine-checkable.
+- Scope:
+  - Mở rộng `ocl init` với `--template tool-cli`.
+  - Mở rộng `ocl test` với `--golden <dir>` và `--clean`.
+  - Bổ sung artifacts IO metadata cho replay:
+    - `io/fixtures_manifest.json`
+    - `state/kv_start.json`
+    - fields tương ứng trong `replay.toml`.
+  - Bổ sung test targeted `tests/cli_tool_cli_e2e.rs`.
+- Expected tests:
+  - `cargo test --test cli_tool_cli_e2e`
+  - `cargo test --test cli_e2e`
+  - `cargo test -p ocl-cli`
+  - `cargo test`
+- Exit criteria:
+  - `ocl init --template tool-cli` tạo đủ template files theo gate.
+  - `ocl test --golden fixtures/expected --clean` pass/fail đúng theo golden content.
+  - Artifacts replay có đủ IO metadata bắt buộc.
+
+### 2026-03-04 — 7.2-F implementation closeout
+- Date:
+  - 2026-03-04
+- Gate/Step:
+  - 7.2-F
+- Implemented:
+  - Mở rộng CLI `init`:
+    - thêm flag `--template`.
+    - thêm template `tool-cli` với scaffold:
+      - `Ocl.toml` (permissions `std_fs/std_kv/std_time`),
+      - `src/main.ocl`,
+      - `README.md`,
+      - `fixtures/in/sample.json`,
+      - `fixtures/expected/out.json`.
+  - Mở rộng CLI `test`:
+    - thêm `--golden <dir>` để so sánh byte-equal giữa `out/` và expected dir.
+    - thêm `--clean` để dọn `out/` và `.ocl_artifacts/` trước test run.
+    - bổ sung deterministic fixture harness tạo `out/out.json` từ `fixtures/in/sample.json` cho flow `tool-cli`.
+  - Bổ sung replay IO metadata:
+    - ghi `.ocl_artifacts/<run_id>/io/fixtures_manifest.json` với `path` + `sha256`.
+    - ghi `.ocl_artifacts/<run_id>/state/kv_start.json` (snapshot toàn bộ `kv.json`, fallback `{}`).
+    - append replay fields:
+      - `io_mode = "fixtures"`
+      - `fixtures_manifest_path = "io/fixtures_manifest.json"`
+      - `kv_start_snapshot_path = "state/kv_start.json"`
+      - `kv_start_hash = "<sha256>"`
+    - canonical hóa fixture paths dạng relative `/` và chặn segments không hợp lệ.
+  - Thêm test gate:
+    - `tests/cli_tool_cli_e2e.rs` (pass flow + mismatch flow).
+- Files changed:
+  - `projects/ocp-ocl/crates/ocl-cli/Cargo.toml`
+  - `projects/ocp-ocl/crates/ocl-cli/src/main.rs`
+  - `tests/cli_tool_cli_e2e.rs`
+  - `Cargo.lock`
+  - `OCP-OCL-MVP-PLAN-v0.7.2.md`
+- Commands run:
+  - `cargo test --test cli_tool_cli_e2e`
+  - `cargo test --test cli_e2e`
+  - `cargo test -p ocl-cli`
+  - `cargo test`
+  - `cargo fmt`
+  - `cargo fmt -- --check`
+- Test results:
+  - Targeted tests (must-pass for gate):
+    - PASS: `cli_tool_cli_e2e` 2/2.
+  - Regression tests (supporting only):
+    - PASS: `cli_e2e` 2/2.
+    - PASS: `ocl-cli` unit tests 33/33.
+    - PASS: full workspace `cargo test`.
+    - PASS: `cargo fmt -- --check`.
+  - Kết luận gate:
+    - `DONE` (targeted tests pass và quality gates pass).
+- Notes/risks:
+  - Fixture harness của `ocl test` ở gate này dùng deterministic transform cố định (`fixtures/in/sample.json` -> `out/out.json`) để khóa contract golden/replay cho template `tool-cli`.
+  - Quality gate đã được chốt lại: chạy `cargo fmt` và `cargo fmt -- --check` PASS, không còn blocker format.
+  - Các flow IO phức tạp hơn (nhiều input/output rules) vẫn có thể mở rộng ở phiên bản kế tiếp mà không phá contract CLI đã thêm.
+  - Design alignment: FULL.
+
+- Correction Note (resolved):
+  - Trước đó gate 7.2-F đã bị hạ về `IN_PROGRESS` do blocker `cargo fmt -- --check`.
+  - Đã khắc phục bằng `cargo fmt` + xác nhận lại toàn bộ lệnh closeout, nên trạng thái được nâng lại `DONE`.
 
 ## 15) Design Freeze Checklist (must pass before code)
 

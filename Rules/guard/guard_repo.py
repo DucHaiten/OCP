@@ -12,7 +12,7 @@ from typing import Iterable
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-PLAN_FILE_RE = re.compile(r"^OCP-OCL-MVP-PLAN-v\d+(\.\d+)?\.md$", re.IGNORECASE)
+PLAN_FILE_RE = re.compile(r"^OCP-OCL-MVP-PLAN-v\d+(?:\.\d+)*\.md$", re.IGNORECASE)
 
 # Keep only high-signal mojibake tokens; avoid broad tokens that can hit valid Vietnamese text.
 MOJIBAKE_PATTERNS = [
@@ -26,14 +26,28 @@ MOJIBAKE_PATTERNS = [
 ]
 
 PLAN_REQUIRED_ALIASES = {
-    "Template cập nhật kế hoạch": ["Template cập nhật kế hoạch"],
-    "Template cập nhật triển khai": ["Template cập nhật triển khai"],
-    "Trạng thái": ["Trạng thái"],
+    "Template cập nhật kế hoạch": [
+        "Template cập nhật kế hoạch",
+        "Template cập nhật kế hoạch (trước khi làm)",
+        "Planning Freeze Template",
+    ],
+    "Template cập nhật triển khai": [
+        "Template cập nhật triển khai",
+        "Template cập nhật triển khai (sau khi làm)",
+        "Implementation Closeout Template",
+    ],
+    "Trạng thái": [
+        "Trạng thái",
+        "Gate status",
+        "Trạng thái Gate",
+        "Trạng thái workstreams",
+    ],
     "Operational commands": [
         "Operational commands",
         "Operational Commands",
         "Lệnh mới",
         "Lệnh kiểm chứng",
+        "CI Commands",
     ],
 }
 
@@ -211,6 +225,13 @@ def check_closeout_block_evidence(path: Path, title: str, block: str) -> list[st
             errors.append(
                 f"{path}: `{title}` must include PASS/FAIL in `Test results`"
             )
+
+    done_marked = re.search(r"`DONE`", block, flags=re.IGNORECASE) is not None
+    has_fail_marker = re.search(r"\bFAIL\b", block) is not None
+    if done_marked and has_fail_marker:
+        errors.append(
+            f"{path}: `{title}` is marked DONE but still contains FAIL marker; set IN_PROGRESS/PARTIAL until all checks pass"
+        )
     return errors
 
 

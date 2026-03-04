@@ -212,6 +212,7 @@ version = "0.1.0"
 dependencies = [
  "ocl-runtime-core",
  "ocl-sdk",
+ "sha2",
 ]
 
 [[package]]

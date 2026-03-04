@@ -55,7 +55,8 @@ allow = ["std.fs.*"]
     );
 
     let msg = expect_permission_denied(
-        run_project_with_lock(&root, false).expect_err("std.fs must be denied without std_fs block"),
+        run_project_with_lock(&root, false)
+            .expect_err("std.fs must be denied without std_fs block"),
     );
     assert!(msg.contains("RC-FS-PERMISSION-DENIED"), "actual={msg}");
     assert!(msg.contains("[permissions.std_fs]"), "actual={msg}");
@@ -130,7 +131,10 @@ read = ["./data/**"]
     let msg = expect_permission_denied(
         run_project_with_lock(&root, false).expect_err("deny must override std_fs allow"),
     );
-    assert!(msg.contains("matched deny rule=`std.fs.read_text`"), "actual={msg}");
+    assert!(
+        msg.contains("matched deny rule=`std.fs.read_text`"),
+        "actual={msg}"
+    );
     assert!(msg.contains("[permissions.package]"), "actual={msg}");
 }
 

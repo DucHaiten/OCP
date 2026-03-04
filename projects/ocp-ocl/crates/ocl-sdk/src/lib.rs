@@ -549,7 +549,9 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
         }
 
         if current_section == "permissions.std_fs" {
-            let cfg = out.std_fs.get_or_insert_with(StdFsPermissionConfig::default);
+            let cfg = out
+                .std_fs
+                .get_or_insert_with(StdFsPermissionConfig::default);
             match key {
                 "read" => cfg.read = values,
                 "write" => cfg.write = values,
@@ -582,7 +584,9 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
         }
 
         if current_section == "permissions.std_kv" {
-            let cfg = out.std_kv.get_or_insert_with(StdKvPermissionConfig::default);
+            let cfg = out
+                .std_kv
+                .get_or_insert_with(StdKvPermissionConfig::default);
             match key {
                 "enabled" => {
                     if let Some(parsed) = parse_bool_literal(scalar_value) {
@@ -839,7 +843,10 @@ fn permission_rule_decision(
         {
             return Some((PermissionDecision::Allow, matched.clone()));
         }
-        return Some((PermissionDecision::Deny, "<implicit-deny-not-in-allow>".to_string()));
+        return Some((
+            PermissionDecision::Deny,
+            "<implicit-deny-not-in-allow>".to_string(),
+        ));
     }
 
     None
@@ -2327,7 +2334,12 @@ pub fn test_project_with_lock(root: &Path, locked: bool) -> Result<TestSummary, 
     tests.sort();
     for (idx, test_file) in tests.iter().enumerate() {
         verify_permissions_for_file(test_file, idx as u32 + 100, &permissions)?;
-        run_file_with_engine_config(test_file, idx as u32 + 100, exec_config, RunEngine::Interpreter)?;
+        run_file_with_engine_config(
+            test_file,
+            idx as u32 + 100,
+            exec_config,
+            RunEngine::Interpreter,
+        )?;
     }
     Ok(TestSummary {
         tests_run: tests.len(),

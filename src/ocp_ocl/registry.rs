@@ -75,11 +75,26 @@ impl CapabilityRegistry {
         let mut ctx_required = HashMap::new();
         ctx_required.insert("std.args.get".to_string(), vec!["value".to_string()]);
         ctx_required.insert("std.fs.read".to_string(), vec!["path".to_string()]);
+        ctx_required.insert("std.fs.read_text".to_string(), vec!["path".to_string()]);
+        ctx_required.insert(
+            "std.fs.write_text".to_string(),
+            vec!["path".to_string(), "text".to_string()],
+        );
+        ctx_required.insert("std.fs.mkdir".to_string(), vec!["path".to_string()]);
+        ctx_required.insert("std.fs.remove".to_string(), vec!["path".to_string()]);
+        ctx_required.insert(
+            "std.fs.rename".to_string(),
+            vec!["from".to_string(), "to".to_string()],
+        );
         ctx_required.insert(
             "std.fs.write".to_string(),
             vec!["path".to_string(), "content".to_string()],
         );
         ctx_required.insert("std.fs.list".to_string(), vec!["path".to_string()]);
+        ctx_required.insert(
+            "std.fs.list_dir".to_string(),
+            vec!["path".to_string(), "cap".to_string()],
+        );
         ctx_required.insert("std.fs.stat".to_string(), vec!["path".to_string()]);
         ctx_required.insert("std.http.get".to_string(), vec!["url".to_string()]);
         ctx_required.insert(
@@ -88,6 +103,10 @@ impl CapabilityRegistry {
         );
         ctx_required.insert("std.json.parse".to_string(), vec!["raw".to_string()]);
         ctx_required.insert("std.json.emit".to_string(), vec!["value".to_string()]);
+        ctx_required.insert("std.kv.get".to_string(), vec!["key".to_string()]);
+        ctx_required.insert("std.kv.keys".to_string(), vec!["cap".to_string()]);
+        ctx_required.insert("std.kv.put".to_string(), vec!["key".to_string()]);
+        ctx_required.insert("std.kv.del".to_string(), vec!["key".to_string()]);
         ctx_required.insert("std.time.sleep".to_string(), vec!["ms".to_string()]);
         ctx_required.insert("std.log.info".to_string(), vec!["message".to_string()]);
         ctx_required.insert("std.net.listen".to_string(), vec!["addr".to_string()]);
@@ -127,7 +146,12 @@ impl CapabilityRegistry {
         );
 
         let mut commit_allowed = HashMap::new();
+        commit_allowed.insert("std.fs.read_text".to_string(), false);
+        commit_allowed.insert("std.fs.list_dir".to_string(), false);
+        commit_allowed.insert("std.fs.stat".to_string(), false);
         commit_allowed.insert("std.db.query_int".to_string(), false);
+        commit_allowed.insert("std.kv.get".to_string(), false);
+        commit_allowed.insert("std.kv.keys".to_string(), false);
         commit_allowed.insert("std.tls.connect".to_string(), false);
         commit_allowed.insert("std.tls.handshake".to_string(), false);
         commit_allowed.insert("std.ui.frame_info".to_string(), false);

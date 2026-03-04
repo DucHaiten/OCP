@@ -24,4 +24,11 @@ impl Value {
             _ => None,
         }
     }
+
+    pub fn as_string(&self) -> Option<String> {
+        match self {
+            Self::String(v) => Some(v.clone()),
+            _ => None,
+        }
+    }
 }

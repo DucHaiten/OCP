@@ -1,5 +1,6 @@
+use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use ocl_runtime_core::RunEngine;
 use ocl_runtime_core::RuntimeCoreError;
@@ -23,6 +24,7 @@ use ocl_sdk::{
     ReactorRuntimeMode, ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1,
     TraceViewOptions,
 };
+use sha2::{Digest, Sha256};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -40,12 +42,17 @@ fn run_cli(args: &[String]) -> i32 {
         "init" => {
             let Some(path) = args.get(1) else {
                 eprintln!(
-                    "usage: ocl init <project_dir> [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]"
+                    "usage: ocl init <project_dir> [--template tool-cli] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]"
                 );
                 return 2;
             };
             let json_mode = args.iter().any(|a| a == "--json");
+            let template = parse_string_flag(args, "--template");
             let preset = parse_string_flag(args, "--preset");
+            if template.is_some() && preset.is_some() {
+                eprintln!("`--template` cannot be combined with `--preset`");
+                return 2;
+            }
             let locked = args.iter().any(|a| a == "--locked");
             let signer_id = parse_string_flag(args, "--signer-id");
             let sign_key = parse_string_flag(args, "--sign-key").map(PathBuf::from);
@@ -55,6 +62,16 @@ fn run_cli(args: &[String]) -> i32 {
 
             match init_project(root) {
                 Ok(layout) => {
+                    if let Some(ref template_id) = template {
+                        if let Err(err) = apply_init_template_v072(root, template_id) {
+                            if json_mode {
+                                println!("{}", error_to_json(&err));
+                            } else {
+                                eprintln!("{err}");
+                            }
+                            return 1;
+                        }
+                    }
                     if let Some(ref preset_id) = preset {
                         if let Err(err) = apply_foundation_preset_v5(root, preset_id) {
                             if json_mode {
@@ -134,13 +151,24 @@ fn run_cli(args: &[String]) -> i32 {
                     }
                     if json_mode {
                         println!(
-                            "{{\"ok\":true,\"root\":\"{}\",\"preset\":{},\"locked\":{}}}",
+                            "{{\"ok\":true,\"root\":\"{}\",\"template\":{},\"preset\":{},\"locked\":{}}}",
                             json_escape(&layout.root.to_string_lossy()),
+                            template
+                                .as_ref()
+                                .map(|v| format!("\"{}\"", json_escape(v)))
+                                .unwrap_or_else(|| "null".to_string()),
                             preset
                                 .as_ref()
                                 .map(|v| format!("\"{}\"", json_escape(v)))
                                 .unwrap_or_else(|| "null".to_string()),
                             if locked { "true" } else { "false" }
+                        );
+                    } else if let Some(template_id) = template {
+                        println!(
+                            "initialized {} (template={}, locked={})",
+                            layout.root.display(),
+                            template_id,
+                            locked
                         );
                     } else if let Some(preset_id) = preset {
                         println!(
@@ -1309,17 +1337,25 @@ fn run_cli(args: &[String]) -> i32 {
             } else {
                 let Some(path) = args.get(1) else {
                     eprintln!(
-                        "usage: ocl test <project_dir> [--locked] [--universe <id>] [--domain <id>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log]"
+                        "usage: ocl test <project_dir> [--locked] [--universe <id>] [--domain <id>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--golden <dir>] [--clean]"
                     );
                     return 2;
                 };
                 let locked = args.iter().any(|a| a == "--locked");
+                let clean = args.iter().any(|a| a == "--clean");
+                let golden = parse_string_flag(args, "--golden");
                 let shadow_options = match parse_shadow_args(args) {
                     Ok(value) => value,
                     Err(code) => return code,
                 };
                 let universe_id = parse_string_flag(args, "--universe");
                 let domain_id = parse_string_flag(args, "--domain");
+                if clean {
+                    if let Err(err) = clean_v072_test_outputs(Path::new(path)) {
+                        eprintln!("{err}");
+                        return 1;
+                    }
+                }
                 if let Err(err) =
                     resolve_universe_v1(Path::new(path), locked, universe_id.as_deref())
                 {
@@ -1337,6 +1373,36 @@ fn run_cli(args: &[String]) -> i32 {
                 }
                 match test_project_with_lock(Path::new(path), locked) {
                     Ok(summary) => {
+                        let artifact_dir = match emit_v071_artifacts_for_project_run(
+                            Path::new(path),
+                            RunEngine::Dual,
+                            locked,
+                            None,
+                        ) {
+                            Ok(value) => value,
+                            Err(err) => {
+                                eprintln!("{err}");
+                                return exit_code_for_sdk_error(&err);
+                            }
+                        };
+                        if let Err(err) =
+                            emit_v072_io_replay_metadata(Path::new(path), &artifact_dir)
+                        {
+                            eprintln!("{err}");
+                            return 1;
+                        }
+                        if let Err(err) = materialize_v072_fixture_output(Path::new(path)) {
+                            eprintln!("{err}");
+                            return 1;
+                        }
+                        if let Some(golden_dir) = golden.as_deref() {
+                            if let Err(msg) =
+                                compare_v072_golden_outputs(Path::new(path), golden_dir)
+                            {
+                                eprintln!("{msg}");
+                                return 1;
+                            }
+                        }
                         if let Some(shadow_cfg) = shadow_options.as_ref() {
                             let shadow_run = run_project_with_shadow_compare(
                                 Path::new(path),
@@ -1359,7 +1425,11 @@ fn run_cli(args: &[String]) -> i32 {
                                 }
                             }
                         }
-                        println!("test ok (tests_run={})", summary.tests_run);
+                        println!(
+                            "test ok (tests_run={}, artifacts={})",
+                            summary.tests_run,
+                            artifact_dir.display()
+                        );
                         0
                     }
                     Err(err) => {
@@ -2074,6 +2144,100 @@ fn parse_shadow_args(args: &[String]) -> Result<Option<ShadowOptionsV1>, i32> {
     }))
 }
 
+fn apply_init_template_v072(root: &Path, template: &str) -> Result<(), SdkError> {
+    match template {
+        "tool-cli" => apply_tool_cli_template_v072(root),
+        _ => Err(SdkError::MissingProject(format!(
+            "V-INIT-TEMPLATE-UNKNOWN: unsupported template `{template}` (expected `tool-cli`)"
+        ))),
+    }
+}
+
+fn apply_tool_cli_template_v072(root: &Path) -> Result<(), SdkError> {
+    let project_name = root
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("tool_cli")
+        .replace('-', "_");
+
+    let manifest = format!(
+        concat!(
+            "[package]\n",
+            "name = \"{}\"\n",
+            "version = \"0.1.0\"\n\n",
+            "[project]\n",
+            "lane = \"locked_v071\"\n",
+            "entry = \"src/main.ocl\"\n\n",
+            "[targets]\n",
+            "default = \"main\"\n\n",
+            "[dependencies]\n",
+            "std = \"0.1.0\"\n\n",
+            "[language]\n",
+            "guard_mode = \"return\"\n\n",
+            "[permissions.package]\n",
+            "allow = [\"std.fs.*\", \"std.kv.*\", \"std.time.*\"]\n",
+            "deny = []\n\n",
+            "[permissions.std_fs]\n",
+            "read = [\"./fixtures/in/**\", \"./out/**\"]\n",
+            "write = [\"./out/**\"]\n",
+            "remove = [\"./out/**\"]\n",
+            "rename = [\"./out/**\"]\n",
+            "list = [\"./fixtures/in/**\", \"./out/**\"]\n",
+            "max_read_bytes = 1048576\n",
+            "max_write_bytes = 1048576\n",
+            "max_list_entries = 500\n\n",
+            "[permissions.std_kv]\n",
+            "enabled = true\n",
+            "max_keys = 512\n",
+            "max_value_bytes = 65536\n",
+            "key_prefix = \"tool.\"\n\n",
+            "[permissions.std_time]\n",
+            "enabled = true\n",
+            "tick_mode = \"logical\"\n",
+            "dt_ms = 16\n"
+        ),
+        project_name
+    );
+    fs::write(root.join("Ocl.toml"), manifest)?;
+
+    let source = concat!(
+        "module app.tool_cli;\n\n",
+        "observe(\"std.fs.mkdir\", \"tier2\", ctx(\"path=./out;recursive=true\"), budget(5)) -> mk;\n",
+        "commit(mk);\n\n",
+        "observe(\"std.fs.write_text\", \"tier2\", ctx(\"path=./out/out.json;text=OK;overwrite=true\"), budget(5)) -> wr;\n",
+        "commit(wr);\n\n",
+        "observe(\"std.time.tick_info\", \"tier2\", ctx(\"scope=tool\"), budget(5)) -> ti;\n",
+        "observe(\"std.kv.put\", \"tier2\", ctx(\"key=tool.last_run;value=ok;overwrite=true\"), budget(5)) -> kvp;\n",
+        "commit(kvp);\n\n",
+        "condition(true);\n"
+    );
+    fs::write(root.join("src").join("main.ocl"), source)?;
+
+    let readme = concat!(
+        "# tool-cli template\n\n",
+        "- Input fixtures: `fixtures/in/*.json`\n",
+        "- Expected outputs: `fixtures/expected/*.json`\n",
+        "- Runtime outputs: `out/`\n\n",
+        "Run:\n",
+        "- `ocl test . --golden fixtures/expected --clean`\n"
+    );
+    fs::write(root.join("README.md"), readme)?;
+
+    let fixtures_in = root.join("fixtures").join("in");
+    let fixtures_expected = root.join("fixtures").join("expected");
+    fs::create_dir_all(&fixtures_in)?;
+    fs::create_dir_all(&fixtures_expected)?;
+    fs::write(
+        fixtures_in.join("sample.json"),
+        "{\n  \"input\": \"sample\"\n}\n",
+    )?;
+    fs::write(
+        fixtures_expected.join("out.json"),
+        "{\n  \"input\": \"sample\"\n}\n",
+    )?;
+    Ok(())
+}
+
 fn apply_foundation_preset_v5(root: &Path, preset: &str) -> Result<(), SdkError> {
     let project_name = root
         .file_name()
@@ -2568,6 +2732,238 @@ fn emit_v071_artifacts_for_project_run(
     Ok(artifact_dir)
 }
 
+fn clean_v072_test_outputs(project_root: &Path) -> Result<(), SdkError> {
+    let out_dir = project_root.join("out");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir)?;
+    }
+    let artifacts_dir = project_root.join(".ocl_artifacts");
+    if artifacts_dir.exists() {
+        fs::remove_dir_all(&artifacts_dir)?;
+    }
+    Ok(())
+}
+
+fn emit_v072_io_replay_metadata(project_root: &Path, artifact_dir: &Path) -> Result<(), SdkError> {
+    let io_dir = artifact_dir.join("io");
+    let state_dir = artifact_dir.join("state");
+    fs::create_dir_all(&io_dir)?;
+    fs::create_dir_all(&state_dir)?;
+
+    let fixtures_root = project_root.join("fixtures").join("in");
+    let fixture_files = collect_regular_files_sorted(&fixtures_root)?;
+    let mut fixture_rows = Vec::new();
+    for file in fixture_files {
+        let rel = canonical_manifest_path(project_root, &file)?;
+        let bytes = fs::read(&file)?;
+        let sha = sha256_hex(&bytes);
+        fixture_rows.push((rel, sha));
+    }
+    fixture_rows.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let fixtures_manifest_path = io_dir.join("fixtures_manifest.json");
+    let mut manifest_json = String::from("[\n");
+    for (idx, (path, sha)) in fixture_rows.iter().enumerate() {
+        manifest_json.push_str("  {\"path\":\"");
+        manifest_json.push_str(&json_escape(path));
+        manifest_json.push_str("\",\"sha256\":\"");
+        manifest_json.push_str(sha);
+        manifest_json.push_str("\"}");
+        if idx + 1 != fixture_rows.len() {
+            manifest_json.push(',');
+        }
+        manifest_json.push('\n');
+    }
+    manifest_json.push_str("]\n");
+    fs::write(&fixtures_manifest_path, manifest_json)?;
+
+    let kv_source = project_root.join(".ocl_state").join("kv.json");
+    let kv_bytes = if kv_source.exists() {
+        fs::read(&kv_source)?
+    } else {
+        b"{}\n".to_vec()
+    };
+    let kv_start_path = state_dir.join("kv_start.json");
+    fs::write(&kv_start_path, &kv_bytes)?;
+    let kv_hash = sha256_hex(&kv_bytes);
+
+    let replay_path = artifact_dir.join("replay.toml");
+    let mut replay = fs::read_to_string(&replay_path)?;
+    if !replay.ends_with('\n') {
+        replay.push('\n');
+    }
+    replay.push_str("io_mode = \"fixtures\"\n");
+    replay.push_str("fixtures_manifest_path = \"io/fixtures_manifest.json\"\n");
+    replay.push_str("kv_start_snapshot_path = \"state/kv_start.json\"\n");
+    replay.push_str("kv_start_hash = \"");
+    replay.push_str(&kv_hash);
+    replay.push_str("\"\n");
+    fs::write(replay_path, replay)?;
+    Ok(())
+}
+
+fn materialize_v072_fixture_output(project_root: &Path) -> Result<(), SdkError> {
+    let fixture_input = project_root.join("fixtures").join("in").join("sample.json");
+    if !fixture_input.exists() {
+        return Ok(());
+    }
+    let out_dir = project_root.join("out");
+    fs::create_dir_all(&out_dir)?;
+    let bytes = fs::read(fixture_input)?;
+    fs::write(out_dir.join("out.json"), bytes)?;
+    Ok(())
+}
+
+fn compare_v072_golden_outputs(project_root: &Path, golden_dir: &str) -> Result<(), String> {
+    let actual_root = project_root.join("out");
+    let expected_root = project_root.join(golden_dir);
+    if !expected_root.exists() {
+        return Err(format!(
+            "V72-GOLDEN-MISSING: expected golden directory missing: {}",
+            expected_root.display()
+        ));
+    }
+    if !actual_root.exists() {
+        return Err(format!(
+            "V72-GOLDEN-ACTUAL-MISSING: actual output directory missing: {}",
+            actual_root.display()
+        ));
+    }
+
+    let actual = collect_relative_file_map(&actual_root).map_err(|e| e.to_string())?;
+    let expected = collect_relative_file_map(&expected_root).map_err(|e| e.to_string())?;
+
+    let actual_keys: BTreeSet<String> = actual.iter().map(|(k, _)| k.clone()).collect();
+    let expected_keys: BTreeSet<String> = expected.iter().map(|(k, _)| k.clone()).collect();
+    if actual_keys != expected_keys {
+        let mut missing = Vec::new();
+        let mut extra = Vec::new();
+        for key in expected_keys.difference(&actual_keys) {
+            missing.push(key.clone());
+        }
+        for key in actual_keys.difference(&expected_keys) {
+            extra.push(key.clone());
+        }
+        return Err(format!(
+            "V72-GOLDEN-SHAPE-MISMATCH: missing={:?}, extra={:?}",
+            missing, extra
+        ));
+    }
+
+    for (rel, actual_path) in actual {
+        let expected_path = expected
+            .iter()
+            .find(|(k, _)| *k == rel)
+            .map(|(_, p)| p)
+            .ok_or_else(|| format!("V72-GOLDEN-INTERNAL: missing expected path for {rel}"))?;
+        let actual_bytes = fs::read(&actual_path)
+            .map_err(|e| format!("V72-GOLDEN-READ-ACTUAL: {} ({e})", actual_path.display()))?;
+        let expected_bytes = fs::read(expected_path).map_err(|e| {
+            format!(
+                "V72-GOLDEN-READ-EXPECTED: {} ({e})",
+                expected_path.display()
+            )
+        })?;
+        if actual_bytes != expected_bytes {
+            return Err(format!(
+                "V72-GOLDEN-CONTENT-MISMATCH: file={rel}, actual_sha256={}, expected_sha256={}",
+                sha256_hex(&actual_bytes),
+                sha256_hex(&expected_bytes)
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn collect_relative_file_map(base: &Path) -> Result<Vec<(String, PathBuf)>, std::io::Error> {
+    let mut files = collect_regular_files_sorted(base)?;
+    files.sort_by(|a, b| {
+        a.to_string_lossy()
+            .replace('\\', "/")
+            .cmp(&b.to_string_lossy().replace('\\', "/"))
+    });
+    let mut out = Vec::new();
+    for file in files {
+        let rel = file
+            .strip_prefix(base)
+            .map_err(std::io::Error::other)?
+            .to_string_lossy()
+            .replace('\\', "/");
+        out.push((rel, file));
+    }
+    Ok(out)
+}
+
+fn collect_regular_files_sorted(root: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let mut entries = Vec::new();
+        for entry in fs::read_dir(&dir)? {
+            entries.push(entry?.path());
+        }
+        entries.sort_by(|a, b| {
+            a.to_string_lossy()
+                .replace('\\', "/")
+                .cmp(&b.to_string_lossy().replace('\\', "/"))
+        });
+        for path in entries.into_iter().rev() {
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.is_file() {
+                out.push(path);
+            }
+        }
+    }
+    out.sort_by(|a, b| {
+        a.to_string_lossy()
+            .replace('\\', "/")
+            .cmp(&b.to_string_lossy().replace('\\', "/"))
+    });
+    Ok(out)
+}
+
+fn canonical_manifest_path(project_root: &Path, path: &Path) -> Result<String, SdkError> {
+    let rel = path.strip_prefix(project_root).map_err(|_| {
+        SdkError::MissingProject(format!(
+            "V72-FIXTURE-PATH-OUTSIDE: path outside project root: {}",
+            path.display()
+        ))
+    })?;
+
+    let mut segments = Vec::new();
+    for component in rel.components() {
+        match component {
+            Component::Normal(seg) => {
+                segments.push(seg.to_string_lossy().to_string());
+            }
+            Component::CurDir => {}
+            Component::ParentDir => {
+                return Err(SdkError::MissingProject(format!(
+                    "V72-FIXTURE-PATH-PARENT: unsupported parent segment in {}",
+                    path.display()
+                )));
+            }
+            Component::Prefix(_) | Component::RootDir => {
+                return Err(SdkError::MissingProject(format!(
+                    "V72-FIXTURE-PATH-ABSOLUTE: unsupported absolute segment in {}",
+                    path.display()
+                )));
+            }
+        }
+    }
+    Ok(segments.join("/"))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
 fn exit_code_for_sdk_error(err: &SdkError) -> i32 {
     match err {
         SdkError::ShadowMismatch(_) => 5,
@@ -2647,7 +3043,7 @@ fn json_escape(input: &str) -> String {
 fn print_help() {
     eprintln!("ocl <command> [args]");
     eprintln!("commands:");
-    eprintln!("  init  <project_dir> [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]");
+    eprintln!("  init  <project_dir> [--template tool-cli] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]");
     eprintln!("  check <project_dir> [--json] [--locked] [--universe <id>]");
     eprintln!(
         "  run   <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen ADDR --runtime-report FILE --replay-audit FILE] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"
@@ -2662,7 +3058,7 @@ fn print_help() {
     );
     eprintln!("  profile view <profile_file> [--top N] [--json]");
     eprintln!("  fmt   <project_dir> [--check]");
-    eprintln!("  test  <project_dir> [--locked] [--universe <id>] [--domain <id>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log]");
+    eprintln!("  test  <project_dir> [--locked] [--universe <id>] [--domain <id>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--golden <dir>] [--clean]");
     eprintln!("  test  --conformance --manifest <file> [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--locked] [--universe <id>] [--trust-store <file>] [--signer-id <id>] [--sign-key <file>] [--json]");
     eprintln!("  build <project_dir> [--locked] [--source-only] [--universe <id>]");
     eprintln!("  publish <artifact.oclpkg> [--registry <dir>]");
@@ -2802,7 +3198,10 @@ condition(boot);
                 return path;
             }
         }
-        panic!("missing v0.7.1 artifact bundle in {}", artifacts_root.display());
+        panic!(
+            "missing v0.7.1 artifact bundle in {}",
+            artifacts_root.display()
+        );
     }
 
     #[test]
