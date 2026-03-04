@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
 use std::fs;
@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine as _;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use sha2::{Digest, Sha256};
 
 pub mod m4;
 pub mod w1;
@@ -22,8 +23,9 @@ pub use m4::{
 };
 use ocl_runtime_core::{
     check_file_with_compat, normalize_text, parse_program, run_file_with_engine_config_and_compat,
-    run_source_with_engine, CommitPolicyMode, CompatMode, ExecConfig, Expr, GuardMode, RunEngine,
-    RuntimeCoreError, Stmt, TraceEvent, TypecheckCompatConfig,
+    run_source_with_engine, CommitPolicyMode, CompatMode, DiagPhase, Diagnostic, ErrorCode,
+    ExecConfig, Expr, GuardMode, RunEngine, RuntimeCoreError, Span, Stmt, TraceEvent,
+    TypecheckCompatConfig,
 };
 pub use w1::{
     enforce_universe_match_v1, init_cosmos_v1, resolve_hive_caps_v1, resolve_universe_v1,
@@ -135,6 +137,7 @@ pub struct PermissionRules {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ProjectPermissions {
+    pub global_deny: Vec<String>,
     pub package: Option<PermissionRules>,
     pub modules: HashMap<String, PermissionRules>,
     pub std_fs: Option<StdFsPermissionConfig>,
@@ -473,10 +476,36 @@ pub struct LockSyncSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DepResolveSummaryV3 {
+    pub deps_resolved: usize,
+    pub lock_hash: String,
+    pub lock_v3_path: PathBuf,
+    pub ocl_lock_path: PathBuf,
+    pub wrote_legacy_lock_v2: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedDepV3 {
+    pub alias: String,
+    pub name: String,
+    pub version: String,
+    pub source: String,
+    pub hash64: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportProvenanceV10 {
+    pub module_id: String,
+    pub package_id: String,
+    pub file_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildOclPkgSummary {
     pub artifact_path: PathBuf,
     pub files_bundled: usize,
     pub payload_hash_blake3: String,
+    pub content_hash_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -498,6 +527,15 @@ pub struct SupplyVerifySummary {
     pub valid: bool,
     pub package_name: String,
     pub payload_hash_blake3: String,
+    pub content_hash_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignOclPkgSummary {
+    pub artifact_path: PathBuf,
+    pub package_name: String,
+    pub payload_hash_blake3: String,
+    pub signer_pub_ed25519_b64: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -506,6 +544,7 @@ pub struct TraceEventV1 {
     pub run_id: String,
     pub event: String,
     pub key: Option<String>,
+    pub callsite_package_id: Option<String>,
     pub kind: Option<String>,
     pub reason: Option<String>,
     pub origin_id: Option<u64>,
@@ -656,6 +695,14 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
                 _ => {}
             }
             normalize_permission_rules(rules);
+            continue;
+        }
+
+        if current_section == "deny" {
+            if key == "patterns" {
+                out.global_deny = values;
+                normalize_string_list(&mut out.global_deny);
+            }
             continue;
         }
 
@@ -944,6 +991,677 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
     out
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RequestedPermissionsV10 {
+    permissions: ProjectPermissions,
+    has_declared: bool,
+}
+
+fn canonicalize_glob_pattern(pattern: &str) -> String {
+    let mut out = pattern.trim().replace('\\', "/");
+    while out.starts_with("./") {
+        out = out[2..].to_string();
+    }
+    out
+}
+
+fn glob_kind(pattern: &str) -> (&'static str, String) {
+    let p = canonicalize_glob_pattern(pattern);
+    if p == "**" {
+        return ("recursive", String::new());
+    }
+    if p.ends_with("/**") && p.matches('*').count() == 2 {
+        return ("recursive", p.trim_end_matches("/**").to_string());
+    }
+    if !p.contains('*') {
+        return ("exact", p);
+    }
+    ("unsupported", p)
+}
+
+fn path_is_under(path: &str, root: &str) -> bool {
+    if root.is_empty() {
+        return true;
+    }
+    path == root || path.starts_with(&format!("{root}/"))
+}
+
+fn glob_pattern_subset(candidate: &str, container: &str) -> bool {
+    let normalized_candidate = canonicalize_glob_pattern(candidate);
+    let normalized_container = canonicalize_glob_pattern(container);
+    if normalized_candidate == normalized_container {
+        return true;
+    }
+
+    let (candidate_kind, candidate_value) = glob_kind(&normalized_candidate);
+    let (container_kind, container_value) = glob_kind(&normalized_container);
+
+    match (candidate_kind, container_kind) {
+        ("exact", "exact") => candidate_value == container_value,
+        ("exact", "recursive") => path_is_under(&candidate_value, &container_value),
+        ("recursive", "recursive") => path_is_under(&candidate_value, &container_value),
+        _ => false,
+    }
+}
+
+fn key_pattern_subset(candidate: &str, container: &str) -> bool {
+    if candidate == container {
+        return true;
+    }
+    if container == "*" {
+        return true;
+    }
+    if let Some(prefix) = container.strip_suffix('*') {
+        return candidate.starts_with(prefix);
+    }
+    false
+}
+
+fn intersect_enum_list(granted: &[String], requested: &[String]) -> Vec<String> {
+    let requested_set: HashSet<&String> = requested.iter().collect();
+    let mut out: Vec<String> = granted
+        .iter()
+        .filter(|v| requested_set.contains(*v))
+        .cloned()
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
+fn intersect_key_patterns(granted: &[String], requested: &[String]) -> Vec<String> {
+    let mut granted_norm: Vec<String> = granted
+        .iter()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .collect();
+    let mut requested_norm: Vec<String> = requested
+        .iter()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .collect();
+    granted_norm.sort();
+    granted_norm.dedup();
+    requested_norm.sort();
+    requested_norm.dedup();
+
+    let mut out = Vec::<String>::new();
+    for g in &granted_norm {
+        if requested_norm.iter().any(|r| key_pattern_subset(g, r)) {
+            out.push(g.clone());
+        }
+    }
+    for r in &requested_norm {
+        if granted_norm.iter().any(|g| key_pattern_subset(r, g)) {
+            out.push(r.clone());
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+fn intersect_glob_patterns(granted: &[String], requested: &[String]) -> Vec<String> {
+    let mut granted_norm: Vec<String> = granted
+        .iter()
+        .map(|v| canonicalize_glob_pattern(v))
+        .filter(|v| !v.is_empty())
+        .collect();
+    let mut requested_norm: Vec<String> = requested
+        .iter()
+        .map(|v| canonicalize_glob_pattern(v))
+        .filter(|v| !v.is_empty())
+        .collect();
+    granted_norm.sort();
+    granted_norm.dedup();
+    requested_norm.sort();
+    requested_norm.dedup();
+
+    let mut out = Vec::<String>::new();
+    for g in &granted_norm {
+        if requested_norm.iter().any(|r| glob_pattern_subset(g, r)) {
+            out.push(g.clone());
+        }
+    }
+    for r in &requested_norm {
+        if granted_norm.iter().any(|g| glob_pattern_subset(r, g)) {
+            out.push(r.clone());
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+fn intersect_permission_rules(
+    granted: Option<&PermissionRules>,
+    requested: Option<&PermissionRules>,
+) -> Option<PermissionRules> {
+    let (Some(granted), Some(requested)) = (granted, requested) else {
+        return None;
+    };
+    Some(PermissionRules {
+        allow: intersect_key_patterns(&granted.allow, &requested.allow),
+        deny: {
+            let mut out = granted.deny.clone();
+            out.extend(requested.deny.clone());
+            out.sort();
+            out.dedup();
+            out
+        },
+    })
+}
+
+fn intersect_prefix(granted: Option<&str>, requested: Option<&str>) -> Option<String> {
+    match (granted, requested) {
+        (Some(g), Some(r)) if g == r => Some(g.to_string()),
+        (Some(g), Some(r)) if g.starts_with(r) => Some(g.to_string()),
+        (Some(g), Some(r)) if r.starts_with(g) => Some(r.to_string()),
+        (Some(_), Some(_)) => Some("__deny_all__".to_string()),
+        _ => None,
+    }
+}
+
+fn compute_effective_permissions_for_dependency_v10(
+    granted: &ProjectPermissions,
+    requested: &RequestedPermissionsV10,
+) -> ProjectPermissions {
+    if !requested.has_declared {
+        let mut passthrough = granted.clone();
+        passthrough.global_deny.sort();
+        passthrough.global_deny.dedup();
+        return passthrough;
+    }
+
+    let mut out = ProjectPermissions {
+        global_deny: granted.global_deny.clone(),
+        package: intersect_permission_rules(
+            granted.package.as_ref(),
+            requested.permissions.package.as_ref(),
+        ),
+        modules: HashMap::new(),
+        std_fs: None,
+        std_net_http: None,
+        std_kv: None,
+        std_time: None,
+        std_proc: None,
+        std_game: None,
+        std_shadow: None,
+        std_ui: None,
+    };
+
+    for (module_name, granted_rules) in &granted.modules {
+        if let Some(requested_rules) = requested.permissions.modules.get(module_name) {
+            out.modules.insert(
+                module_name.clone(),
+                PermissionRules {
+                    allow: intersect_key_patterns(&granted_rules.allow, &requested_rules.allow),
+                    deny: {
+                        let mut deny = granted_rules.deny.clone();
+                        deny.extend(requested_rules.deny.clone());
+                        deny.sort();
+                        deny.dedup();
+                        deny
+                    },
+                },
+            );
+        }
+    }
+
+    if let (Some(g), Some(r)) = (
+        granted.std_fs.as_ref(),
+        requested.permissions.std_fs.as_ref(),
+    ) {
+        out.std_fs = Some(StdFsPermissionConfig {
+            read: intersect_glob_patterns(&g.read, &r.read),
+            write: intersect_glob_patterns(&g.write, &r.write),
+            remove: intersect_glob_patterns(&g.remove, &r.remove),
+            rename: intersect_glob_patterns(&g.rename, &r.rename),
+            list: intersect_glob_patterns(&g.list, &r.list),
+            max_read_bytes: g.max_read_bytes.min(r.max_read_bytes),
+            max_write_bytes: g.max_write_bytes.min(r.max_write_bytes),
+            max_list_entries: g.max_list_entries.min(r.max_list_entries),
+        });
+    }
+
+    if let (Some(g), Some(r)) = (
+        granted.std_net_http.as_ref(),
+        requested.permissions.std_net_http.as_ref(),
+    ) {
+        out.std_net_http = Some(StdNetHttpPermissionConfig {
+            enabled: g.enabled && r.enabled,
+            allow_hosts: intersect_enum_list(&g.allow_hosts, &r.allow_hosts),
+            allow_methods: intersect_enum_list(&g.allow_methods, &r.allow_methods),
+            max_body_bytes: g.max_body_bytes.min(r.max_body_bytes),
+            timeout_ms: g.timeout_ms.min(r.timeout_ms),
+        });
+    }
+
+    if let (Some(g), Some(r)) = (
+        granted.std_kv.as_ref(),
+        requested.permissions.std_kv.as_ref(),
+    ) {
+        out.std_kv = Some(StdKvPermissionConfig {
+            enabled: g.enabled && r.enabled,
+            max_keys: g.max_keys.min(r.max_keys),
+            max_value_bytes: g.max_value_bytes.min(r.max_value_bytes),
+            key_prefix: intersect_prefix(g.key_prefix.as_deref(), r.key_prefix.as_deref()),
+        });
+    }
+
+    if let (Some(g), Some(r)) = (
+        granted.std_time.as_ref(),
+        requested.permissions.std_time.as_ref(),
+    ) {
+        out.std_time = Some(StdTimePermissionConfig {
+            enabled: g.enabled && r.enabled,
+            tick_mode: "logical".to_string(),
+            dt_ms: g.dt_ms.min(r.dt_ms),
+        });
+    }
+
+    if let (Some(g), Some(r)) = (
+        granted.std_proc.as_ref(),
+        requested.permissions.std_proc.as_ref(),
+    ) {
+        out.std_proc = Some(StdProcPermissionConfig {
+            enabled: g.enabled && r.enabled,
+            allow_bins: intersect_enum_list(&g.allow_bins, &r.allow_bins),
+            timeout_ms: g.timeout_ms.min(r.timeout_ms),
+            max_stdout_bytes: g.max_stdout_bytes.min(r.max_stdout_bytes),
+            max_stderr_bytes: g.max_stderr_bytes.min(r.max_stderr_bytes),
+        });
+    }
+
+    if let (Some(g), Some(r)) = (
+        granted.std_game.as_ref(),
+        requested.permissions.std_game.as_ref(),
+    ) {
+        out.std_game = Some(StdGamePermissionConfig {
+            enabled: g.enabled && r.enabled,
+            fixed_dt_ms: g.fixed_dt_ms.min(r.fixed_dt_ms),
+            rng_streams: intersect_enum_list(&g.rng_streams, &r.rng_streams),
+            rng_max_count: g.rng_max_count.min(r.rng_max_count),
+            state_delta_max_bytes: g.state_delta_max_bytes.min(r.state_delta_max_bytes),
+        });
+    }
+
+    if let (Some(g), Some(r)) = (
+        granted.std_shadow.as_ref(),
+        requested.permissions.std_shadow.as_ref(),
+    ) {
+        out.std_shadow = Some(StdShadowPermissionConfig {
+            enabled: g.enabled && r.enabled,
+            max_branches: g.max_branches.min(r.max_branches),
+            branch_step_cap: g.branch_step_cap.min(r.branch_step_cap),
+            branch_budget_cap: g.branch_budget_cap.min(r.branch_budget_cap),
+            max_diff_keys: g.max_diff_keys.min(r.max_diff_keys),
+            max_report_bytes: g.max_report_bytes.min(r.max_report_bytes),
+        });
+    }
+
+    if let (Some(g), Some(r)) = (
+        granted.std_ui.as_ref(),
+        requested.permissions.std_ui.as_ref(),
+    ) {
+        out.std_ui = Some(StdUiPermissionConfig {
+            enabled: g.enabled && r.enabled,
+            max_draw_cmds: g.max_draw_cmds.min(r.max_draw_cmds),
+            max_input_events: g.max_input_events.min(r.max_input_events),
+            assets_read: intersect_glob_patterns(&g.assets_read, &r.assets_read),
+            max_asset_bytes: g.max_asset_bytes.min(r.max_asset_bytes),
+        });
+    }
+
+    out.global_deny.sort();
+    out.global_deny.dedup();
+    out
+}
+
+fn apply_permission_entry(out: &mut ProjectPermissions, section: &str, key: &str, value_raw: &str) {
+    let values = parse_string_array_literal(value_raw);
+    let scalar_value = value_raw.trim().trim_matches('"');
+
+    if section == "deny" {
+        if key == "patterns" {
+            out.global_deny = values;
+            normalize_string_list(&mut out.global_deny);
+        }
+        return;
+    }
+
+    if section == "package" {
+        let rules = out.package.get_or_insert_with(PermissionRules::default);
+        match key {
+            "allow" => rules.allow = values,
+            "deny" => rules.deny = values,
+            _ => {}
+        }
+        normalize_permission_rules(rules);
+        return;
+    }
+
+    if let Some(module_name) = section.strip_prefix("module.") {
+        let module_key = module_name.trim().to_string();
+        if module_key.is_empty() {
+            return;
+        }
+        let rules = out.modules.entry(module_key).or_default();
+        match key {
+            "allow" => rules.allow = values,
+            "deny" => rules.deny = values,
+            _ => {}
+        }
+        normalize_permission_rules(rules);
+        return;
+    }
+
+    if section == "std_fs" {
+        let cfg = out
+            .std_fs
+            .get_or_insert_with(StdFsPermissionConfig::default);
+        match key {
+            "read" => cfg.read = values,
+            "write" => cfg.write = values,
+            "remove" => cfg.remove = values,
+            "rename" => cfg.rename = values,
+            "list" => cfg.list = values,
+            "max_read_bytes" => {
+                if let Ok(parsed) = scalar_value.parse::<u64>() {
+                    cfg.max_read_bytes = parsed.max(1);
+                }
+            }
+            "max_write_bytes" => {
+                if let Ok(parsed) = scalar_value.parse::<u64>() {
+                    cfg.max_write_bytes = parsed.max(1);
+                }
+            }
+            "max_list_entries" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.max_list_entries = parsed.max(1);
+                }
+            }
+            _ => {}
+        }
+        normalize_string_list(&mut cfg.read);
+        normalize_string_list(&mut cfg.write);
+        normalize_string_list(&mut cfg.remove);
+        normalize_string_list(&mut cfg.rename);
+        normalize_string_list(&mut cfg.list);
+        return;
+    }
+
+    if section == "std_net_http" {
+        let cfg = out
+            .std_net_http
+            .get_or_insert_with(StdNetHttpPermissionConfig::default);
+        match key {
+            "enabled" => {
+                if let Some(parsed) = parse_bool_literal(scalar_value) {
+                    cfg.enabled = parsed;
+                }
+            }
+            "allow_hosts" => {
+                cfg.allow_hosts = values.into_iter().map(|v| v.to_ascii_lowercase()).collect();
+            }
+            "allow_methods" => {
+                cfg.allow_methods = values.into_iter().map(|v| v.to_ascii_uppercase()).collect();
+            }
+            "max_body_bytes" => {
+                if let Ok(parsed) = scalar_value.parse::<u64>() {
+                    cfg.max_body_bytes = parsed.max(1);
+                }
+            }
+            "timeout_ms" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.timeout_ms = parsed.max(1);
+                }
+            }
+            _ => {}
+        }
+        normalize_string_list(&mut cfg.allow_hosts);
+        normalize_string_list(&mut cfg.allow_methods);
+        return;
+    }
+
+    if section == "std_kv" {
+        let cfg = out
+            .std_kv
+            .get_or_insert_with(StdKvPermissionConfig::default);
+        match key {
+            "enabled" => {
+                if let Some(parsed) = parse_bool_literal(scalar_value) {
+                    cfg.enabled = parsed;
+                }
+            }
+            "max_keys" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.max_keys = parsed.max(1);
+                }
+            }
+            "max_value_bytes" => {
+                if let Ok(parsed) = scalar_value.parse::<u64>() {
+                    cfg.max_value_bytes = parsed.max(1);
+                }
+            }
+            "key_prefix" => {
+                if scalar_value.is_empty() {
+                    cfg.key_prefix = None;
+                } else {
+                    cfg.key_prefix = Some(scalar_value.to_string());
+                }
+            }
+            _ => {}
+        }
+        return;
+    }
+
+    if section == "std_time" {
+        let cfg = out
+            .std_time
+            .get_or_insert_with(StdTimePermissionConfig::default);
+        match key {
+            "enabled" => {
+                if let Some(parsed) = parse_bool_literal(scalar_value) {
+                    cfg.enabled = parsed;
+                }
+            }
+            "tick_mode" => {
+                if scalar_value == "logical" {
+                    cfg.tick_mode = scalar_value.to_string();
+                }
+            }
+            "dt_ms" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.dt_ms = parsed.max(1);
+                }
+            }
+            _ => {}
+        }
+        return;
+    }
+
+    if section == "std_proc" {
+        let cfg = out
+            .std_proc
+            .get_or_insert_with(StdProcPermissionConfig::default);
+        match key {
+            "enabled" => {
+                if let Some(parsed) = parse_bool_literal(scalar_value) {
+                    cfg.enabled = parsed;
+                }
+            }
+            "allow_bins" => cfg.allow_bins = values,
+            "timeout_ms" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.timeout_ms = parsed.max(1);
+                }
+            }
+            "max_stdout_bytes" => {
+                if let Ok(parsed) = scalar_value.parse::<u64>() {
+                    cfg.max_stdout_bytes = parsed.max(1);
+                }
+            }
+            "max_stderr_bytes" => {
+                if let Ok(parsed) = scalar_value.parse::<u64>() {
+                    cfg.max_stderr_bytes = parsed.max(1);
+                }
+            }
+            _ => {}
+        }
+        normalize_string_list(&mut cfg.allow_bins);
+        return;
+    }
+
+    if section == "std_game" {
+        let cfg = out
+            .std_game
+            .get_or_insert_with(StdGamePermissionConfig::default);
+        match key {
+            "enabled" => {
+                if let Some(parsed) = parse_bool_literal(scalar_value) {
+                    cfg.enabled = parsed;
+                }
+            }
+            "fixed_dt_ms" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.fixed_dt_ms = parsed.max(1);
+                }
+            }
+            "rng_streams" => cfg.rng_streams = values,
+            "rng_max_count" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.rng_max_count = parsed.max(1);
+                }
+            }
+            "state_delta_max_bytes" => {
+                if let Ok(parsed) = scalar_value.parse::<u64>() {
+                    cfg.state_delta_max_bytes = parsed.max(1);
+                }
+            }
+            _ => {}
+        }
+        normalize_string_list(&mut cfg.rng_streams);
+        return;
+    }
+
+    if section == "std_shadow" {
+        let cfg = out
+            .std_shadow
+            .get_or_insert_with(StdShadowPermissionConfig::default);
+        match key {
+            "enabled" => {
+                if let Some(parsed) = parse_bool_literal(scalar_value) {
+                    cfg.enabled = parsed;
+                }
+            }
+            "max_branches" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.max_branches = parsed.max(1);
+                }
+            }
+            "branch_step_cap" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.branch_step_cap = parsed.max(1);
+                }
+            }
+            "branch_budget_cap" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.branch_budget_cap = parsed.max(1);
+                }
+            }
+            "max_diff_keys" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.max_diff_keys = parsed.max(1);
+                }
+            }
+            "max_report_bytes" => {
+                if let Ok(parsed) = scalar_value.parse::<u64>() {
+                    cfg.max_report_bytes = parsed.max(1);
+                }
+            }
+            _ => {}
+        }
+        return;
+    }
+
+    if section == "std_ui" {
+        let cfg = out
+            .std_ui
+            .get_or_insert_with(StdUiPermissionConfig::default);
+        match key {
+            "enabled" => {
+                if let Some(parsed) = parse_bool_literal(scalar_value) {
+                    cfg.enabled = parsed;
+                }
+            }
+            "max_draw_cmds" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.max_draw_cmds = parsed.max(1);
+                }
+            }
+            "max_input_events" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.max_input_events = parsed.max(1);
+                }
+            }
+            "assets_read" => cfg.assets_read = values,
+            "max_asset_bytes" => {
+                if let Ok(parsed) = scalar_value.parse::<u64>() {
+                    cfg.max_asset_bytes = parsed.max(1);
+                }
+            }
+            _ => {}
+        }
+        normalize_string_list(&mut cfg.assets_read);
+    }
+}
+
+fn parse_requested_permissions_from_package_manifest_v10(raw: &str) -> RequestedPermissionsV10 {
+    let mut out = ProjectPermissions::default();
+    let mut current_section = String::new();
+    let mut has_declared = false;
+
+    for raw_line in raw.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        if line.starts_with('[') && line.ends_with(']') {
+            current_section = line[1..line.len() - 1].trim().to_string();
+            if current_section == "requested_permissions"
+                || current_section.starts_with("requested_permissions.")
+            {
+                has_declared = true;
+            }
+            continue;
+        }
+
+        let Some((k, v)) = line.split_once('=') else {
+            continue;
+        };
+        let key = k.trim();
+        let value_raw = v.trim();
+
+        if current_section == "requested_permissions" {
+            if let Some((section, nested_key)) = key.split_once('.') {
+                apply_permission_entry(&mut out, section.trim(), nested_key.trim(), value_raw);
+            }
+            continue;
+        }
+
+        if let Some(section) = current_section.strip_prefix("requested_permissions.") {
+            apply_permission_entry(&mut out, section.trim(), key, value_raw);
+        }
+    }
+
+    RequestedPermissionsV10 {
+        permissions: out,
+        has_declared,
+    }
+}
+
 fn std_fs_action_from_key(key: &str) -> Option<&'static str> {
     match key {
         "std.fs.read_text" | "std.fs.stat" => Some("read"),
@@ -1057,6 +1775,7 @@ fn verify_pack_permissions_for_key(
     module_path: Option<&str>,
     file_path: &Path,
     key: &str,
+    _callsite_package_id: Option<&str>,
 ) -> Result<(), SdkError> {
     if let Some(action) = engine_ui_action_from_key(key) {
         let Some(cfg) = permissions.std_ui.as_ref() else {
@@ -1559,6 +2278,18 @@ fn permission_decision_for_key(
     module_path: Option<&str>,
     key: &str,
 ) -> (PermissionDecision, Option<String>, Option<String>) {
+    if let Some(matched) = permissions
+        .global_deny
+        .iter()
+        .find(|pattern| permission_pattern_matches(pattern, key))
+    {
+        return (
+            PermissionDecision::Deny,
+            Some(matched.clone()),
+            Some("deny".to_string()),
+        );
+    }
+
     if let Some(module_path) = module_path {
         if let Some(module_rules) = permissions.modules.get(module_path) {
             if let Some((decision, pattern)) = permission_rule_decision(module_rules, key) {
@@ -1623,8 +2354,10 @@ fn verify_permissions_for_source(
     file_id: u32,
     file_path: &Path,
     permissions: &ProjectPermissions,
+    callsite_package_id: Option<&str>,
 ) -> Result<(), SdkError> {
-    if permissions.package.is_none()
+    if permissions.global_deny.is_empty()
+        && permissions.package.is_none()
         && permissions.modules.is_empty()
         && permissions.std_fs.is_none()
         && permissions.std_net_http.is_none()
@@ -1649,7 +2382,10 @@ fn verify_permissions_for_source(
         if decision == PermissionDecision::Deny {
             let section_name = section.unwrap_or_else(|| "permissions.package".to_string());
             let matched = matched_rule.unwrap_or_else(|| "<none>".to_string());
-            let hint = if section_name.starts_with("permissions.module.") {
+            let hint = if section_name == "deny" {
+                "Hint: remove key from `[deny].patterns` or move execution to package with different policy."
+                    .to_string()
+            } else if section_name.starts_with("permissions.module.") {
                 format!(
                     "Hint: add key to `[{}].allow` or remove from `[{}].deny`.",
                     section_name, section_name
@@ -1658,12 +2394,15 @@ fn verify_permissions_for_source(
                 "Hint: add key to `[permissions.package].allow` or remove from `[permissions.package].deny`.".to_string()
             };
             return Err(SdkError::PermissionDenied(format!(
-                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; matched deny rule=`{}` in [{}]. {}",
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}{}; matched deny rule=`{}` in [{}]. {}",
                 key,
                 file_path.display(),
                 module_path
                     .as_ref()
                     .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+                callsite_package_id
+                    .map(|pkg| format!(" (callsite_package_id `{pkg}`)"))
                     .unwrap_or_default(),
                 matched,
                 section_name,
@@ -1671,7 +2410,13 @@ fn verify_permissions_for_source(
             )));
         }
 
-        verify_pack_permissions_for_key(permissions, module_path.as_deref(), file_path, &key)?;
+        verify_pack_permissions_for_key(
+            permissions,
+            module_path.as_deref(),
+            file_path,
+            &key,
+            callsite_package_id,
+        )?;
     }
 
     Ok(())
@@ -1827,8 +2572,10 @@ fn verify_project_exists(layout: &ProjectLayout) -> Result<(), SdkError> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ManifestDep {
+    alias: String,
     name: String,
-    version: String,
+    version_req: String,
+    source: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1836,6 +2583,102 @@ struct LockDep {
     name: String,
     version: String,
     hash64: String,
+}
+
+fn strip_toml_quotes(value: &str) -> String {
+    value.trim().trim_matches('"').to_string()
+}
+
+fn default_dep_source(dep_name: &str) -> String {
+    if dep_name == "std" {
+        "builtin".to_string()
+    } else {
+        "registry".to_string()
+    }
+}
+
+fn normalize_dep_source(dep_name: &str, source_raw: Option<&str>) -> String {
+    let source = source_raw
+        .map(|v| strip_toml_quotes(v).to_ascii_lowercase())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| default_dep_source(dep_name));
+    match source.as_str() {
+        "builtin" | "registry" | "path" | "git" => source,
+        _ => "registry".to_string(),
+    }
+}
+
+fn resolve_version_req_deterministic(version_req: &str) -> String {
+    let trimmed = version_req.trim();
+    if trimmed.is_empty() || trimmed == "*" {
+        return "0.0.0".to_string();
+    }
+    if !trimmed.contains('*') {
+        return trimmed.to_string();
+    }
+    let parts: Vec<&str> = trimmed.split('.').collect();
+    let major = parts
+        .first()
+        .copied()
+        .unwrap_or("0")
+        .trim()
+        .trim_matches('"');
+    let minor = parts
+        .get(1)
+        .copied()
+        .unwrap_or("0")
+        .trim()
+        .trim_matches('"');
+    let patch = parts
+        .get(2)
+        .copied()
+        .unwrap_or("0")
+        .trim()
+        .trim_matches('"');
+
+    let major_norm = if major == "*" || major.is_empty() {
+        "0"
+    } else {
+        major
+    };
+    let minor_norm = if minor == "*" || minor.is_empty() {
+        "0"
+    } else {
+        minor
+    };
+    let patch_norm = if patch == "*" || patch.is_empty() {
+        "0"
+    } else {
+        patch
+    };
+    format!("{major_norm}.{minor_norm}.{patch_norm}")
+}
+
+fn parse_dep_object_fields(raw: &str) -> Result<HashMap<String, String>, SdkError> {
+    let value = raw.trim();
+    if !(value.starts_with('{') && value.ends_with('}')) {
+        return Err(SdkError::MissingProject(
+            "invalid dependency object form (expected `{...}`)".to_string(),
+        ));
+    }
+    let inner = &value[1..value.len() - 1];
+    let mut out = HashMap::new();
+    if inner.trim().is_empty() {
+        return Ok(out);
+    }
+    for segment in inner.split(',') {
+        let token = segment.trim();
+        if token.is_empty() {
+            continue;
+        }
+        let Some((k, v)) = token.split_once('=') else {
+            return Err(SdkError::MissingProject(
+                "invalid dependency object field (expected `key=value`)".to_string(),
+            ));
+        };
+        out.insert(k.trim().to_string(), strip_toml_quotes(v));
+    }
+    Ok(out)
 }
 
 fn parse_manifest_dependencies(manifest: &str) -> Result<Vec<ManifestDep>, SdkError> {
@@ -1860,20 +2703,65 @@ fn parse_manifest_dependencies(manifest: &str) -> Result<Vec<ManifestDep>, SdkEr
                 "invalid [dependencies] entry in Ocl.toml".to_string(),
             ));
         };
-        let name = k.trim();
-        let version = v.trim().trim_matches('"');
-        if name.is_empty() || version.is_empty() {
+        let alias = k.trim();
+        if alias.is_empty() {
             return Err(SdkError::MissingProject(
                 "dependency name/version must not be empty".to_string(),
             ));
         }
+        let value = v.trim();
+        if value.is_empty() {
+            return Err(SdkError::MissingProject(
+                "dependency version must not be empty".to_string(),
+            ));
+        }
+
+        let (name, version_req, source) = if value.starts_with('{') {
+            let fields = parse_dep_object_fields(value)?;
+            let resolved_name = fields
+                .get("name")
+                .map(|v| v.trim())
+                .filter(|v| !v.is_empty())
+                .unwrap_or(alias);
+            let Some(version_raw) = fields.get("version").map(|v| v.trim()) else {
+                return Err(SdkError::MissingProject(format!(
+                    "dependency `{alias}` object form missing `version` field"
+                )));
+            };
+            if version_raw.is_empty() {
+                return Err(SdkError::MissingProject(format!(
+                    "dependency `{alias}` has empty `version` field"
+                )));
+            }
+            let source =
+                normalize_dep_source(resolved_name, fields.get("source").map(String::as_str));
+            (resolved_name.to_string(), version_raw.to_string(), source)
+        } else {
+            let version_raw = strip_toml_quotes(value);
+            if version_raw.is_empty() {
+                return Err(SdkError::MissingProject(
+                    "dependency version must not be empty".to_string(),
+                ));
+            }
+            let source = normalize_dep_source(alias, None);
+            (alias.to_string(), version_raw, source)
+        };
+
         deps.push(ManifestDep {
-            name: name.to_string(),
-            version: version.to_string(),
+            alias: alias.to_string(),
+            name,
+            version_req,
+            source,
         });
     }
 
-    deps.sort_by(|a, b| a.name.cmp(&b.name).then(a.version.cmp(&b.version)));
+    deps.sort_by(|a, b| {
+        a.alias
+            .cmp(&b.alias)
+            .then(a.name.cmp(&b.name))
+            .then(a.version_req.cmp(&b.version_req))
+            .then(a.source.cmp(&b.source))
+    });
     Ok(deps)
 }
 
@@ -1881,16 +2769,146 @@ fn to_lock_deps(deps: &[ManifestDep]) -> Vec<LockDep> {
     let mut out: Vec<LockDep> = deps
         .iter()
         .map(|dep| {
-            let digest_input = format!("{}@{}", dep.name, dep.version);
+            let resolved_version = resolve_version_req_deterministic(&dep.version_req);
+            let digest_input = format!("{}@{}", dep.name, resolved_version);
             LockDep {
                 name: dep.name.clone(),
-                version: dep.version.clone(),
+                version: resolved_version,
                 hash64: fnv1a64_hex(&digest_input),
             }
         })
         .collect();
     out.sort_by(|a, b| a.name.cmp(&b.name).then(a.version.cmp(&b.version)));
     out
+}
+
+fn canonicalize_path(path: &Path, context: &str) -> Result<PathBuf, SdkError> {
+    path.canonicalize()
+        .map_err(|e| SdkError::MissingProject(format!("{context}: {} ({e})", path.display())))
+}
+
+fn canonicalize_path_under(path: &Path, root: &Path, context: &str) -> Result<PathBuf, SdkError> {
+    let canonical = canonicalize_path(path, context)?;
+    if !canonical.starts_with(root) {
+        return Err(SdkError::Runtime(RuntimeCoreError::from(
+            Diagnostic::new(
+                ErrorCode::TImportNotFound,
+                DiagPhase::Typecheck,
+                Span::new(0, 0, 0, 0, 0),
+                format!(
+                    "import path '{}' resolved outside module root '{}'",
+                    canonical.display(),
+                    root.display()
+                ),
+            )
+            .with_hint("use module path under package src root"),
+        )));
+    }
+    Ok(canonical)
+}
+
+fn module_id_from_file_under_root(root: &Path, file: &Path) -> Result<String, SdkError> {
+    let rel = file.strip_prefix(root).map_err(|_| {
+        SdkError::MissingProject(format!(
+            "module file '{}' is outside root '{}'",
+            file.display(),
+            root.display()
+        ))
+    })?;
+    let mut parts = Vec::new();
+    for comp in rel.components() {
+        let raw = comp.as_os_str().to_string_lossy().replace('\\', "/");
+        parts.push(raw);
+    }
+    if let Some(last) = parts.last_mut() {
+        if let Some(stripped) = last.strip_suffix(".ocl") {
+            *last = stripped.to_string();
+        }
+    }
+    Ok(parts.join("."))
+}
+
+fn project_package_id_v10(layout: &ProjectLayout) -> Result<String, SdkError> {
+    let manifest = fs::read_to_string(&layout.manifest)?;
+    let (name, _) = parse_package_name_version(&manifest)?;
+    Ok(format!("project:{name}"))
+}
+
+fn dep_package_id_v10(dep: &ManifestDep) -> String {
+    let version = resolve_version_req_deterministic(&dep.version_req);
+    let digest = sha256_hex(format!("{}@{}|{}", dep.name, version, dep.source).as_bytes());
+    let short = &digest[..12];
+    format!("dep:{}@{}#{}", dep.name, version, short)
+}
+
+fn parse_package_exports_modules_v10(raw: &str) -> Vec<String> {
+    let mut in_exports = false;
+    let mut modules = Vec::new();
+    for raw_line in raw.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            in_exports = line == "[exports]";
+            continue;
+        }
+        if !in_exports {
+            continue;
+        }
+        let Some((k, v)) = line.split_once('=') else {
+            continue;
+        };
+        if k.trim() == "modules" {
+            modules = parse_string_array_literal(v)
+                .into_iter()
+                .map(|m| m.trim().to_string())
+                .filter(|m| !m.is_empty())
+                .collect();
+        }
+    }
+    modules.sort();
+    modules.dedup();
+    modules
+}
+
+#[derive(Debug, Clone)]
+struct DependencyPackageIndexV10 {
+    package_id: String,
+    src_root: PathBuf,
+    exports: HashSet<String>,
+}
+
+fn load_dependency_package_index_v10(
+    layout: &ProjectLayout,
+    dep: &ManifestDep,
+) -> Result<DependencyPackageIndexV10, SdkError> {
+    let dep_root = layout.root.join("deps").join(&dep.alias);
+    let package_manifest_path = dep_root.join("package.oclp");
+    if !package_manifest_path.exists() {
+        return Err(SdkError::MissingProject(format!(
+            "missing dependency package manifest for alias `{}`: {}",
+            dep.alias,
+            package_manifest_path.display()
+        )));
+    }
+    let raw = fs::read_to_string(&package_manifest_path)?;
+    let exports = parse_package_exports_modules_v10(&raw);
+    let src_root = dep_root.join("src");
+    if !src_root.exists() {
+        return Err(SdkError::MissingProject(format!(
+            "missing dependency src root for alias `{}`: {}",
+            dep.alias,
+            src_root.display()
+        )));
+    }
+    let src_root_canon = canonicalize_path(&src_root, "failed to canonicalize dependency src")?;
+    let exports_set: HashSet<String> = exports.into_iter().collect();
+    Ok(DependencyPackageIndexV10 {
+        package_id: dep_package_id_v10(dep),
+        src_root: src_root_canon,
+        exports: exports_set,
+    })
 }
 
 fn encode_lock_v1(lock_deps: &[LockDep]) -> String {
@@ -1958,6 +2976,249 @@ fn read_expected_lock(layout: &ProjectLayout) -> Result<Vec<LockDep>, SdkError> 
     Ok(to_lock_deps(&deps))
 }
 
+pub fn verify_dependency_exports_and_collect_provenance_v10(
+    root: &Path,
+) -> Result<Vec<ImportProvenanceV10>, SdkError> {
+    let layout = project_layout(root);
+    verify_project_exists(&layout)?;
+
+    let manifest_raw = fs::read_to_string(&layout.manifest)?;
+    let deps = parse_manifest_dependencies(&manifest_raw)?;
+    let project_src_root =
+        canonicalize_path(&layout.root.join("src"), "failed to canonicalize src")?;
+    let project_package_id = project_package_id_v10(&layout)?;
+
+    let mut dep_index = HashMap::<String, DependencyPackageIndexV10>::new();
+    for dep in deps {
+        if dep.source == "builtin" {
+            continue;
+        }
+        dep_index.insert(
+            dep.alias.clone(),
+            load_dependency_package_index_v10(&layout, &dep)?,
+        );
+    }
+
+    let mut out = Vec::<ImportProvenanceV10>::new();
+    let mut loaded = HashSet::<String>::new();
+    let mut visiting = HashSet::<String>::new();
+
+    #[allow(clippy::too_many_arguments)]
+    fn visit_module(
+        package_id: &str,
+        src_root: &Path,
+        module_id: String,
+        file_path: PathBuf,
+        dep_index: &HashMap<String, DependencyPackageIndexV10>,
+        loaded: &mut HashSet<String>,
+        visiting: &mut HashSet<String>,
+        out: &mut Vec<ImportProvenanceV10>,
+    ) -> Result<(), SdkError> {
+        let key = format!("{package_id}::{module_id}");
+        if loaded.contains(&key) {
+            return Ok(());
+        }
+        if visiting.contains(&key) {
+            return Err(SdkError::Runtime(RuntimeCoreError::from(
+                Diagnostic::new(
+                    ErrorCode::TImportCycle,
+                    DiagPhase::Typecheck,
+                    Span::new(0, 0, 0, 0, 0),
+                    format!("import cycle detected at `{module_id}`"),
+                )
+                .with_hint("break circular imports by extracting shared modules"),
+            )));
+        }
+        visiting.insert(key.clone());
+
+        let source = fs::read_to_string(&file_path)?;
+        let program = parse_program(&source, 1).map_err(RuntimeCoreError::from)?;
+        for stmt in &program.statements {
+            let Stmt::ImportDecl { path, .. } = stmt else {
+                continue;
+            };
+            if matches!(path.first().map(String::as_str), Some("std")) {
+                continue;
+            }
+            let Some(first) = path.first() else {
+                continue;
+            };
+            if let Some(dep_pkg) = dep_index.get(first) {
+                if path.len() < 2 {
+                    return Err(SdkError::Runtime(RuntimeCoreError::from(
+                        Diagnostic::new(
+                            ErrorCode::TImportNotFound,
+                            DiagPhase::Typecheck,
+                            Span::new(0, 0, 0, 0, 0),
+                            format!("import `{first}` must include module path under dependency"),
+                        )
+                        .with_hint("use form `import <dep_alias>.<exported_module>;`"),
+                    )));
+                }
+                let target_module = path[1..].join(".");
+                if !dep_pkg.exports.contains(&target_module) {
+                    return Err(SdkError::Runtime(RuntimeCoreError::from(
+                        Diagnostic::new(
+                            ErrorCode::TImportNotFound,
+                            DiagPhase::Typecheck,
+                            Span::new(0, 0, 0, 0, 0),
+                            format!(
+                                "module `{target_module}` is not exported by dependency alias `{first}`"
+                            ),
+                        )
+                        .with_hint("add module to `[exports].modules` in dependency package.oclp"),
+                    )));
+                }
+                let mut candidate = dep_pkg.src_root.clone();
+                for seg in &path[1..] {
+                    candidate.push(seg);
+                }
+                candidate.set_extension("ocl");
+                let child_path = canonicalize_path_under(
+                    &candidate,
+                    &dep_pkg.src_root,
+                    "failed to resolve dependency import module",
+                )?;
+                visit_module(
+                    &dep_pkg.package_id,
+                    &dep_pkg.src_root,
+                    target_module,
+                    child_path,
+                    dep_index,
+                    loaded,
+                    visiting,
+                    out,
+                )?;
+            } else {
+                let target_module = path.join(".");
+                let mut candidate = src_root.to_path_buf();
+                for seg in path {
+                    candidate.push(seg);
+                }
+                candidate.set_extension("ocl");
+                let child_path = canonicalize_path_under(
+                    &candidate,
+                    src_root,
+                    "failed to resolve local import module",
+                )?;
+                visit_module(
+                    package_id,
+                    src_root,
+                    target_module,
+                    child_path,
+                    dep_index,
+                    loaded,
+                    visiting,
+                    out,
+                )?;
+            }
+        }
+
+        out.push(ImportProvenanceV10 {
+            module_id: module_id.clone(),
+            package_id: package_id.to_string(),
+            file_path: file_path.to_string_lossy().to_string(),
+        });
+        visiting.remove(&key);
+        loaded.insert(key);
+        Ok(())
+    }
+
+    let entry_canon = canonicalize_path_under(
+        &layout.src_main,
+        &project_src_root,
+        "failed to canonicalize entry module",
+    )?;
+    let entry_module = module_id_from_file_under_root(&project_src_root, &entry_canon)?;
+    visit_module(
+        &project_package_id,
+        &project_src_root,
+        entry_module,
+        entry_canon,
+        &dep_index,
+        &mut loaded,
+        &mut visiting,
+        &mut out,
+    )?;
+
+    out.sort_by(|a, b| {
+        a.module_id
+            .cmp(&b.module_id)
+            .then(a.package_id.cmp(&b.package_id))
+            .then(a.file_path.cmp(&b.file_path))
+    });
+    Ok(out)
+}
+
+fn compute_effective_permissions_by_package_v10(
+    layout: &ProjectLayout,
+    project_permissions: &ProjectPermissions,
+) -> Result<HashMap<String, ProjectPermissions>, SdkError> {
+    let mut out = HashMap::<String, ProjectPermissions>::new();
+    let project_package_id = project_package_id_v10(layout)?;
+    out.insert(project_package_id, project_permissions.clone());
+
+    let manifest_raw = fs::read_to_string(&layout.manifest)?;
+    let deps = parse_manifest_dependencies(&manifest_raw)?;
+    for dep in deps {
+        if dep.source == "builtin" {
+            continue;
+        }
+        let dep_root = layout.root.join("deps").join(&dep.alias);
+        let package_manifest_path = dep_root.join("package.oclp");
+        if !package_manifest_path.exists() {
+            return Err(SdkError::MissingProject(format!(
+                "missing dependency package manifest for permission compute: {}",
+                package_manifest_path.display()
+            )));
+        }
+        let raw = fs::read_to_string(&package_manifest_path)?;
+        let requested = parse_requested_permissions_from_package_manifest_v10(&raw);
+        let dep_package_id = dep_package_id_v10(&dep);
+        let effective =
+            compute_effective_permissions_for_dependency_v10(project_permissions, &requested);
+        out.insert(dep_package_id, effective);
+    }
+
+    Ok(out)
+}
+
+pub fn compute_effective_permissions_v10(
+    root: &Path,
+) -> Result<HashMap<String, ProjectPermissions>, SdkError> {
+    let layout = project_layout(root);
+    verify_project_exists(&layout)?;
+    let project_permissions = load_permissions_for_layout(&layout, false)?;
+    compute_effective_permissions_by_package_v10(&layout, &project_permissions)
+}
+
+fn verify_permissions_with_provenance_v10(
+    root: &Path,
+    layout: &ProjectLayout,
+    project_permissions: &ProjectPermissions,
+) -> Result<(), SdkError> {
+    let provenance = verify_dependency_exports_and_collect_provenance_v10(root)?;
+    let effective_by_package =
+        compute_effective_permissions_by_package_v10(layout, project_permissions)?;
+
+    for (idx, entry) in provenance.iter().enumerate() {
+        let Some(permissions) = effective_by_package.get(&entry.package_id) else {
+            return Err(SdkError::PermissionDenied(format!(
+                "X-DEP-PROVENANCE-MISSING: missing effective permissions for `{}` (module `{}`)",
+                entry.package_id, entry.module_id
+            )));
+        };
+        verify_permissions_for_file(
+            Path::new(&entry.file_path),
+            idx as u32 + 1,
+            permissions,
+            Some(entry.package_id.as_str()),
+        )?;
+    }
+
+    Ok(())
+}
+
 fn verify_lock_consistency(layout: &ProjectLayout) -> Result<Vec<LockDep>, SdkError> {
     let expected = read_expected_lock(layout)?;
     if !layout.deps_lock.exists() {
@@ -1973,6 +3234,11 @@ fn verify_lock_consistency(layout: &ProjectLayout) -> Result<Vec<LockDep>, SdkEr
             "deps.lock mismatch with Ocl.toml dependencies (run `ocl lock sync <project_dir>`)"
                 .to_string(),
         ));
+    }
+    let lock_v3 = deps_lock_v3_path(layout);
+    if lock_v3.exists() {
+        let lock_v3_deps = verify_lock_v3_consistency(layout)?;
+        let _ = evaluate_lock_v3_decisions_v10(layout, &lock_v3_deps, true)?;
     }
     Ok(current)
 }
@@ -1993,6 +3259,291 @@ struct LockDepV2 {
     hash64: String,
     signature_b64: String,
     signer_pub_b64: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LockDepV3 {
+    alias: String,
+    name: String,
+    version: String,
+    source: String,
+    hash64: String,
+    content_hash_sha256: String,
+    signature_b64: String,
+    signer_pub_b64: String,
+    trust_decision: String,
+    requested_permissions_hash: String,
+    dependencies: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct TrustStoreV10 {
+    global_keys: HashSet<String>,
+    by_source_keys: HashMap<String, HashSet<String>>,
+}
+
+fn deps_lock_v3_path(layout: &ProjectLayout) -> PathBuf {
+    layout.root.join("deps.lock.v3")
+}
+
+fn ocl_lock_export_path(layout: &ProjectLayout) -> PathBuf {
+    layout.root.join("ocl.lock")
+}
+
+fn empty_requested_permissions_hash() -> String {
+    sha256_hex(b"")
+}
+
+fn trust_store_path_v10(layout: &ProjectLayout) -> PathBuf {
+    layout.root.join("trust.toml")
+}
+
+fn normalize_trust_source_v10(raw: &str) -> String {
+    let lowered = raw.trim().to_ascii_lowercase();
+    match lowered.as_str() {
+        "builtin" | "registry" | "git" | "path" => lowered,
+        _ => lowered,
+    }
+}
+
+fn insert_trusted_keys_v10(store: &mut TrustStoreV10, source: Option<&str>, mut keys: Vec<String>) {
+    normalize_string_list(&mut keys);
+    if keys.is_empty() {
+        return;
+    }
+    if let Some(source_name) = source {
+        let source_key = normalize_trust_source_v10(source_name);
+        if source_key.is_empty() {
+            return;
+        }
+        let bucket = store.by_source_keys.entry(source_key).or_default();
+        for key in keys {
+            bucket.insert(key);
+        }
+        return;
+    }
+    for key in keys {
+        store.global_keys.insert(key);
+    }
+}
+
+fn parse_trust_store_v10(path: &Path) -> Result<TrustStoreV10, SdkError> {
+    if !path.exists() {
+        return Ok(TrustStoreV10::default());
+    }
+
+    let raw = fs::read_to_string(path)?;
+    let mut out = TrustStoreV10::default();
+    let mut current_section = String::new();
+
+    for raw_line in raw.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        if line.starts_with('[') && line.ends_with(']') {
+            current_section = line[1..line.len() - 1].trim().to_string();
+            continue;
+        }
+
+        let Some((key_raw, value_raw)) = line.split_once('=') else {
+            continue;
+        };
+        let key = key_raw.trim();
+        let value = value_raw.trim();
+        let keys = parse_string_array_literal(value);
+        if keys.is_empty() {
+            continue;
+        }
+
+        if current_section == "trusted_signers" {
+            if key == "keys" || key == "all" {
+                insert_trusted_keys_v10(&mut out, None, keys);
+                continue;
+            }
+            insert_trusted_keys_v10(&mut out, Some(key), keys);
+            continue;
+        }
+
+        if let Some(source) = current_section.strip_prefix("trusted_signers.") {
+            if key == "keys" || key == "allow" || key == "trusted" {
+                insert_trusted_keys_v10(&mut out, Some(source), keys);
+            }
+        }
+    }
+
+    Ok(out)
+}
+
+fn is_signer_trusted_v10(store: &TrustStoreV10, source: &str, signer_pub_b64: &str) -> bool {
+    if signer_pub_b64.trim().is_empty() {
+        return false;
+    }
+    if store.global_keys.contains(signer_pub_b64) {
+        return true;
+    }
+    let source_key = normalize_trust_source_v10(source);
+    store
+        .by_source_keys
+        .get(&source_key)
+        .map(|keys| keys.contains(signer_pub_b64))
+        .unwrap_or(false)
+}
+
+fn lock_v3_sign_message(dep: &LockDepV3) -> String {
+    format!("{}|{}|{}|{}", dep.alias, dep.name, dep.version, dep.source)
+}
+
+fn evaluate_lock_dep_trust_decision_v10(
+    dep: &LockDepV3,
+    trust_store: &TrustStoreV10,
+) -> Result<String, SdkError> {
+    let source = normalize_trust_source_v10(&dep.source);
+    let has_sig = !dep.signature_b64.trim().is_empty();
+    let has_pub = !dep.signer_pub_b64.trim().is_empty();
+
+    if source == "builtin" && !has_sig && !has_pub {
+        return Ok("builtin-unsigned".to_string());
+    }
+
+    if has_sig ^ has_pub {
+        return Err(SdkError::SupplyInvalid(format!(
+            "dependency `{}` has partial signing fields in deps.lock.v3 (signature/signer must both exist or both be empty)",
+            dep.alias
+        )));
+    }
+
+    if !has_sig {
+        return Ok("unsigned-unverified".to_string());
+    }
+
+    let sign_message = lock_v3_sign_message(dep);
+    deterministic_verify(
+        sign_message.as_bytes(),
+        &dep.signature_b64,
+        &dep.signer_pub_b64,
+    )?;
+
+    if is_signer_trusted_v10(trust_store, &source, &dep.signer_pub_b64) {
+        Ok("signed-trusted".to_string())
+    } else {
+        Ok("signed-untrusted".to_string())
+    }
+}
+
+fn evaluate_lock_v3_decisions_v10(
+    layout: &ProjectLayout,
+    deps: &[LockDepV3],
+    enforce_lane_policy: bool,
+) -> Result<Vec<String>, SdkError> {
+    let language_cfg = load_project_language_config_for_layout(layout)?;
+    let lane = language_cfg.lane.trim().to_string();
+    let trust_store = parse_trust_store_v10(&trust_store_path_v10(layout))?;
+
+    let mut decisions = Vec::with_capacity(deps.len());
+    for dep in deps {
+        let decision = evaluate_lock_dep_trust_decision_v10(dep, &trust_store)?;
+        if enforce_lane_policy && lane == "locked_v071" && dep.source != "builtin" {
+            if decision == "unsigned-unverified" {
+                return Err(SdkError::SupplyInvalid(format!(
+                    "V-DEPS-SIGN-REQUIRED: non-builtin dependency `{}` is unsigned in lane `locked_v071`. Hint: sign dependency and regenerate deps.lock.v3.",
+                    dep.alias
+                )));
+            }
+            if decision == "signed-untrusted" {
+                return Err(SdkError::SupplyInvalid(format!(
+                    "V-DEPS-TRUST-REQUIRED: signer for dependency `{}` is not trusted in lane `locked_v071`. Hint: add signer key to trust.toml under [trusted_signers] or [trusted_signers.{}].",
+                    dep.alias, dep.source
+                )));
+            }
+        }
+        decisions.push(decision);
+    }
+
+    Ok(decisions)
+}
+
+fn to_lock_deps_v3_from_manifest_deps(deps: &[ManifestDep]) -> Vec<LockDepV3> {
+    let mut out = Vec::with_capacity(deps.len());
+    for dep in deps {
+        let version = resolve_version_req_deterministic(&dep.version_req);
+        let digest_input = format!("{}@{}|{}", dep.name, version, dep.source);
+        let hash64 = fnv1a64_hex(&digest_input);
+        let content_hash_sha256 = sha256_hex(digest_input.as_bytes());
+        let sign_msg = format!("{}|{}|{}|{}", dep.alias, dep.name, version, dep.source);
+        let (signature_b64, signer_pub_b64, trust_decision) = if dep.source == "builtin" {
+            (
+                "".to_string(),
+                "".to_string(),
+                "builtin-unsigned".to_string(),
+            )
+        } else {
+            let (sig, pub_key) = deterministic_sign("dep-lock-v3", sign_msg.as_bytes());
+            (sig, pub_key, "signed-unverified".to_string())
+        };
+        out.push(LockDepV3 {
+            alias: dep.alias.clone(),
+            name: dep.name.clone(),
+            version,
+            source: dep.source.clone(),
+            hash64,
+            content_hash_sha256,
+            signature_b64,
+            signer_pub_b64,
+            trust_decision,
+            requested_permissions_hash: empty_requested_permissions_hash(),
+            dependencies: Vec::new(),
+        });
+    }
+    out.sort_by(|a, b| {
+        a.alias
+            .cmp(&b.alias)
+            .then(a.name.cmp(&b.name))
+            .then(a.version.cmp(&b.version))
+            .then(a.source.cmp(&b.source))
+    });
+    out
+}
+
+fn to_lock_deps_v3_from_v2(lock_v2: &[LockDepV2]) -> Vec<LockDepV3> {
+    let mut out = Vec::with_capacity(lock_v2.len());
+    for dep in lock_v2 {
+        let source = if is_builtin_dep(&dep.name) {
+            "builtin".to_string()
+        } else {
+            "registry".to_string()
+        };
+        let trust_decision = if source == "builtin" {
+            "builtin-unsigned".to_string()
+        } else if dep.signature_b64.is_empty() || dep.signer_pub_b64.is_empty() {
+            "unsigned-unverified".to_string()
+        } else {
+            "signed-unverified".to_string()
+        };
+        let digest_input = format!("{}@{}|{}", dep.name, dep.version, source);
+        out.push(LockDepV3 {
+            alias: dep.name.clone(),
+            name: dep.name.clone(),
+            version: dep.version.clone(),
+            source,
+            hash64: dep.hash64.clone(),
+            content_hash_sha256: sha256_hex(digest_input.as_bytes()),
+            signature_b64: dep.signature_b64.clone(),
+            signer_pub_b64: dep.signer_pub_b64.clone(),
+            trust_decision,
+            requested_permissions_hash: empty_requested_permissions_hash(),
+            dependencies: Vec::new(),
+        });
+    }
+    out.sort_by(|a, b| {
+        a.alias
+            .cmp(&b.alias)
+            .then(a.name.cmp(&b.name))
+            .then(a.version.cmp(&b.version))
+            .then(a.source.cmp(&b.source))
+    });
+    out
 }
 
 fn deterministic_sign(context: &str, message: &[u8]) -> (String, String) {
@@ -2042,6 +3593,15 @@ fn hash256_hex(input: &[u8]) -> String {
     blake3::hash(input).to_hex().to_string()
 }
 
+fn sha256_hex(input: &[u8]) -> String {
+    let digest = Sha256::digest(input);
+    let mut out = String::with_capacity(digest.len() * 2);
+    for b in digest {
+        out.push_str(&format!("{b:02x}"));
+    }
+    out
+}
+
 fn bytes_to_hex(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len() * 2);
     for b in bytes {
@@ -2069,6 +3629,76 @@ fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, SdkError> {
         i += 2;
     }
     Ok(out)
+}
+
+fn normalize_rel_path_for_hash(path: &Path) -> String {
+    let mut rel = path.to_string_lossy().replace('\\', "/");
+    while let Some(stripped) = rel.strip_prefix("./") {
+        rel = stripped.to_string();
+    }
+    rel
+}
+
+fn is_text_extension(path: &Path) -> bool {
+    let Some(ext) = path.extension().and_then(|v| v.to_str()) else {
+        return false;
+    };
+    matches!(
+        ext.to_ascii_lowercase().as_str(),
+        "ocl" | "md" | "toml" | "json" | "yaml" | "yml" | "txt"
+    )
+}
+
+fn normalize_lf_bytes(bytes: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut idx = 0usize;
+    while idx < bytes.len() {
+        let b = bytes[idx];
+        if b == b'\r' {
+            out.push(b'\n');
+            if idx + 1 < bytes.len() && bytes[idx + 1] == b'\n' {
+                idx += 2;
+            } else {
+                idx += 1;
+            }
+            continue;
+        }
+        out.push(b);
+        idx += 1;
+    }
+    out
+}
+
+fn canonicalize_bytes_for_hash(path: &Path, bytes: &[u8]) -> Vec<u8> {
+    let has_nul = bytes.contains(&0);
+    if has_nul || !is_text_extension(path) {
+        return bytes.to_vec();
+    }
+    normalize_lf_bytes(bytes)
+}
+
+fn compute_content_hash_sha256_from_raw_files(files: &[(String, Vec<u8>)]) -> String {
+    let mut rows = Vec::with_capacity(files.len());
+    for (rel, raw_bytes) in files {
+        let rel_norm = normalize_rel_path_for_hash(Path::new(rel));
+        let canonical = canonicalize_bytes_for_hash(Path::new(&rel_norm), raw_bytes);
+        let file_hash = sha256_hex(&canonical);
+        rows.push(format!(
+            "file={rel_norm}|len={}|sha256={file_hash}",
+            canonical.len()
+        ));
+    }
+    rows.sort();
+    let canonical_listing = rows.join("\n");
+    sha256_hex(canonical_listing.as_bytes())
+}
+
+fn decode_packaged_files(files: &[(String, String)]) -> Result<Vec<(String, Vec<u8>)>, SdkError> {
+    let mut decoded = Vec::with_capacity(files.len());
+    for (rel, content_hex) in files {
+        decoded.push((rel.clone(), hex_to_bytes(content_hex)?));
+    }
+    Ok(decoded)
 }
 
 fn to_lock_deps_v2(lock_deps: &[LockDep]) -> Vec<LockDepV2> {
@@ -2167,6 +3797,266 @@ fn verify_lock_v2_signatures(lock_deps_v2: &[LockDepV2]) -> Result<(), SdkError>
     Ok(())
 }
 
+fn encode_lock_v3(lock_deps: &[LockDepV3]) -> String {
+    let mut out = String::from("version=3\nhasher_version=sha256-v1\n");
+    for dep in lock_deps {
+        let mut deps = dep.dependencies.clone();
+        deps.sort();
+        deps.dedup();
+        let deps_joined = deps.join(",");
+
+        out.push_str("dep=");
+        out.push_str(&dep.alias);
+        out.push('|');
+        out.push_str(&dep.name);
+        out.push('|');
+        out.push_str(&dep.version);
+        out.push('|');
+        out.push_str(&dep.source);
+        out.push('|');
+        out.push_str(&dep.hash64);
+        out.push('|');
+        out.push_str(&dep.content_hash_sha256);
+        out.push('|');
+        out.push_str(&dep.signature_b64);
+        out.push('|');
+        out.push_str(&dep.signer_pub_b64);
+        out.push('|');
+        out.push_str(&dep.trust_decision);
+        out.push('|');
+        out.push_str(&dep.requested_permissions_hash);
+        out.push('|');
+        out.push_str(&deps_joined);
+        out.push('\n');
+    }
+    out
+}
+
+fn parse_lock_v3(text: &str) -> Result<Vec<LockDepV3>, SdkError> {
+    let mut has_version = false;
+    let mut has_hasher = false;
+    let mut deps = Vec::new();
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line == "version=3" {
+            has_version = true;
+            continue;
+        }
+        if line == "hasher_version=sha256-v1" {
+            has_hasher = true;
+            continue;
+        }
+        let Some(payload) = line.strip_prefix("dep=") else {
+            return Err(SdkError::SupplyInvalid(
+                "invalid deps.lock.v3 line, expected `dep=...`".to_string(),
+            ));
+        };
+        let parts: Vec<&str> = payload.split('|').collect();
+        if parts.len() != 11 {
+            return Err(SdkError::SupplyInvalid(
+                "invalid dep entry in deps.lock.v3 (expected 11 fields)".to_string(),
+            ));
+        }
+        let mut dependency_list = if parts[10].trim().is_empty() {
+            Vec::new()
+        } else {
+            parts[10]
+                .split(',')
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .collect::<Vec<String>>()
+        };
+        dependency_list.sort();
+        dependency_list.dedup();
+
+        deps.push(LockDepV3 {
+            alias: parts[0].to_string(),
+            name: parts[1].to_string(),
+            version: parts[2].to_string(),
+            source: parts[3].to_string(),
+            hash64: parts[4].to_string(),
+            content_hash_sha256: parts[5].to_string(),
+            signature_b64: parts[6].to_string(),
+            signer_pub_b64: parts[7].to_string(),
+            trust_decision: parts[8].to_string(),
+            requested_permissions_hash: parts[9].to_string(),
+            dependencies: dependency_list,
+        });
+    }
+    if !has_version {
+        return Err(SdkError::SupplyInvalid(
+            "deps.lock.v3 missing `version=3` header".to_string(),
+        ));
+    }
+    if !has_hasher {
+        return Err(SdkError::SupplyInvalid(
+            "deps.lock.v3 missing `hasher_version=sha256-v1` header".to_string(),
+        ));
+    }
+    deps.sort_by(|a, b| {
+        a.alias
+            .cmp(&b.alias)
+            .then(a.name.cmp(&b.name))
+            .then(a.version.cmp(&b.version))
+            .then(a.source.cmp(&b.source))
+    });
+    Ok(deps)
+}
+
+fn encode_ocl_lock_export_v3(lock_hash: &str, lock_deps: &[LockDepV3]) -> String {
+    let mut out = String::from("version=1\nsource=deps.lock.v3\n");
+    out.push_str("lock_hash=");
+    out.push_str(lock_hash);
+    out.push('\n');
+    for dep in lock_deps {
+        out.push_str("dep=");
+        out.push_str(&dep.alias);
+        out.push('|');
+        out.push_str(&dep.name);
+        out.push('|');
+        out.push_str(&dep.version);
+        out.push('|');
+        out.push_str(&dep.source);
+        out.push('|');
+        out.push_str(&dep.content_hash_sha256);
+        out.push('|');
+        out.push_str(&dep.trust_decision);
+        out.push('\n');
+    }
+    out
+}
+
+fn expected_lock_v3_from_layout(layout: &ProjectLayout) -> Result<Vec<LockDepV3>, SdkError> {
+    let manifest = fs::read_to_string(&layout.manifest)?;
+    let deps = parse_manifest_dependencies(&manifest)?;
+    Ok(to_lock_deps_v3_from_manifest_deps(&deps))
+}
+
+fn verify_lock_v3_consistency(layout: &ProjectLayout) -> Result<Vec<LockDepV3>, SdkError> {
+    let expected = expected_lock_v3_from_layout(layout)?;
+    let path = deps_lock_v3_path(layout);
+    if !path.exists() {
+        return Err(SdkError::LockMismatch(format!(
+            "missing deps.lock.v3: {} (run `ocl deps resolve <project_dir>`)",
+            path.display()
+        )));
+    }
+    let raw = fs::read_to_string(&path)?;
+    let current = parse_lock_v3(&raw)?;
+    if current != expected {
+        return Err(SdkError::LockMismatch(
+            "deps.lock.v3 mismatch with Ocl.toml dependencies (run `ocl deps resolve <project_dir>`)"
+                .to_string(),
+        ));
+    }
+    Ok(current)
+}
+
+fn load_lock_v3_or_v2(layout: &ProjectLayout) -> Result<Vec<LockDepV3>, SdkError> {
+    let lock_v3 = deps_lock_v3_path(layout);
+    if lock_v3.exists() {
+        let raw = fs::read_to_string(lock_v3)?;
+        return parse_lock_v3(&raw);
+    }
+    let lock_v2_path = layout.root.join("deps.lock.v2");
+    if lock_v2_path.exists() {
+        let raw = fs::read_to_string(lock_v2_path)?;
+        let lock_v2 = parse_lock_v2(&raw)?;
+        return Ok(to_lock_deps_v3_from_v2(&lock_v2));
+    }
+    Err(SdkError::LockMismatch(
+        "missing deps lock (expected deps.lock.v3 or deps.lock.v2)".to_string(),
+    ))
+}
+
+fn write_lock_v3_and_export(layout: &ProjectLayout) -> Result<(usize, String), SdkError> {
+    let deps_v3 = expected_lock_v3_from_layout(layout)?;
+    let lock_text = encode_lock_v3(&deps_v3);
+    let lock_hash = sha256_hex(lock_text.as_bytes());
+    fs::write(deps_lock_v3_path(layout), lock_text)?;
+    fs::write(
+        ocl_lock_export_path(layout),
+        encode_ocl_lock_export_v3(&lock_hash, &deps_v3),
+    )?;
+    Ok((deps_v3.len(), lock_hash))
+}
+
+pub fn read_resolved_deps_v3(root: &Path) -> Result<Vec<ResolvedDepV3>, SdkError> {
+    let layout = project_layout(root);
+    verify_project_exists(&layout)?;
+    let deps = load_lock_v3_or_v2(&layout)?;
+    Ok(deps
+        .into_iter()
+        .map(|dep| ResolvedDepV3 {
+            alias: dep.alias,
+            name: dep.name,
+            version: dep.version,
+            source: dep.source,
+            hash64: dep.hash64,
+        })
+        .collect())
+}
+
+pub fn resolve_deps_v3(
+    root: &Path,
+    write_legacy_lock_v2: bool,
+) -> Result<DepResolveSummaryV3, SdkError> {
+    let layout = project_layout(root);
+    verify_project_exists(&layout)?;
+    let (deps_resolved, lock_hash) = write_lock_v3_and_export(&layout)?;
+    if write_legacy_lock_v2 {
+        let expected = read_expected_lock(&layout)?;
+        let lock_v2 = to_lock_deps_v2(&expected);
+        fs::write(layout.root.join("deps.lock.v2"), encode_lock_v2(&lock_v2))?;
+    }
+    Ok(DepResolveSummaryV3 {
+        deps_resolved,
+        lock_hash,
+        lock_v3_path: deps_lock_v3_path(&layout),
+        ocl_lock_path: ocl_lock_export_path(&layout),
+        wrote_legacy_lock_v2: write_legacy_lock_v2,
+    })
+}
+
+pub fn verify_deps_lock_v3(root: &Path) -> Result<(), SdkError> {
+    let layout = project_layout(root);
+    verify_project_exists(&layout)?;
+    let _ = verify_lock_v3_consistency(&layout)?;
+    Ok(())
+}
+
+pub fn verify_deps_signing_and_trust_v10(
+    root: &Path,
+    enforce_lane_policy: bool,
+) -> Result<(), SdkError> {
+    let layout = project_layout(root);
+    verify_project_exists(&layout)?;
+    let deps = load_lock_v3_or_v2(&layout)?;
+    let _ = evaluate_lock_v3_decisions_v10(&layout, &deps, enforce_lane_policy)?;
+    Ok(())
+}
+
+pub fn collect_deps_resolved_trace_events_v10(root: &Path) -> Result<Vec<TraceEventV1>, SdkError> {
+    let layout = project_layout(root);
+    verify_project_exists(&layout)?;
+    let callsite_package_id = project_package_id_v10(&layout)?;
+    let mut seq = 1u64;
+    let mut events = Vec::new();
+    append_deps_resolved_trace_events_v10(
+        "deps_resolved_audit",
+        TRACE_UNIVERSE_SENTINEL,
+        TRACE_DOMAIN_SENTINEL,
+        Some(&callsite_package_id),
+        &layout,
+        &mut seq,
+        &mut events,
+    )?;
+    Ok(events)
+}
+
 pub fn sync_deps_lock_v1(root: &Path) -> Result<LockSyncSummary, SdkError> {
     let layout = project_layout(root);
     verify_project_exists(&layout)?;
@@ -2214,13 +4104,62 @@ fn gather_project_ocl_files(layout: &ProjectLayout) -> Result<Vec<PathBuf>, SdkE
     Ok(files)
 }
 
+fn collect_all_files(base: &Path, out: &mut Vec<PathBuf>) -> Result<(), SdkError> {
+    if !base.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(base)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_all_files(&path, out)?;
+        } else if path.is_file() {
+            out.push(path);
+        }
+    }
+    Ok(())
+}
+
+fn gather_package_files_v10(
+    layout: &ProjectLayout,
+    entry_rel: &str,
+) -> Result<Vec<PathBuf>, SdkError> {
+    let mut files = Vec::new();
+    collect_all_files(&layout.root.join("src"), &mut files)?;
+    collect_all_files(&layout.root.join("assets"), &mut files)?;
+    collect_all_files(&layout.root.join("docs"), &mut files)?;
+    collect_all_files(&layout.tests_dir, &mut files)?;
+
+    let entry_path = layout.root.join(entry_rel);
+    if !entry_path.exists() || !entry_path.is_file() {
+        return Err(SdkError::MissingProject(format!(
+            "package entry file not found: {}",
+            entry_path.display()
+        )));
+    }
+    if !files.iter().any(|p| p == &entry_path) {
+        files.push(entry_path);
+    }
+
+    files.sort();
+    files.dedup();
+    Ok(files)
+}
+
 fn verify_permissions_for_file(
     file_path: &Path,
     file_id: u32,
     permissions: &ProjectPermissions,
+    callsite_package_id: Option<&str>,
 ) -> Result<(), SdkError> {
     let source = fs::read_to_string(file_path)?;
-    verify_permissions_for_source(&source, file_id, file_path, permissions)
+    verify_permissions_for_source(
+        &source,
+        file_id,
+        file_path,
+        permissions,
+        callsite_package_id,
+    )
 }
 
 fn enforce_locked_plugin_contract(layout: &ProjectLayout, locked: bool) -> Result<(), SdkError> {
@@ -2297,6 +4236,7 @@ pub fn check_project_with_lock(root: &Path, locked: bool) -> Result<CheckSummary
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    verify_permissions_with_provenance_v10(root, &layout, &permissions)?;
     let language_cfg = load_project_language_config_for_layout(&layout)?;
     let compat = language_cfg.typecheck_compat();
     let files = gather_project_ocl_files(&layout)?;
@@ -2306,7 +4246,7 @@ pub fn check_project_with_lock(root: &Path, locked: bool) -> Result<CheckSummary
         ));
     }
     for (idx, path) in files.iter().enumerate() {
-        verify_permissions_for_file(path, idx as u32 + 1, &permissions)?;
+        verify_permissions_for_file(path, idx as u32 + 1, &permissions, None)?;
         check_file_with_compat(path, idx as u32 + 1, compat)?;
     }
     Ok(CheckSummary {
@@ -2339,9 +4279,9 @@ pub fn run_project_with_engine_and_lock(
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    verify_permissions_with_provenance_v10(root, &layout, &permissions)?;
     let language_cfg = load_project_language_config_for_layout(&layout)?;
     let compat = language_cfg.typecheck_compat();
-    verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
     let config = default_exec_config_for_layout(&layout)?;
     let out =
         run_file_with_engine_config_and_compat(&layout.src_main, 1, config, run_engine, compat)?;
@@ -2615,10 +4555,10 @@ pub fn run_reactor_service_with_lock(
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    verify_permissions_with_provenance_v10(root, &layout, &permissions)?;
     let language_cfg = load_project_language_config_for_layout(&layout)?;
     let compat = language_cfg.typecheck_compat();
     let exec_config = default_exec_config_for_layout(&layout)?;
-    verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
 
     let source = fs::read_to_string(&layout.src_main)?;
     if !source.contains("on_event") {
@@ -3051,7 +4991,7 @@ pub fn test_project_with_lock(root: &Path, locked: bool) -> Result<TestSummary, 
     collect_ocl_files(&layout.tests_dir, &mut tests)?;
     tests.sort();
     for (idx, test_file) in tests.iter().enumerate() {
-        verify_permissions_for_file(test_file, idx as u32 + 100, &permissions)?;
+        verify_permissions_for_file(test_file, idx as u32 + 100, &permissions, None)?;
         run_file_with_engine_config_and_compat(
             test_file,
             idx as u32 + 100,
@@ -3103,6 +5043,8 @@ pub fn build_project_with_lock(root: &Path, locked: bool) -> Result<BuildSummary
     verify_project_exists(&layout)?;
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
+    let permissions = load_permissions_for_layout(&layout, locked)?;
+    verify_permissions_with_provenance_v10(root, &layout, &permissions)?;
     let lock_deps = if locked {
         verify_lock_consistency(&layout)?
     } else {
@@ -3196,12 +5138,91 @@ fn parse_package_name_version(manifest: &str) -> Result<(String, String), SdkErr
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct PackageManifestV10 {
+    name: String,
+    version: String,
+    entry: String,
+}
+
+fn parse_package_manifest_v10(raw: &str) -> Result<PackageManifestV10, SdkError> {
+    let mut in_package = false;
+    let mut name = None::<String>;
+    let mut version = None::<String>;
+    let mut entry = None::<String>;
+
+    for line_raw in raw.lines() {
+        let line = line_raw.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            in_package = line == "[package]";
+            continue;
+        }
+        if !in_package {
+            continue;
+        }
+        let Some((k, v)) = line.split_once('=') else {
+            continue;
+        };
+        let key = k.trim();
+        let value = v.trim().trim_matches('"').to_string();
+        match key {
+            "name" => name = Some(value),
+            "version" => version = Some(value),
+            "entry" => entry = Some(value),
+            _ => {}
+        }
+    }
+
+    let Some(name) = name else {
+        return Err(SdkError::MissingProject(
+            "package.oclp missing [package].name".to_string(),
+        ));
+    };
+    let Some(version) = version else {
+        return Err(SdkError::MissingProject(
+            "package.oclp missing [package].version".to_string(),
+        ));
+    };
+    let entry = entry.unwrap_or_else(|| "src/main.ocl".to_string());
+    if entry.trim().is_empty() {
+        return Err(SdkError::MissingProject(
+            "package.oclp has empty [package].entry".to_string(),
+        ));
+    }
+
+    Ok(PackageManifestV10 {
+        name,
+        version,
+        entry,
+    })
+}
+
+fn load_package_manifest_v10(layout: &ProjectLayout) -> Result<PackageManifestV10, SdkError> {
+    let package_oclp = layout.root.join("package.oclp");
+    if package_oclp.exists() {
+        let raw = fs::read_to_string(&package_oclp)?;
+        return parse_package_manifest_v10(&raw);
+    }
+
+    let manifest = fs::read_to_string(&layout.manifest)?;
+    let (name, version) = parse_package_name_version(&manifest)?;
+    Ok(PackageManifestV10 {
+        name,
+        version,
+        entry: "src/main.ocl".to_string(),
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ParsedOclPkg {
     package_name: String,
     version: String,
     entry: String,
     payload: String,
     payload_hash_blake3: String,
+    content_hash_sha256: Option<String>,
     signature_ed25519_b64: String,
     signer_pub_ed25519_b64: String,
     files: Vec<(String, String)>,
@@ -3219,22 +5240,39 @@ fn parse_oclpkg(path: &Path) -> Result<ParsedOclPkg, SdkError> {
             "missing payload hash line".to_string(),
         ));
     };
-    let Some(sig_line) = lines.next() else {
-        return Err(SdkError::SupplyInvalid(
-            "missing signature line".to_string(),
-        ));
-    };
-    let Some(pub_line) = lines.next() else {
-        return Err(SdkError::SupplyInvalid(
-            "missing signer public key line".to_string(),
-        ));
-    };
-
     let Some(payload_hash_blake3) = hash_line.strip_prefix("payload_hash_blake3=") else {
         return Err(SdkError::SupplyInvalid(
             "invalid payload hash line".to_string(),
         ));
     };
+    let Some(third_line) = lines.next() else {
+        return Err(SdkError::SupplyInvalid(
+            "missing signature line".to_string(),
+        ));
+    };
+    let mut content_hash_sha256 = None::<String>;
+    let (sig_line, pub_line) = if let Some(v) = third_line.strip_prefix("content_hash_sha256=") {
+        content_hash_sha256 = Some(v.to_string());
+        let Some(sig_line) = lines.next() else {
+            return Err(SdkError::SupplyInvalid(
+                "missing signature line".to_string(),
+            ));
+        };
+        let Some(pub_line) = lines.next() else {
+            return Err(SdkError::SupplyInvalid(
+                "missing signer public key line".to_string(),
+            ));
+        };
+        (sig_line, pub_line)
+    } else {
+        let Some(pub_line) = lines.next() else {
+            return Err(SdkError::SupplyInvalid(
+                "missing signer public key line".to_string(),
+            ));
+        };
+        (third_line, pub_line)
+    };
+
     let Some(signature_ed25519_b64) = sig_line.strip_prefix("signature_ed25519=") else {
         return Err(SdkError::SupplyInvalid(
             "invalid signature line".to_string(),
@@ -3302,6 +5340,7 @@ fn parse_oclpkg(path: &Path) -> Result<ParsedOclPkg, SdkError> {
         entry,
         payload,
         payload_hash_blake3: payload_hash_blake3.to_string(),
+        content_hash_sha256,
         signature_ed25519_b64: signature_ed25519_b64.to_string(),
         signer_pub_ed25519_b64: signer_pub_ed25519_b64.to_string(),
         files,
@@ -3323,11 +5362,62 @@ pub fn verify_supply_artifact(path: &Path) -> Result<SupplyVerifySummary, SdkErr
         &parsed.signature_ed25519_b64,
         &parsed.signer_pub_ed25519_b64,
     )?;
+    if let Some(expected_content_hash) = parsed.content_hash_sha256.as_ref() {
+        let decoded_files = decode_packaged_files(&parsed.files)?;
+        let got_content_hash = compute_content_hash_sha256_from_raw_files(&decoded_files);
+        if got_content_hash != *expected_content_hash {
+            return Err(SdkError::SupplyInvalid(format!(
+                "content hash mismatch: expected {} got {}",
+                expected_content_hash, got_content_hash
+            )));
+        }
+    }
     verify_lock_v2_signatures(&parsed.deps)?;
     Ok(SupplyVerifySummary {
         valid: true,
         package_name: parsed.package_name,
         payload_hash_blake3: parsed.payload_hash_blake3,
+        content_hash_sha256: parsed.content_hash_sha256,
+    })
+}
+
+pub fn sign_oclpkg(path: &Path) -> Result<SignOclPkgSummary, SdkError> {
+    let parsed = parse_oclpkg(path)?;
+    let payload_hash = hash256_hex(parsed.payload.as_bytes());
+    if payload_hash != parsed.payload_hash_blake3 {
+        return Err(SdkError::SupplyInvalid(format!(
+            "payload hash mismatch: expected {} got {}",
+            parsed.payload_hash_blake3, payload_hash
+        )));
+    }
+
+    let (signature_ed25519_b64, signer_pub_ed25519_b64) =
+        deterministic_sign("artifact-v1", payload_hash.as_bytes());
+
+    let mut oclpkg = String::new();
+    oclpkg.push_str("OCLPKGv1\n");
+    oclpkg.push_str("payload_hash_blake3=");
+    oclpkg.push_str(&parsed.payload_hash_blake3);
+    oclpkg.push('\n');
+    if let Some(content_hash_sha256) = parsed.content_hash_sha256.as_ref() {
+        oclpkg.push_str("content_hash_sha256=");
+        oclpkg.push_str(content_hash_sha256);
+        oclpkg.push('\n');
+    }
+    oclpkg.push_str("signature_ed25519=");
+    oclpkg.push_str(&signature_ed25519_b64);
+    oclpkg.push('\n');
+    oclpkg.push_str("signer_pub_ed25519=");
+    oclpkg.push_str(&signer_pub_ed25519_b64);
+    oclpkg.push('\n');
+    oclpkg.push_str(&parsed.payload);
+    fs::write(path, oclpkg)?;
+
+    Ok(SignOclPkgSummary {
+        artifact_path: path.to_path_buf(),
+        package_name: parsed.package_name,
+        payload_hash_blake3: parsed.payload_hash_blake3,
+        signer_pub_ed25519_b64,
     })
 }
 
@@ -3358,9 +5448,11 @@ pub fn build_oclpkg_with_lock(root: &Path, locked: bool) -> Result<BuildOclPkgSu
         verify_lock_v2_signatures(&lock_v2)?;
     }
 
-    let manifest = fs::read_to_string(&layout.manifest)?;
-    let (package_name, version) = parse_package_name_version(&manifest)?;
-    let files = gather_project_ocl_files(&layout)?;
+    let package_manifest = load_package_manifest_v10(&layout)?;
+    let package_name = package_manifest.name.clone();
+    let version = package_manifest.version.clone();
+    let entry_rel = normalize_rel_path_for_hash(Path::new(&package_manifest.entry));
+    let files = gather_package_files_v10(&layout, &entry_rel)?;
 
     let mut payload = String::new();
     payload.push_str("name=");
@@ -3369,18 +5461,22 @@ pub fn build_oclpkg_with_lock(root: &Path, locked: bool) -> Result<BuildOclPkgSu
     payload.push_str("version=");
     payload.push_str(&version);
     payload.push('\n');
-    payload.push_str("entry=src/main.ocl\n");
+    payload.push_str("entry=");
+    payload.push_str(&entry_rel);
+    payload.push('\n');
     payload.push_str("files=");
     payload.push_str(&files.len().to_string());
     payload.push('\n');
 
+    let mut raw_files_for_hash = Vec::with_capacity(files.len());
     for file in &files {
         let rel = file
             .strip_prefix(&layout.root)
             .map_err(|_| SdkError::MissingProject("invalid project path layout".to_string()))?;
-        let rel_text = rel.to_string_lossy().replace('\\', "/");
+        let rel_text = normalize_rel_path_for_hash(rel);
         let content = fs::read(file)?;
         let content_b64 = bytes_to_hex(&content);
+        raw_files_for_hash.push((rel_text.clone(), content));
         payload.push_str("file=");
         payload.push_str(&rel_text);
         payload.push('|');
@@ -3405,6 +5501,7 @@ pub fn build_oclpkg_with_lock(root: &Path, locked: bool) -> Result<BuildOclPkgSu
         payload.push('\n');
     }
 
+    let content_hash_sha256 = compute_content_hash_sha256_from_raw_files(&raw_files_for_hash);
     let payload_hash_blake3 = hash256_hex(payload.as_bytes());
     let (signature_ed25519_b64, signer_pub_ed25519_b64) =
         deterministic_sign("artifact-v1", payload_hash_blake3.as_bytes());
@@ -3413,6 +5510,9 @@ pub fn build_oclpkg_with_lock(root: &Path, locked: bool) -> Result<BuildOclPkgSu
     oclpkg.push_str("OCLPKGv1\n");
     oclpkg.push_str("payload_hash_blake3=");
     oclpkg.push_str(&payload_hash_blake3);
+    oclpkg.push('\n');
+    oclpkg.push_str("content_hash_sha256=");
+    oclpkg.push_str(&content_hash_sha256);
     oclpkg.push('\n');
     oclpkg.push_str("signature_ed25519=");
     oclpkg.push_str(&signature_ed25519_b64);
@@ -3429,8 +5529,9 @@ pub fn build_oclpkg_with_lock(root: &Path, locked: bool) -> Result<BuildOclPkgSu
 
     Ok(BuildOclPkgSummary {
         artifact_path,
-        files_bundled: build.files_bundled,
+        files_bundled: files.len().max(build.files_bundled),
         payload_hash_blake3,
+        content_hash_sha256,
     })
 }
 
@@ -3663,15 +5764,16 @@ pub fn run_project_with_trace_engine_config_and_lock(
 ) -> Result<TraceRunSummary, SdkError> {
     let layout = project_layout(root);
     verify_project_exists(&layout)?;
+    let callsite_package_id = project_package_id_v10(&layout)?;
     if locked {
         verify_lock_consistency(&layout)?;
     }
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    verify_permissions_with_provenance_v10(root, &layout, &permissions)?;
     let language_cfg = load_project_language_config_for_layout(&layout)?;
     let compat = language_cfg.typecheck_compat();
-    verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
     let mut runtime_config = config;
     runtime_config.guard_mode = language_cfg.guard_mode;
 
@@ -3685,10 +5787,22 @@ pub fn run_project_with_trace_engine_config_and_lock(
     let run_id = build_run_id_deterministic("project", root, run_engine, None, None);
     let mut seq = 1u64;
     let mut events = Vec::new();
+    if locked {
+        append_deps_resolved_trace_events_v10(
+            &run_id,
+            TRACE_UNIVERSE_SENTINEL,
+            TRACE_DOMAIN_SENTINEL,
+            Some(&callsite_package_id),
+            &layout,
+            &mut seq,
+            &mut events,
+        )?;
+    }
     append_trace_events(
         &run_id,
         TRACE_UNIVERSE_SENTINEL,
         TRACE_DOMAIN_SENTINEL,
+        Some(&callsite_package_id),
         &mut seq,
         &out.trace.events,
         &mut events,
@@ -3728,15 +5842,16 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
 ) -> Result<TraceRunSummary, SdkError> {
     let layout = project_layout(root);
     verify_project_exists(&layout)?;
+    let callsite_package_id = project_package_id_v10(&layout)?;
     if locked {
         verify_lock_consistency(&layout)?;
     }
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    verify_permissions_with_provenance_v10(root, &layout, &permissions)?;
     let language_cfg = load_project_language_config_for_layout(&layout)?;
     let compat = language_cfg.typecheck_compat();
-    verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
     let mut runtime_config = config;
     runtime_config.guard_mode = language_cfg.guard_mode;
 
@@ -3779,6 +5894,17 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
     );
     let mut seq = 1u64;
     let mut events = Vec::new();
+    if locked {
+        append_deps_resolved_trace_events_v10(
+            &run_id,
+            TRACE_UNIVERSE_SENTINEL,
+            TRACE_DOMAIN_SENTINEL,
+            Some(&callsite_package_id),
+            &layout,
+            &mut seq,
+            &mut events,
+        )?;
+    }
     let mut total_steps = 0u32;
     let io_tape_replay_entries = match &options.io_tape_replay_path {
         Some(path) => Some(read_reactor_io_tape(path)?),
@@ -3832,6 +5958,7 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
                         &run_id,
                         &plan.universe_id,
                         domain_id,
+                        Some(&callsite_package_id),
                         &mut seq,
                         &out.trace.events,
                         &mut events,
@@ -3857,6 +5984,7 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
                         &run_id,
                         &plan.universe_id,
                         domain_id,
+                        Some(&callsite_package_id),
                         &mut seq,
                         &out.trace.events,
                         &mut events,
@@ -4256,16 +6384,83 @@ pub fn render_profile_view(report: &ProfileReportV1, options: ProfileViewOptions
     out
 }
 
+fn append_deps_resolved_trace_events_v10(
+    run_id: &str,
+    universe_id: &str,
+    domain_id: &str,
+    callsite_package_id: Option<&str>,
+    layout: &ProjectLayout,
+    seq: &mut u64,
+    out: &mut Vec<TraceEventV1>,
+) -> Result<(), SdkError> {
+    let lock_v3_path = deps_lock_v3_path(layout);
+    if !lock_v3_path.exists() {
+        return Ok(());
+    }
+
+    let raw_lock = fs::read_to_string(&lock_v3_path)?;
+    let deps = parse_lock_v3(&raw_lock)?;
+    let decisions = evaluate_lock_v3_decisions_v10(layout, &deps, false)?;
+    let lock_hash = sha256_hex(raw_lock.as_bytes());
+    let callsite = callsite_package_id.map(|v| v.to_string());
+
+    for (idx, dep) in deps.iter().enumerate() {
+        let decision = decisions
+            .get(idx)
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_string());
+        let payload = format!(
+            "DepsResolved|lock_hash={}|alias={}|name={}|version={}|source={}|content_hash_sha256={}|signature_b64={}|signer_pub_b64={}|trust_decision={}",
+            lock_hash,
+            dep.alias,
+            dep.name,
+            dep.version,
+            dep.source,
+            dep.content_hash_sha256,
+            dep.signature_b64,
+            dep.signer_pub_b64,
+            decision
+        );
+        out.push(TraceEventV1 {
+            seq: *seq,
+            run_id: run_id.to_string(),
+            event: "deps_resolved".to_string(),
+            key: Some(format!("{}@{}|{}", dep.alias, dep.version, dep.source)),
+            callsite_package_id: callsite.clone(),
+            kind: None,
+            reason: Some(decision.clone()),
+            origin_id: None,
+            allowed: Some(decision == "signed-trusted" || dep.source == "builtin"),
+            value: None,
+            steps: Some((idx as u32).saturating_add(1)),
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload_hash: fnv1a64_hex(&payload),
+        });
+        *seq = seq.saturating_add(1);
+    }
+
+    Ok(())
+}
+
 fn append_trace_events(
     run_id: &str,
     universe_id: &str,
     domain_id: &str,
+    callsite_package_id: Option<&str>,
     seq: &mut u64,
     input: &[TraceEvent],
     out: &mut Vec<TraceEventV1>,
 ) {
     for event in input {
-        let mapped = map_trace_event(*seq, run_id, universe_id, domain_id, event);
+        let mapped = map_trace_event(
+            *seq,
+            run_id,
+            universe_id,
+            domain_id,
+            callsite_package_id,
+            event,
+        );
         out.push(mapped);
         *seq = seq.saturating_add(1);
     }
@@ -4276,15 +6471,18 @@ fn map_trace_event(
     run_id: &str,
     universe_id: &str,
     domain_id: &str,
+    callsite_package_id: Option<&str>,
     event: &TraceEvent,
 ) -> TraceEventV1 {
     let payload_hash = fnv1a64_hex(&canonical_trace_event_payload(event));
+    let callsite = callsite_package_id.map(|v| v.to_string());
     match event {
         TraceEvent::ObserveStart { key, .. } => TraceEventV1 {
             seq,
             run_id: run_id.to_string(),
             event: "observe_start".to_string(),
             key: Some(key.clone()),
+            callsite_package_id: callsite.clone(),
             kind: None,
             reason: None,
             origin_id: None,
@@ -4305,6 +6503,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "observe_end".to_string(),
             key: Some(key.clone()),
+            callsite_package_id: callsite.clone(),
             kind: Some(result_kind_label(*kind)),
             reason: reason.map(|r| r.as_str().to_string()),
             origin_id: Some(*origin_id),
@@ -4326,6 +6525,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "wallclock_observe".to_string(),
             key: Some(key.clone()),
+            callsite_package_id: callsite.clone(),
             kind: Some(result_kind_label(*kind)),
             reason: reason.map(|r| r.as_str().to_string()),
             origin_id: None,
@@ -4348,6 +6548,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "proc_observe".to_string(),
             key: Some(key.clone()),
+            callsite_package_id: callsite.clone(),
             kind: Some(result_kind_label(*kind)),
             reason: reason.map(|r| r.as_str().to_string()),
             origin_id: None,
@@ -4372,6 +6573,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "net_http_observe".to_string(),
             key: Some(format!("{key}:{method}:{host}")),
+            callsite_package_id: callsite.clone(),
             kind: Some(result_kind_label(*kind)),
             reason: reason.map(|r| r.as_str().to_string()),
             origin_id: None,
@@ -4394,6 +6596,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "ui_observe".to_string(),
             key: Some(key.clone()),
+            callsite_package_id: callsite.clone(),
             kind: Some(result_kind_label(*kind)),
             reason: reason.map(|r| r.as_str().to_string()),
             origin_id: None,
@@ -4416,6 +6619,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "game_observe".to_string(),
             key: Some(format!("{key}:{stream}:{tick}")),
+            callsite_package_id: callsite.clone(),
             kind: Some(result_kind_label(*kind)),
             reason: reason.map(|r| r.as_str().to_string()),
             origin_id: None,
@@ -4438,6 +6642,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "shadow_run".to_string(),
             key: Some(format!("{key}:{detail}")),
+            callsite_package_id: callsite.clone(),
             kind: Some(result_kind_label(*kind)),
             reason: reason.map(|r| r.as_str().to_string()),
             origin_id: None,
@@ -4460,6 +6665,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "shadow_compare".to_string(),
             key: Some(format!("{key}:{report_bytes}")),
+            callsite_package_id: callsite.clone(),
             kind: Some(result_kind_label(*kind)),
             reason: reason.map(|r| r.as_str().to_string()),
             origin_id: None,
@@ -4475,6 +6681,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "match_arm_selected".to_string(),
             key: None,
+            callsite_package_id: callsite.clone(),
             kind: Some(result_kind_label(*arm)),
             reason: None,
             origin_id: None,
@@ -4490,6 +6697,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "commit_attempt".to_string(),
             key: None,
+            callsite_package_id: callsite.clone(),
             kind: kind.as_ref().copied().map(result_kind_label),
             reason: None,
             origin_id: *origin_id,
@@ -4505,6 +6713,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "commit_result".to_string(),
             key: None,
+            callsite_package_id: callsite.clone(),
             kind: None,
             reason: reason.map(|r| r.as_str().to_string()),
             origin_id: None,
@@ -4526,6 +6735,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "ui_commit".to_string(),
             key: Some(key.clone()),
+            callsite_package_id: callsite.clone(),
             kind: Some(result_kind_label(*kind)),
             reason: reason.map(|r| r.as_str().to_string()),
             origin_id: None,
@@ -4547,6 +6757,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "game_commit".to_string(),
             key: Some(format!("{key}:{idempotency_hash}")),
+            callsite_package_id: callsite.clone(),
             kind: Some(result_kind_label(*kind)),
             reason: reason.map(|r| r.as_str().to_string()),
             origin_id: None,
@@ -4562,6 +6773,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "condition_check".to_string(),
             key: None,
+            callsite_package_id: callsite.clone(),
             kind: None,
             reason: None,
             origin_id: None,
@@ -4580,6 +6792,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "loop_iter".to_string(),
             key: Some(loop_kind.clone()),
+            callsite_package_id: callsite.clone(),
             kind: None,
             reason: None,
             origin_id: None,
@@ -4595,6 +6808,7 @@ fn map_trace_event(
             run_id: run_id.to_string(),
             event: "program_end".to_string(),
             key: None,
+            callsite_package_id: callsite.clone(),
             kind: None,
             reason: None,
             origin_id: None,
@@ -4786,11 +7000,12 @@ fn result_kind_label(kind: ocl_runtime_core::ResultKind) -> String {
 
 fn encode_trace_line(event: &TraceEventV1) -> String {
     format!(
-        "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+        "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
         event.seq,
         event.run_id,
         event.event,
         encode_opt_str(event.key.as_deref()),
+        encode_opt_str(event.callsite_package_id.as_deref()),
         encode_opt_str(event.kind.as_deref()),
         encode_opt_str(event.reason.as_deref()),
         encode_opt_u64(event.origin_id),
@@ -4805,18 +7020,36 @@ fn encode_trace_line(event: &TraceEventV1) -> String {
 
 fn decode_trace_line(line: &str) -> Result<TraceEventV1, SdkError> {
     let parts: Vec<&str> = line.split('|').collect();
-    if parts.len() != 11 && parts.len() != 13 {
+    if parts.len() != 11 && parts.len() != 12 && parts.len() != 13 && parts.len() != 14 {
         return Err(SdkError::MissingProject(
-            "invalid trace row (expected 11 or 13 columns)".to_string(),
+            "invalid trace row (expected 11/12/13/14 columns)".to_string(),
         ));
     }
-    let (universe_id, domain_id, payload_idx) = if parts.len() == 13 {
-        (parts[10].to_string(), parts[11].to_string(), 12usize)
+    let has_callsite = parts.len() == 12 || parts.len() == 14;
+    let has_universe_domain = parts.len() == 13 || parts.len() == 14;
+
+    let key_idx = 3usize;
+    let callsite_idx = if has_callsite { Some(4usize) } else { None };
+    let kind_idx = if has_callsite { 5usize } else { 4usize };
+    let reason_idx = if has_callsite { 6usize } else { 5usize };
+    let origin_idx = if has_callsite { 7usize } else { 6usize };
+    let allowed_idx = if has_callsite { 8usize } else { 7usize };
+    let value_idx = if has_callsite { 9usize } else { 8usize };
+    let steps_idx = if has_callsite { 10usize } else { 9usize };
+    let (universe_id, domain_id, payload_idx) = if has_universe_domain {
+        let universe_idx = if has_callsite { 11usize } else { 10usize };
+        let domain_idx = if has_callsite { 12usize } else { 11usize };
+        let payload_idx = if has_callsite { 13usize } else { 12usize };
+        (
+            parts[universe_idx].to_string(),
+            parts[domain_idx].to_string(),
+            payload_idx,
+        )
     } else {
         (
             TRACE_UNIVERSE_SENTINEL.to_string(),
             TRACE_DOMAIN_SENTINEL.to_string(),
-            10usize,
+            if has_callsite { 11usize } else { 10usize },
         )
     };
     Ok(TraceEventV1 {
@@ -4825,13 +7058,14 @@ fn decode_trace_line(line: &str) -> Result<TraceEventV1, SdkError> {
             .map_err(|_| SdkError::MissingProject("invalid trace seq".to_string()))?,
         run_id: parts[1].to_string(),
         event: parts[2].to_string(),
-        key: decode_opt_str(parts[3]),
-        kind: decode_opt_str(parts[4]),
-        reason: decode_opt_str(parts[5]),
-        origin_id: decode_opt_u64(parts[6])?,
-        allowed: decode_opt_bool(parts[7])?,
-        value: decode_opt_bool(parts[8])?,
-        steps: decode_opt_u32(parts[9])?,
+        key: decode_opt_str(parts[key_idx]),
+        callsite_package_id: callsite_idx.and_then(|idx| decode_opt_str(parts[idx])),
+        kind: decode_opt_str(parts[kind_idx]),
+        reason: decode_opt_str(parts[reason_idx]),
+        origin_id: decode_opt_u64(parts[origin_idx])?,
+        allowed: decode_opt_bool(parts[allowed_idx])?,
+        value: decode_opt_bool(parts[value_idx])?,
+        steps: decode_opt_u32(parts[steps_idx])?,
         universe_id,
         domain_id,
         payload_hash: parts[payload_idx].to_string(),
@@ -4904,7 +7138,7 @@ fn trace_event_to_json(event: &TraceEventV1) -> String {
     format!(
         concat!(
             "{{\"seq\":{},\"run_id\":\"{}\",\"event\":\"{}\",",
-            "\"key\":{},\"kind\":{},\"reason\":{},",
+            "\"key\":{},\"callsite_package_id\":{},\"kind\":{},\"reason\":{},",
             "\"origin_id\":{},\"allowed\":{},\"value\":{},\"steps\":{},",
             "\"universe_id\":\"{}\",\"domain_id\":\"{}\",",
             "\"payload_hash\":\"{}\"}}"
@@ -4913,6 +7147,7 @@ fn trace_event_to_json(event: &TraceEventV1) -> String {
         json_escape(&event.run_id),
         json_escape(&event.event),
         json_opt_str(event.key.as_deref()),
+        json_opt_str(event.callsite_package_id.as_deref()),
         json_opt_str(event.kind.as_deref()),
         json_opt_str(event.reason.as_deref()),
         json_opt_u64(event.origin_id),

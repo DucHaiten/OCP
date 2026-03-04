@@ -230,6 +230,7 @@ dependencies = [
  "blake3",
  "ed25519-dalek",
  "ocl-runtime-core",
+ "sha2",
 ]
 
 [[package]]

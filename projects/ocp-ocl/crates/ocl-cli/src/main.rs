@@ -13,18 +13,18 @@ use ocl_sdk::{
     fetch_artifact, fmt_project, init_cosmos_v1, init_project, install_organs_v1,
     list_kits_from_cosmos_v1, parse_conformance_manifest_v1, parse_shadow_policy_v1,
     publish_artifact, read_profile_json, read_trace_jsonl, render_conformance_report_json,
-    render_profile_view, render_trace_view, resolve_domain_selection_v1, resolve_universe_v1,
-    resolve_view_selection_v1, run_artifact, run_conformance_v1, run_kit_doctor_v1,
-    run_project_with_engine_and_lock, run_project_with_shadow_compare,
+    render_profile_view, render_trace_view, resolve_deps_v3, resolve_domain_selection_v1,
+    resolve_universe_v1, resolve_view_selection_v1, run_artifact, run_conformance_v1,
+    run_kit_doctor_v1, run_project_with_engine_and_lock, run_project_with_shadow_compare,
     run_project_with_trace_engine_and_lock, run_reactor_service_with_lock,
     run_reactor_service_with_shadow_compare, run_reactor_service_with_trace_engine_and_lock,
-    sync_cosmos_lock_v1, sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1,
+    sign_oclpkg, sync_cosmos_lock_v1, sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1,
     sync_policy_lock_v1, test_project_with_lock, trace_required_digest, verify_assembly,
-    verify_organs_lock_v1, verify_plugin_lock_v1, verify_supply_artifact,
-    write_conformance_report_json, write_profile_json, write_shadow_compare_artifacts_v1,
-    write_trace_jsonl, ConformanceRunOptionsV1, InputEnvelopeV1, ProfileViewOptions,
-    ReactorRuntimeMode, ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1,
-    TraceViewOptions,
+    verify_deps_lock_v3, verify_deps_signing_and_trust_v10, verify_organs_lock_v1,
+    verify_plugin_lock_v1, verify_supply_artifact, write_conformance_report_json,
+    write_profile_json, write_shadow_compare_artifacts_v1, write_trace_jsonl,
+    ConformanceRunOptionsV1, InputEnvelopeV1, ProfileViewOptions, ReactorRuntimeMode,
+    ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1, TraceViewOptions,
 };
 use sha2::{Digest, Sha256};
 
@@ -44,7 +44,7 @@ fn run_cli(args: &[String]) -> i32 {
         "init" => {
             let Some(path) = args.get(1) else {
                 eprintln!(
-                    "usage: ocl init <project_dir> [--template tool-cli|tool-http|tool-proc|tool-wallclock|mini-game|shadow-preview] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]"
+                    "usage: ocl init <project_dir> [--template tool-cli|tool-http|tool-proc|tool-wallclock|mini-game|shadow-preview|dep-permission] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]"
                 );
                 return 2;
             };
@@ -1605,18 +1605,220 @@ fn run_cli(args: &[String]) -> i32 {
                 }
             }
         }
+        "deps" => {
+            let Some(scope) = args.get(1).map(String::as_str) else {
+                eprintln!("usage: ocl deps <resolve|update|verify> ...");
+                return 2;
+            };
+            match scope {
+                "resolve" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!("usage: ocl deps resolve <project_dir> [--write-legacy-lock]");
+                        return 2;
+                    };
+                    let write_legacy = args.iter().any(|a| a == "--write-legacy-lock");
+                    match resolve_deps_v3(Path::new(path), write_legacy) {
+                        Ok(summary) => {
+                            println!(
+                                "deps resolve ok (deps_resolved={}, lock_hash={}, lock_v3={}, ocl_lock={}, legacy_v2={})",
+                                summary.deps_resolved,
+                                summary.lock_hash,
+                                summary.lock_v3_path.display(),
+                                summary.ocl_lock_path.display(),
+                                summary.wrote_legacy_lock_v2
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "update" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!(
+                            "usage: ocl deps update <project_dir> [pkg] [--write-legacy-lock]"
+                        );
+                        return 2;
+                    };
+                    let target = args
+                        .iter()
+                        .skip(3)
+                        .find(|a| !a.starts_with("--"))
+                        .map(String::as_str)
+                        .unwrap_or("all");
+                    let write_legacy = args.iter().any(|a| a == "--write-legacy-lock");
+                    match resolve_deps_v3(Path::new(path), write_legacy) {
+                        Ok(summary) => {
+                            println!(
+                                "deps update ok (target={}, deps_resolved={}, lock_hash={}, lock_v3={}, ocl_lock={}, legacy_v2={})",
+                                target,
+                                summary.deps_resolved,
+                                summary.lock_hash,
+                                summary.lock_v3_path.display(),
+                                summary.ocl_lock_path.display(),
+                                summary.wrote_legacy_lock_v2
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "verify" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!("usage: ocl deps verify <project_dir> [--no-lane-policy]");
+                        return 2;
+                    };
+                    let root = Path::new(path);
+                    let enforce_lane_policy = !args.iter().any(|a| a == "--no-lane-policy");
+                    match verify_dependency_override_guardrails_v10(root)
+                        .and_then(|_| verify_deps_lock_v3(root))
+                        .and_then(|_| verify_deps_signing_and_trust_v10(root, enforce_lane_policy))
+                    {
+                        Ok(()) => {
+                            println!(
+                                "deps verify ok (root={}, lane_policy={})",
+                                root.display(),
+                                enforce_lane_policy
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                _ => {
+                    eprintln!("usage: ocl deps <resolve|update|verify> ...");
+                    2
+                }
+            }
+        }
+        "pack" => {
+            let Some(scope) = args.get(1).map(String::as_str) else {
+                eprintln!("usage: ocl pack <build|sign|publish|verify> ...");
+                return 2;
+            };
+            match scope {
+                "build" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!("usage: ocl pack build <project_dir> [--locked]");
+                        return 2;
+                    };
+                    let locked = args.iter().any(|a| a == "--locked");
+                    match build_oclpkg_with_lock(Path::new(path), locked) {
+                        Ok(summary) => {
+                            println!(
+                                "pack build ok (artifact={}, files_bundled={}, payload_hash={}, content_hash={})",
+                                summary.artifact_path.display(),
+                                summary.files_bundled,
+                                summary.payload_hash_blake3,
+                                summary.content_hash_sha256
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "sign" => {
+                    let Some(artifact) = args.get(2) else {
+                        eprintln!("usage: ocl pack sign <artifact.oclpkg>");
+                        return 2;
+                    };
+                    match sign_oclpkg(Path::new(artifact)) {
+                        Ok(summary) => {
+                            println!(
+                                "pack sign ok (artifact={}, package={}, payload_hash={}, signer={})",
+                                summary.artifact_path.display(),
+                                summary.package_name,
+                                summary.payload_hash_blake3,
+                                summary.signer_pub_ed25519_b64
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "publish" => {
+                    let Some(artifact) = args.get(2) else {
+                        eprintln!("usage: ocl pack publish <artifact.oclpkg> [--registry <dir>]");
+                        return 2;
+                    };
+                    let registry = parse_string_flag(args, "--registry")
+                        .unwrap_or_else(|| "registry".to_string());
+                    match publish_artifact(Path::new(artifact), Path::new(&registry)) {
+                        Ok(summary) => {
+                            println!(
+                                "pack publish ok (artifact={}, registry_index={}, package={}, hash={})",
+                                summary.artifact_path.display(),
+                                summary.registry_index.display(),
+                                summary.package_name,
+                                summary.payload_hash_blake3
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "verify" => {
+                    let Some(artifact) = args.get(2) else {
+                        eprintln!("usage: ocl pack verify <artifact.oclpkg>");
+                        return 2;
+                    };
+                    match verify_supply_artifact(Path::new(artifact)) {
+                        Ok(summary) => {
+                            println!(
+                                "pack verify ok (package={}, hash={})",
+                                summary.package_name, summary.payload_hash_blake3
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                _ => {
+                    eprintln!("usage: ocl pack <build|sign|publish|verify> ...");
+                    2
+                }
+            }
+        }
         "lock" => {
             if args.get(1).map(String::as_str) != Some("sync") {
-                eprintln!("usage: ocl lock sync <project_dir>");
+                eprintln!("usage: ocl lock sync <project_dir> [--write-legacy-lock]");
                 return 2;
             }
             let Some(path) = args.get(2) else {
-                eprintln!("usage: ocl lock sync <project_dir>");
+                eprintln!("usage: ocl lock sync <project_dir> [--write-legacy-lock]");
                 return 2;
             };
-            match sync_deps_lock_v1(Path::new(path)) {
+            let write_legacy = args.iter().any(|a| a == "--write-legacy-lock");
+            match resolve_deps_v3(Path::new(path), write_legacy) {
                 Ok(summary) => {
-                    println!("lock sync ok (deps_synced={})", summary.deps_synced);
+                    println!(
+                        "lock sync ok (deps_resolved={}, lock_hash={}, lock_v3={}, ocl_lock={}, legacy_v2={})",
+                        summary.deps_resolved,
+                        summary.lock_hash,
+                        summary.lock_v3_path.display(),
+                        summary.ocl_lock_path.display(),
+                        summary.wrote_legacy_lock_v2
+                    );
                     0
                 }
                 Err(err) => {
@@ -2387,6 +2589,63 @@ fn parse_string_flag(args: &[String], flag: &str) -> Option<String> {
     None
 }
 
+fn verify_dependency_override_guardrails_v10(root: &Path) -> Result<(), SdkError> {
+    let manifest_path = root.join("Ocl.toml");
+    if !manifest_path.exists() {
+        return Err(SdkError::MissingProject(format!(
+            "missing manifest: {}",
+            manifest_path.display()
+        )));
+    }
+    let raw = fs::read_to_string(&manifest_path)?;
+    let mut has_override_section = false;
+    let mut in_security = false;
+    let mut manifest_allows_overrides = false;
+
+    for line_raw in raw.lines() {
+        let line = line_raw.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            let section = line.trim_start_matches('[').trim_end_matches(']');
+            in_security = section == "security";
+            if section.starts_with("permission_overrides.") {
+                has_override_section = true;
+            }
+            continue;
+        }
+        if !in_security {
+            continue;
+        }
+        let Some((k, v)) = line.split_once('=') else {
+            continue;
+        };
+        if k.trim() != "allow_overrides" {
+            continue;
+        }
+        manifest_allows_overrides = matches!(
+            v.trim().trim_matches('"').to_ascii_lowercase().as_str(),
+            "true" | "1" | "yes" | "on"
+        );
+    }
+
+    if !has_override_section {
+        return Ok(());
+    }
+    if !manifest_allows_overrides {
+        return Err(SdkError::PermissionDenied(
+            "X-PERMISSION-OVERRIDE-DISABLED: permission_overrides declared but [security].allow_overrides=true is missing.".to_string(),
+        ));
+    }
+    if std::env::var("OCL_ALLOW_OVERRIDES").unwrap_or_default() != "1" {
+        return Err(SdkError::PermissionDenied(
+            "V-PERMISSION-OVERRIDE-ENV-REQUIRED: set OCL_ALLOW_OVERRIDES=1 to allow permission_overrides in this run.".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn parse_shadow_args(args: &[String]) -> Result<Option<ShadowOptionsV1>, i32> {
     let Some(shadow_id) = parse_string_flag(args, "--shadow") else {
         return Ok(None);
@@ -2414,8 +2673,9 @@ fn apply_init_template_v072(root: &Path, template: &str) -> Result<(), SdkError>
         "tool-wallclock" => apply_tool_wallclock_template_v08(root),
         "mini-game" => apply_mini_game_template_v073(root),
         "shadow-preview" => apply_shadow_preview_template_v073(root),
+        "dep-permission" => apply_dep_permission_template_v10(root),
         _ => Err(SdkError::MissingProject(format!(
-            "V-INIT-TEMPLATE-UNKNOWN: unsupported template `{template}` (expected `tool-cli`, `tool-http`, `tool-proc`, `tool-wallclock`, `mini-game`, or `shadow-preview`)"
+            "V-INIT-TEMPLATE-UNKNOWN: unsupported template `{template}` (expected `tool-cli`, `tool-http`, `tool-proc`, `tool-wallclock`, `mini-game`, `shadow-preview`, or `dep-permission`)"
         ))),
     }
 }
@@ -2826,6 +3086,83 @@ fn apply_shadow_preview_template_v073(root: &Path) -> Result<(), SdkError> {
         "# shadow-preview template\n\n",
         "- Run: `ocl run .`\n",
         "- Replay: `ocl replay ./.ocl_artifacts/<run_id>`\n"
+    );
+    fs::write(root.join("README.md"), readme)?;
+    Ok(())
+}
+
+fn apply_dep_permission_template_v10(root: &Path) -> Result<(), SdkError> {
+    let project_name = root
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("dep_permission")
+        .replace('-', "_");
+
+    let manifest = format!(
+        concat!(
+            "[package]\n",
+            "name = \"{}\"\n",
+            "version = \"0.1.0\"\n\n",
+            "[project]\n",
+            "lane = \"locked_v071\"\n",
+            "entry = \"src/main.ocl\"\n\n",
+            "[targets]\n",
+            "default = \"main\"\n\n",
+            "[dependencies]\n",
+            "std = \"0.1.0\"\n",
+            "widgets = {{ name=\"engine-ui-widgets\", version=\"0.3.0\", source=\"path\" }}\n\n",
+            "[permissions.package]\n",
+            "allow = [\"std.proc.*\"]\n",
+            "deny = []\n\n",
+            "[permissions.std_proc]\n",
+            "enabled = true\n",
+            "allow_bins = [\"python\"]\n",
+            "timeout_ms = 3000\n",
+            "max_stdout_bytes = 256\n",
+            "max_stderr_bytes = 256\n"
+        ),
+        project_name
+    );
+    fs::write(root.join("Ocl.toml"), manifest)?;
+
+    let source = concat!(
+        "module app.dep_permission;\n\n",
+        "import widgets.widget;\n",
+        "let ready = true;\n",
+        "condition(ready);\n"
+    );
+    fs::write(root.join("src").join("main.ocl"), source)?;
+
+    let dep_dir = root.join("deps").join("widgets");
+    fs::create_dir_all(dep_dir.join("src"))?;
+    let dep_manifest = concat!(
+        "[package]\n",
+        "name = \"engine-ui-widgets\"\n",
+        "version = \"0.3.0\"\n",
+        "entry = \"src/widget.ocl\"\n\n",
+        "[exports]\n",
+        "modules = [\"widget\"]\n\n",
+        "[requested_permissions]\n",
+        "std_proc.enabled = true\n",
+        "std_proc.allow_bins = [\"python\", \"node\"]\n",
+        "std_proc.timeout_ms = 3000\n",
+        "std_proc.max_stdout_bytes = 512\n",
+        "std_proc.max_stderr_bytes = 512\n"
+    );
+    fs::write(dep_dir.join("package.oclp"), dep_manifest)?;
+    fs::write(
+        dep_dir.join("src").join("widget.ocl"),
+        "module widgets.widget;\nlet stable = true;\ncondition(stable);\n",
+    )?;
+
+    let readme = concat!(
+        "# dep-permission template\n\n",
+        "- Muc tieu: demo dependency + permission gating theo package.\n",
+        "- Thu nghiem nhanh:\n",
+        "  - `ocl deps resolve .`\n",
+        "  - `ocl deps verify .`\n",
+        "  - `ocl pack build .`\n",
+        "  - `ocl pack sign ./.oclpkg/<artifact>.oclpkg`\n"
     );
     fs::write(root.join("README.md"), readme)?;
     Ok(())
@@ -4874,7 +5211,7 @@ fn json_escape(input: &str) -> String {
 fn print_help() {
     eprintln!("ocl <command> [args]");
     eprintln!("commands:");
-    eprintln!("  init  <project_dir> [--template tool-cli|tool-http|tool-proc|tool-wallclock|mini-game|shadow-preview] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]");
+    eprintln!("  init  <project_dir> [--template tool-cli|tool-http|tool-proc|tool-wallclock|mini-game|shadow-preview|dep-permission] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]");
     eprintln!("  check <project_dir> [--json] [--locked] [--universe <id>]");
     eprintln!(
         "  run   <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen ADDR --runtime-report FILE --replay-audit FILE] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"
@@ -4896,7 +5233,14 @@ fn print_help() {
     eprintln!("  publish <artifact.oclpkg> [--registry <dir>]");
     eprintln!("  fetch <artifact|package> [--registry <dir>] [--out <dir>]");
     eprintln!("  verify-supply <artifact.oclpkg>");
-    eprintln!("  lock  sync <project_dir>");
+    eprintln!("  deps  resolve <project_dir> [--write-legacy-lock]");
+    eprintln!("  deps  update <project_dir> [pkg] [--write-legacy-lock]");
+    eprintln!("  deps  verify <project_dir> [--no-lane-policy]");
+    eprintln!("  pack  build <project_dir> [--locked]");
+    eprintln!("  pack  sign <artifact.oclpkg>");
+    eprintln!("  pack  publish <artifact.oclpkg> [--registry <dir>]");
+    eprintln!("  pack  verify <artifact.oclpkg>");
+    eprintln!("  lock  sync <project_dir> [--write-legacy-lock]");
     eprintln!("  policy lock sync <project_dir>");
     eprintln!("  cosmos init <project_dir> [--preset default|ci]");
     eprintln!("  cosmos lock sync <project_dir> [--locked] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>]");
