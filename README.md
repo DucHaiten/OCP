@@ -10,7 +10,7 @@ OCP-OCL follows the principle “observe before collapse”: all world-data must
 
 OCP-OCL evolves into a capability/permission-driven and replay-first platform: packages ship with permission manifests, lockfile + signing + attestation, deterministic-by-recording cassettes for non-deterministic I/O, bounded shadow/search (parallel “realities” under measurable budgets), plus trace/debug/diff/minimizer tooling, a global conformance suite, and an LTS rehearsal track.
 
-The underlying ideas synthesize concepts from TSS, ELW, RGOK, SHSM, a biologic direction, cosmology motifs (parallel/superposed/horizon), and Hive.
+The underlying ideas synthesize concepts from TSS (TIERED STATE SYSTEM), ELW (ENTITY-LESS WORLD), RGOK (REALITY-GATED OBSERVATION KERNEL), SHSM (Synchronous Hyperdimensional State Matrix), a biologic direction, cosmology motifs (parallel/superposed/horizon), and Hive.
 
 #
 
@@ -24,4 +24,4 @@ OCP-OCL được thiết kế quanh nguyên lý “quan sát rồi mới sụp t
 
 OCP-OCL mở rộng thành nền tảng capability/permission-driven và replay-first: packages kèm permission manifests, lockfile + signing + attestation, deterministic-by-recording (cassette) cho I/O không xác định, shadow/search bounded (song song các “nhánh thực tại” trong ngân sách đo được), cùng toolchain trace/debug/diff/minimizer, conformance suite và LTS rehearsal.
 
-Nền tảng ý tưởng tổng hợp từ TSS, ELW, RGOK, SHSM, hướng Biologic, vũ trụ học (song song/chồng chập/chân trời) và Hive.
+Nền tảng ý tưởng tổng hợp từ TSS (TIERED STATE SYSTEM), ELW (ENTITY-LESS WORLD), RGOK (REALITY-GATED OBSERVATION KERNEL), SHSM (Synchronous Hyperdimensional State Matrix), hướng Biologic, vũ trụ học (song song/chồng chập/chân trời) và Hive.
