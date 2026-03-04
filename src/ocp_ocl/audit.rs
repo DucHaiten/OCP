@@ -14,6 +14,31 @@ pub enum TraceEvent {
         reason: Option<ReasonCode>,
         origin_id: u64,
     },
+    WallclockObserve {
+        key: String,
+        call_id: u64,
+        unix_ms: Option<i64>,
+        kind: ResultKind,
+        reason: Option<ReasonCode>,
+    },
+    ProcObserve {
+        key: String,
+        call_id: u64,
+        exit_code: Option<i64>,
+        truncated: bool,
+        kind: ResultKind,
+        reason: Option<ReasonCode>,
+    },
+    NetHttpObserve {
+        key: String,
+        call_id: u64,
+        method: String,
+        host: String,
+        status: Option<i64>,
+        truncated: bool,
+        kind: ResultKind,
+        reason: Option<ReasonCode>,
+    },
     UiObserve {
         key: String,
         event_count: u32,
@@ -123,6 +148,54 @@ fn serialize_event(ev: &TraceEvent) -> String {
             origin_id,
         } => format!(
             "ObserveEnd|{key}|{:?}|{}|{origin_id}",
+            kind,
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::WallclockObserve {
+            key,
+            call_id,
+            unix_ms,
+            kind,
+            reason,
+        } => format!(
+            "WallclockObserve|{key}|{call_id}|{}|{:?}|{}",
+            unix_ms
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "-".to_string()),
+            kind,
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::ProcObserve {
+            key,
+            call_id,
+            exit_code,
+            truncated,
+            kind,
+            reason,
+        } => format!(
+            "ProcObserve|{key}|{call_id}|{}|{}|{:?}|{}",
+            exit_code
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "-".to_string()),
+            if *truncated { "1" } else { "0" },
+            kind,
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::NetHttpObserve {
+            key,
+            call_id,
+            method,
+            host,
+            status,
+            truncated,
+            kind,
+            reason,
+        } => format!(
+            "NetHttpObserve|{key}|{call_id}|{method}|{host}|{}|{}|{:?}|{}",
+            status
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "-".to_string()),
+            if *truncated { "1" } else { "0" },
             kind,
             reason.map(|r| r.as_str()).unwrap_or("-")
         ),

@@ -137,8 +137,10 @@ pub struct ProjectPermissions {
     pub package: Option<PermissionRules>,
     pub modules: HashMap<String, PermissionRules>,
     pub std_fs: Option<StdFsPermissionConfig>,
+    pub std_net_http: Option<StdNetHttpPermissionConfig>,
     pub std_kv: Option<StdKvPermissionConfig>,
     pub std_time: Option<StdTimePermissionConfig>,
+    pub std_proc: Option<StdProcPermissionConfig>,
     pub std_game: Option<StdGamePermissionConfig>,
     pub std_shadow: Option<StdShadowPermissionConfig>,
     pub std_ui: Option<StdUiPermissionConfig>,
@@ -167,6 +169,27 @@ impl Default for StdFsPermissionConfig {
             max_read_bytes: 1_048_576,
             max_write_bytes: 1_048_576,
             max_list_entries: 500,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StdNetHttpPermissionConfig {
+    pub enabled: bool,
+    pub allow_hosts: Vec<String>,
+    pub allow_methods: Vec<String>,
+    pub max_body_bytes: u64,
+    pub timeout_ms: u32,
+}
+
+impl Default for StdNetHttpPermissionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            allow_hosts: Vec::new(),
+            allow_methods: Vec::new(),
+            max_body_bytes: 1_048_576,
+            timeout_ms: 5_000,
         }
     }
 }
@@ -203,6 +226,27 @@ impl Default for StdTimePermissionConfig {
             enabled: false,
             tick_mode: "logical".to_string(),
             dt_ms: 16,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StdProcPermissionConfig {
+    pub enabled: bool,
+    pub allow_bins: Vec<String>,
+    pub timeout_ms: u32,
+    pub max_stdout_bytes: u64,
+    pub max_stderr_bytes: u64,
+}
+
+impl Default for StdProcPermissionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            allow_bins: Vec::new(),
+            timeout_ms: 5_000,
+            max_stdout_bytes: 1_048_576,
+            max_stderr_bytes: 1_048_576,
         }
     }
 }
@@ -651,6 +695,40 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
             continue;
         }
 
+        if current_section == "permissions.std_net_http" {
+            let cfg = out
+                .std_net_http
+                .get_or_insert_with(StdNetHttpPermissionConfig::default);
+            match key {
+                "enabled" => {
+                    if let Some(parsed) = parse_bool_literal(scalar_value) {
+                        cfg.enabled = parsed;
+                    }
+                }
+                "allow_hosts" => {
+                    cfg.allow_hosts = values.into_iter().map(|v| v.to_ascii_lowercase()).collect();
+                }
+                "allow_methods" => {
+                    cfg.allow_methods =
+                        values.into_iter().map(|v| v.to_ascii_uppercase()).collect();
+                }
+                "max_body_bytes" => {
+                    if let Ok(parsed) = scalar_value.parse::<u64>() {
+                        cfg.max_body_bytes = parsed.max(1);
+                    }
+                }
+                "timeout_ms" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.timeout_ms = parsed.max(1);
+                    }
+                }
+                _ => {}
+            }
+            normalize_string_list(&mut cfg.allow_hosts);
+            normalize_string_list(&mut cfg.allow_methods);
+            continue;
+        }
+
         if current_section == "permissions.std_kv" {
             let cfg = out
                 .std_kv
@@ -705,6 +783,40 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
                 }
                 _ => {}
             }
+        }
+
+        if current_section == "permissions.std_proc" {
+            let cfg = out
+                .std_proc
+                .get_or_insert_with(StdProcPermissionConfig::default);
+            match key {
+                "enabled" => {
+                    if let Some(parsed) = parse_bool_literal(scalar_value) {
+                        cfg.enabled = parsed;
+                    }
+                }
+                "allow_bins" => {
+                    cfg.allow_bins = values;
+                }
+                "timeout_ms" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.timeout_ms = parsed.max(1);
+                    }
+                }
+                "max_stdout_bytes" => {
+                    if let Ok(parsed) = scalar_value.parse::<u64>() {
+                        cfg.max_stdout_bytes = parsed.max(1);
+                    }
+                }
+                "max_stderr_bytes" => {
+                    if let Ok(parsed) = scalar_value.parse::<u64>() {
+                        cfg.max_stderr_bytes = parsed.max(1);
+                    }
+                }
+                _ => {}
+            }
+            normalize_string_list(&mut cfg.allow_bins);
+            continue;
         }
 
         if current_section == "permissions.std_game" {
@@ -846,6 +958,22 @@ fn std_game_action_from_key(key: &str) -> Option<&'static str> {
         "std.game.rng" => Some("rng"),
         "std.game.state_delta" => Some("state_delta"),
         _ if key.starts_with("std.game.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn std_net_http_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "std.net.http.request" => Some("request"),
+        _ if key.starts_with("std.net.http.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn std_proc_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "std.proc.exec" => Some("exec"),
+        _ if key.starts_with("std.proc.") => Some("unknown"),
         _ => None,
     }
 }
@@ -1104,6 +1232,106 @@ fn verify_pack_permissions_for_key(
             )));
         }
         return Ok(());
+    }
+
+    if let Some(action) = std_net_http_action_from_key(key) {
+        let Some(cfg) = permissions.std_net_http.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-NET-HOST-DENIED`; missing section `[permissions.std_net_http]`. Hint: add `[permissions.std_net_http]` with `enabled = true`, non-empty `allow_hosts`, and non-empty `allow_methods` in Ocl.toml.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-NET-HOST-DENIED`; `[permissions.std_net_http].enabled = false`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if cfg.allow_hosts.is_empty() {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-NET-HOST-DENIED`; `[permissions.std_net_http].allow_hosts` is empty.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if cfg.allow_methods.is_empty() {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-NET-METHOD-DENIED`; `[permissions.std_net_http].allow_methods` is empty.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if action == "request" {
+            return Ok(());
+        }
+        return Err(SdkError::PermissionDenied(format!(
+            "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-NET-METHOD-DENIED`; unsupported std.net.http action `{}`.",
+            key,
+            file_path.display(),
+            module_path
+                .map(|m| format!(" (module `{m}`)"))
+                .unwrap_or_default(),
+            action,
+        )));
+    }
+
+    if let Some(action) = std_proc_action_from_key(key) {
+        let Some(cfg) = permissions.std_proc.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-PROC-BIN-DENIED`; missing section `[permissions.std_proc]`. Hint: add `[permissions.std_proc]` with `enabled = true` and non-empty `allow_bins` in Ocl.toml.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-PROC-BIN-DENIED`; `[permissions.std_proc].enabled = false`. Hint: set `enabled = true` in `[permissions.std_proc]`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if cfg.allow_bins.is_empty() {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-PROC-BIN-DENIED`; `[permissions.std_proc].allow_bins` is empty.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if action == "exec" {
+            return Ok(());
+        }
+        return Err(SdkError::PermissionDenied(format!(
+            "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-PROC-BIN-DENIED`; unsupported std.proc action `{}`.",
+            key,
+            file_path.display(),
+            module_path
+                .map(|m| format!(" (module `{m}`)"))
+                .unwrap_or_default(),
+            action,
+        )));
     }
 
     if let Some(action) = std_game_action_from_key(key) {
@@ -1367,8 +1595,10 @@ fn verify_permissions_for_source(
     if permissions.package.is_none()
         && permissions.modules.is_empty()
         && permissions.std_fs.is_none()
+        && permissions.std_net_http.is_none()
         && permissions.std_kv.is_none()
         && permissions.std_time.is_none()
+        && permissions.std_proc.is_none()
         && permissions.std_game.is_none()
         && permissions.std_shadow.is_none()
         && permissions.std_ui.is_none()
@@ -4029,6 +4259,73 @@ fn map_trace_event(
             domain_id: domain_id.to_string(),
             payload_hash,
         },
+        TraceEvent::WallclockObserve {
+            key,
+            call_id,
+            unix_ms,
+            kind,
+            reason,
+        } => TraceEventV1 {
+            seq,
+            run_id: run_id.to_string(),
+            event: "wallclock_observe".to_string(),
+            key: Some(key.clone()),
+            kind: Some(result_kind_label(*kind)),
+            reason: reason.map(|r| r.as_str().to_string()),
+            origin_id: None,
+            allowed: None,
+            value: Some(unix_ms.is_some()),
+            steps: Some((*call_id).min(u32::MAX as u64) as u32),
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload_hash,
+        },
+        TraceEvent::ProcObserve {
+            key,
+            call_id,
+            exit_code: _,
+            truncated,
+            kind,
+            reason,
+        } => TraceEventV1 {
+            seq,
+            run_id: run_id.to_string(),
+            event: "proc_observe".to_string(),
+            key: Some(key.clone()),
+            kind: Some(result_kind_label(*kind)),
+            reason: reason.map(|r| r.as_str().to_string()),
+            origin_id: None,
+            allowed: None,
+            value: Some(*truncated),
+            steps: Some((*call_id).min(u32::MAX as u64) as u32),
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload_hash,
+        },
+        TraceEvent::NetHttpObserve {
+            key,
+            call_id,
+            method,
+            host,
+            status: _,
+            truncated,
+            kind,
+            reason,
+        } => TraceEventV1 {
+            seq,
+            run_id: run_id.to_string(),
+            event: "net_http_observe".to_string(),
+            key: Some(format!("{key}:{method}:{host}")),
+            kind: Some(result_kind_label(*kind)),
+            reason: reason.map(|r| r.as_str().to_string()),
+            origin_id: None,
+            allowed: None,
+            value: Some(*truncated),
+            steps: Some((*call_id).min(u32::MAX as u64) as u32),
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload_hash,
+        },
         TraceEvent::UiObserve {
             key,
             event_count,
@@ -4270,6 +4567,54 @@ fn canonical_trace_event_payload(event: &TraceEvent) -> String {
             origin_id,
         } => format!(
             "ObserveEnd|{key}|{}|{}|{origin_id}",
+            result_kind_label(*kind),
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::WallclockObserve {
+            key,
+            call_id,
+            unix_ms,
+            kind,
+            reason,
+        } => format!(
+            "WallclockObserve|{key}|{call_id}|{}|{}|{}",
+            unix_ms
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "-".to_string()),
+            result_kind_label(*kind),
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::ProcObserve {
+            key,
+            call_id,
+            exit_code,
+            truncated,
+            kind,
+            reason,
+        } => format!(
+            "ProcObserve|{key}|{call_id}|{}|{}|{}|{}",
+            exit_code
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "-".to_string()),
+            if *truncated { "1" } else { "0" },
+            result_kind_label(*kind),
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::NetHttpObserve {
+            key,
+            call_id,
+            method,
+            host,
+            status,
+            truncated,
+            kind,
+            reason,
+        } => format!(
+            "NetHttpObserve|{key}|{call_id}|{method}|{host}|{}|{}|{}|{}",
+            status
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "-".to_string()),
+            if *truncated { "1" } else { "0" },
             result_kind_label(*kind),
             reason.map(|r| r.as_str()).unwrap_or("-")
         ),

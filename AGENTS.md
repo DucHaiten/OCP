@@ -181,6 +181,16 @@ Mục tiêu: giảm tối đa rủi ro mất dữ liệu khi trợ lý làm vi�
 - `Kết luận gate:`
   - Chỉ ghi `DONE` khi nhóm targeted pass.
 
+### 15.1) Khóa cứng marker FAIL trong gate đã DONE
+- Với mọi block `Implementation Closeout` có kết luận gate = `DONE`:
+  - CẤM để literal `FAIL` hoặc `PASS/FAIL` trong chính block đó.
+  - Nếu từng có lỗi tạm thời, ghi theo dạng không chứa marker FAIL (ví dụ: `Sự cố tạm thời đã xử lý`).
+  - Các mã lỗi/reason code có hậu tố `-FAIL` không được liệt kê nguyên văn trong block closeout `DONE`; thay bằng mô tả hoặc tham chiếu file code/test.
+- Trước khi kết thúc cập nhật plan, bắt buộc tự rà:
+  - không còn marker `FAIL` trong các closeout `DONE`,
+  - không còn placeholder `PASS/FAIL`,
+  - gate status và closeout không mâu thuẫn.
+
 ## 16) 🚨 CẤM TUYỆT ĐỐI CÁCH SỬA DỄ LÀM HỎNG TEXT
 ### KHÓA CỨNG (không được phép bỏ qua)
 - TUYỆT ĐỐI CẤM mọi cách “chuyển mã hàng loạt” hoặc “sửa encoding toàn file”.

@@ -1,11 +1,12 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpStream;
+use std::fs::OpenOptions;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::{TcpStream, ToSocketAddrs};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::ocp_ocl::ast::{Expr, MatchStmt, Program, Stmt};
 use crate::ocp_ocl::audit::{TraceEvent, TraceLog};
@@ -176,6 +177,7 @@ pub struct Executor {
     commit_policy: CommitPolicyMode,
     guard_mode: GuardMode,
     next_origin_id: u64,
+    next_quarantine_call_id: u64,
     registry: CapabilityRegistry,
     observations: HashMap<u64, ObservationMeta>,
     applied_sqlite_writes: HashSet<String>,
@@ -197,6 +199,7 @@ impl Executor {
             commit_policy: config.commit_policy,
             guard_mode: config.guard_mode,
             next_origin_id: 1,
+            next_quarantine_call_id: 0,
             registry: CapabilityRegistry::default(),
             observations: HashMap::new(),
             applied_sqlite_writes: HashSet::new(),
@@ -218,6 +221,7 @@ impl Executor {
             commit_policy: config.commit_policy,
             guard_mode: config.guard_mode,
             next_origin_id: 1,
+            next_quarantine_call_id: 0,
             registry,
             observations: HashMap::new(),
             applied_sqlite_writes: HashSet::new(),
@@ -386,7 +390,7 @@ impl Executor {
 
                 let origin_id = self.allocate_origin_id();
                 let r = match self.registry.check_observe(key_lit, ctx_lit) {
-                    Ok(kref) => observe_stub_result(&kref.raw, ctx_lit),
+                    Ok(kref) => self.observe_result_for_key(&kref.raw, ctx_lit),
                     Err(e) => Result4::<Value>::insufficient(e.to_reason_code()),
                 }
                 .with_origin_id(origin_id);
@@ -1813,6 +1817,584 @@ impl Executor {
         self.next_origin_id = self.next_origin_id.saturating_add(1);
         id
     }
+
+    fn allocate_quarantine_call_id(&mut self) -> u64 {
+        let id = self.next_quarantine_call_id;
+        self.next_quarantine_call_id = self.next_quarantine_call_id.saturating_add(1);
+        id
+    }
+
+    fn observe_result_for_key(&mut self, key: &str, ctx_lit: &str) -> Result4<Value> {
+        match key {
+            "std.time.wallclock.now" => self.observe_wallclock_now(key),
+            "std.proc.exec" => self.observe_proc_exec(key, ctx_lit),
+            "std.net.http.request" => self.observe_net_http_request(key, ctx_lit),
+            _ => observe_stub_result(key, ctx_lit),
+        }
+    }
+
+    fn observe_wallclock_now(&mut self, key: &str) -> Result4<Value> {
+        let lane = runtime_lane_from_env_v08();
+        if lane != "quarantine" {
+            return Result4::deferred(ReasonCode::QuarantineRequired);
+        }
+
+        let call_id = self.allocate_quarantine_call_id();
+        let mode = quarantine_mode_from_env_v08();
+        let (unix_ms, iso) = if mode == "replay" {
+            match load_wallclock_from_cassette_v08(call_id) {
+                Ok(v) => v,
+                Err(reason) => {
+                    self.trace.push(TraceEvent::WallclockObserve {
+                        key: key.to_string(),
+                        call_id,
+                        unix_ms: None,
+                        kind: ResultKind::Insufficient,
+                        reason: Some(reason),
+                    });
+                    return Result4::insufficient(reason);
+                }
+            }
+        } else {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0);
+            let now_iso = format!("{now}Z");
+            if let Err(reason) = append_wallclock_record_v08(call_id, now, &now_iso) {
+                self.trace.push(TraceEvent::WallclockObserve {
+                    key: key.to_string(),
+                    call_id,
+                    unix_ms: None,
+                    kind: ResultKind::Insufficient,
+                    reason: Some(reason),
+                });
+                return Result4::insufficient(reason);
+            }
+            (now, now_iso)
+        };
+
+        self.trace.push(TraceEvent::WallclockObserve {
+            key: key.to_string(),
+            call_id,
+            unix_ms: Some(unix_ms),
+            kind: ResultKind::Ok,
+            reason: None,
+        });
+
+        let mut map = BTreeMap::new();
+        map.insert("unix_ms".to_string(), unix_ms.to_string());
+        map.insert("iso".to_string(), iso);
+        Result4::ok(Value::Payload(map))
+    }
+
+    fn observe_proc_exec(&mut self, key: &str, ctx_lit: &str) -> Result4<Value> {
+        let lane = runtime_lane_from_env_v08();
+        if lane != "quarantine" {
+            self.trace.push(TraceEvent::ProcObserve {
+                key: key.to_string(),
+                call_id: self.next_quarantine_call_id,
+                exit_code: None,
+                truncated: false,
+                kind: ResultKind::Deferred,
+                reason: Some(ReasonCode::QuarantineRequired),
+            });
+            return Result4::deferred(ReasonCode::QuarantineRequired);
+        }
+
+        let call_id = self.allocate_quarantine_call_id();
+        let mode = quarantine_mode_from_env_v08();
+        if mode == "replay" {
+            match load_proc_from_cassette_v08(call_id) {
+                Ok((exit_code, stdout, stderr, truncated)) => {
+                    let mut payload = BTreeMap::new();
+                    payload.insert("exit_code".to_string(), Value::Int(exit_code));
+                    payload.insert("stdout".to_string(), Value::String(stdout));
+                    payload.insert("stderr".to_string(), Value::String(stderr));
+                    payload.insert("truncated".to_string(), Value::Bool(truncated));
+                    let (kind, reason) = if truncated {
+                        (ResultKind::Degraded, Some(ReasonCode::LimitExceeded))
+                    } else {
+                        (ResultKind::Ok, None)
+                    };
+                    self.trace.push(TraceEvent::ProcObserve {
+                        key: key.to_string(),
+                        call_id,
+                        exit_code: Some(exit_code),
+                        truncated,
+                        kind,
+                        reason,
+                    });
+                    if let Some(degraded_reason) = reason {
+                        Result4::degraded(Value::Map(payload), degraded_reason)
+                    } else {
+                        Result4::ok(Value::Map(payload))
+                    }
+                }
+                Err(reason) => {
+                    self.trace.push(TraceEvent::ProcObserve {
+                        key: key.to_string(),
+                        call_id,
+                        exit_code: None,
+                        truncated: false,
+                        kind: ResultKind::Insufficient,
+                        reason: Some(reason),
+                    });
+                    Result4::insufficient(reason)
+                }
+            }
+        } else {
+            let ctx = parse_ctx_pairs(ctx_lit);
+            let bin = ctx.get("bin").cloned().unwrap_or_default();
+            if bin.trim().is_empty() || !proc_bin_allowed(&bin) {
+                self.trace.push(TraceEvent::ProcObserve {
+                    key: key.to_string(),
+                    call_id,
+                    exit_code: None,
+                    truncated: false,
+                    kind: ResultKind::Insufficient,
+                    reason: Some(ReasonCode::ProcBinDenied),
+                });
+                return Result4::insufficient(ReasonCode::ProcBinDenied);
+            }
+
+            let args = parse_proc_args_csv(ctx.get("args"));
+            let timeout_ms = parse_nonnegative_u64(ctx.get("timeout_ms"))
+                .unwrap_or(proc_timeout_ms())
+                .max(1);
+            if let Some((mock_exit_code, mut mock_stdout, mut mock_stderr)) =
+                mock_proc_response_v08(&bin, &args)
+            {
+                let stdout_cap = parse_nonnegative_usize(ctx.get("max_stdout_bytes"))
+                    .unwrap_or(proc_max_stdout_bytes())
+                    .min(proc_max_stdout_bytes());
+                let stderr_cap = parse_nonnegative_usize(ctx.get("max_stderr_bytes"))
+                    .unwrap_or(proc_max_stderr_bytes())
+                    .min(proc_max_stderr_bytes());
+                let stdout_truncated = mock_stdout.len() > stdout_cap;
+                if stdout_truncated {
+                    mock_stdout.truncate(stdout_cap);
+                }
+                let stderr_truncated = mock_stderr.len() > stderr_cap;
+                if stderr_truncated {
+                    mock_stderr.truncate(stderr_cap);
+                }
+                let truncated = stdout_truncated || stderr_truncated;
+                let stdout_text = String::from_utf8_lossy(&mock_stdout).to_string();
+                let stderr_text = String::from_utf8_lossy(&mock_stderr).to_string();
+                if let Err(reason) = append_proc_record_v08(
+                    call_id,
+                    mock_exit_code,
+                    truncated,
+                    &mock_stdout,
+                    &mock_stderr,
+                ) {
+                    self.trace.push(TraceEvent::ProcObserve {
+                        key: key.to_string(),
+                        call_id,
+                        exit_code: None,
+                        truncated: false,
+                        kind: ResultKind::Insufficient,
+                        reason: Some(reason),
+                    });
+                    return Result4::insufficient(reason);
+                }
+
+                let mut payload = BTreeMap::new();
+                payload.insert("exit_code".to_string(), Value::Int(mock_exit_code));
+                payload.insert("stdout".to_string(), Value::String(stdout_text));
+                payload.insert("stderr".to_string(), Value::String(stderr_text));
+                payload.insert("truncated".to_string(), Value::Bool(truncated));
+                if truncated {
+                    self.trace.push(TraceEvent::ProcObserve {
+                        key: key.to_string(),
+                        call_id,
+                        exit_code: Some(mock_exit_code),
+                        truncated: true,
+                        kind: ResultKind::Degraded,
+                        reason: Some(ReasonCode::LimitExceeded),
+                    });
+                    return Result4::degraded(Value::Map(payload), ReasonCode::LimitExceeded);
+                }
+
+                self.trace.push(TraceEvent::ProcObserve {
+                    key: key.to_string(),
+                    call_id,
+                    exit_code: Some(mock_exit_code),
+                    truncated: false,
+                    kind: ResultKind::Ok,
+                    reason: None,
+                });
+                return Result4::ok(Value::Map(payload));
+            }
+
+            let mut cmd = Command::new(&bin);
+            if !args.is_empty() {
+                cmd.args(&args);
+            }
+            if let Some(cwd) = ctx.get("cwd") {
+                let trimmed = cwd.trim();
+                if !trimmed.is_empty() {
+                    cmd.current_dir(trimmed);
+                }
+            }
+            cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+            let mut child = match cmd.spawn() {
+                Ok(v) => v,
+                Err(err) => {
+                    let reason = if err.kind() == std::io::ErrorKind::NotFound {
+                        ReasonCode::ProcNotFound
+                    } else {
+                        ReasonCode::ProcExecFail
+                    };
+                    self.trace.push(TraceEvent::ProcObserve {
+                        key: key.to_string(),
+                        call_id,
+                        exit_code: None,
+                        truncated: false,
+                        kind: ResultKind::Insufficient,
+                        reason: Some(reason),
+                    });
+                    return Result4::insufficient(reason);
+                }
+            };
+
+            let timeout = Duration::from_millis(timeout_ms);
+            let started = Instant::now();
+            let output = loop {
+                match child.try_wait() {
+                    Ok(Some(_)) => match child.wait_with_output() {
+                        Ok(v) => break v,
+                        Err(_) => {
+                            self.trace.push(TraceEvent::ProcObserve {
+                                key: key.to_string(),
+                                call_id,
+                                exit_code: None,
+                                truncated: false,
+                                kind: ResultKind::Insufficient,
+                                reason: Some(ReasonCode::ProcExecFail),
+                            });
+                            return Result4::insufficient(ReasonCode::ProcExecFail);
+                        }
+                    },
+                    Ok(None) => {
+                        if started.elapsed() >= timeout {
+                            let _ = child.kill();
+                            let _ = child.wait();
+                            self.trace.push(TraceEvent::ProcObserve {
+                                key: key.to_string(),
+                                call_id,
+                                exit_code: None,
+                                truncated: false,
+                                kind: ResultKind::Insufficient,
+                                reason: Some(ReasonCode::ProcTimeout),
+                            });
+                            return Result4::insufficient(ReasonCode::ProcTimeout);
+                        }
+                        std::thread::sleep(Duration::from_millis(1));
+                    }
+                    Err(_) => {
+                        self.trace.push(TraceEvent::ProcObserve {
+                            key: key.to_string(),
+                            call_id,
+                            exit_code: None,
+                            truncated: false,
+                            kind: ResultKind::Insufficient,
+                            reason: Some(ReasonCode::ProcExecFail),
+                        });
+                        return Result4::insufficient(ReasonCode::ProcExecFail);
+                    }
+                }
+            };
+
+            let mut stdout_bytes = output.stdout;
+            let mut stderr_bytes = output.stderr;
+            let stdout_cap = parse_nonnegative_usize(ctx.get("max_stdout_bytes"))
+                .unwrap_or(proc_max_stdout_bytes())
+                .min(proc_max_stdout_bytes());
+            let stderr_cap = parse_nonnegative_usize(ctx.get("max_stderr_bytes"))
+                .unwrap_or(proc_max_stderr_bytes())
+                .min(proc_max_stderr_bytes());
+
+            let stdout_truncated = stdout_bytes.len() > stdout_cap;
+            if stdout_truncated {
+                stdout_bytes.truncate(stdout_cap);
+            }
+            let stderr_truncated = stderr_bytes.len() > stderr_cap;
+            if stderr_truncated {
+                stderr_bytes.truncate(stderr_cap);
+            }
+            let truncated = stdout_truncated || stderr_truncated;
+            let exit_code = i64::from(output.status.code().unwrap_or(-1));
+            let stdout_text = String::from_utf8_lossy(&stdout_bytes).to_string();
+            let stderr_text = String::from_utf8_lossy(&stderr_bytes).to_string();
+
+            if let Err(reason) =
+                append_proc_record_v08(call_id, exit_code, truncated, &stdout_bytes, &stderr_bytes)
+            {
+                self.trace.push(TraceEvent::ProcObserve {
+                    key: key.to_string(),
+                    call_id,
+                    exit_code: None,
+                    truncated: false,
+                    kind: ResultKind::Insufficient,
+                    reason: Some(reason),
+                });
+                return Result4::insufficient(reason);
+            }
+
+            let mut payload = BTreeMap::new();
+            payload.insert("exit_code".to_string(), Value::Int(exit_code));
+            payload.insert("stdout".to_string(), Value::String(stdout_text));
+            payload.insert("stderr".to_string(), Value::String(stderr_text));
+            payload.insert("truncated".to_string(), Value::Bool(truncated));
+            if truncated {
+                self.trace.push(TraceEvent::ProcObserve {
+                    key: key.to_string(),
+                    call_id,
+                    exit_code: Some(exit_code),
+                    truncated: true,
+                    kind: ResultKind::Degraded,
+                    reason: Some(ReasonCode::LimitExceeded),
+                });
+                Result4::degraded(Value::Map(payload), ReasonCode::LimitExceeded)
+            } else {
+                self.trace.push(TraceEvent::ProcObserve {
+                    key: key.to_string(),
+                    call_id,
+                    exit_code: Some(exit_code),
+                    truncated: false,
+                    kind: ResultKind::Ok,
+                    reason: None,
+                });
+                Result4::ok(Value::Map(payload))
+            }
+        }
+    }
+
+    fn observe_net_http_request(&mut self, key: &str, ctx_lit: &str) -> Result4<Value> {
+        let lane = runtime_lane_from_env_v08();
+        if lane != "quarantine" {
+            self.trace.push(TraceEvent::NetHttpObserve {
+                key: key.to_string(),
+                call_id: self.next_quarantine_call_id,
+                method: "-".to_string(),
+                host: "-".to_string(),
+                status: None,
+                truncated: false,
+                kind: ResultKind::Deferred,
+                reason: Some(ReasonCode::QuarantineRequired),
+            });
+            return Result4::deferred(ReasonCode::QuarantineRequired);
+        }
+
+        let call_id = self.allocate_quarantine_call_id();
+        let ctx = parse_ctx_pairs(ctx_lit);
+        let method = ctx
+            .get("method")
+            .map(|v| v.trim().to_ascii_uppercase())
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| "GET".to_string());
+        let url = ctx.get("url").cloned().unwrap_or_default();
+        let body = ctx.get("body").cloned().unwrap_or_default();
+        let req_hash = stable_hash64_hex(&format!("{method}|{url}|{body}"));
+        let mode = quarantine_mode_from_env_v08();
+        let host_for_trace = parse_http_url_v08(&url)
+            .ok()
+            .map(|v| v.host)
+            .unwrap_or_else(|| "-".to_string());
+
+        if mode == "replay" {
+            match load_net_http_from_cassette_v08(call_id, &req_hash) {
+                Ok((status, headers, body_text, truncated)) => {
+                    let mut headers_map = BTreeMap::new();
+                    for (k, v) in headers {
+                        headers_map.insert(k, Value::String(v));
+                    }
+                    let mut payload = BTreeMap::new();
+                    payload.insert("status".to_string(), Value::Int(status));
+                    payload.insert("headers".to_string(), Value::Map(headers_map));
+                    payload.insert("body".to_string(), Value::String(body_text));
+                    payload.insert("truncated".to_string(), Value::Bool(truncated));
+
+                    let (kind, reason) = if truncated {
+                        (ResultKind::Degraded, Some(ReasonCode::LimitExceeded))
+                    } else {
+                        (ResultKind::Ok, None)
+                    };
+                    self.trace.push(TraceEvent::NetHttpObserve {
+                        key: key.to_string(),
+                        call_id,
+                        method: method.clone(),
+                        host: host_for_trace.clone(),
+                        status: Some(status),
+                        truncated,
+                        kind,
+                        reason,
+                    });
+                    if let Some(reason) = reason {
+                        Result4::degraded(Value::Map(payload), reason)
+                    } else {
+                        Result4::ok(Value::Map(payload))
+                    }
+                }
+                Err(reason) => {
+                    self.trace.push(TraceEvent::NetHttpObserve {
+                        key: key.to_string(),
+                        call_id,
+                        method,
+                        host: host_for_trace,
+                        status: None,
+                        truncated: false,
+                        kind: ResultKind::Insufficient,
+                        reason: Some(reason),
+                    });
+                    Result4::insufficient(reason)
+                }
+            }
+        } else {
+            if !net_http_method_allowed(&method) {
+                self.trace.push(TraceEvent::NetHttpObserve {
+                    key: key.to_string(),
+                    call_id,
+                    method,
+                    host: host_for_trace,
+                    status: None,
+                    truncated: false,
+                    kind: ResultKind::Insufficient,
+                    reason: Some(ReasonCode::NetMethodDenied),
+                });
+                return Result4::insufficient(ReasonCode::NetMethodDenied);
+            }
+
+            let parsed_url = match parse_http_url_v08(&url) {
+                Ok(v) => v,
+                Err(reason) => {
+                    self.trace.push(TraceEvent::NetHttpObserve {
+                        key: key.to_string(),
+                        call_id,
+                        method,
+                        host: host_for_trace,
+                        status: None,
+                        truncated: false,
+                        kind: ResultKind::Insufficient,
+                        reason: Some(reason),
+                    });
+                    return Result4::insufficient(reason);
+                }
+            };
+
+            if !net_http_host_allowed(&parsed_url.host) {
+                self.trace.push(TraceEvent::NetHttpObserve {
+                    key: key.to_string(),
+                    call_id,
+                    method,
+                    host: parsed_url.host,
+                    status: None,
+                    truncated: false,
+                    kind: ResultKind::Insufficient,
+                    reason: Some(ReasonCode::NetHostDenied),
+                });
+                return Result4::insufficient(ReasonCode::NetHostDenied);
+            }
+
+            let timeout_ms = parse_nonnegative_u64(ctx.get("timeout_ms"))
+                .unwrap_or(net_http_timeout_ms())
+                .max(1);
+            let requested_body_cap = parse_nonnegative_usize(ctx.get("max_body_bytes"))
+                .unwrap_or(net_http_max_body_bytes());
+            let body_cap = requested_body_cap.min(net_http_max_body_bytes()).max(1);
+
+            let response = match execute_http_request_v08(
+                &method,
+                &parsed_url,
+                body.as_bytes(),
+                Duration::from_millis(timeout_ms),
+            ) {
+                Ok(v) => v,
+                Err(reason) => {
+                    self.trace.push(TraceEvent::NetHttpObserve {
+                        key: key.to_string(),
+                        call_id,
+                        method,
+                        host: parsed_url.host,
+                        status: None,
+                        truncated: false,
+                        kind: ResultKind::Insufficient,
+                        reason: Some(reason),
+                    });
+                    return Result4::insufficient(reason);
+                }
+            };
+
+            let truncated = response.body.len() > body_cap;
+            let mut body_bytes = response.body;
+            if truncated {
+                body_bytes.truncate(body_cap);
+            }
+            let body_text = String::from_utf8_lossy(&body_bytes).to_string();
+            let record_row = NetHttpRecordAppendV08 {
+                call_id,
+                method: &method,
+                url: &url,
+                req_hash: &req_hash,
+                status: response.status,
+                truncated,
+                headers: &response.headers,
+                body_bytes: &body_bytes,
+            };
+            if let Err(reason) = append_net_http_record_v08(record_row) {
+                self.trace.push(TraceEvent::NetHttpObserve {
+                    key: key.to_string(),
+                    call_id,
+                    method,
+                    host: parsed_url.host,
+                    status: None,
+                    truncated: false,
+                    kind: ResultKind::Insufficient,
+                    reason: Some(reason),
+                });
+                return Result4::insufficient(reason);
+            }
+
+            let mut headers_map = BTreeMap::new();
+            for (k, v) in response.headers {
+                headers_map.insert(k, Value::String(v));
+            }
+            let mut payload = BTreeMap::new();
+            payload.insert("status".to_string(), Value::Int(response.status));
+            payload.insert("headers".to_string(), Value::Map(headers_map));
+            payload.insert("body".to_string(), Value::String(body_text));
+            payload.insert("truncated".to_string(), Value::Bool(truncated));
+
+            if truncated {
+                self.trace.push(TraceEvent::NetHttpObserve {
+                    key: key.to_string(),
+                    call_id,
+                    method,
+                    host: parsed_url.host,
+                    status: Some(response.status),
+                    truncated: true,
+                    kind: ResultKind::Degraded,
+                    reason: Some(ReasonCode::LimitExceeded),
+                });
+                Result4::degraded(Value::Map(payload), ReasonCode::LimitExceeded)
+            } else {
+                self.trace.push(TraceEvent::NetHttpObserve {
+                    key: key.to_string(),
+                    call_id,
+                    method,
+                    host: parsed_url.host,
+                    status: Some(response.status),
+                    truncated: false,
+                    kind: ResultKind::Ok,
+                    reason: None,
+                });
+                Result4::ok(Value::Map(payload))
+            }
+        }
+    }
 }
 
 fn stmt_span(stmt: &Stmt) -> Span {
@@ -1864,6 +2446,645 @@ fn as_non_negative_int_runtime(value: &Value) -> Option<u32> {
         Value::Int(v) if *v >= 0 => Some(*v as u32),
         _ => None,
     }
+}
+
+fn runtime_lane_from_env_v08() -> String {
+    env::var("OCL_PROJECT_LANE").unwrap_or_else(|_| "locked_v071".to_string())
+}
+
+fn quarantine_mode_from_env_v08() -> String {
+    env::var("OCL_QUARANTINE_MODE").unwrap_or_else(|_| "record".to_string())
+}
+
+fn append_wallclock_record_v08(call_id: u64, unix_ms: i64, iso: &str) -> Result<(), ReasonCode> {
+    let Some(path) = env::var("OCL_V08_WALLCLOCK_RECORD_PATH").ok() else {
+        return Ok(());
+    };
+    if path.trim().is_empty() {
+        return Ok(());
+    }
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|_| ReasonCode::FsIoError)?;
+    let safe_iso = iso.replace('\n', "\\n").replace('\r', "\\r");
+    writeln!(file, "{call_id}|{unix_ms}|{safe_iso}").map_err(|_| ReasonCode::FsIoError)?;
+    Ok(())
+}
+
+fn extract_json_string_field_v08(line: &str, field: &str) -> Option<String> {
+    let needle = format!("\"{field}\":\"");
+    let start = line.find(&needle)? + needle.len();
+    let tail = &line[start..];
+    let end = tail.find('"')?;
+    Some(tail[..end].to_string())
+}
+
+fn extract_call_id_entry_id_from_index_v08(index_text: &str, call_id: u64) -> Option<String> {
+    let needle = format!("\"{call_id}\":\"");
+    let start = index_text.find(&needle)? + needle.len();
+    let tail = &index_text[start..];
+    let end = tail.find('"')?;
+    Some(tail[..end].to_string())
+}
+
+fn load_wallclock_from_cassette_v08(call_id: u64) -> Result<(i64, String), ReasonCode> {
+    let index_path = env::var("OCL_V08_CASSETTE_INDEX_PATH").ok();
+    let jsonl_path = env::var("OCL_V08_CASSETTE_JSONL_PATH").ok();
+    let (Some(index_path), Some(jsonl_path)) = (index_path, jsonl_path) else {
+        return Err(ReasonCode::CassetteMissing);
+    };
+
+    let index_text = fs::read_to_string(index_path).map_err(|_| ReasonCode::CassetteMissing)?;
+    let entry_id = extract_call_id_entry_id_from_index_v08(&index_text, call_id)
+        .ok_or(ReasonCode::CassetteMiss)?;
+
+    let file = fs::File::open(jsonl_path).map_err(|_| ReasonCode::CassetteMissing)?;
+    let reader = BufReader::new(file);
+    for line in reader.lines() {
+        let line = line.map_err(|_| ReasonCode::CassetteMissing)?;
+        if !line.contains("\"cap\":\"std.time.wallclock.now\"") {
+            continue;
+        }
+        let id = extract_json_string_field_v08(&line, "id");
+        if id.as_deref() != Some(entry_id.as_str()) {
+            continue;
+        }
+        let unix_ms_raw =
+            extract_json_string_field_v08(&line, "unix_ms").ok_or(ReasonCode::CassetteMiss)?;
+        let iso = extract_json_string_field_v08(&line, "iso").ok_or(ReasonCode::CassetteMiss)?;
+        let unix_ms = unix_ms_raw
+            .parse::<i64>()
+            .map_err(|_| ReasonCode::CassetteMiss)?;
+        return Ok((unix_ms, iso));
+    }
+    Err(ReasonCode::CassetteMiss)
+}
+
+#[derive(Debug, Clone)]
+struct ParsedHttpUrlV08 {
+    host: String,
+    port: u16,
+    path_and_query: String,
+}
+
+#[derive(Debug, Clone)]
+struct HttpResponseV08 {
+    status: i64,
+    headers: BTreeMap<String, String>,
+    body: Vec<u8>,
+}
+
+fn parse_http_url_v08(url: &str) -> Result<ParsedHttpUrlV08, ReasonCode> {
+    let trimmed = url.trim();
+    if trimmed.starts_with("https://") {
+        return Err(ReasonCode::NetTlsFail);
+    }
+    let Some(rest) = trimmed.strip_prefix("http://") else {
+        return Err(ReasonCode::NetInvalidUrl);
+    };
+    if rest.is_empty() {
+        return Err(ReasonCode::NetInvalidUrl);
+    }
+
+    let (host_port_raw, path_raw) = match rest.split_once('/') {
+        Some((hp, tail)) => (hp, format!("/{}", tail)),
+        None => (rest, "/".to_string()),
+    };
+    if host_port_raw.is_empty() || host_port_raw.contains(' ') {
+        return Err(ReasonCode::NetInvalidUrl);
+    }
+    if host_port_raw.contains('[') || host_port_raw.contains(']') {
+        return Err(ReasonCode::NetInvalidUrl);
+    }
+
+    let (host_raw, port) = match host_port_raw.rsplit_once(':') {
+        Some((host, port_raw)) if !host.is_empty() && !port_raw.is_empty() => {
+            let port = port_raw
+                .parse::<u16>()
+                .map_err(|_| ReasonCode::NetInvalidUrl)?;
+            (host.to_string(), port)
+        }
+        _ => (host_port_raw.to_string(), 80u16),
+    };
+
+    if host_raw.is_empty() {
+        return Err(ReasonCode::NetInvalidUrl);
+    }
+    let path_and_query = if path_raw.is_empty() {
+        "/".to_string()
+    } else {
+        path_raw
+    };
+    Ok(ParsedHttpUrlV08 {
+        host: host_raw,
+        port,
+        path_and_query,
+    })
+}
+
+fn net_http_allow_hosts() -> Vec<String> {
+    env::var("OCL_STD_NET_ALLOW_HOSTS")
+        .unwrap_or_default()
+        .split(',')
+        .map(|v| v.trim().to_ascii_lowercase())
+        .filter(|v| !v.is_empty())
+        .collect()
+}
+
+fn net_http_allow_methods() -> Vec<String> {
+    env::var("OCL_STD_NET_ALLOW_METHODS")
+        .unwrap_or_default()
+        .split(',')
+        .map(|v| v.trim().to_ascii_uppercase())
+        .filter(|v| !v.is_empty())
+        .collect()
+}
+
+fn net_http_host_allowed(host: &str) -> bool {
+    let allow_hosts = net_http_allow_hosts();
+    if allow_hosts.is_empty() {
+        return false;
+    }
+    let host_lc = host.to_ascii_lowercase();
+    allow_hosts.iter().any(|allow| allow == &host_lc)
+}
+
+fn net_http_method_allowed(method: &str) -> bool {
+    let allow_methods = net_http_allow_methods();
+    if allow_methods.is_empty() {
+        return false;
+    }
+    let method_uc = method.to_ascii_uppercase();
+    allow_methods.iter().any(|allow| allow == &method_uc)
+}
+
+fn net_http_timeout_ms() -> u64 {
+    env::var("OCL_STD_NET_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(5_000)
+}
+
+fn net_http_max_body_bytes() -> usize {
+    env::var("OCL_STD_NET_MAX_BODY_BYTES")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(1_048_576)
+}
+
+fn find_subslice_v08(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    haystack.windows(needle.len()).position(|w| w == needle)
+}
+
+fn parse_http_response_v08(raw: &[u8]) -> Result<HttpResponseV08, ReasonCode> {
+    let Some(header_end) = find_subslice_v08(raw, b"\r\n\r\n") else {
+        return Err(ReasonCode::AdapterFailed);
+    };
+    let header_bytes = &raw[..header_end];
+    let body_bytes = raw[header_end + 4..].to_vec();
+    let header_text = String::from_utf8_lossy(header_bytes);
+    let mut lines = header_text.lines();
+    let status_line = lines.next().ok_or(ReasonCode::AdapterFailed)?;
+    let mut status_parts = status_line.split_whitespace();
+    let _http_ver = status_parts.next().ok_or(ReasonCode::AdapterFailed)?;
+    let status = status_parts
+        .next()
+        .ok_or(ReasonCode::AdapterFailed)?
+        .parse::<i64>()
+        .map_err(|_| ReasonCode::AdapterFailed)?;
+
+    let mut headers = BTreeMap::new();
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some((k, v)) = trimmed.split_once(':') {
+            headers.insert(k.trim().to_ascii_lowercase(), v.trim().to_string());
+        }
+    }
+    Ok(HttpResponseV08 {
+        status,
+        headers,
+        body: body_bytes,
+    })
+}
+
+fn mock_http_response_v08(
+    method: &str,
+    parsed: &ParsedHttpUrlV08,
+    body: &[u8],
+) -> Option<HttpResponseV08> {
+    if !parsed.host.eq_ignore_ascii_case("mock.local") {
+        return None;
+    }
+    let mut headers = BTreeMap::new();
+    headers.insert("content-type".to_string(), "application/json".to_string());
+    headers.insert("x-ocl-mock".to_string(), "v08".to_string());
+    let body_text = String::from_utf8_lossy(body);
+    let payload = format!(
+        "{{\"mock\":true,\"method\":\"{}\",\"path\":\"{}\",\"body\":\"{}\"}}",
+        method,
+        parsed.path_and_query,
+        json_escape_inline(&body_text)
+    );
+    Some(HttpResponseV08 {
+        status: 200,
+        headers,
+        body: payload.into_bytes(),
+    })
+}
+
+fn execute_http_request_v08(
+    method: &str,
+    parsed: &ParsedHttpUrlV08,
+    body: &[u8],
+    timeout: Duration,
+) -> Result<HttpResponseV08, ReasonCode> {
+    if let Some(mock) = mock_http_response_v08(method, parsed, body) {
+        return Ok(mock);
+    }
+    let addr_literal = format!("{}:{}", parsed.host, parsed.port);
+    let mut addrs = addr_literal
+        .to_socket_addrs()
+        .map_err(|_| ReasonCode::NetDnsFail)?;
+    let socket = addrs.next().ok_or(ReasonCode::NetDnsFail)?;
+    let mut stream = TcpStream::connect_timeout(&socket, timeout).map_err(|err| {
+        if err.kind() == std::io::ErrorKind::TimedOut {
+            ReasonCode::NetTimeout
+        } else {
+            ReasonCode::AdapterFailed
+        }
+    })?;
+    let _ = stream.set_read_timeout(Some(timeout));
+    let _ = stream.set_write_timeout(Some(timeout));
+
+    let mut request_head = format!(
+        "{} {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nContent-Length: {}\r\n",
+        method,
+        parsed.path_and_query,
+        parsed.host,
+        body.len()
+    );
+    request_head.push_str("\r\n");
+
+    stream.write_all(request_head.as_bytes()).map_err(|err| {
+        if err.kind() == std::io::ErrorKind::TimedOut {
+            ReasonCode::NetTimeout
+        } else {
+            ReasonCode::AdapterFailed
+        }
+    })?;
+    if !body.is_empty() {
+        stream.write_all(body).map_err(|err| {
+            if err.kind() == std::io::ErrorKind::TimedOut {
+                ReasonCode::NetTimeout
+            } else {
+                ReasonCode::AdapterFailed
+            }
+        })?;
+    }
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).map_err(|err| {
+        if err.kind() == std::io::ErrorKind::TimedOut {
+            ReasonCode::NetTimeout
+        } else {
+            ReasonCode::AdapterFailed
+        }
+    })?;
+    parse_http_response_v08(&response)
+}
+
+fn encode_headers_blob_v08(headers: &BTreeMap<String, String>) -> String {
+    let mut out = String::new();
+    for (idx, (k, v)) in headers.iter().enumerate() {
+        if idx > 0 {
+            out.push('\n');
+        }
+        out.push_str(k);
+        out.push(':');
+        out.push_str(v);
+    }
+    out
+}
+
+fn decode_headers_blob_v08(raw: &str) -> Option<BTreeMap<String, String>> {
+    let mut out = BTreeMap::new();
+    if raw.is_empty() {
+        return Some(out);
+    }
+    for line in raw.lines() {
+        let (k, v) = line.split_once(':')?;
+        let key = k.trim().to_ascii_lowercase();
+        if key.is_empty() {
+            return None;
+        }
+        out.insert(key, v.trim().to_string());
+    }
+    Some(out)
+}
+
+struct NetHttpRecordAppendV08<'a> {
+    call_id: u64,
+    method: &'a str,
+    url: &'a str,
+    req_hash: &'a str,
+    status: i64,
+    truncated: bool,
+    headers: &'a BTreeMap<String, String>,
+    body_bytes: &'a [u8],
+}
+
+fn append_net_http_record_v08(row: NetHttpRecordAppendV08<'_>) -> Result<(), ReasonCode> {
+    let Some(path) = env::var("OCL_V08_HTTP_RECORD_PATH").ok() else {
+        return Ok(());
+    };
+    if path.trim().is_empty() {
+        return Ok(());
+    }
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|_| ReasonCode::FsIoError)?;
+    let truncated_flag = if row.truncated { "1" } else { "0" };
+    let url_hex = hex_encode_bytes_v08(row.url.as_bytes());
+    let body_hex = hex_encode_bytes_v08(row.body_bytes);
+    let headers_hex = hex_encode_bytes_v08(encode_headers_blob_v08(row.headers).as_bytes());
+    writeln!(
+        file,
+        "{}|{}|{url_hex}|{}|{}|{truncated_flag}|{body_hex}|{headers_hex}",
+        row.call_id, row.method, row.req_hash, row.status
+    )
+    .map_err(|_| ReasonCode::FsIoError)?;
+    Ok(())
+}
+
+fn load_net_http_from_cassette_v08(
+    call_id: u64,
+    req_hash: &str,
+) -> Result<(i64, BTreeMap<String, String>, String, bool), ReasonCode> {
+    let index_path = env::var("OCL_V08_CASSETTE_INDEX_PATH").ok();
+    let jsonl_path = env::var("OCL_V08_CASSETTE_JSONL_PATH").ok();
+    let (Some(index_path), Some(jsonl_path)) = (index_path, jsonl_path) else {
+        return Err(ReasonCode::CassetteMissing);
+    };
+
+    let index_text = fs::read_to_string(index_path).map_err(|_| ReasonCode::CassetteMissing)?;
+    let mapped_entry_id = extract_call_id_entry_id_from_index_v08(&index_text, call_id);
+    let file = fs::File::open(jsonl_path).map_err(|_| ReasonCode::CassetteMissing)?;
+    let reader = BufReader::new(file);
+    for line in reader.lines() {
+        let line = line.map_err(|_| ReasonCode::CassetteMissing)?;
+        if !line.contains("\"cap\":\"std.net.http.request\"") {
+            continue;
+        }
+        if let Some(entry_id) = mapped_entry_id.as_ref() {
+            let id = extract_json_string_field_v08(&line, "id");
+            if id.as_deref() != Some(entry_id.as_str()) {
+                continue;
+            }
+        } else {
+            let row_req_hash =
+                extract_json_string_field_v08(&line, "req_hash").ok_or(ReasonCode::CassetteMiss)?;
+            if row_req_hash != req_hash {
+                continue;
+            }
+        }
+
+        let status_raw =
+            extract_json_string_field_v08(&line, "status").ok_or(ReasonCode::CassetteMiss)?;
+        let truncated_raw =
+            extract_json_string_field_v08(&line, "truncated").ok_or(ReasonCode::CassetteMiss)?;
+        let body_hex =
+            extract_json_string_field_v08(&line, "body_hex").ok_or(ReasonCode::CassetteMiss)?;
+        let headers_hex =
+            extract_json_string_field_v08(&line, "headers_hex").ok_or(ReasonCode::CassetteMiss)?;
+
+        let status = status_raw
+            .parse::<i64>()
+            .map_err(|_| ReasonCode::CassetteMiss)?;
+        let truncated = parse_bool_text_v08(&truncated_raw).ok_or(ReasonCode::CassetteMiss)?;
+        let body = hex_decode_bytes_v08(&body_hex).ok_or(ReasonCode::CassetteMiss)?;
+        let headers_blob = String::from_utf8_lossy(
+            &hex_decode_bytes_v08(&headers_hex).ok_or(ReasonCode::CassetteMiss)?,
+        )
+        .to_string();
+        let headers = decode_headers_blob_v08(&headers_blob).ok_or(ReasonCode::CassetteMiss)?;
+        let body_text = String::from_utf8_lossy(&body).to_string();
+        return Ok((status, headers, body_text, truncated));
+    }
+    Err(ReasonCode::CassetteMiss)
+}
+
+fn parse_nonnegative_u64(raw: Option<&String>) -> Option<u64> {
+    raw.and_then(|v| v.trim().parse::<u64>().ok())
+}
+
+fn parse_proc_args_csv(raw: Option<&String>) -> Vec<String> {
+    raw.map(|v| {
+        v.split(',')
+            .map(|p| p.trim().to_string())
+            .filter(|p| !p.is_empty())
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
+fn mock_proc_response_v08(bin: &str, args: &[String]) -> Option<(i64, Vec<u8>, Vec<u8>)> {
+    if !bin.eq_ignore_ascii_case("mock.proc") {
+        return None;
+    }
+    let mut exit_code = 0i64;
+    let mut body = "MOCK_PROC_OK".to_string();
+    for arg in args {
+        if arg == "--fail" {
+            exit_code = 7;
+        } else if let Some(rest) = arg.strip_prefix("--exit=") {
+            if let Ok(parsed) = rest.parse::<i64>() {
+                exit_code = parsed;
+            }
+        } else if let Some(rest) = arg.strip_prefix("--stdout=") {
+            body = rest.to_string();
+        }
+    }
+    let stdout = format!("{body}\n").into_bytes();
+    Some((exit_code, stdout, Vec::new()))
+}
+
+fn proc_allow_bins() -> Vec<String> {
+    env::var("OCL_STD_PROC_ALLOW_BINS")
+        .unwrap_or_default()
+        .split(',')
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .collect()
+}
+
+fn proc_bin_matches_allow(bin: &str, allow: &str) -> bool {
+    if bin.eq_ignore_ascii_case(allow) {
+        return true;
+    }
+    let bin_name = Path::new(bin)
+        .file_name()
+        .and_then(|v| v.to_str())
+        .unwrap_or(bin);
+    if bin_name.eq_ignore_ascii_case(allow) {
+        return true;
+    }
+    let bin_stem = Path::new(bin_name)
+        .file_stem()
+        .and_then(|v| v.to_str())
+        .unwrap_or(bin_name);
+    bin_stem.eq_ignore_ascii_case(allow)
+}
+
+fn proc_bin_allowed(bin: &str) -> bool {
+    let allow_bins = proc_allow_bins();
+    if allow_bins.is_empty() {
+        return false;
+    }
+    allow_bins.iter().any(|v| proc_bin_matches_allow(bin, v))
+}
+
+fn proc_timeout_ms() -> u64 {
+    env::var("OCL_STD_PROC_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(5_000)
+}
+
+fn proc_max_stdout_bytes() -> usize {
+    env::var("OCL_STD_PROC_MAX_STDOUT_BYTES")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(1_048_576)
+}
+
+fn proc_max_stderr_bytes() -> usize {
+    env::var("OCL_STD_PROC_MAX_STDERR_BYTES")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(1_048_576)
+}
+
+fn hex_encode_bytes_v08(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        out.push_str(&format!("{b:02x}"));
+    }
+    out
+}
+
+fn hex_decode_bytes_v08(raw: &str) -> Option<Vec<u8>> {
+    if !raw.len().is_multiple_of(2) {
+        return None;
+    }
+    let mut out = Vec::with_capacity(raw.len() / 2);
+    let mut idx = 0usize;
+    while idx < raw.len() {
+        let chunk = &raw[idx..idx + 2];
+        let value = u8::from_str_radix(chunk, 16).ok()?;
+        out.push(value);
+        idx += 2;
+    }
+    Some(out)
+}
+
+fn append_proc_record_v08(
+    call_id: u64,
+    exit_code: i64,
+    truncated: bool,
+    stdout: &[u8],
+    stderr: &[u8],
+) -> Result<(), ReasonCode> {
+    let Some(path) = env::var("OCL_V08_PROC_RECORD_PATH").ok() else {
+        return Ok(());
+    };
+    if path.trim().is_empty() {
+        return Ok(());
+    }
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|_| ReasonCode::ProcExecFail)?;
+    let truncated_flag = if truncated { "1" } else { "0" };
+    let stdout_hex = hex_encode_bytes_v08(stdout);
+    let stderr_hex = hex_encode_bytes_v08(stderr);
+    writeln!(
+        file,
+        "{call_id}|{exit_code}|{truncated_flag}|{stdout_hex}|{stderr_hex}"
+    )
+    .map_err(|_| ReasonCode::ProcExecFail)?;
+    Ok(())
+}
+
+fn parse_bool_text_v08(raw: &str) -> Option<bool> {
+    match raw {
+        "1" | "true" => Some(true),
+        "0" | "false" => Some(false),
+        _ => None,
+    }
+}
+
+fn load_proc_from_cassette_v08(call_id: u64) -> Result<(i64, String, String, bool), ReasonCode> {
+    let index_path = env::var("OCL_V08_CASSETTE_INDEX_PATH").ok();
+    let jsonl_path = env::var("OCL_V08_CASSETTE_JSONL_PATH").ok();
+    let (Some(index_path), Some(jsonl_path)) = (index_path, jsonl_path) else {
+        return Err(ReasonCode::CassetteMissing);
+    };
+
+    let index_text = fs::read_to_string(index_path).map_err(|_| ReasonCode::CassetteMissing)?;
+    let entry_id = extract_call_id_entry_id_from_index_v08(&index_text, call_id)
+        .ok_or(ReasonCode::CassetteMiss)?;
+
+    let file = fs::File::open(jsonl_path).map_err(|_| ReasonCode::CassetteMissing)?;
+    let reader = BufReader::new(file);
+    for line in reader.lines() {
+        let line = line.map_err(|_| ReasonCode::CassetteMissing)?;
+        if !line.contains("\"cap\":\"std.proc.exec\"") {
+            continue;
+        }
+        let id = extract_json_string_field_v08(&line, "id");
+        if id.as_deref() != Some(entry_id.as_str()) {
+            continue;
+        }
+        let exit_code_raw =
+            extract_json_string_field_v08(&line, "exit_code").ok_or(ReasonCode::CassetteMiss)?;
+        let truncated_raw =
+            extract_json_string_field_v08(&line, "truncated").ok_or(ReasonCode::CassetteMiss)?;
+        let stdout_hex =
+            extract_json_string_field_v08(&line, "stdout_hex").ok_or(ReasonCode::CassetteMiss)?;
+        let stderr_hex =
+            extract_json_string_field_v08(&line, "stderr_hex").ok_or(ReasonCode::CassetteMiss)?;
+
+        let exit_code = exit_code_raw
+            .parse::<i64>()
+            .map_err(|_| ReasonCode::CassetteMiss)?;
+        let truncated = parse_bool_text_v08(&truncated_raw).ok_or(ReasonCode::CassetteMiss)?;
+        let stdout = hex_decode_bytes_v08(&stdout_hex).ok_or(ReasonCode::CassetteMiss)?;
+        let stderr = hex_decode_bytes_v08(&stderr_hex).ok_or(ReasonCode::CassetteMiss)?;
+
+        return Ok((
+            exit_code,
+            String::from_utf8_lossy(&stdout).to_string(),
+            String::from_utf8_lossy(&stderr).to_string(),
+            truncated,
+        ));
+    }
+
+    Err(ReasonCode::CassetteMiss)
 }
 
 fn into_mapish_runtime(
@@ -4792,6 +6013,20 @@ fn reason_code_from_str(raw: &str) -> Option<ReasonCode> {
         "RC-SHADOW-EFFECT-DISALLOWED" => Some(ReasonCode::ShadowEffectDisallowed),
         "RC-UI-DISABLED" => Some(ReasonCode::UiDisabled),
         "RC-UI-CAP-EXCEEDED" => Some(ReasonCode::UiCapExceeded),
+        "RC-QUARANTINE-REQUIRED" => Some(ReasonCode::QuarantineRequired),
+        "RC-CASSETTE-MISSING" => Some(ReasonCode::CassetteMissing),
+        "RC-CASSETTE-MISS" => Some(ReasonCode::CassetteMiss),
+        "RC-CASSETTE-TOO-LARGE" => Some(ReasonCode::CassetteTooLarge),
+        "RC-NET-INVALID-URL" => Some(ReasonCode::NetInvalidUrl),
+        "RC-NET-DNS-FAIL" => Some(ReasonCode::NetDnsFail),
+        "RC-NET-TIMEOUT" => Some(ReasonCode::NetTimeout),
+        "RC-NET-TLS-FAIL" => Some(ReasonCode::NetTlsFail),
+        "RC-NET-HOST-DENIED" => Some(ReasonCode::NetHostDenied),
+        "RC-NET-METHOD-DENIED" => Some(ReasonCode::NetMethodDenied),
+        "RC-PROC-BIN-DENIED" => Some(ReasonCode::ProcBinDenied),
+        "RC-PROC-TIMEOUT" => Some(ReasonCode::ProcTimeout),
+        "RC-PROC-NOT-FOUND" => Some(ReasonCode::ProcNotFound),
+        "RC-PROC-EXEC-FAIL" => Some(ReasonCode::ProcExecFail),
         "RC-LIMIT-EXCEEDED" => Some(ReasonCode::LimitExceeded),
         "RC-JSON-INVALID" => Some(ReasonCode::JsonInvalid),
         "RC-NOT-IMPLEMENTED" => Some(ReasonCode::NotImplemented),

@@ -101,6 +101,10 @@ impl CapabilityRegistry {
             "std.http.post".to_string(),
             vec!["url".to_string(), "body".to_string()],
         );
+        ctx_required.insert(
+            "std.net.http.request".to_string(),
+            vec!["method".to_string(), "url".to_string()],
+        );
         ctx_required.insert("std.json.parse".to_string(), vec!["raw".to_string()]);
         ctx_required.insert("std.json.emit".to_string(), vec!["value".to_string()]);
         ctx_required.insert("std.kv.get".to_string(), vec!["key".to_string()]);
@@ -109,6 +113,7 @@ impl CapabilityRegistry {
         ctx_required.insert("std.kv.del".to_string(), vec!["key".to_string()]);
         ctx_required.insert("std.time.sleep".to_string(), vec!["ms".to_string()]);
         ctx_required.insert("std.log.info".to_string(), vec!["message".to_string()]);
+        ctx_required.insert("std.proc.exec".to_string(), vec!["bin".to_string()]);
         ctx_required.insert("std.net.listen".to_string(), vec!["addr".to_string()]);
         ctx_required.insert(
             "std.net.reply".to_string(),
@@ -182,6 +187,9 @@ impl CapabilityRegistry {
         commit_allowed.insert("std.ui.input".to_string(), false);
         commit_allowed.insert("std.game.tick_info".to_string(), false);
         commit_allowed.insert("std.game.rng".to_string(), false);
+        commit_allowed.insert("std.time.wallclock.now".to_string(), false);
+        commit_allowed.insert("std.proc.exec".to_string(), false);
+        commit_allowed.insert("std.net.http.request".to_string(), false);
         commit_allowed.insert("std.game.state_delta".to_string(), true);
         commit_allowed.insert("std.shadow.run".to_string(), false);
         commit_allowed.insert("std.shadow.compare".to_string(), false);

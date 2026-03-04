@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
@@ -42,7 +42,7 @@ fn run_cli(args: &[String]) -> i32 {
         "init" => {
             let Some(path) = args.get(1) else {
                 eprintln!(
-                    "usage: ocl init <project_dir> [--template tool-cli|mini-game|shadow-preview] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]"
+                    "usage: ocl init <project_dir> [--template tool-cli|tool-http|tool-proc|tool-wallclock|mini-game|shadow-preview] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]"
                 );
                 return 2;
             };
@@ -430,41 +430,61 @@ fn run_cli(args: &[String]) -> i32 {
                 return 2;
             }
             with_view_env(view.as_ref().map(|v| v.view_id.as_str()), || {
-                if reactor_mode {
-                    let options = ReactorServiceOptions {
-                        ticks,
-                        runtime_mode,
-                        socket_listen: socket_listen.clone(),
-                        runtime_report: runtime_report.clone(),
-                        replay_audit: replay_audit.clone(),
-                        hive_caps: None,
-                        io_tape_record_path: None,
-                        io_tape_replay_path: None,
-                        universe_id: domain.as_ref().and_then(|v| {
-                            if v.universe_id == "__legacy__" {
-                                None
-                            } else {
-                                Some(v.universe_id.clone())
-                            }
-                        }),
-                        domain_id: domain.as_ref().and_then(|v| {
-                            if v.universe_id == "__legacy__" {
-                                None
-                            } else {
-                                Some(v.domain_id.clone())
-                            }
-                        }),
-                    };
-                    if let Some(shadow_cfg) = shadow_options.as_ref() {
-                        match run_reactor_service_with_shadow_compare(
-                            Path::new(path),
-                            &options,
-                            run_engine,
-                            locked,
-                            shadow_cfg,
-                        ) {
-                            Ok(summary) => {
-                                println!(
+                let mut runtime_updates = vec![
+                    (ENV_PROJECT_LANE_V08, Some(lane.clone())),
+                    (
+                        ENV_QUARANTINE_MODE_V08,
+                        if is_quarantine_lane_v08(&lane) {
+                            Some(CASSETTE_MODE_RECORD_V08.to_string())
+                        } else {
+                            None
+                        },
+                    ),
+                    (ENV_WALLCLOCK_RECORD_PATH_V08, None),
+                    (ENV_PROC_RECORD_PATH_V08, None),
+                    (ENV_HTTP_RECORD_PATH_V08, None),
+                    (ENV_CASSETTE_JSONL_PATH_V08, None),
+                    (ENV_CASSETTE_INDEX_PATH_V08, None),
+                ];
+                runtime_updates.extend(fs_runtime_env_updates_v08(path_ref));
+                runtime_updates.extend(proc_runtime_env_updates_v08(path_ref));
+                runtime_updates.extend(net_http_runtime_env_updates_v08(path_ref));
+                with_runtime_env_v08(runtime_updates, || {
+                    if reactor_mode {
+                        let options = ReactorServiceOptions {
+                            ticks,
+                            runtime_mode,
+                            socket_listen: socket_listen.clone(),
+                            runtime_report: runtime_report.clone(),
+                            replay_audit: replay_audit.clone(),
+                            hive_caps: None,
+                            io_tape_record_path: None,
+                            io_tape_replay_path: None,
+                            universe_id: domain.as_ref().and_then(|v| {
+                                if v.universe_id == "__legacy__" {
+                                    None
+                                } else {
+                                    Some(v.universe_id.clone())
+                                }
+                            }),
+                            domain_id: domain.as_ref().and_then(|v| {
+                                if v.universe_id == "__legacy__" {
+                                    None
+                                } else {
+                                    Some(v.domain_id.clone())
+                                }
+                            }),
+                        };
+                        if let Some(shadow_cfg) = shadow_options.as_ref() {
+                            match run_reactor_service_with_shadow_compare(
+                                Path::new(path),
+                                &options,
+                                run_engine,
+                                locked,
+                                shadow_cfg,
+                            ) {
+                                Ok(summary) => {
+                                    println!(
                                     "reactor run ok (mode={}, ticks={}, events={}, total_steps={}, backpressure={}, universe={}, domain={}, shadow={}, shadow_digest={})",
                                     summary.reactor.mode.as_str(),
                                     summary.reactor.ticks,
@@ -482,27 +502,27 @@ fn run_cli(args: &[String]) -> i32 {
                                     summary.compare.shadow_id,
                                     summary.compare.main_required_digest
                                 );
-                                println!(
-                                    "shadow report written: {}",
-                                    summary.artifacts.report_path.display()
-                                );
-                                if let Some(path) = &runtime_report {
-                                    println!("runtime report written: {}", path.display());
+                                    println!(
+                                        "shadow report written: {}",
+                                        summary.artifacts.report_path.display()
+                                    );
+                                    if let Some(path) = &runtime_report {
+                                        println!("runtime report written: {}", path.display());
+                                    }
+                                    if let Some(path) = &replay_audit {
+                                        println!("replay audit written: {}", path.display());
+                                    }
+                                    0
                                 }
-                                if let Some(path) = &replay_audit {
-                                    println!("replay audit written: {}", path.display());
+                                Err(err) => {
+                                    eprintln!("{err}");
+                                    exit_code_for_sdk_error(&err)
                                 }
-                                0
                             }
-                            Err(err) => {
-                                eprintln!("{err}");
-                                exit_code_for_sdk_error(&err)
-                            }
-                        }
-                    } else {
-                        match run_reactor_service_with_lock(Path::new(path), &options, locked) {
-                            Ok(summary) => {
-                                println!(
+                        } else {
+                            match run_reactor_service_with_lock(Path::new(path), &options, locked) {
+                                Ok(summary) => {
+                                    println!(
                                     "reactor run ok (mode={}, ticks={}, events={}, total_steps={}, backpressure={}, universe={}, domain={})",
                                     summary.mode.as_str(),
                                     summary.ticks,
@@ -518,12 +538,33 @@ fn run_cli(args: &[String]) -> i32 {
                                         .map(|v| v.domain_id.as_str())
                                         .unwrap_or("default")
                                 );
-                                if let Some(path) = &runtime_report {
-                                    println!("runtime report written: {}", path.display());
+                                    if let Some(path) = &runtime_report {
+                                        println!("runtime report written: {}", path.display());
+                                    }
+                                    if let Some(path) = &replay_audit {
+                                        println!("replay audit written: {}", path.display());
+                                    }
+                                    0
                                 }
-                                if let Some(path) = &replay_audit {
-                                    println!("replay audit written: {}", path.display());
+                                Err(err) => {
+                                    eprintln!("{err}");
+                                    1
                                 }
+                            }
+                        }
+                    } else if path_ref
+                        .extension()
+                        .and_then(|v| v.to_str())
+                        .map(|v| v.eq_ignore_ascii_case("oclpkg"))
+                        .unwrap_or(false)
+                    {
+                        match run_artifact(path_ref, run_engine, 4096) {
+                            Ok(summary) => {
+                                println!(
+                                    "run artifact ok (engine={}, steps={})",
+                                    run_engine.as_str(),
+                                    summary.steps
+                                );
                                 0
                             }
                             Err(err) => {
@@ -531,41 +572,21 @@ fn run_cli(args: &[String]) -> i32 {
                                 1
                             }
                         }
-                    }
-                } else if path_ref
-                    .extension()
-                    .and_then(|v| v.to_str())
-                    .map(|v| v.eq_ignore_ascii_case("oclpkg"))
-                    .unwrap_or(false)
-                {
-                    match run_artifact(path_ref, run_engine, 4096) {
-                        Ok(summary) => {
-                            println!(
-                                "run artifact ok (engine={}, steps={})",
-                                run_engine.as_str(),
-                                summary.steps
-                            );
-                            0
-                        }
-                        Err(err) => {
-                            eprintln!("{err}");
-                            1
-                        }
-                    }
-                } else if let Some(shadow_cfg) = shadow_options.as_ref() {
-                    match run_project_with_shadow_compare(path_ref, run_engine, locked, shadow_cfg)
-                    {
-                        Ok(summary) => {
-                            let artifact_dir = match emit_v071_artifacts_for_project_run(
-                                path_ref, run_engine, locked, None,
-                            ) {
-                                Ok(path) => path,
-                                Err(err) => {
-                                    eprintln!("{err}");
-                                    return 1;
-                                }
-                            };
-                            println!(
+                    } else if let Some(shadow_cfg) = shadow_options.as_ref() {
+                        match run_project_with_shadow_compare(
+                            path_ref, run_engine, locked, shadow_cfg,
+                        ) {
+                            Ok(summary) => {
+                                let artifact_dir = match emit_v071_artifacts_for_project_run(
+                                    path_ref, run_engine, locked, None,
+                                ) {
+                                    Ok(path) => path,
+                                    Err(err) => {
+                                        eprintln!("{err}");
+                                        return 1;
+                                    }
+                                };
+                                println!(
                                 "run ok (engine={}, steps={}, universe={}, domain={}, shadow={}, shadow_digest={})",
                                 run_engine.as_str(),
                                 summary.steps,
@@ -580,68 +601,69 @@ fn run_cli(args: &[String]) -> i32 {
                                 summary.compare.shadow_id,
                                 summary.compare.main_required_digest
                             );
-                            println!(
-                                "shadow report written: {}",
-                                summary.artifacts.report_path.display()
-                            );
-                            println!("v0.7.1 artifacts written: {}", artifact_dir.display());
-                            0
-                        }
-                        Err(err) => {
-                            eprintln!("{err}");
-                            if let Ok(path) = emit_v071_artifacts_for_project_run(
-                                path_ref,
-                                run_engine,
-                                locked,
-                                Some(&err),
-                            ) {
-                                println!("v0.7.1 artifacts written: {}", path.display());
+                                println!(
+                                    "shadow report written: {}",
+                                    summary.artifacts.report_path.display()
+                                );
+                                println!("v0.7.1 artifacts written: {}", artifact_dir.display());
+                                0
                             }
-                            exit_code_for_sdk_error(&err)
-                        }
-                    }
-                } else {
-                    match run_project_with_engine_and_lock(path_ref, run_engine, locked) {
-                        Ok(summary) => {
-                            let artifact_dir = match emit_v071_artifacts_for_project_run(
-                                path_ref, run_engine, locked, None,
-                            ) {
-                                Ok(path) => path,
-                                Err(err) => {
-                                    eprintln!("{err}");
-                                    return 1;
+                            Err(err) => {
+                                eprintln!("{err}");
+                                if let Ok(path) = emit_v071_artifacts_for_project_run(
+                                    path_ref,
+                                    run_engine,
+                                    locked,
+                                    Some(&err),
+                                ) {
+                                    println!("v0.7.1 artifacts written: {}", path.display());
                                 }
-                            };
-                            println!(
-                                "run ok (engine={}, steps={}, universe={}, domain={})",
-                                run_engine.as_str(),
-                                summary.steps,
-                                domain
-                                    .as_ref()
-                                    .map(|v| v.universe_id.as_str())
-                                    .unwrap_or("__legacy__"),
-                                domain
-                                    .as_ref()
-                                    .map(|v| v.domain_id.as_str())
-                                    .unwrap_or("default")
-                            );
-                            println!("v0.7.1 artifacts written: {}", artifact_dir.display());
-                            0
-                        }
-                        Err(err) => {
-                            eprintln!("{err}");
-                            if let Ok(path) = emit_v071_artifacts_for_project_run(
-                                path_ref,
-                                run_engine,
-                                locked,
-                                Some(&err),
-                            ) {
-                                println!("v0.7.1 artifacts written: {}", path.display());
+                                exit_code_for_sdk_error(&err)
                             }
-                            1
+                        }
+                    } else {
+                        match run_project_with_engine_and_lock(path_ref, run_engine, locked) {
+                            Ok(summary) => {
+                                let artifact_dir = match emit_v071_artifacts_for_project_run(
+                                    path_ref, run_engine, locked, None,
+                                ) {
+                                    Ok(path) => path,
+                                    Err(err) => {
+                                        eprintln!("{err}");
+                                        return 1;
+                                    }
+                                };
+                                println!(
+                                    "run ok (engine={}, steps={}, universe={}, domain={})",
+                                    run_engine.as_str(),
+                                    summary.steps,
+                                    domain
+                                        .as_ref()
+                                        .map(|v| v.universe_id.as_str())
+                                        .unwrap_or("__legacy__"),
+                                    domain
+                                        .as_ref()
+                                        .map(|v| v.domain_id.as_str())
+                                        .unwrap_or("default")
+                                );
+                                println!("v0.7.1 artifacts written: {}", artifact_dir.display());
+                                0
+                            }
+                            Err(err) => {
+                                eprintln!("{err}");
+                                if let Ok(path) = emit_v071_artifacts_for_project_run(
+                                    path_ref,
+                                    run_engine,
+                                    locked,
+                                    Some(&err),
+                                ) {
+                                    println!("v0.7.1 artifacts written: {}", path.display());
+                                }
+                                1
+                            }
                         }
                     }
-                }
+                })
             })
         }
         "replay" => {
@@ -2117,6 +2139,28 @@ where
     out
 }
 
+fn with_runtime_env_v08<T, F>(updates: Vec<(&'static str, Option<String>)>, run: F) -> T
+where
+    F: FnOnce() -> T,
+{
+    let mut prev = Vec::<(&'static str, Option<String>)>::new();
+    for (key, value) in &updates {
+        prev.push((*key, std::env::var(key).ok()));
+        match value {
+            Some(v) => std::env::set_var(key, v),
+            None => std::env::remove_var(key),
+        }
+    }
+    let out = run();
+    for (key, value) in prev {
+        match value {
+            Some(v) => std::env::set_var(key, v),
+            None => std::env::remove_var(key),
+        }
+    }
+    out
+}
+
 fn parse_path_with_flag(args: &[String], flag: &str) -> (Option<PathBuf>, bool) {
     let mut path = None;
     let mut has_flag = false;
@@ -2178,10 +2222,13 @@ fn parse_shadow_args(args: &[String]) -> Result<Option<ShadowOptionsV1>, i32> {
 fn apply_init_template_v072(root: &Path, template: &str) -> Result<(), SdkError> {
     match template {
         "tool-cli" => apply_tool_cli_template_v072(root),
+        "tool-http" => apply_tool_http_template_v08(root),
+        "tool-proc" => apply_tool_proc_template_v08(root),
+        "tool-wallclock" => apply_tool_wallclock_template_v08(root),
         "mini-game" => apply_mini_game_template_v073(root),
         "shadow-preview" => apply_shadow_preview_template_v073(root),
         _ => Err(SdkError::MissingProject(format!(
-            "V-INIT-TEMPLATE-UNKNOWN: unsupported template `{template}` (expected `tool-cli`, `mini-game`, or `shadow-preview`)"
+            "V-INIT-TEMPLATE-UNKNOWN: unsupported template `{template}` (expected `tool-cli`, `tool-http`, `tool-proc`, `tool-wallclock`, `mini-game`, or `shadow-preview`)"
         ))),
     }
 }
@@ -2268,6 +2315,220 @@ fn apply_tool_cli_template_v072(root: &Path) -> Result<(), SdkError> {
         fixtures_expected.join("out.json"),
         "{\n  \"input\": \"sample\"\n}\n",
     )?;
+    Ok(())
+}
+
+fn apply_tool_http_template_v08(root: &Path) -> Result<(), SdkError> {
+    let project_name = root
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("tool_http")
+        .replace('-', "_");
+
+    let manifest = format!(
+        concat!(
+            "[package]\n",
+            "name = \"{}\"\n",
+            "version = \"0.1.0\"\n\n",
+            "[project]\n",
+            "lane = \"quarantine\"\n",
+            "entry = \"src/main.ocl\"\n\n",
+            "[quarantine]\n",
+            "mode = \"record\"\n",
+            "max_cassette_bytes = 10485760\n",
+            "max_entries = 2000\n\n",
+            "[targets]\n",
+            "default = \"main\"\n\n",
+            "[dependencies]\n",
+            "std = \"0.1.0\"\n\n",
+            "[language]\n",
+            "guard_mode = \"return\"\n\n",
+            "[permissions.package]\n",
+            "allow = [\"std.net.http.*\", \"std.fs.*\"]\n",
+            "deny = []\n\n",
+            "[permissions.std_net_http]\n",
+            "enabled = true\n",
+            "allow_hosts = [\"mock.local\"]\n",
+            "allow_methods = [\"GET\"]\n",
+            "timeout_ms = 3000\n",
+            "max_body_bytes = 64\n\n",
+            "[permissions.std_fs]\n",
+            "read = [\"./out/**\"]\n",
+            "write = [\"./out/**\"]\n",
+            "remove = [\"./out/**\"]\n",
+            "rename = [\"./out/**\"]\n",
+            "list = [\"./out/**\"]\n",
+            "max_read_bytes = 1048576\n",
+            "max_write_bytes = 1048576\n",
+            "max_list_entries = 500\n"
+        ),
+        project_name
+    );
+    fs::write(root.join("Ocl.toml"), manifest)?;
+
+    let source = concat!(
+        "module app.tool_http;\n\n",
+        "observe(\"std.net.http.request\", \"tier2\", ctx(\"method=GET;url=http://mock.local/template-http;timeout_ms=3000;max_body_bytes=32\"), budget(8)) -> net;\n",
+        "observe(\"std.fs.mkdir\", \"tier2\", ctx(\"path=./out;recursive=true\"), budget(5)) -> mk;\n",
+        "commit(mk);\n",
+        "observe(\"std.fs.write_text\", \"tier2\", ctx(\"path=./out/http.txt;text=HTTP_TOOL_OK;overwrite=true\"), budget(5)) -> wr;\n",
+        "commit(wr);\n",
+        "condition(true);\n"
+    );
+    fs::write(root.join("src").join("main.ocl"), source)?;
+
+    let readme = concat!(
+        "# tool-http template\n\n",
+        "- Lane: `quarantine`\n",
+        "- Capability chính: `std.net.http.request` (record/replay qua cassette)\n\n",
+        "Run record:\n",
+        "- `OCL_QUARANTINE=1 ocl run .`\n\n",
+        "Replay:\n",
+        "- `OCL_QUARANTINE=1 ocl replay ./.ocl_artifacts/<run_id>`\n"
+    );
+    fs::write(root.join("README.md"), readme)?;
+    Ok(())
+}
+
+fn apply_tool_proc_template_v08(root: &Path) -> Result<(), SdkError> {
+    let project_name = root
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("tool_proc")
+        .replace('-', "_");
+
+    let manifest = format!(
+        concat!(
+            "[package]\n",
+            "name = \"{}\"\n",
+            "version = \"0.1.0\"\n\n",
+            "[project]\n",
+            "lane = \"quarantine\"\n",
+            "entry = \"src/main.ocl\"\n\n",
+            "[quarantine]\n",
+            "mode = \"record\"\n",
+            "max_cassette_bytes = 10485760\n",
+            "max_entries = 2000\n\n",
+            "[targets]\n",
+            "default = \"main\"\n\n",
+            "[dependencies]\n",
+            "std = \"0.1.0\"\n\n",
+            "[language]\n",
+            "guard_mode = \"return\"\n\n",
+            "[permissions.package]\n",
+            "allow = [\"std.proc.*\", \"std.fs.*\"]\n",
+            "deny = []\n\n",
+            "[permissions.std_proc]\n",
+            "enabled = true\n",
+            "allow_bins = [\"mock.proc\"]\n",
+            "timeout_ms = 3000\n",
+            "max_stdout_bytes = 128\n",
+            "max_stderr_bytes = 128\n\n",
+            "[permissions.std_fs]\n",
+            "read = [\"./out/**\"]\n",
+            "write = [\"./out/**\"]\n",
+            "remove = [\"./out/**\"]\n",
+            "rename = [\"./out/**\"]\n",
+            "list = [\"./out/**\"]\n",
+            "max_read_bytes = 1048576\n",
+            "max_write_bytes = 1048576\n",
+            "max_list_entries = 500\n"
+        ),
+        project_name
+    );
+    fs::write(root.join("Ocl.toml"), manifest)?;
+
+    let source = concat!(
+        "module app.tool_proc;\n\n",
+        "observe(\"std.proc.exec\", \"tier2\", ctx(\"bin=mock.proc;args=--template;timeout_ms=3000;max_stdout_bytes=32\"), budget(8)) -> proc_res;\n",
+        "observe(\"std.fs.mkdir\", \"tier2\", ctx(\"path=./out;recursive=true\"), budget(5)) -> mk;\n",
+        "commit(mk);\n",
+        "observe(\"std.fs.write_text\", \"tier2\", ctx(\"path=./out/proc.txt;text=PROC_TOOL_OK;overwrite=true\"), budget(5)) -> wr;\n",
+        "commit(wr);\n",
+        "condition(true);\n"
+    );
+    fs::write(root.join("src").join("main.ocl"), source)?;
+
+    let readme = concat!(
+        "# tool-proc template\n\n",
+        "- Lane: `quarantine`\n",
+        "- Capability chính: `std.proc.exec` (record/replay qua cassette)\n\n",
+        "Run record:\n",
+        "- `OCL_QUARANTINE=1 ocl run .`\n\n",
+        "Replay:\n",
+        "- `OCL_QUARANTINE=1 ocl replay ./.ocl_artifacts/<run_id>`\n"
+    );
+    fs::write(root.join("README.md"), readme)?;
+    Ok(())
+}
+
+fn apply_tool_wallclock_template_v08(root: &Path) -> Result<(), SdkError> {
+    let project_name = root
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("tool_wallclock")
+        .replace('-', "_");
+
+    let manifest = format!(
+        concat!(
+            "[package]\n",
+            "name = \"{}\"\n",
+            "version = \"0.1.0\"\n\n",
+            "[project]\n",
+            "lane = \"quarantine\"\n",
+            "entry = \"src/main.ocl\"\n\n",
+            "[quarantine]\n",
+            "mode = \"record\"\n",
+            "max_cassette_bytes = 10485760\n",
+            "max_entries = 2000\n\n",
+            "[targets]\n",
+            "default = \"main\"\n\n",
+            "[dependencies]\n",
+            "std = \"0.1.0\"\n\n",
+            "[language]\n",
+            "guard_mode = \"return\"\n\n",
+            "[permissions.package]\n",
+            "allow = [\"std.time.*\", \"std.fs.*\"]\n",
+            "deny = []\n\n",
+            "[permissions.std_time]\n",
+            "enabled = true\n",
+            "tick_mode = \"logical\"\n",
+            "dt_ms = 16\n\n",
+            "[permissions.std_fs]\n",
+            "read = [\"./out/**\"]\n",
+            "write = [\"./out/**\"]\n",
+            "remove = [\"./out/**\"]\n",
+            "rename = [\"./out/**\"]\n",
+            "list = [\"./out/**\"]\n",
+            "max_read_bytes = 1048576\n",
+            "max_write_bytes = 1048576\n",
+            "max_list_entries = 500\n"
+        ),
+        project_name
+    );
+    fs::write(root.join("Ocl.toml"), manifest)?;
+
+    let source = concat!(
+        "module app.tool_wallclock;\n\n",
+        "observe(\"std.time.wallclock.now\", \"tier2\", ctx(\"scope=tool\"), budget(8)) -> now;\n",
+        "observe(\"std.fs.mkdir\", \"tier2\", ctx(\"path=./out;recursive=true\"), budget(5)) -> mk;\n",
+        "commit(mk);\n",
+        "observe(\"std.fs.write_text\", \"tier2\", ctx(\"path=./out/wallclock.txt;text=WALLCLOCK_TOOL_OK;overwrite=true\"), budget(5)) -> wr;\n",
+        "commit(wr);\n",
+        "condition(true);\n"
+    );
+    fs::write(root.join("src").join("main.ocl"), source)?;
+
+    let readme = concat!(
+        "# tool-wallclock template\n\n",
+        "- Lane: `quarantine`\n",
+        "- Capability chính: `std.time.wallclock.now` (record/replay qua cassette)\n\n",
+        "Run record:\n",
+        "- `OCL_QUARANTINE=1 ocl run .`\n\n",
+        "Replay:\n",
+        "- `OCL_QUARANTINE=1 ocl replay ./.ocl_artifacts/<run_id>`\n"
+    );
+    fs::write(root.join("README.md"), readme)?;
     Ok(())
 }
 
@@ -2546,6 +2807,374 @@ fn read_lane_and_entry_for_v071(root: &Path) -> (String, String) {
     (lane, entry)
 }
 
+#[derive(Debug, Clone)]
+struct StdFsRuntimeConfigV08 {
+    read: Vec<String>,
+    write: Vec<String>,
+    remove: Vec<String>,
+    rename: Vec<String>,
+    list: Vec<String>,
+    max_read_bytes: u64,
+    max_write_bytes: u64,
+    max_list_entries: u32,
+}
+
+impl Default for StdFsRuntimeConfigV08 {
+    fn default() -> Self {
+        Self {
+            read: Vec::new(),
+            write: Vec::new(),
+            remove: Vec::new(),
+            rename: Vec::new(),
+            list: Vec::new(),
+            max_read_bytes: 1_048_576,
+            max_write_bytes: 1_048_576,
+            max_list_entries: 1_000,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct StdProcRuntimeConfigV08 {
+    enabled: bool,
+    allow_bins: Vec<String>,
+    timeout_ms: u32,
+    max_stdout_bytes: u64,
+    max_stderr_bytes: u64,
+}
+
+impl Default for StdProcRuntimeConfigV08 {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            allow_bins: Vec::new(),
+            timeout_ms: 5_000,
+            max_stdout_bytes: 1_048_576,
+            max_stderr_bytes: 1_048_576,
+        }
+    }
+}
+
+fn parse_string_array_literal_v08(value_raw: &str) -> Vec<String> {
+    let value = value_raw.trim();
+    if value.starts_with('[') && value.ends_with(']') {
+        let inner = &value[1..value.len() - 1];
+        if inner.trim().is_empty() {
+            return Vec::new();
+        }
+        return inner
+            .split(',')
+            .map(|v| v.trim().trim_matches('"').to_string())
+            .filter(|v| !v.is_empty())
+            .collect();
+    }
+    let single = value.trim_matches('"').to_string();
+    if single.is_empty() {
+        Vec::new()
+    } else {
+        vec![single]
+    }
+}
+
+fn read_std_fs_runtime_config_v08(root: &Path) -> Option<StdFsRuntimeConfigV08> {
+    let manifest_path = manifest_path_for_v071(root);
+    let Ok(raw) = fs::read_to_string(manifest_path) else {
+        return None;
+    };
+
+    let mut out = StdFsRuntimeConfigV08::default();
+    let mut section = String::new();
+    let mut section_seen = false;
+    for raw_line in raw.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            section = line[1..line.len() - 1].trim().to_string();
+            continue;
+        }
+        if section != "permissions.std_fs" {
+            continue;
+        }
+        section_seen = true;
+        let Some((k_raw, v_raw)) = line.split_once('=') else {
+            continue;
+        };
+        let key = k_raw.trim();
+        let value = v_raw.trim().trim_matches('"');
+        match key {
+            "read" => out.read = parse_string_array_literal_v08(v_raw),
+            "write" => out.write = parse_string_array_literal_v08(v_raw),
+            "remove" => out.remove = parse_string_array_literal_v08(v_raw),
+            "rename" => out.rename = parse_string_array_literal_v08(v_raw),
+            "list" => out.list = parse_string_array_literal_v08(v_raw),
+            "max_read_bytes" => {
+                if let Ok(parsed) = value.parse::<u64>() {
+                    out.max_read_bytes = parsed.max(1);
+                }
+            }
+            "max_write_bytes" => {
+                if let Ok(parsed) = value.parse::<u64>() {
+                    out.max_write_bytes = parsed.max(1);
+                }
+            }
+            "max_list_entries" => {
+                if let Ok(parsed) = value.parse::<u32>() {
+                    out.max_list_entries = parsed.max(1);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if !section_seen {
+        return None;
+    }
+
+    out.read.sort();
+    out.read.dedup();
+    out.write.sort();
+    out.write.dedup();
+    out.remove.sort();
+    out.remove.dedup();
+    out.rename.sort();
+    out.rename.dedup();
+    out.list.sort();
+    out.list.dedup();
+    Some(out)
+}
+
+fn fs_runtime_env_updates_v08(root: &Path) -> Vec<(&'static str, Option<String>)> {
+    let mut updates = vec![
+        (ENV_STD_FS_ROOT_V08, None),
+        (ENV_STD_FS_ALLOW_READ_V08, None),
+        (ENV_STD_FS_ALLOW_WRITE_V08, None),
+        (ENV_STD_FS_ALLOW_REMOVE_V08, None),
+        (ENV_STD_FS_ALLOW_RENAME_V08, None),
+        (ENV_STD_FS_ALLOW_LIST_V08, None),
+        (ENV_STD_FS_MAX_READ_BYTES_V08, None),
+        (ENV_STD_FS_MAX_WRITE_BYTES_V08, None),
+        (ENV_STD_FS_MAX_LIST_ENTRIES_V08, None),
+    ];
+    let Some(cfg) = read_std_fs_runtime_config_v08(root) else {
+        return updates;
+    };
+
+    let root_path = root
+        .canonicalize()
+        .unwrap_or_else(|_| root.to_path_buf())
+        .to_string_lossy()
+        .to_string();
+    updates[0] = (ENV_STD_FS_ROOT_V08, Some(root_path));
+    updates[1] = (ENV_STD_FS_ALLOW_READ_V08, Some(cfg.read.join(",")));
+    updates[2] = (ENV_STD_FS_ALLOW_WRITE_V08, Some(cfg.write.join(",")));
+    updates[3] = (ENV_STD_FS_ALLOW_REMOVE_V08, Some(cfg.remove.join(",")));
+    updates[4] = (ENV_STD_FS_ALLOW_RENAME_V08, Some(cfg.rename.join(",")));
+    updates[5] = (ENV_STD_FS_ALLOW_LIST_V08, Some(cfg.list.join(",")));
+    updates[6] = (
+        ENV_STD_FS_MAX_READ_BYTES_V08,
+        Some(cfg.max_read_bytes.to_string()),
+    );
+    updates[7] = (
+        ENV_STD_FS_MAX_WRITE_BYTES_V08,
+        Some(cfg.max_write_bytes.to_string()),
+    );
+    updates[8] = (
+        ENV_STD_FS_MAX_LIST_ENTRIES_V08,
+        Some(cfg.max_list_entries.to_string()),
+    );
+    updates
+}
+
+fn read_std_proc_runtime_config_v08(root: &Path) -> StdProcRuntimeConfigV08 {
+    let manifest_path = manifest_path_for_v071(root);
+    let Ok(raw) = fs::read_to_string(manifest_path) else {
+        return StdProcRuntimeConfigV08::default();
+    };
+
+    let mut out = StdProcRuntimeConfigV08::default();
+    let mut section = String::new();
+    for raw_line in raw.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            section = line[1..line.len() - 1].trim().to_string();
+            continue;
+        }
+        if section != "permissions.std_proc" {
+            continue;
+        }
+        let Some((k_raw, v_raw)) = line.split_once('=') else {
+            continue;
+        };
+        let key = k_raw.trim();
+        let value = v_raw.trim().trim_matches('"');
+        match key {
+            "enabled" => {
+                out.enabled = matches!(value, "true");
+            }
+            "allow_bins" => {
+                out.allow_bins = parse_string_array_literal_v08(v_raw);
+                out.allow_bins.sort();
+                out.allow_bins.dedup();
+            }
+            "timeout_ms" => {
+                if let Ok(parsed) = value.parse::<u32>() {
+                    out.timeout_ms = parsed.max(1);
+                }
+            }
+            "max_stdout_bytes" => {
+                if let Ok(parsed) = value.parse::<u64>() {
+                    out.max_stdout_bytes = parsed.max(1);
+                }
+            }
+            "max_stderr_bytes" => {
+                if let Ok(parsed) = value.parse::<u64>() {
+                    out.max_stderr_bytes = parsed.max(1);
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+fn proc_runtime_env_updates_v08(root: &Path) -> Vec<(&'static str, Option<String>)> {
+    let mut updates = vec![
+        (ENV_STD_PROC_ALLOW_BINS_V08, None),
+        (ENV_STD_PROC_TIMEOUT_MS_V08, None),
+        (ENV_STD_PROC_MAX_STDOUT_BYTES_V08, None),
+        (ENV_STD_PROC_MAX_STDERR_BYTES_V08, None),
+    ];
+    let cfg = read_std_proc_runtime_config_v08(root);
+    if !cfg.enabled {
+        return updates;
+    }
+    updates[0] = (ENV_STD_PROC_ALLOW_BINS_V08, Some(cfg.allow_bins.join(",")));
+    updates[1] = (
+        ENV_STD_PROC_TIMEOUT_MS_V08,
+        Some(cfg.timeout_ms.to_string()),
+    );
+    updates[2] = (
+        ENV_STD_PROC_MAX_STDOUT_BYTES_V08,
+        Some(cfg.max_stdout_bytes.to_string()),
+    );
+    updates[3] = (
+        ENV_STD_PROC_MAX_STDERR_BYTES_V08,
+        Some(cfg.max_stderr_bytes.to_string()),
+    );
+    updates
+}
+
+#[derive(Debug, Clone)]
+struct StdNetHttpRuntimeConfigV08 {
+    enabled: bool,
+    allow_hosts: Vec<String>,
+    allow_methods: Vec<String>,
+    timeout_ms: u32,
+    max_body_bytes: u64,
+}
+
+impl Default for StdNetHttpRuntimeConfigV08 {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            allow_hosts: Vec::new(),
+            allow_methods: Vec::new(),
+            timeout_ms: 5_000,
+            max_body_bytes: 1_048_576,
+        }
+    }
+}
+
+fn read_std_net_http_runtime_config_v08(root: &Path) -> StdNetHttpRuntimeConfigV08 {
+    let manifest_path = manifest_path_for_v071(root);
+    let Ok(raw) = fs::read_to_string(manifest_path) else {
+        return StdNetHttpRuntimeConfigV08::default();
+    };
+
+    let mut out = StdNetHttpRuntimeConfigV08::default();
+    let mut section = String::new();
+    for raw_line in raw.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            section = line[1..line.len() - 1].trim().to_string();
+            continue;
+        }
+        if section != "permissions.std_net_http" {
+            continue;
+        }
+        let Some((k_raw, v_raw)) = line.split_once('=') else {
+            continue;
+        };
+        let key = k_raw.trim();
+        let value = v_raw.trim().trim_matches('"');
+        match key {
+            "enabled" => {
+                out.enabled = matches!(value, "true");
+            }
+            "allow_hosts" => {
+                out.allow_hosts = parse_string_array_literal_v08(v_raw)
+                    .into_iter()
+                    .map(|v| v.to_ascii_lowercase())
+                    .collect();
+                out.allow_hosts.sort();
+                out.allow_hosts.dedup();
+            }
+            "allow_methods" => {
+                out.allow_methods = parse_string_array_literal_v08(v_raw)
+                    .into_iter()
+                    .map(|v| v.to_ascii_uppercase())
+                    .collect();
+                out.allow_methods.sort();
+                out.allow_methods.dedup();
+            }
+            "timeout_ms" => {
+                if let Ok(parsed) = value.parse::<u32>() {
+                    out.timeout_ms = parsed.max(1);
+                }
+            }
+            "max_body_bytes" => {
+                if let Ok(parsed) = value.parse::<u64>() {
+                    out.max_body_bytes = parsed.max(1);
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+fn net_http_runtime_env_updates_v08(root: &Path) -> Vec<(&'static str, Option<String>)> {
+    let mut updates = vec![
+        (ENV_STD_NET_ALLOW_HOSTS_V08, None),
+        (ENV_STD_NET_ALLOW_METHODS_V08, None),
+        (ENV_STD_NET_TIMEOUT_MS_V08, None),
+        (ENV_STD_NET_MAX_BODY_BYTES_V08, None),
+    ];
+    let cfg = read_std_net_http_runtime_config_v08(root);
+    if !cfg.enabled {
+        return updates;
+    }
+    updates[0] = (ENV_STD_NET_ALLOW_HOSTS_V08, Some(cfg.allow_hosts.join(",")));
+    updates[1] = (
+        ENV_STD_NET_ALLOW_METHODS_V08,
+        Some(cfg.allow_methods.join(",")),
+    );
+    updates[2] = (ENV_STD_NET_TIMEOUT_MS_V08, Some(cfg.timeout_ms.to_string()));
+    updates[3] = (
+        ENV_STD_NET_MAX_BODY_BYTES_V08,
+        Some(cfg.max_body_bytes.to_string()),
+    );
+    updates
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LaneModeV071 {
     LockedV06,
@@ -2584,7 +3213,39 @@ struct ReplaySpecV071 {
     lane: String,
     engine: RunEngine,
     signature: String,
+    mode: String,
+    cassette_hash: Option<String>,
+    hasher_version: Option<String>,
 }
+
+const CASSETTE_SCHEMA_VERSION_V08: &str = "v0.8";
+const CASSETTE_HASHER_VERSION_V08: &str = "sha256-v1";
+const CASSETTE_MODE_RECORD_V08: &str = "record";
+const CASSETTE_MODE_REPLAY_V08: &str = "replay";
+const ENV_PROJECT_LANE_V08: &str = "OCL_PROJECT_LANE";
+const ENV_QUARANTINE_MODE_V08: &str = "OCL_QUARANTINE_MODE";
+const ENV_WALLCLOCK_RECORD_PATH_V08: &str = "OCL_V08_WALLCLOCK_RECORD_PATH";
+const ENV_PROC_RECORD_PATH_V08: &str = "OCL_V08_PROC_RECORD_PATH";
+const ENV_HTTP_RECORD_PATH_V08: &str = "OCL_V08_HTTP_RECORD_PATH";
+const ENV_CASSETTE_JSONL_PATH_V08: &str = "OCL_V08_CASSETTE_JSONL_PATH";
+const ENV_CASSETTE_INDEX_PATH_V08: &str = "OCL_V08_CASSETTE_INDEX_PATH";
+const ENV_STD_FS_ROOT_V08: &str = "OCL_STD_FS_ROOT";
+const ENV_STD_FS_ALLOW_READ_V08: &str = "OCL_STD_FS_ALLOW_READ";
+const ENV_STD_FS_ALLOW_WRITE_V08: &str = "OCL_STD_FS_ALLOW_WRITE";
+const ENV_STD_FS_ALLOW_REMOVE_V08: &str = "OCL_STD_FS_ALLOW_REMOVE";
+const ENV_STD_FS_ALLOW_RENAME_V08: &str = "OCL_STD_FS_ALLOW_RENAME";
+const ENV_STD_FS_ALLOW_LIST_V08: &str = "OCL_STD_FS_ALLOW_LIST";
+const ENV_STD_FS_MAX_READ_BYTES_V08: &str = "OCL_STD_FS_MAX_READ_BYTES";
+const ENV_STD_FS_MAX_WRITE_BYTES_V08: &str = "OCL_STD_FS_MAX_WRITE_BYTES";
+const ENV_STD_FS_MAX_LIST_ENTRIES_V08: &str = "OCL_STD_FS_MAX_LIST_ENTRIES";
+const ENV_STD_PROC_ALLOW_BINS_V08: &str = "OCL_STD_PROC_ALLOW_BINS";
+const ENV_STD_PROC_TIMEOUT_MS_V08: &str = "OCL_STD_PROC_TIMEOUT_MS";
+const ENV_STD_PROC_MAX_STDOUT_BYTES_V08: &str = "OCL_STD_PROC_MAX_STDOUT_BYTES";
+const ENV_STD_PROC_MAX_STDERR_BYTES_V08: &str = "OCL_STD_PROC_MAX_STDERR_BYTES";
+const ENV_STD_NET_ALLOW_HOSTS_V08: &str = "OCL_STD_NET_ALLOW_HOSTS";
+const ENV_STD_NET_ALLOW_METHODS_V08: &str = "OCL_STD_NET_ALLOW_METHODS";
+const ENV_STD_NET_TIMEOUT_MS_V08: &str = "OCL_STD_NET_TIMEOUT_MS";
+const ENV_STD_NET_MAX_BODY_BYTES_V08: &str = "OCL_STD_NET_MAX_BODY_BYTES";
 
 fn parse_run_engine_literal(raw: &str) -> Result<RunEngine, SdkError> {
     match raw {
@@ -2604,6 +3265,9 @@ fn parse_replay_toml_v071(path: &Path) -> Result<ReplaySpecV071, SdkError> {
     let mut lane = "locked_v071".to_string();
     let mut engine = None::<RunEngine>;
     let mut signature = None::<String>;
+    let mut mode = CASSETTE_MODE_RECORD_V08.to_string();
+    let mut cassette_hash = None::<String>;
+    let mut hasher_version = None::<String>;
 
     for raw_line in raw.lines() {
         let line = raw_line.split('#').next().unwrap_or_default().trim();
@@ -2635,6 +3299,15 @@ fn parse_replay_toml_v071(path: &Path) -> Result<ReplaySpecV071, SdkError> {
             "signature" if !value.is_empty() => {
                 signature = Some(value.to_string());
             }
+            "mode" if !value.is_empty() => {
+                mode = value.to_string();
+            }
+            "cassette_hash" if !value.is_empty() => {
+                cassette_hash = Some(value.to_string());
+            }
+            "hasher_version" if !value.is_empty() => {
+                hasher_version = Some(value.to_string());
+            }
             _ => {}
         }
     }
@@ -2654,12 +3327,32 @@ fn parse_replay_toml_v071(path: &Path) -> Result<ReplaySpecV071, SdkError> {
             "V-REPLAY-MISSING-SIGNATURE: replay.toml missing `[replay].signature`".to_string(),
         ));
     };
+    if mode != CASSETTE_MODE_RECORD_V08 && mode != CASSETTE_MODE_REPLAY_V08 {
+        return Err(SdkError::MissingProject(format!(
+            "V-REPLAY-MODE-INVALID: unsupported mode `{mode}` in replay.toml"
+        )));
+    }
+    if lane == "quarantine" {
+        if cassette_hash.is_none() {
+            return Err(SdkError::MissingProject(
+                "V-CASSETTE-MISSING: replay.toml missing `[replay].cassette_hash` for quarantine lane (INSUFFICIENT(RC-CASSETTE-MISSING))".to_string(),
+            ));
+        }
+        if hasher_version.is_none() {
+            return Err(SdkError::MissingProject(
+                "V-CASSETTE-HASHER-MISSING: replay.toml missing `[replay].hasher_version` for quarantine lane".to_string(),
+            ));
+        }
+    }
 
     Ok(ReplaySpecV071 {
         root,
         lane,
         engine,
         signature,
+        mode,
+        cassette_hash,
+        hasher_version,
     })
 }
 
@@ -2672,7 +3365,579 @@ fn locked_from_lane_v071(lane: &str) -> bool {
     }
 }
 
-fn signature_with_lane_v071(payload: &str, lane: &str) -> String {
+fn is_quarantine_lane_v08(lane: &str) -> bool {
+    matches!(parse_lane_mode_v071(lane), Ok(LaneModeV071::Quarantine))
+}
+
+fn build_cassette_index_json_v08(
+    call_id_to_entry_id: &BTreeMap<u64, String>,
+    mode: &str,
+) -> String {
+    let mut out = String::new();
+    out.push_str("{\n");
+    out.push_str("  \"schema_version\":\"");
+    out.push_str(CASSETTE_SCHEMA_VERSION_V08);
+    out.push_str("\",\n");
+    out.push_str("  \"mode\":\"");
+    out.push_str(mode);
+    out.push_str("\",\n");
+    out.push_str("  \"call_id_to_entry_id\":{");
+    if call_id_to_entry_id.is_empty() {
+        out.push_str("},\n");
+    } else {
+        out.push('\n');
+        let len = call_id_to_entry_id.len();
+        for (idx, (call_id, entry_id)) in call_id_to_entry_id.iter().enumerate() {
+            out.push_str("    \"");
+            out.push_str(&call_id.to_string());
+            out.push_str("\":\"");
+            out.push_str(&json_escape(entry_id));
+            out.push('"');
+            if idx + 1 != len {
+                out.push(',');
+            }
+            out.push('\n');
+        }
+        out.push_str("  },\n");
+    }
+    out.push_str("  \"entries\":");
+    out.push_str(&call_id_to_entry_id.len().to_string());
+    out.push_str(",\n");
+    out.push_str("  \"next_call_id\":");
+    out.push_str(&call_id_to_entry_id.len().to_string());
+    out.push('\n');
+    out.push_str("}\n");
+    out
+}
+
+fn compute_cassette_hash_v08(
+    cassette_jsonl: &str,
+    cassette_index_json: &str,
+    lane: &str,
+    mode: &str,
+) -> String {
+    let canonical = format!(
+        concat!(
+            "schema_version={}\n",
+            "hasher_version={}\n",
+            "lane={}\n",
+            "mode={}\n",
+            "---cassette.jsonl---\n{}\n",
+            "---cassette_index.json---\n{}\n"
+        ),
+        CASSETTE_SCHEMA_VERSION_V08,
+        CASSETTE_HASHER_VERSION_V08,
+        lane,
+        mode,
+        cassette_jsonl,
+        cassette_index_json
+    );
+    sha256_hex(canonical.as_bytes())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WallclockRecordV08 {
+    call_id: u64,
+    unix_ms: String,
+    iso: String,
+}
+
+fn load_wallclock_record_source_v08(path: &Path) -> Result<Vec<WallclockRecordV08>, SdkError> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let raw = fs::read_to_string(path)?;
+    let mut out = Vec::<WallclockRecordV08>::new();
+    for (idx, line) in raw.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = trimmed.splitn(3, '|').collect();
+        if parts.len() != 3 {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-WALLCLOCK-FORMAT: invalid record line {} in {}",
+                idx + 1,
+                path.display()
+            )));
+        }
+        let call_id = parts[0].parse::<u64>().map_err(|_| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-WALLCLOCK-FORMAT: invalid call_id at line {} in {}",
+                idx + 1,
+                path.display()
+            ))
+        })?;
+        out.push(WallclockRecordV08 {
+            call_id,
+            unix_ms: parts[1].to_string(),
+            iso: parts[2].to_string(),
+        });
+    }
+    out.sort_by(|a, b| a.call_id.cmp(&b.call_id));
+    Ok(out)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ProcRecordV08 {
+    call_id: u64,
+    exit_code: i64,
+    truncated: bool,
+    stdout_hex: String,
+    stderr_hex: String,
+}
+
+fn is_hex_literal_v08(raw: &str) -> bool {
+    if !raw.len().is_multiple_of(2) {
+        return false;
+    }
+    raw.chars().all(|ch| ch.is_ascii_hexdigit())
+}
+
+fn hex_decode_v08_cli(raw: &str) -> Result<Vec<u8>, ()> {
+    if !raw.len().is_multiple_of(2) {
+        return Err(());
+    }
+    let mut out = Vec::with_capacity(raw.len() / 2);
+    let mut idx = 0usize;
+    while idx < raw.len() {
+        let value = u8::from_str_radix(&raw[idx..idx + 2], 16).map_err(|_| ())?;
+        out.push(value);
+        idx += 2;
+    }
+    Ok(out)
+}
+
+fn load_proc_record_source_v08(path: &Path) -> Result<Vec<ProcRecordV08>, SdkError> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let raw = fs::read_to_string(path)?;
+    let mut out = Vec::<ProcRecordV08>::new();
+    for (idx, line) in raw.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = trimmed.splitn(5, '|').collect();
+        if parts.len() != 5 {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-PROC-FORMAT: invalid record line {} in {}",
+                idx + 1,
+                path.display()
+            )));
+        }
+        let call_id = parts[0].parse::<u64>().map_err(|_| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-PROC-FORMAT: invalid call_id at line {} in {}",
+                idx + 1,
+                path.display()
+            ))
+        })?;
+        let exit_code = parts[1].parse::<i64>().map_err(|_| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-PROC-FORMAT: invalid exit_code at line {} in {}",
+                idx + 1,
+                path.display()
+            ))
+        })?;
+        let truncated = match parts[2] {
+            "1" => true,
+            "0" => false,
+            _ => {
+                return Err(SdkError::MissingProject(format!(
+                    "V-CASSETTE-PROC-FORMAT: invalid truncated flag at line {} in {}",
+                    idx + 1,
+                    path.display()
+                )));
+            }
+        };
+        let stdout_hex = parts[3].to_string();
+        let stderr_hex = parts[4].to_string();
+        if !is_hex_literal_v08(&stdout_hex) || !is_hex_literal_v08(&stderr_hex) {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-PROC-FORMAT: invalid hex payload at line {} in {}",
+                idx + 1,
+                path.display()
+            )));
+        }
+        out.push(ProcRecordV08 {
+            call_id,
+            exit_code,
+            truncated,
+            stdout_hex,
+            stderr_hex,
+        });
+    }
+    out.sort_by(|a, b| a.call_id.cmp(&b.call_id));
+    Ok(out)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NetHttpRecordV08 {
+    call_id: u64,
+    method: String,
+    url: String,
+    req_hash: String,
+    status: i64,
+    truncated: bool,
+    body_hex: String,
+    headers_hex: String,
+}
+
+fn load_net_http_record_source_v08(path: &Path) -> Result<Vec<NetHttpRecordV08>, SdkError> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let raw = fs::read_to_string(path)?;
+    let mut out = Vec::<NetHttpRecordV08>::new();
+    for (idx, line) in raw.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = trimmed.splitn(8, '|').collect();
+        if parts.len() != 8 {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-NETHTTP-FORMAT: invalid record line {} in {}",
+                idx + 1,
+                path.display()
+            )));
+        }
+        let call_id = parts[0].parse::<u64>().map_err(|_| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-NETHTTP-FORMAT: invalid call_id at line {} in {}",
+                idx + 1,
+                path.display()
+            ))
+        })?;
+        let method = parts[1].trim().to_ascii_uppercase();
+        if method.is_empty() {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-NETHTTP-FORMAT: empty method at line {} in {}",
+                idx + 1,
+                path.display()
+            )));
+        }
+        let url_hex = parts[2];
+        if !is_hex_literal_v08(url_hex) {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-NETHTTP-FORMAT: invalid url_hex at line {} in {}",
+                idx + 1,
+                path.display()
+            )));
+        }
+        let url = String::from_utf8(hex_decode_v08_cli(url_hex).map_err(|_| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-NETHTTP-FORMAT: invalid url bytes at line {} in {}",
+                idx + 1,
+                path.display()
+            ))
+        })?)
+        .map_err(|_| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-NETHTTP-FORMAT: non-utf8 url at line {} in {}",
+                idx + 1,
+                path.display()
+            ))
+        })?;
+        let req_hash = parts[3].to_string();
+        if req_hash.is_empty() {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-NETHTTP-FORMAT: empty req_hash at line {} in {}",
+                idx + 1,
+                path.display()
+            )));
+        }
+        let status = parts[4].parse::<i64>().map_err(|_| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-NETHTTP-FORMAT: invalid status at line {} in {}",
+                idx + 1,
+                path.display()
+            ))
+        })?;
+        let truncated = match parts[5] {
+            "1" => true,
+            "0" => false,
+            _ => {
+                return Err(SdkError::MissingProject(format!(
+                    "V-CASSETTE-NETHTTP-FORMAT: invalid truncated flag at line {} in {}",
+                    idx + 1,
+                    path.display()
+                )));
+            }
+        };
+        let body_hex = parts[6].to_string();
+        let headers_hex = parts[7].to_string();
+        if !is_hex_literal_v08(&body_hex) || !is_hex_literal_v08(&headers_hex) {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-NETHTTP-FORMAT: invalid hex payload at line {} in {}",
+                idx + 1,
+                path.display()
+            )));
+        }
+        out.push(NetHttpRecordV08 {
+            call_id,
+            method,
+            url,
+            req_hash,
+            status,
+            truncated,
+            body_hex,
+            headers_hex,
+        });
+    }
+    out.sort_by(|a, b| a.call_id.cmp(&b.call_id));
+    Ok(out)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CassetteRecordRowV08 {
+    Wallclock(WallclockRecordV08),
+    Proc(ProcRecordV08),
+    NetHttp(NetHttpRecordV08),
+}
+
+fn write_quarantine_cassette_bundle_v08(
+    artifact_dir: &Path,
+    lane: &str,
+    mode: &str,
+    wallclock_record_path: Option<&Path>,
+    proc_record_path: Option<&Path>,
+    net_http_record_path: Option<&Path>,
+) -> Result<String, SdkError> {
+    let cassette_dir = artifact_dir.join("cassette");
+    fs::create_dir_all(&cassette_dir)?;
+
+    let wallclock_rows = match wallclock_record_path {
+        Some(path) => load_wallclock_record_source_v08(path)?,
+        None => Vec::new(),
+    };
+    let proc_rows = match proc_record_path {
+        Some(path) => load_proc_record_source_v08(path)?,
+        None => Vec::new(),
+    };
+    let net_http_rows = match net_http_record_path {
+        Some(path) => load_net_http_record_source_v08(path)?,
+        None => Vec::new(),
+    };
+
+    let mut rows = Vec::<(u64, CassetteRecordRowV08)>::new();
+    for row in wallclock_rows {
+        rows.push((row.call_id, CassetteRecordRowV08::Wallclock(row)));
+    }
+    for row in proc_rows {
+        rows.push((row.call_id, CassetteRecordRowV08::Proc(row)));
+    }
+    for row in net_http_rows {
+        rows.push((row.call_id, CassetteRecordRowV08::NetHttp(row)));
+    }
+    rows.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let mut cassette_jsonl = String::new();
+    let mut call_map = BTreeMap::<u64, String>::new();
+    for (seq, (call_id, row)) in rows.iter().enumerate() {
+        let entry_id = format!("entry-{:06}", call_id);
+        call_map.insert(*call_id, entry_id.clone());
+        match row {
+            CassetteRecordRowV08::Wallclock(row) => {
+                let entry_core = format!(
+                    concat!(
+                        "{{\"seq\":{},\"id\":\"{}\",\"cap\":\"std.time.wallclock.now\",",
+                        "\"call_id\":{},\"kind\":\"OK\",\"req\":{{}},\"res\":{{\"unix_ms\":\"{}\",\"iso\":\"{}\"}}}}"
+                    ),
+                    seq,
+                    json_escape(&entry_id),
+                    call_id,
+                    json_escape(&row.unix_ms),
+                    json_escape(&row.iso)
+                );
+                let entry_hash = sha256_hex(entry_core.as_bytes());
+                cassette_jsonl.push_str(&format!(
+                    concat!(
+                        "{{\"seq\":{},\"id\":\"{}\",\"cap\":\"std.time.wallclock.now\",",
+                        "\"call_id\":{},\"kind\":\"OK\",\"req\":{{}},",
+                        "\"res\":{{\"unix_ms\":\"{}\",\"iso\":\"{}\"}},\"hash\":\"{}\"}}\n"
+                    ),
+                    seq,
+                    json_escape(&entry_id),
+                    call_id,
+                    json_escape(&row.unix_ms),
+                    json_escape(&row.iso),
+                    entry_hash
+                ));
+            }
+            CassetteRecordRowV08::Proc(row) => {
+                let kind = if row.truncated { "DEGRADED" } else { "OK" };
+                let truncated_text = if row.truncated { "true" } else { "false" };
+                let entry_core = format!(
+                    concat!(
+                        "{{\"seq\":{},\"id\":\"{}\",\"cap\":\"std.proc.exec\",",
+                        "\"call_id\":{},\"kind\":\"{}\",\"req\":{{}},",
+                        "\"res\":{{\"exit_code\":\"{}\",\"stdout_hex\":\"{}\",\"stderr_hex\":\"{}\",\"truncated\":\"{}\"}}}}"
+                    ),
+                    seq,
+                    json_escape(&entry_id),
+                    call_id,
+                    kind,
+                    row.exit_code,
+                    json_escape(&row.stdout_hex),
+                    json_escape(&row.stderr_hex),
+                    truncated_text
+                );
+                let entry_hash = sha256_hex(entry_core.as_bytes());
+                cassette_jsonl.push_str(&format!(
+                    concat!(
+                        "{{\"seq\":{},\"id\":\"{}\",\"cap\":\"std.proc.exec\",",
+                        "\"call_id\":{},\"kind\":\"{}\",\"req\":{{}},",
+                        "\"res\":{{\"exit_code\":\"{}\",\"stdout_hex\":\"{}\",\"stderr_hex\":\"{}\",\"truncated\":\"{}\"}},\"hash\":\"{}\"}}\n"
+                    ),
+                    seq,
+                    json_escape(&entry_id),
+                    call_id,
+                    kind,
+                    row.exit_code,
+                    json_escape(&row.stdout_hex),
+                    json_escape(&row.stderr_hex),
+                    truncated_text,
+                    entry_hash
+                ));
+            }
+            CassetteRecordRowV08::NetHttp(row) => {
+                let kind = if row.truncated { "DEGRADED" } else { "OK" };
+                let truncated_text = if row.truncated { "true" } else { "false" };
+                let entry_core = format!(
+                    concat!(
+                        "{{\"seq\":{},\"id\":\"{}\",\"cap\":\"std.net.http.request\",",
+                        "\"call_id\":{},\"kind\":\"{}\",",
+                        "\"req\":{{\"method\":\"{}\",\"url\":\"{}\",\"req_hash\":\"{}\"}},",
+                        "\"res\":{{\"status\":\"{}\",\"body_hex\":\"{}\",\"headers_hex\":\"{}\",\"truncated\":\"{}\"}}}}"
+                    ),
+                    seq,
+                    json_escape(&entry_id),
+                    call_id,
+                    kind,
+                    json_escape(&row.method),
+                    json_escape(&row.url),
+                    json_escape(&row.req_hash),
+                    row.status,
+                    json_escape(&row.body_hex),
+                    json_escape(&row.headers_hex),
+                    truncated_text
+                );
+                let entry_hash = sha256_hex(entry_core.as_bytes());
+                cassette_jsonl.push_str(&format!(
+                    concat!(
+                        "{{\"seq\":{},\"id\":\"{}\",\"cap\":\"std.net.http.request\",",
+                        "\"call_id\":{},\"kind\":\"{}\",",
+                        "\"req\":{{\"method\":\"{}\",\"url\":\"{}\",\"req_hash\":\"{}\"}},",
+                        "\"res\":{{\"status\":\"{}\",\"body_hex\":\"{}\",\"headers_hex\":\"{}\",\"truncated\":\"{}\"}},\"hash\":\"{}\"}}\n"
+                    ),
+                    seq,
+                    json_escape(&entry_id),
+                    call_id,
+                    kind,
+                    json_escape(&row.method),
+                    json_escape(&row.url),
+                    json_escape(&row.req_hash),
+                    row.status,
+                    json_escape(&row.body_hex),
+                    json_escape(&row.headers_hex),
+                    truncated_text,
+                    entry_hash
+                ));
+            }
+        }
+    }
+
+    let cassette_index_json = build_cassette_index_json_v08(&call_map, mode);
+    let cassette_hash =
+        compute_cassette_hash_v08(&cassette_jsonl, &cassette_index_json, lane, mode);
+
+    let cassette_jsonl_path = cassette_dir.join("cassette.jsonl");
+    let cassette_index_path = cassette_dir.join("cassette_index.json");
+    let cassette_meta_path = cassette_dir.join("cassette_meta.toml");
+    let cassette_hash_path = cassette_dir.join("cassette_hash.txt");
+
+    fs::write(&cassette_jsonl_path, cassette_jsonl)?;
+    fs::write(&cassette_index_path, &cassette_index_json)?;
+
+    let created_at_unix_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let cassette_meta = format!(
+        concat!(
+            "schema_version = \"{}\"\n",
+            "lane = \"{}\"\n",
+            "mode = \"{}\"\n",
+            "hasher_version = \"{}\"\n",
+            "created_at_unix_ms = {}\n"
+        ),
+        CASSETTE_SCHEMA_VERSION_V08, lane, mode, CASSETTE_HASHER_VERSION_V08, created_at_unix_ms
+    );
+    fs::write(&cassette_meta_path, cassette_meta)?;
+    fs::write(cassette_hash_path, format!("{cassette_hash}\n"))?;
+    Ok(cassette_hash)
+}
+
+fn validate_quarantine_cassette_bundle_v08(
+    artifact_dir: &Path,
+    lane: &str,
+    mode: &str,
+    expected_hash: &str,
+) -> Result<(), SdkError> {
+    let cassette_dir = artifact_dir.join("cassette");
+    if !cassette_dir.exists() {
+        return Err(SdkError::MissingProject(
+            "V-CASSETTE-MISSING: missing cassette directory (INSUFFICIENT(RC-CASSETTE-MISSING))"
+                .to_string(),
+        ));
+    }
+    let cassette_jsonl_path = cassette_dir.join("cassette.jsonl");
+    let cassette_index_path = cassette_dir.join("cassette_index.json");
+    let cassette_meta_path = cassette_dir.join("cassette_meta.toml");
+    let cassette_hash_path = cassette_dir.join("cassette_hash.txt");
+    for path in [
+        &cassette_jsonl_path,
+        &cassette_index_path,
+        &cassette_meta_path,
+        &cassette_hash_path,
+    ] {
+        if !path.exists() {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-MISSING: missing {} (INSUFFICIENT(RC-CASSETTE-MISSING))",
+                path.display()
+            )));
+        }
+    }
+    let cassette_jsonl = fs::read_to_string(&cassette_jsonl_path)?;
+    let cassette_index = fs::read_to_string(&cassette_index_path)?;
+    let actual_hash = compute_cassette_hash_v08(&cassette_jsonl, &cassette_index, lane, mode);
+    if actual_hash != expected_hash {
+        return Err(SdkError::MissingProject(format!(
+            "V-CASSETTE-HASH-MISMATCH: expected={} actual={}",
+            expected_hash, actual_hash
+        )));
+    }
+    let stored_hash = fs::read_to_string(cassette_hash_path)?.trim().to_string();
+    if stored_hash != expected_hash {
+        return Err(SdkError::MissingProject(format!(
+            "V-CASSETTE-HASH-FILE-MISMATCH: expected={} stored={}",
+            expected_hash, stored_hash
+        )));
+    }
+    Ok(())
+}
+
+fn signature_with_lane_v071(payload: &str, lane: &str, cassette_hash: Option<&str>) -> String {
+    if is_quarantine_lane_v08(lane) {
+        let canonical = format!(
+            "lane={lane}\npayload={payload}\ncassette_hash={}\n",
+            cassette_hash.unwrap_or_default()
+        );
+        return sha256_hex(canonical.as_bytes());
+    }
     fnv1a64_hex(&format!("lane={lane}\npayload={payload}"))
 }
 
@@ -2688,9 +3953,71 @@ fn replay_v071(artifact_dir: &Path) -> Result<String, SdkError> {
     let spec = parse_replay_toml_v071(&replay_toml)?;
     parse_lane_mode_v071(&spec.lane)?;
     enforce_quarantine_lane_gate_v073(&spec.lane)?;
+    if is_quarantine_lane_v08(&spec.lane) {
+        if spec.hasher_version.as_deref() != Some(CASSETTE_HASHER_VERSION_V08) {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-HASHER-UNSUPPORTED: expected={} actual={}",
+                CASSETTE_HASHER_VERSION_V08,
+                spec.hasher_version.as_deref().unwrap_or("<missing>")
+            )));
+        }
+        let expected_hash = spec.cassette_hash.as_deref().ok_or_else(|| {
+            SdkError::MissingProject(
+                "V-CASSETTE-MISSING: replay.toml missing cassette hash for quarantine replay"
+                    .to_string(),
+            )
+        })?;
+        validate_quarantine_cassette_bundle_v08(
+            artifact_dir,
+            &spec.lane,
+            &spec.mode,
+            expected_hash,
+        )?;
+    }
     let locked = locked_from_lane_v071(&spec.lane);
-    let trace = run_project_with_trace_engine_and_lock(&spec.root, spec.engine, locked)?;
-    let actual = signature_with_lane_v071(&trace_required_digest(&trace.events), &spec.lane);
+    let cassette_jsonl_path = artifact_dir.join("cassette").join("cassette.jsonl");
+    let cassette_index_path = artifact_dir.join("cassette").join("cassette_index.json");
+    let mut runtime_updates = vec![
+        (ENV_PROJECT_LANE_V08, Some(spec.lane.clone())),
+        (
+            ENV_QUARANTINE_MODE_V08,
+            if is_quarantine_lane_v08(&spec.lane) {
+                Some(CASSETTE_MODE_REPLAY_V08.to_string())
+            } else {
+                None
+            },
+        ),
+        (ENV_WALLCLOCK_RECORD_PATH_V08, None),
+        (ENV_PROC_RECORD_PATH_V08, None),
+        (ENV_HTTP_RECORD_PATH_V08, None),
+        (
+            ENV_CASSETTE_JSONL_PATH_V08,
+            if is_quarantine_lane_v08(&spec.lane) {
+                Some(cassette_jsonl_path.to_string_lossy().to_string())
+            } else {
+                None
+            },
+        ),
+        (
+            ENV_CASSETTE_INDEX_PATH_V08,
+            if is_quarantine_lane_v08(&spec.lane) {
+                Some(cassette_index_path.to_string_lossy().to_string())
+            } else {
+                None
+            },
+        ),
+    ];
+    runtime_updates.extend(fs_runtime_env_updates_v08(&spec.root));
+    runtime_updates.extend(proc_runtime_env_updates_v08(&spec.root));
+    runtime_updates.extend(net_http_runtime_env_updates_v08(&spec.root));
+    let trace = with_runtime_env_v08(runtime_updates, || {
+        run_project_with_trace_engine_and_lock(&spec.root, spec.engine, locked)
+    })?;
+    let actual = signature_with_lane_v071(
+        &trace_required_digest(&trace.events),
+        &spec.lane,
+        spec.cassette_hash.as_deref(),
+    );
     if actual != spec.signature {
         return Err(SdkError::MissingProject(format!(
             "V-REPLAY-SIGNATURE-MISMATCH: expected={} actual={} lane={} root={}",
@@ -2830,9 +4157,12 @@ fn build_v071_replay_toml(
     entry: &str,
     engine: RunEngine,
     signature: &str,
+    mode: &str,
+    cassette_hash: Option<&str>,
+    hasher_version: Option<&str>,
 ) -> String {
     let root_norm = root.to_string_lossy().replace('\\', "/");
-    format!(
+    let mut out = format!(
         concat!(
             "[replay]\n",
             "run_id = \"{}\"\n",
@@ -2840,15 +4170,28 @@ fn build_v071_replay_toml(
             "entry = \"{}\"\n",
             "lane = \"{}\"\n",
             "engine = \"{}\"\n",
-            "signature = \"{}\"\n"
+            "signature = \"{}\"\n",
+            "mode = \"{}\"\n"
         ),
         run_id,
         root_norm,
         entry,
         lane,
         engine.as_str(),
-        signature
-    )
+        signature,
+        mode
+    );
+    if let Some(hash) = cassette_hash {
+        out.push_str("cassette_hash = \"");
+        out.push_str(hash);
+        out.push_str("\"\n");
+    }
+    if let Some(version) = hasher_version {
+        out.push_str("hasher_version = \"");
+        out.push_str(version);
+        out.push_str("\"\n");
+    }
+    out
 }
 
 fn emit_v071_artifacts_for_project_run(
@@ -2867,11 +4210,83 @@ fn emit_v071_artifacts_for_project_run(
     let (lane, entry) = read_lane_and_entry_for_v071(project_root);
     parse_lane_mode_v071(&lane)?;
     enforce_quarantine_lane_gate_v073(&lane)?;
+    let is_quarantine = is_quarantine_lane_v08(&lane);
+    let wallclock_record_path = artifact_dir.join("cassette").join(".wallclock.record.tmp");
+    let proc_record_path = artifact_dir.join("cassette").join(".proc.record.tmp");
+    let net_http_record_path = artifact_dir.join("cassette").join(".http.record.tmp");
+    if let Some(parent) = wallclock_record_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    if wallclock_record_path.exists() {
+        fs::remove_file(&wallclock_record_path)?;
+    }
+    if proc_record_path.exists() {
+        fs::remove_file(&proc_record_path)?;
+    }
+    if net_http_record_path.exists() {
+        fs::remove_file(&net_http_record_path)?;
+    }
+    let mut runtime_updates = vec![
+        (ENV_PROJECT_LANE_V08, Some(lane.clone())),
+        (
+            ENV_QUARANTINE_MODE_V08,
+            if is_quarantine {
+                Some(CASSETTE_MODE_RECORD_V08.to_string())
+            } else {
+                None
+            },
+        ),
+        (
+            ENV_WALLCLOCK_RECORD_PATH_V08,
+            if is_quarantine {
+                Some(wallclock_record_path.to_string_lossy().to_string())
+            } else {
+                None
+            },
+        ),
+        (
+            ENV_PROC_RECORD_PATH_V08,
+            if is_quarantine {
+                Some(proc_record_path.to_string_lossy().to_string())
+            } else {
+                None
+            },
+        ),
+        (
+            ENV_HTTP_RECORD_PATH_V08,
+            if is_quarantine {
+                Some(net_http_record_path.to_string_lossy().to_string())
+            } else {
+                None
+            },
+        ),
+        (ENV_CASSETTE_JSONL_PATH_V08, None),
+        (ENV_CASSETTE_INDEX_PATH_V08, None),
+    ];
+    runtime_updates.extend(fs_runtime_env_updates_v08(project_root));
+    runtime_updates.extend(proc_runtime_env_updates_v08(project_root));
+    runtime_updates.extend(net_http_runtime_env_updates_v08(project_root));
+    let trace_run = with_runtime_env_v08(runtime_updates, || {
+        run_project_with_trace_engine_and_lock(project_root, run_engine, locked)
+    });
 
-    match run_project_with_trace_engine_and_lock(project_root, run_engine, locked) {
+    match trace_run {
         Ok(trace_summary) => {
+            let cassette_hash = if is_quarantine {
+                Some(write_quarantine_cassette_bundle_v08(
+                    &artifact_dir,
+                    &lane,
+                    CASSETTE_MODE_RECORD_V08,
+                    Some(&wallclock_record_path),
+                    Some(&proc_record_path),
+                    Some(&net_http_record_path),
+                )?)
+            } else {
+                None
+            };
             let required_digest = trace_required_digest(&trace_summary.events);
-            let signature = signature_with_lane_v071(&required_digest, &lane);
+            let signature =
+                signature_with_lane_v071(&required_digest, &lane, cassette_hash.as_deref());
             let mut audit_text = String::new();
             audit_text.push_str(&encode_v071_lane_marker_line(&lane));
             audit_text.push('\n');
@@ -2890,10 +4305,29 @@ fn emit_v071_artifacts_for_project_run(
                     &entry,
                     run_engine,
                     &signature,
+                    CASSETTE_MODE_RECORD_V08,
+                    cassette_hash.as_deref(),
+                    if is_quarantine {
+                        Some(CASSETTE_HASHER_VERSION_V08)
+                    } else {
+                        None
+                    },
                 ),
             )?;
         }
         Err(trace_err) => {
+            let cassette_hash = if is_quarantine {
+                Some(write_quarantine_cassette_bundle_v08(
+                    &artifact_dir,
+                    &lane,
+                    CASSETTE_MODE_RECORD_V08,
+                    Some(&wallclock_record_path),
+                    Some(&proc_record_path),
+                    Some(&net_http_record_path),
+                )?)
+            } else {
+                None
+            };
             let err_ref = primary_error.unwrap_or(&trace_err);
             let (code, phase, message, hint, root_reason) = extract_error_fields_for_v071(err_ref);
             let line = encode_v071_error_line(
@@ -2903,7 +4337,7 @@ fn emit_v071_artifacts_for_project_run(
                 hint.as_deref(),
                 root_reason.as_deref(),
             );
-            let signature = signature_with_lane_v071(&line, &lane);
+            let signature = signature_with_lane_v071(&line, &lane, cassette_hash.as_deref());
             fs::write(
                 &audit_path,
                 format!("{}\n{line}\n", encode_v071_lane_marker_line(&lane)),
@@ -2918,6 +4352,13 @@ fn emit_v071_artifacts_for_project_run(
                     &entry,
                     run_engine,
                     &signature,
+                    CASSETTE_MODE_RECORD_V08,
+                    cassette_hash.as_deref(),
+                    if is_quarantine {
+                        Some(CASSETTE_HASHER_VERSION_V08)
+                    } else {
+                        None
+                    },
                 ),
             )?;
         }
@@ -3237,7 +4678,7 @@ fn json_escape(input: &str) -> String {
 fn print_help() {
     eprintln!("ocl <command> [args]");
     eprintln!("commands:");
-    eprintln!("  init  <project_dir> [--template tool-cli|mini-game|shadow-preview] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]");
+    eprintln!("  init  <project_dir> [--template tool-cli|tool-http|tool-proc|tool-wallclock|mini-game|shadow-preview] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]");
     eprintln!("  check <project_dir> [--json] [--locked] [--universe <id>]");
     eprintln!(
         "  run   <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen ADDR --runtime-report FILE --replay-audit FILE] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"
