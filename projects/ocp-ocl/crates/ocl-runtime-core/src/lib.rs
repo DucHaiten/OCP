@@ -11,9 +11,11 @@ mod vm;
 
 pub use bytecode::{assemble as assemble_bytecode, BytecodeOp, BytecodeProgram};
 pub use engine::{
-    parse_program, typecheck_program, CommitPolicyMode, DiagPhase, Diagnostic, ErrorCode,
-    ExecConfig, ExecOutput, Expr, GuardMode, Program, ReasonCode, ResultKind, Span, Stmt,
-    TraceEvent, Type,
+    parse_program, pretty_schema, schema_skeleton, typecheck_program,
+    typecheck_program_with_compat, validate_schema_value, CapabilityRegistry, CommitPolicyMode,
+    CompatMode, DiagPhase, Diagnostic, ErrorCode, ExecConfig, ExecOutput, Expr, FieldConstraints,
+    FieldSpec, GuardMode, KeyCapabilityKind, Program, ReasonCode, ResultKind, SchemaIssue,
+    SchemaIssueCode, SchemaType, Span, Stmt, TraceEvent, Type, TypecheckCompatConfig,
 };
 pub use ir::{lower_program as lower_to_ir, IrOp, IrOpKind, TypedIrProgram};
 pub use source_map::{build_source_map, SourceMap, SourceMapEntry};
@@ -93,13 +95,30 @@ pub fn normalize_text(input: &str) -> String {
 }
 
 pub fn check_source(source: &str, file_id: u32) -> Result<(), Diagnostic> {
+    check_source_with_compat(source, file_id, TypecheckCompatConfig::default())
+}
+
+pub fn check_source_with_compat(
+    source: &str,
+    file_id: u32,
+    compat: TypecheckCompatConfig,
+) -> Result<(), Diagnostic> {
     let program = parse_program(source, file_id)?;
-    typecheck_program(&program)
+    typecheck_program_with_compat(&program, compat)
 }
 
 pub fn run_source(source: &str, file_id: u32, step_cap: u32) -> Result<ExecOutput, Diagnostic> {
+    run_source_with_compat(source, file_id, step_cap, TypecheckCompatConfig::default())
+}
+
+pub fn run_source_with_compat(
+    source: &str,
+    file_id: u32,
+    step_cap: u32,
+    compat: TypecheckCompatConfig,
+) -> Result<ExecOutput, Diagnostic> {
     let program = parse_program(source, file_id)?;
-    typecheck_program(&program)?;
+    typecheck_program_with_compat(&program, compat)?;
     engine::execute_program(
         &program,
         ExecConfig {
@@ -111,8 +130,16 @@ pub fn run_source(source: &str, file_id: u32, step_cap: u32) -> Result<ExecOutpu
 }
 
 pub fn compile_source(source: &str, file_id: u32) -> Result<CompiledProgram, Diagnostic> {
+    compile_source_with_compat(source, file_id, TypecheckCompatConfig::default())
+}
+
+pub fn compile_source_with_compat(
+    source: &str,
+    file_id: u32,
+    compat: TypecheckCompatConfig,
+) -> Result<CompiledProgram, Diagnostic> {
     let program = parse_program(source, file_id)?;
-    typecheck_program(&program)?;
+    typecheck_program_with_compat(&program, compat)?;
     let ir = lower_to_ir(&program);
     let bytecode = assemble_bytecode(&ir);
     let source_map = build_source_map(&ir);
@@ -152,7 +179,7 @@ pub fn run_source_with_engine(
     step_cap: u32,
     run_engine: RunEngine,
 ) -> Result<ExecOutput, Diagnostic> {
-    run_source_with_engine_config(
+    run_source_with_engine_config_and_compat(
         source,
         file_id,
         ExecConfig {
@@ -161,6 +188,7 @@ pub fn run_source_with_engine(
             ..ExecConfig::default()
         },
         run_engine,
+        TypecheckCompatConfig::default(),
     )
 }
 
@@ -170,21 +198,37 @@ pub fn run_source_with_engine_config(
     config: ExecConfig,
     run_engine: RunEngine,
 ) -> Result<ExecOutput, Diagnostic> {
+    run_source_with_engine_config_and_compat(
+        source,
+        file_id,
+        config,
+        run_engine,
+        TypecheckCompatConfig::default(),
+    )
+}
+
+pub fn run_source_with_engine_config_and_compat(
+    source: &str,
+    file_id: u32,
+    config: ExecConfig,
+    run_engine: RunEngine,
+    compat: TypecheckCompatConfig,
+) -> Result<ExecOutput, Diagnostic> {
     match run_engine {
         RunEngine::Interpreter => {
             let program = parse_program(source, file_id)?;
-            typecheck_program(&program)?;
+            typecheck_program_with_compat(&program, compat)?;
             engine::execute_program(&program, config)
         }
         RunEngine::Bytecode => {
-            let compiled = compile_source(source, file_id)?;
+            let compiled = compile_source_with_compat(source, file_id, compat)?;
             run_compiled_with_config(&compiled, config)
         }
         RunEngine::Dual => {
             let program = parse_program(source, file_id)?;
-            typecheck_program(&program)?;
+            typecheck_program_with_compat(&program, compat)?;
             let interpreted = engine::execute_program(&program, config)?;
-            let compiled = compile_source(source, file_id)?;
+            let compiled = compile_source_with_compat(source, file_id, compat)?;
             let bytecode = run_compiled_with_config(&compiled, config)?;
             if interpreted.signature != bytecode.signature {
                 return Err(Diagnostic::new(
@@ -203,20 +247,45 @@ pub fn run_source_with_engine_config(
 }
 
 pub fn check_file(path: &Path, file_id: u32) -> Result<(), RuntimeCoreError> {
+    check_file_with_compat(path, file_id, TypecheckCompatConfig::default())
+}
+
+pub fn check_file_with_compat(
+    path: &Path,
+    file_id: u32,
+    compat: TypecheckCompatConfig,
+) -> Result<(), RuntimeCoreError> {
     let source = fs::read_to_string(path)?;
-    check_source(&source, file_id)?;
+    check_source_with_compat(&source, file_id, compat)?;
     Ok(())
 }
 
 pub fn run_file(path: &Path, file_id: u32, step_cap: u32) -> Result<ExecOutput, RuntimeCoreError> {
+    run_file_with_compat(path, file_id, step_cap, TypecheckCompatConfig::default())
+}
+
+pub fn run_file_with_compat(
+    path: &Path,
+    file_id: u32,
+    step_cap: u32,
+    compat: TypecheckCompatConfig,
+) -> Result<ExecOutput, RuntimeCoreError> {
     let source = fs::read_to_string(path)?;
-    let out = run_source(&source, file_id, step_cap)?;
+    let out = run_source_with_compat(&source, file_id, step_cap, compat)?;
     Ok(out)
 }
 
 pub fn compile_file(path: &Path, file_id: u32) -> Result<CompiledProgram, RuntimeCoreError> {
+    compile_file_with_compat(path, file_id, TypecheckCompatConfig::default())
+}
+
+pub fn compile_file_with_compat(
+    path: &Path,
+    file_id: u32,
+    compat: TypecheckCompatConfig,
+) -> Result<CompiledProgram, RuntimeCoreError> {
     let source = fs::read_to_string(path)?;
-    let compiled = compile_source(&source, file_id)?;
+    let compiled = compile_source_with_compat(&source, file_id, compat)?;
     Ok(compiled)
 }
 
@@ -244,7 +313,24 @@ pub fn run_file_with_engine_config(
     config: ExecConfig,
     run_engine: RunEngine,
 ) -> Result<ExecOutput, RuntimeCoreError> {
+    run_file_with_engine_config_and_compat(
+        path,
+        file_id,
+        config,
+        run_engine,
+        TypecheckCompatConfig::default(),
+    )
+}
+
+pub fn run_file_with_engine_config_and_compat(
+    path: &Path,
+    file_id: u32,
+    config: ExecConfig,
+    run_engine: RunEngine,
+    compat: TypecheckCompatConfig,
+) -> Result<ExecOutput, RuntimeCoreError> {
     let source = fs::read_to_string(path)?;
-    let out = run_source_with_engine_config(&source, file_id, config, run_engine)?;
+    let out =
+        run_source_with_engine_config_and_compat(&source, file_id, config, run_engine, compat)?;
     Ok(out)
 }

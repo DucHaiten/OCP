@@ -1,4 +1,4 @@
-use crate::ocp_ocl::ast::{Expr, MatchStmt, Program, Stmt};
+use crate::ocp_ocl::ast::{Expr, LetPattern, MatchStmt, Program, Stmt};
 use crate::ocp_ocl::lex::{lex, Token, TokenKind};
 use crate::ocp_ocl::{DiagPhase, Diagnostic, ErrorCode, Span};
 
@@ -222,18 +222,43 @@ impl Parser {
 
     fn parse_let(&mut self) -> Result<Stmt, Diagnostic> {
         let start = self.expect(TokenKind::Let, "expected `let`")?.span;
-        let name = self.expect_ident("expected variable name after `let`")?;
+        let pattern = self.parse_let_pattern()?;
         self.expect(TokenKind::Eq, "expected `=` after let name")?;
-        if self.at(TokenKind::TryKw) {
-            return self.parse_try_let(name, start);
+        if let LetPattern::Ident(name) = &pattern {
+            if self.at(TokenKind::TryKw) {
+                return self.parse_try_let(name.clone(), start);
+            }
         }
         let value = self.parse_expr()?;
         let end = self.expect(TokenKind::Semi, "expected `;` after let statement")?;
         Ok(Stmt::Let {
-            name,
+            pattern,
             value,
             span: merge_span(start, end.span),
         })
+    }
+
+    fn parse_let_pattern(&mut self) -> Result<LetPattern, Diagnostic> {
+        if self.consume_if(TokenKind::LBrace) {
+            let mut fields = Vec::new();
+            if !self.at(TokenKind::RBrace) {
+                loop {
+                    fields.push(self.expect_ident("expected field name in let destructure")?);
+                    if self.consume_if(TokenKind::Comma) {
+                        continue;
+                    }
+                    break;
+                }
+            }
+            self.expect(
+                TokenKind::RBrace,
+                "expected `}` after let destructure pattern",
+            )?;
+            return Ok(LetPattern::Record(fields));
+        }
+        Ok(LetPattern::Ident(
+            self.expect_ident("expected variable name after `let`")?,
+        ))
     }
 
     fn parse_try_let(&mut self, name: String, start: Span) -> Result<Stmt, Diagnostic> {
@@ -539,8 +564,16 @@ impl Parser {
                 })
             }
             TokenKind::LBrace => {
-                let mut entries = Vec::new();
-                if !self.at(TokenKind::RBrace) {
+                if self.at(TokenKind::RBrace) {
+                    let end = self.expect(TokenKind::RBrace, "expected `}` after map literal")?;
+                    return Ok(Expr::Map {
+                        entries: Vec::new(),
+                        span: merge_span(tok.span, end.span),
+                    });
+                }
+
+                if self.at(TokenKind::Str) {
+                    let mut entries = Vec::new();
                     loop {
                         let key =
                             self.expect_kind(TokenKind::Str, "expected string key in map literal")?;
@@ -552,12 +585,35 @@ impl Parser {
                         }
                         break;
                     }
+                    let end = self.expect(TokenKind::RBrace, "expected `}` after map literal")?;
+                    Ok(Expr::Map {
+                        entries,
+                        span: merge_span(tok.span, end.span),
+                    })
+                } else if self.at(TokenKind::Ident) {
+                    let mut fields = Vec::new();
+                    loop {
+                        let key = self.expect_ident("expected field name in record literal")?;
+                        self.expect(TokenKind::Colon, "expected `:` after record field")?;
+                        let value = self.parse_expr()?;
+                        fields.push((key, value));
+                        if self.consume_if(TokenKind::Comma) {
+                            continue;
+                        }
+                        break;
+                    }
+                    let end =
+                        self.expect(TokenKind::RBrace, "expected `}` after record literal")?;
+                    Ok(Expr::Record {
+                        fields,
+                        span: merge_span(tok.span, end.span),
+                    })
+                } else {
+                    Err(self.error_here(
+                        ErrorCode::PUnexpectedToken,
+                        "expected string-key map or record literal fields",
+                    ))
                 }
-                let end = self.expect(TokenKind::RBrace, "expected `}` after map literal")?;
-                Ok(Expr::Map {
-                    entries,
-                    span: merge_span(tok.span, end.span),
-                })
             }
             _ => Err(Diagnostic::new(
                 ErrorCode::PUnexpectedToken,

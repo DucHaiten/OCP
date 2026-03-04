@@ -21,8 +21,9 @@ pub use m4::{
     AssemblyProofV1, ComponentSpecV1, ComposeSummary, PhenotypeSpecV1, VerifySummary,
 };
 use ocl_runtime_core::{
-    check_file, normalize_text, parse_program, run_file_with_engine_config, run_source_with_engine,
-    CommitPolicyMode, ExecConfig, Expr, GuardMode, RunEngine, RuntimeCoreError, Stmt, TraceEvent,
+    check_file_with_compat, normalize_text, parse_program, run_file_with_engine_config_and_compat,
+    run_source_with_engine, CommitPolicyMode, CompatMode, ExecConfig, Expr, GuardMode, RunEngine,
+    RuntimeCoreError, Stmt, TraceEvent, TypecheckCompatConfig,
 };
 pub use w1::{
     enforce_universe_match_v1, init_cosmos_v1, resolve_hive_caps_v1, resolve_universe_v1,
@@ -320,6 +321,8 @@ impl Default for StdUiPermissionConfig {
 pub struct ProjectLanguageConfigV071 {
     pub lane: String,
     pub guard_mode: GuardMode,
+    pub compat_ctx_string: CompatMode,
+    pub compat_ctx_extra_fields: CompatMode,
 }
 
 impl Default for ProjectLanguageConfigV071 {
@@ -327,6 +330,17 @@ impl Default for ProjectLanguageConfigV071 {
         Self {
             lane: "locked_v071".to_string(),
             guard_mode: GuardMode::Return,
+            compat_ctx_string: CompatMode::Warn,
+            compat_ctx_extra_fields: CompatMode::Warn,
+        }
+    }
+}
+
+impl ProjectLanguageConfigV071 {
+    fn typecheck_compat(&self) -> TypecheckCompatConfig {
+        TypecheckCompatConfig {
+            ctx_string: self.compat_ctx_string,
+            ctx_extra_fields: self.compat_ctx_extra_fields,
         }
     }
 }
@@ -1447,6 +1461,14 @@ fn verify_pack_permissions_for_key(
 }
 
 pub fn parse_project_language_config_v071(manifest_text: &str) -> ProjectLanguageConfigV071 {
+    fn parse_compat_mode(raw: &str) -> CompatMode {
+        match raw {
+            "allow" => CompatMode::Allow,
+            "deny" => CompatMode::Deny,
+            _ => CompatMode::Warn,
+        }
+    }
+
     let mut out = ProjectLanguageConfigV071::default();
     let mut current_section = String::new();
 
@@ -1477,6 +1499,16 @@ pub fn parse_project_language_config_v071(manifest_text: &str) -> ProjectLanguag
                 "error" => GuardMode::Error,
                 _ => GuardMode::Return,
             };
+            continue;
+        }
+
+        if current_section == "compat" && key == "ctx_string" {
+            out.compat_ctx_string = parse_compat_mode(value);
+            continue;
+        }
+
+        if current_section == "compat" && key == "ctx_extra_fields" {
+            out.compat_ctx_extra_fields = parse_compat_mode(value);
         }
     }
 
@@ -2265,6 +2297,8 @@ pub fn check_project_with_lock(root: &Path, locked: bool) -> Result<CheckSummary
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    let language_cfg = load_project_language_config_for_layout(&layout)?;
+    let compat = language_cfg.typecheck_compat();
     let files = gather_project_ocl_files(&layout)?;
     if files.is_empty() {
         return Err(SdkError::MissingProject(
@@ -2273,7 +2307,7 @@ pub fn check_project_with_lock(root: &Path, locked: bool) -> Result<CheckSummary
     }
     for (idx, path) in files.iter().enumerate() {
         verify_permissions_for_file(path, idx as u32 + 1, &permissions)?;
-        check_file(path, idx as u32 + 1)?;
+        check_file_with_compat(path, idx as u32 + 1, compat)?;
     }
     Ok(CheckSummary {
         files_checked: files.len(),
@@ -2305,9 +2339,12 @@ pub fn run_project_with_engine_and_lock(
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    let language_cfg = load_project_language_config_for_layout(&layout)?;
+    let compat = language_cfg.typecheck_compat();
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
     let config = default_exec_config_for_layout(&layout)?;
-    let out = run_file_with_engine_config(&layout.src_main, 1, config, run_engine)?;
+    let out =
+        run_file_with_engine_config_and_compat(&layout.src_main, 1, config, run_engine, compat)?;
     Ok(RunSummary { steps: out.steps })
 }
 
@@ -2578,6 +2615,8 @@ pub fn run_reactor_service_with_lock(
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    let language_cfg = load_project_language_config_for_layout(&layout)?;
+    let compat = language_cfg.typecheck_compat();
     let exec_config = default_exec_config_for_layout(&layout)?;
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
 
@@ -2693,11 +2732,12 @@ pub fn run_reactor_service_with_lock(
                     }
                     event_count = event_count.saturating_add(1);
                     event_id = event_id.saturating_add(1);
-                    let out = run_file_with_engine_config(
+                    let out = run_file_with_engine_config_and_compat(
                         &layout.src_main,
                         1,
                         exec_config,
                         RunEngine::Interpreter,
+                        compat,
                     )?;
                     total_steps = total_steps.saturating_add(out.steps);
                     signatures.push(out.signature.clone());
@@ -2761,11 +2801,12 @@ pub fn run_reactor_service_with_lock(
                     }
                     event_count = event_count.saturating_add(1);
                     event_id = event_id.saturating_add(1);
-                    let out = run_file_with_engine_config(
+                    let out = run_file_with_engine_config_and_compat(
                         &layout.src_main,
                         1,
                         exec_config,
                         RunEngine::Interpreter,
+                        compat,
                     )?;
                     total_steps = total_steps.saturating_add(out.steps);
                     signatures.push(out.signature.clone());
@@ -3003,17 +3044,20 @@ pub fn test_project_with_lock(root: &Path, locked: bool) -> Result<TestSummary, 
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    let language_cfg = load_project_language_config_for_layout(&layout)?;
+    let compat = language_cfg.typecheck_compat();
     let exec_config = default_exec_config_for_layout(&layout)?;
     let mut tests = Vec::new();
     collect_ocl_files(&layout.tests_dir, &mut tests)?;
     tests.sort();
     for (idx, test_file) in tests.iter().enumerate() {
         verify_permissions_for_file(test_file, idx as u32 + 100, &permissions)?;
-        run_file_with_engine_config(
+        run_file_with_engine_config_and_compat(
             test_file,
             idx as u32 + 100,
             exec_config,
             RunEngine::Interpreter,
+            compat,
         )?;
     }
     Ok(TestSummary {
@@ -3625,11 +3669,19 @@ pub fn run_project_with_trace_engine_config_and_lock(
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    let language_cfg = load_project_language_config_for_layout(&layout)?;
+    let compat = language_cfg.typecheck_compat();
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
     let mut runtime_config = config;
-    runtime_config.guard_mode = load_project_language_config_for_layout(&layout)?.guard_mode;
+    runtime_config.guard_mode = language_cfg.guard_mode;
 
-    let out = run_file_with_engine_config(&layout.src_main, 1, runtime_config, run_engine)?;
+    let out = run_file_with_engine_config_and_compat(
+        &layout.src_main,
+        1,
+        runtime_config,
+        run_engine,
+        compat,
+    )?;
     let run_id = build_run_id_deterministic("project", root, run_engine, None, None);
     let mut seq = 1u64;
     let mut events = Vec::new();
@@ -3682,9 +3734,11 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
     enforce_locked_plugin_contract(&layout, locked)?;
     enforce_locked_organ_contract(&layout, locked)?;
     let permissions = load_permissions_for_layout(&layout, locked)?;
+    let language_cfg = load_project_language_config_for_layout(&layout)?;
+    let compat = language_cfg.typecheck_compat();
     verify_permissions_for_file(&layout.src_main, 1, &permissions)?;
     let mut runtime_config = config;
-    runtime_config.guard_mode = load_project_language_config_for_layout(&layout)?.guard_mode;
+    runtime_config.guard_mode = language_cfg.guard_mode;
 
     let source = fs::read_to_string(&layout.src_main)?;
     if !source.contains("on_event") {
@@ -3758,11 +3812,12 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
                     if tape_entry.tick != tick || tape_entry.domain_id != *domain_id {
                         break;
                     }
-                    let out = run_file_with_engine_config(
+                    let out = run_file_with_engine_config_and_compat(
                         &layout.src_main,
                         1,
                         runtime_config,
                         run_engine,
+                        compat,
                     )?;
                     total_steps = total_steps.saturating_add(out.steps);
                     let payload_hash256 = fnv1a64_hex(&out.signature);
@@ -3785,11 +3840,12 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
                 }
             } else {
                 for _ in 0..events_per_tick {
-                    let out = run_file_with_engine_config(
+                    let out = run_file_with_engine_config_and_compat(
                         &layout.src_main,
                         1,
                         runtime_config,
                         run_engine,
+                        compat,
                     )?;
                     total_steps = total_steps.saturating_add(out.steps);
                     io_tape_record_entries.push(ReactorIoTapeEntry {

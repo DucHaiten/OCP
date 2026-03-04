@@ -58,6 +58,11 @@ fn cli_tool_proc_template_run_record_replay_pass() {
         String::from_utf8_lossy(&init.stderr)
     );
     assert!(root.join("Ocl.toml").exists(), "missing Ocl.toml");
+    let manifest = fs::read_to_string(root.join("Ocl.toml")).expect("read Ocl.toml");
+    assert!(
+        manifest.contains("ctx_string = \"deny\""),
+        "tool-proc template must default compat.ctx_string=deny"
+    );
     assert!(
         root.join("src").join("main.ocl").exists(),
         "missing src/main.ocl"

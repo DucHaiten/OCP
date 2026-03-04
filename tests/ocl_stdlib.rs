@@ -269,7 +269,7 @@ commit(w);
 }
 
 #[test]
-fn exec_commit_std_db_query_int_is_forbidden() {
+fn typecheck_commit_std_db_query_int_is_forbidden() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -280,15 +280,8 @@ observe("std.db.query_int", "tier2", ctx("dsn=file:demo.db;sql=SELECT 1"), budge
 commit(q);
 "#;
     let p = parse_program(src, 1).expect("parse should pass");
-    typecheck_program(&p).expect("typecheck should pass");
-
-    let err = Executor::new(ExecConfig {
-        step_cap: 100,
-        ..ExecConfig::default()
-    })
-    .run(&p)
-    .expect_err("commit on std.db.query_int must be denied by policy");
-    assert_eq!(err.code.as_str(), "X-COMMIT-FORBIDDEN");
+    let err = typecheck_program(&p).expect_err("typecheck must reject observe-only commit");
+    assert_eq!(err.code.as_str(), "T-COMMIT-FORBIDDEN-KEY");
 }
 
 #[test]

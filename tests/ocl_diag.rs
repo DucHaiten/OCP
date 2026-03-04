@@ -11,6 +11,17 @@ fn error_codes_have_stable_wire_values() {
     assert_eq!(ErrorCode::TTryNotResult4.as_str(), "T-TRY-NOT-RESULT4");
     assert_eq!(ErrorCode::TGuardNotResult4.as_str(), "T-GUARD-NOT-RESULT4");
     assert_eq!(ErrorCode::TTryElseNoValue.as_str(), "T-TRY-ELSE-NO-VALUE");
+    assert_eq!(ErrorCode::TCtxMissingField.as_str(), "T-CTX-MISSING-FIELD");
+    assert_eq!(ErrorCode::TCtxUnknownField.as_str(), "T-CTX-UNKNOWN-FIELD");
+    assert_eq!(ErrorCode::TCtxTypeMismatch.as_str(), "T-CTX-TYPE-MISMATCH");
+    assert_eq!(
+        ErrorCode::TCtxConstraintViolation.as_str(),
+        "T-CTX-CONSTRAINT-VIOLATION"
+    );
+    assert_eq!(
+        ErrorCode::TKeyNotLiteralForSchema.as_str(),
+        "T-KEY-NOT-LITERAL-FOR-SCHEMA"
+    );
     assert_eq!(ErrorCode::XCommitForbidden.as_str(), "X-COMMIT-FORBIDDEN");
     assert_eq!(ErrorCode::XLoopCapExceeded.as_str(), "X-LOOP-CAP-EXCEEDED");
     assert_eq!(ErrorCode::XKeysCapExceeded.as_str(), "X-KEYS-CAP-EXCEEDED");

@@ -2,8 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use ocl_runtime_core::RunEngine;
-use ocl_runtime_core::RuntimeCoreError;
+use ocl_runtime_core::{
+    pretty_schema, schema_skeleton, CapabilityRegistry, KeyCapabilityKind, RunEngine,
+    RuntimeCoreError,
+};
 use ocl_sdk::{
     build_oclpkg_with_lock, build_profile_from_trace, build_project_with_lock,
     build_run_id_deterministic, check_project_with_lock, compare_shadow_traces_v1,
@@ -2079,6 +2081,28 @@ fn run_cli(args: &[String]) -> i32 {
                 }
             }
         }
+        "doc" => {
+            let Some(topic) = args.get(1) else {
+                eprintln!("usage: ocl doc packs [--json]");
+                return 2;
+            };
+            match topic.as_str() {
+                "packs" => {
+                    let json_mode = args.iter().any(|a| a == "--json");
+                    let rendered = if json_mode {
+                        render_doc_packs_json_v09()
+                    } else {
+                        render_doc_packs_text_v09()
+                    };
+                    println!("{rendered}");
+                    0
+                }
+                _ => {
+                    eprintln!("usage: ocl doc packs [--json]");
+                    2
+                }
+            }
+        }
         "verify" => {
             let Some(path) = args.get(1) else {
                 eprintln!("usage: ocl verify <project_dir> --phenotype <file> [--registry <dir>] [--locked] [--universe <id>]");
@@ -2120,6 +2144,169 @@ fn run_cli(args: &[String]) -> i32 {
             2
         }
     }
+}
+
+fn render_doc_packs_text_v09() -> String {
+    let registry = CapabilityRegistry::v1_baseline();
+    let mut out = String::new();
+    out.push_str("# OCL capability docs (v0.9)\n\n");
+    out.push_str("Generated from CapabilityRegistry::v1_baseline()\n\n");
+    for key in registry.documented_keys() {
+        let key_kind = key_kind_label_v09(registry.key_kind_for_key(&key));
+        let permission_class = permission_class_for_key_v09(&key);
+        let ctx_required = registry.ctx_required_for_key(&key);
+        let ctx_schema = registry
+            .ctx_schema_for_key(&key)
+            .map(pretty_schema)
+            .unwrap_or_else(|| "n/a".to_string());
+        let payload_schema = registry
+            .payload_schema_for_key(&key)
+            .map(pretty_schema)
+            .unwrap_or_else(|| "n/a".to_string());
+        let ctx_skeleton = registry
+            .ctx_schema_for_key(&key)
+            .map(schema_skeleton)
+            .unwrap_or_else(|| "{}".to_string());
+        out.push_str("- key: ");
+        out.push_str(&key);
+        out.push('\n');
+        out.push_str("  key_kind: ");
+        out.push_str(key_kind);
+        out.push('\n');
+        out.push_str("  permission_class: ");
+        out.push_str(permission_class);
+        out.push('\n');
+        if ctx_required.is_empty() {
+            out.push_str("  ctx_required: []\n");
+        } else {
+            out.push_str("  ctx_required: [");
+            for (idx, field) in ctx_required.iter().enumerate() {
+                if idx > 0 {
+                    out.push_str(", ");
+                }
+                out.push_str(field);
+            }
+            out.push_str("]\n");
+        }
+        out.push_str("  ctx_schema:\n");
+        out.push_str(&indent_block_v09(&ctx_schema, "    "));
+        out.push_str("  payload_schema:\n");
+        out.push_str(&indent_block_v09(&payload_schema, "    "));
+        out.push_str("  example:\n");
+        out.push_str("    observe(\"");
+        out.push_str(&key);
+        out.push_str("\", \"tier2\", <ctx>, budget(10)) -> r;\n");
+        out.push_str("    ctx_skeleton:\n");
+        out.push_str(&indent_block_v09(&ctx_skeleton, "      "));
+        out.push('\n');
+    }
+    out
+}
+
+fn render_doc_packs_json_v09() -> String {
+    let registry = CapabilityRegistry::v1_baseline();
+    let mut out = String::from("{\"packs\":[");
+    let keys = registry.documented_keys();
+    for (idx, key) in keys.iter().enumerate() {
+        if idx > 0 {
+            out.push(',');
+        }
+        let key_kind = key_kind_label_v09(registry.key_kind_for_key(key));
+        let permission_class = permission_class_for_key_v09(key);
+        let ctx_required = registry.ctx_required_for_key(key);
+        let ctx_schema = registry
+            .ctx_schema_for_key(key)
+            .map(pretty_schema)
+            .unwrap_or_else(|| "n/a".to_string());
+        let payload_schema = registry
+            .payload_schema_for_key(key)
+            .map(pretty_schema)
+            .unwrap_or_else(|| "n/a".to_string());
+        let ctx_skeleton = registry
+            .ctx_schema_for_key(key)
+            .map(schema_skeleton)
+            .unwrap_or_else(|| "{}".to_string());
+        out.push_str("{\"key\":\"");
+        out.push_str(&json_escape(key));
+        out.push_str("\",\"key_kind\":\"");
+        out.push_str(key_kind);
+        out.push_str("\",\"permission_class\":\"");
+        out.push_str(permission_class);
+        out.push_str("\",\"ctx_required\":[");
+        for (field_idx, field) in ctx_required.iter().enumerate() {
+            if field_idx > 0 {
+                out.push(',');
+            }
+            out.push('"');
+            out.push_str(&json_escape(field));
+            out.push('"');
+        }
+        out.push_str("],\"ctx_schema\":\"");
+        out.push_str(&json_escape(&ctx_schema));
+        out.push_str("\",\"payload_schema\":\"");
+        out.push_str(&json_escape(&payload_schema));
+        out.push_str("\",\"example\":\"");
+        out.push_str(&json_escape(&format!(
+            "observe(\"{}\", \"tier2\", <ctx>, budget(10)) -> r;",
+            key
+        )));
+        out.push_str("\",\"ctx_skeleton\":\"");
+        out.push_str(&json_escape(&ctx_skeleton));
+        out.push_str("\"}");
+    }
+    out.push_str("]}");
+    out
+}
+
+fn key_kind_label_v09(kind: KeyCapabilityKind) -> &'static str {
+    match kind {
+        KeyCapabilityKind::ObserveOnly => "observe_only",
+        KeyCapabilityKind::ObserveAndCommit => "observe_and_commit",
+    }
+}
+
+fn permission_class_for_key_v09(key: &str) -> &'static str {
+    if key.starts_with("std.fs.") {
+        "permissions.std_fs"
+    } else if key.starts_with("std.kv.") {
+        "permissions.std_kv"
+    } else if key.starts_with("std.time.wallclock.") {
+        "permissions.std_time_wallclock"
+    } else if key.starts_with("std.time.") {
+        "permissions.std_time"
+    } else if key.starts_with("std.net.http.") {
+        "permissions.std_net_http"
+    } else if key.starts_with("std.proc.") {
+        "permissions.std_proc"
+    } else if key.starts_with("std.ui.") {
+        "permissions.std_ui"
+    } else if key.starts_with("std.game.") {
+        "permissions.std_game"
+    } else if key.starts_with("std.shadow.") {
+        "permissions.std_shadow"
+    } else if key.starts_with("engine.ui.") {
+        "permissions.std_ui"
+    } else if key.starts_with("engine.game.") {
+        "permissions.std_game"
+    } else if key.starts_with("engine.shadow.") {
+        "permissions.std_shadow"
+    } else {
+        "permissions.package"
+    }
+}
+
+fn indent_block_v09(input: &str, prefix: &str) -> String {
+    let mut out = String::new();
+    for line in input.lines() {
+        out.push_str(prefix);
+        out.push_str(line);
+        out.push('\n');
+    }
+    if input.is_empty() {
+        out.push_str(prefix);
+        out.push('\n');
+    }
+    out
 }
 
 fn with_view_env<T, F>(view_id: Option<&str>, run: F) -> T
@@ -2343,6 +2530,9 @@ fn apply_tool_http_template_v08(root: &Path) -> Result<(), SdkError> {
             "std = \"0.1.0\"\n\n",
             "[language]\n",
             "guard_mode = \"return\"\n\n",
+            "[compat]\n",
+            "ctx_string = \"deny\"\n",
+            "ctx_extra_fields = \"warn\"\n\n",
             "[permissions.package]\n",
             "allow = [\"std.net.http.*\", \"std.fs.*\"]\n",
             "deny = []\n\n",
@@ -2368,10 +2558,10 @@ fn apply_tool_http_template_v08(root: &Path) -> Result<(), SdkError> {
 
     let source = concat!(
         "module app.tool_http;\n\n",
-        "observe(\"std.net.http.request\", \"tier2\", ctx(\"method=GET;url=http://mock.local/template-http;timeout_ms=3000;max_body_bytes=32\"), budget(8)) -> net;\n",
-        "observe(\"std.fs.mkdir\", \"tier2\", ctx(\"path=./out;recursive=true\"), budget(5)) -> mk;\n",
+        "observe(\"std.net.http.request\", \"tier2\", { method: \"GET\", url: \"http://mock.local/template-http\", timeout_ms: 3000, max_body_bytes: 32 }, budget(8)) -> net;\n",
+        "observe(\"std.fs.mkdir\", \"tier2\", { path: \"./out\", recursive: true }, budget(5)) -> mk;\n",
         "commit(mk);\n",
-        "observe(\"std.fs.write_text\", \"tier2\", ctx(\"path=./out/http.txt;text=HTTP_TOOL_OK;overwrite=true\"), budget(5)) -> wr;\n",
+        "observe(\"std.fs.write_text\", \"tier2\", { path: \"./out/http.txt\", text: \"HTTP_TOOL_OK\", overwrite: true }, budget(5)) -> wr;\n",
         "commit(wr);\n",
         "condition(true);\n"
     );
@@ -2415,6 +2605,9 @@ fn apply_tool_proc_template_v08(root: &Path) -> Result<(), SdkError> {
             "std = \"0.1.0\"\n\n",
             "[language]\n",
             "guard_mode = \"return\"\n\n",
+            "[compat]\n",
+            "ctx_string = \"deny\"\n",
+            "ctx_extra_fields = \"warn\"\n\n",
             "[permissions.package]\n",
             "allow = [\"std.proc.*\", \"std.fs.*\"]\n",
             "deny = []\n\n",
@@ -2440,10 +2633,10 @@ fn apply_tool_proc_template_v08(root: &Path) -> Result<(), SdkError> {
 
     let source = concat!(
         "module app.tool_proc;\n\n",
-        "observe(\"std.proc.exec\", \"tier2\", ctx(\"bin=mock.proc;args=--template;timeout_ms=3000;max_stdout_bytes=32\"), budget(8)) -> proc_res;\n",
-        "observe(\"std.fs.mkdir\", \"tier2\", ctx(\"path=./out;recursive=true\"), budget(5)) -> mk;\n",
+        "observe(\"std.proc.exec\", \"tier2\", { bin: \"mock.proc\", args: \"--template\", timeout_ms: 3000, max_stdout_bytes: 32 }, budget(8)) -> proc_res;\n",
+        "observe(\"std.fs.mkdir\", \"tier2\", { path: \"./out\", recursive: true }, budget(5)) -> mk;\n",
         "commit(mk);\n",
-        "observe(\"std.fs.write_text\", \"tier2\", ctx(\"path=./out/proc.txt;text=PROC_TOOL_OK;overwrite=true\"), budget(5)) -> wr;\n",
+        "observe(\"std.fs.write_text\", \"tier2\", { path: \"./out/proc.txt\", text: \"PROC_TOOL_OK\", overwrite: true }, budget(5)) -> wr;\n",
         "commit(wr);\n",
         "condition(true);\n"
     );
@@ -2487,6 +2680,9 @@ fn apply_tool_wallclock_template_v08(root: &Path) -> Result<(), SdkError> {
             "std = \"0.1.0\"\n\n",
             "[language]\n",
             "guard_mode = \"return\"\n\n",
+            "[compat]\n",
+            "ctx_string = \"deny\"\n",
+            "ctx_extra_fields = \"warn\"\n\n",
             "[permissions.package]\n",
             "allow = [\"std.time.*\", \"std.fs.*\"]\n",
             "deny = []\n\n",
@@ -2510,10 +2706,10 @@ fn apply_tool_wallclock_template_v08(root: &Path) -> Result<(), SdkError> {
 
     let source = concat!(
         "module app.tool_wallclock;\n\n",
-        "observe(\"std.time.wallclock.now\", \"tier2\", ctx(\"scope=tool\"), budget(8)) -> now;\n",
-        "observe(\"std.fs.mkdir\", \"tier2\", ctx(\"path=./out;recursive=true\"), budget(5)) -> mk;\n",
+        "observe(\"std.time.wallclock.now\", \"tier2\", { scope: \"tool\" }, budget(8)) -> now;\n",
+        "observe(\"std.fs.mkdir\", \"tier2\", { path: \"./out\", recursive: true }, budget(5)) -> mk;\n",
         "commit(mk);\n",
-        "observe(\"std.fs.write_text\", \"tier2\", ctx(\"path=./out/wallclock.txt;text=WALLCLOCK_TOOL_OK;overwrite=true\"), budget(5)) -> wr;\n",
+        "observe(\"std.fs.write_text\", \"tier2\", { path: \"./out/wallclock.txt\", text: \"WALLCLOCK_TOOL_OK\", overwrite: true }, budget(5)) -> wr;\n",
         "commit(wr);\n",
         "condition(true);\n"
     );
@@ -4684,6 +4880,7 @@ fn print_help() {
         "  run   <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen ADDR --runtime-report FILE --replay-audit FILE] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"
     );
     eprintln!("  replay <artifact_dir>");
+    eprintln!("  doc packs [--json]");
     eprintln!(
         "  trace run  <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"
     );

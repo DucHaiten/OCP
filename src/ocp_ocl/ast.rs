@@ -6,6 +6,12 @@ pub struct Program {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LetPattern {
+    Ident(String),
+    Record(Vec<String>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stmt {
     ModuleDecl {
         path: Vec<String>,
@@ -36,7 +42,7 @@ pub enum Stmt {
         span: Span,
     },
     Let {
-        name: String,
+        pattern: LetPattern,
         value: Expr,
         span: Span,
     },
@@ -140,6 +146,10 @@ pub enum Expr {
         entries: Vec<(String, Expr)>,
         span: Span,
     },
+    Record {
+        fields: Vec<(String, Expr)>,
+        span: Span,
+    },
     Try {
         value: Box<Expr>,
         span: Span,
@@ -161,6 +171,7 @@ impl Expr {
             | Self::Call { span, .. }
             | Self::List { span, .. }
             | Self::Map { span, .. }
+            | Self::Record { span, .. }
             | Self::Try { span, .. }
             | Self::FieldAccess { span, .. } => *span,
         }

@@ -8,12 +8,13 @@ use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use crate::ocp_ocl::ast::{Expr, MatchStmt, Program, Stmt};
+use crate::ocp_ocl::ast::{Expr, LetPattern, MatchStmt, Program, Stmt};
 use crate::ocp_ocl::audit::{TraceEvent, TraceLog};
 use crate::ocp_ocl::budget::{BudgetMeter, CommitPolicyMode, ExecConfig, GuardMode};
 use crate::ocp_ocl::diag::{DiagPhase, Diagnostic, ErrorCode, ReasonCode};
 use crate::ocp_ocl::registry::CapabilityRegistry;
 use crate::ocp_ocl::result_kind::{Result4, ResultKind};
+use crate::ocp_ocl::schema::{validate_schema_value, SchemaType};
 use crate::ocp_ocl::value::Value;
 use crate::ocp_ocl::Span;
 
@@ -293,9 +294,13 @@ impl Executor {
             | Stmt::StructDecl { .. }
             | Stmt::EnumDecl { .. }
             | Stmt::FnDef { .. } => Ok(Flow::Continue),
-            Stmt::Let { name, value, .. } => {
+            Stmt::Let {
+                pattern,
+                value,
+                span,
+            } => {
                 let v = self.eval_expr(value)?;
-                self.env.insert(name.clone(), v);
+                self.bind_let_pattern(pattern, v, *span)?;
                 Ok(Flow::Continue)
             }
             Stmt::Return { value, span: _ } => {
@@ -359,7 +364,7 @@ impl Executor {
                         ErrorCode::RCapabilityDenied,
                         DiagPhase::Exec,
                         ctx.span(),
-                        "observe ctx must evaluate to ctx(...) value",
+                        "observe ctx must evaluate to ctx(...)/record/map-compatible value",
                     )
                 })?;
                 let budget_units = as_budget_runtime(&budget_value).ok_or_else(|| {
@@ -371,7 +376,7 @@ impl Executor {
                     )
                 })?;
 
-                validate_ctx_literal(ctx_lit).map_err(|message| {
+                validate_ctx_literal(&ctx_lit).map_err(|message| {
                     Diagnostic::new(
                         ErrorCode::RCtxInvalid,
                         DiagPhase::Runtime,
@@ -384,13 +389,22 @@ impl Executor {
                 self.trace.push(TraceEvent::ObserveStart {
                     key: key_lit.to_string(),
                     tier: tier_lit.to_string(),
-                    ctx: ctx_lit.to_string(),
+                    ctx: ctx_lit.clone(),
                     budget: budget_units,
                 });
 
                 let origin_id = self.allocate_origin_id();
-                let r = match self.registry.check_observe(key_lit, ctx_lit) {
-                    Ok(kref) => self.observe_result_for_key(&kref.raw, ctx_lit),
+                let r = match self.registry.check_observe(key_lit, &ctx_lit) {
+                    Ok(kref) => {
+                        if let Err(reason) =
+                            validate_runtime_ctx_schema(&self.registry, &kref.raw, &ctx_lit)
+                        {
+                            Result4::<Value>::insufficient(reason)
+                        } else {
+                            let observed = self.observe_result_for_key(&kref.raw, &ctx_lit);
+                            self.validate_runtime_payload_schema(&kref.raw, observed)
+                        }
+                    }
                     Err(e) => Result4::<Value>::insufficient(e.to_reason_code()),
                 }
                 .with_origin_id(origin_id);
@@ -441,6 +455,52 @@ impl Executor {
                 Ok(Flow::Continue)
             }
             Stmt::Match(m) => self.exec_match(m, in_function),
+        }
+    }
+
+    fn bind_let_pattern(
+        &mut self,
+        pattern: &LetPattern,
+        value: Value,
+        span: Span,
+    ) -> Result<(), Diagnostic> {
+        match pattern {
+            LetPattern::Ident(name) => {
+                self.env.insert(name.clone(), value);
+                Ok(())
+            }
+            LetPattern::Record(fields) => {
+                let field_map: BTreeMap<String, Value> = match value {
+                    Value::Map(map) => map,
+                    Value::Payload(payload) => payload
+                        .into_iter()
+                        .map(|(k, v)| (k, Value::String(v)))
+                        .collect(),
+                    other => {
+                        return Err(Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            format!(
+                                "let destructure expects record/map runtime value, got {other:?}"
+                            ),
+                        ));
+                    }
+                };
+
+                for field in fields {
+                    let Some(field_value) = field_map.get(field).cloned() else {
+                        return Err(Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            format!("let destructure field `{field}` is missing at runtime"),
+                        ));
+                    };
+                    self.env.insert(field.clone(), field_value);
+                }
+                Ok(())
+            }
         }
     }
 
@@ -1478,6 +1538,13 @@ impl Executor {
                 }
                 Ok(Value::Map(out))
             }
+            Expr::Record { fields, .. } => {
+                let mut out = BTreeMap::new();
+                for (field, value_expr) in fields {
+                    out.insert(field.clone(), self.eval_expr(value_expr)?);
+                }
+                Ok(Value::Map(out))
+            }
             Expr::Try { value, span } => {
                 let base = self.eval_expr(value)?;
                 let Value::Result4(result) = base else {
@@ -1831,6 +1898,30 @@ impl Executor {
             "std.net.http.request" => self.observe_net_http_request(key, ctx_lit),
             _ => observe_stub_result(key, ctx_lit),
         }
+    }
+
+    fn validate_runtime_payload_schema(
+        &self,
+        key: &str,
+        observed: Result4<Value>,
+    ) -> Result4<Value> {
+        if !is_core_pack_schema_key(key) {
+            return observed;
+        }
+        if !matches!(observed.kind, ResultKind::Ok | ResultKind::Degraded) {
+            return observed;
+        }
+        let Some(schema) = self.registry.payload_schema_for_key(key) else {
+            return observed;
+        };
+        let Some(payload) = observed.payload.as_ref() else {
+            return Result4::insufficient(ReasonCode::AdapterFailed);
+        };
+        let payload_value = normalize_payload_value_for_schema(payload);
+        if validate_schema_value(schema, &payload_value).is_err() {
+            return Result4::insufficient(ReasonCode::AdapterFailed);
+        }
+        observed
     }
 
     fn observe_wallclock_now(&mut self, key: &str) -> Result4<Value> {
@@ -2427,9 +2518,31 @@ fn as_string_runtime(value: &Value) -> Option<&str> {
     }
 }
 
-fn as_ctx_runtime(value: &Value) -> Option<&str> {
+fn as_ctx_runtime(value: &Value) -> Option<String> {
     match value {
-        Value::Ctx(v) => Some(v),
+        Value::Ctx(v) => Some(v.clone()),
+        Value::Map(map) => {
+            let mut pairs = Vec::with_capacity(map.len());
+            for (key, raw_value) in map {
+                let rendered = match raw_value {
+                    Value::String(v) => v.clone(),
+                    Value::Int(v) => v.to_string(),
+                    Value::Bool(v) => {
+                        if *v {
+                            "true".to_string()
+                        } else {
+                            "false".to_string()
+                        }
+                    }
+                    _ => return None,
+                };
+                if key.contains('=') || key.contains(';') || rendered.contains(';') {
+                    return None;
+                }
+                pairs.push(format!("{key}={rendered}"));
+            }
+            Some(pairs.join(";"))
+        }
         _ => None,
     }
 }
@@ -3162,6 +3275,18 @@ fn condition_budget_stats(expr: &Expr) -> ConditionBudgetStats {
                     constraints: 1,
                 };
                 for (_, value) in entries {
+                    let child = walk(value);
+                    stats.steps = stats.steps.saturating_add(child.steps);
+                    stats.constraints = stats.constraints.saturating_add(child.constraints);
+                }
+                stats
+            }
+            Expr::Record { fields, .. } => {
+                let mut stats = ConditionBudgetStats {
+                    steps: 1,
+                    constraints: 1,
+                };
+                for (_, value) in fields {
                     let child = walk(value);
                     stats.steps = stats.steps.saturating_add(child.steps);
                     stats.constraints = stats.constraints.saturating_add(child.constraints);
@@ -6097,6 +6222,101 @@ fn parse_ctx_pairs(ctx_literal: &str) -> HashMap<String, String> {
         }
     }
     out
+}
+
+fn validate_runtime_ctx_schema(
+    registry: &CapabilityRegistry,
+    key: &str,
+    ctx_literal: &str,
+) -> Result<(), ReasonCode> {
+    if !is_core_pack_schema_key(key) {
+        return Ok(());
+    }
+    let Some(schema) = registry.ctx_schema_for_key(key) else {
+        return Ok(());
+    };
+    let ctx_value = ctx_literal_to_schema_value(ctx_literal, schema);
+    match validate_schema_value(schema, &ctx_value) {
+        Ok(()) => Ok(()),
+        Err(_) => Err(ReasonCode::CtxInvalid),
+    }
+}
+
+fn ctx_literal_to_schema_value(ctx_literal: &str, schema: &SchemaType) -> Value {
+    let ctx_pairs = parse_ctx_pairs(ctx_literal);
+    let mut out = BTreeMap::new();
+    if let SchemaType::Record { fields, .. } = schema {
+        for (key, raw) in &ctx_pairs {
+            let value = if let Some(spec) = fields.get(key) {
+                coerce_ctx_raw_to_schema(raw, &spec.ty)
+                    .unwrap_or_else(|| Value::String(raw.clone()))
+            } else {
+                Value::String(raw.clone())
+            };
+            out.insert(key.clone(), value);
+        }
+    } else {
+        for (key, raw) in &ctx_pairs {
+            out.insert(key.clone(), Value::String(raw.clone()));
+        }
+    }
+    Value::Map(out)
+}
+
+fn coerce_ctx_raw_to_schema(raw: &str, schema: &SchemaType) -> Option<Value> {
+    match schema {
+        SchemaType::Bool => match raw.trim().to_ascii_lowercase().as_str() {
+            "1" | "true" | "yes" => Some(Value::Bool(true)),
+            "0" | "false" | "no" => Some(Value::Bool(false)),
+            _ => None,
+        },
+        SchemaType::Int => raw.trim().parse::<i64>().ok().map(Value::Int),
+        SchemaType::String | SchemaType::Enum { .. } | SchemaType::Bytes => {
+            Some(Value::String(raw.to_string()))
+        }
+        SchemaType::Null => {
+            if raw.trim().is_empty() {
+                Some(Value::Unit)
+            } else {
+                None
+            }
+        }
+        SchemaType::Union { types } => {
+            for ty in types {
+                if let Some(value) = coerce_ctx_raw_to_schema(raw, ty) {
+                    return Some(value);
+                }
+            }
+            None
+        }
+        SchemaType::List { .. } | SchemaType::Map { .. } | SchemaType::Record { .. } => {
+            parse_json_value(raw).ok()
+        }
+    }
+}
+
+fn normalize_payload_value_for_schema(payload: &Value) -> Value {
+    match payload {
+        Value::Payload(map) => {
+            let mut out = BTreeMap::new();
+            for (k, v) in map {
+                out.insert(k.clone(), Value::String(v.clone()));
+            }
+            Value::Map(out)
+        }
+        other => other.clone(),
+    }
+}
+
+fn is_core_pack_schema_key(key: &str) -> bool {
+    key.starts_with("std.fs.")
+        || key.starts_with("std.kv.")
+        || key.starts_with("std.time.")
+        || key.starts_with("std.proc.")
+        || key.starts_with("std.net.http.")
+        || key.starts_with("std.ui.")
+        || key.starts_with("std.game.")
+        || key.starts_with("std.shadow.")
 }
 
 fn parse_nonnegative_i64(raw: Option<&String>) -> Option<i64> {

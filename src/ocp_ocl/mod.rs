@@ -11,12 +11,13 @@ pub mod pilot;
 pub mod registry;
 pub mod result_kind;
 pub mod runner;
+pub mod schema;
 pub mod span;
 pub mod typecheck;
 pub mod types;
 pub mod value;
 
-pub use ast::{Expr, MatchStmt, Program, Stmt};
+pub use ast::{Expr, LetPattern, MatchStmt, Program, Stmt};
 pub use audit::{TraceEvent, TraceLog};
 pub use budget::{BudgetMeter, CommitPolicyMode, ExecConfig, GuardMode};
 pub use ctx_contract::{
@@ -31,10 +32,17 @@ pub use pilot::{
     build_closeout_report, replay_pilot_sequence, run_pilot_sequence, PilotReplayResult,
     PilotSummary, PilotTurnResult, PilotTurnStatus,
 };
-pub use registry::{CapabilityRegistry, KeyPattern, RegistryCheckError};
+pub use registry::{CapabilityRegistry, KeyCapabilityKind, KeyPattern, RegistryCheckError};
 pub use result_kind::{Result4, ResultKind};
 pub use runner::{run_fixture_file, run_fixture_source, FixtureRunnerError};
+pub use schema::{
+    pretty_schema, schema_skeleton, validate_schema_value, FieldConstraints, FieldSpec,
+    SchemaIssue, SchemaIssueCode, SchemaType,
+};
 pub use span::Span;
-pub use typecheck::{typecheck_program, TypeChecker};
+pub use typecheck::{
+    typecheck_program, typecheck_program_with_compat, CompatMode, TypeChecker,
+    TypecheckCompatConfig,
+};
 pub use types::Type;
 pub use value::Value;

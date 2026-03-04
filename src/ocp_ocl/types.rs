@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Int,
@@ -5,6 +7,7 @@ pub enum Type {
     String,
     List(Box<Type>),
     Map(Box<Type>, Box<Type>),
+    Record(BTreeMap<String, Type>),
     Budget,
     Ctx,
     Payload,
@@ -25,6 +28,7 @@ impl Type {
             Self::String => "string",
             Self::List(_) => "list",
             Self::Map(_, _) => "map",
+            Self::Record(_) => "record",
             Self::Budget => "budget",
             Self::Ctx => "ctx",
             Self::Payload => "payload",
