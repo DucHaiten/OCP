@@ -1,5 +1,6 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
+use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
 
 use ocl_runtime_core::{
@@ -13,9 +14,9 @@ use ocl_sdk::{
     fetch_artifact, fmt_project, init_cosmos_v1, init_project, install_organs_v1,
     list_kits_from_cosmos_v1, parse_conformance_manifest_v1, parse_shadow_policy_v1,
     publish_artifact, read_profile_json, read_trace_jsonl, render_conformance_report_json,
-    render_profile_view, render_trace_view, resolve_deps_v3, resolve_domain_selection_v1,
-    resolve_universe_v1, resolve_view_selection_v1, run_artifact, run_conformance_v1,
-    run_kit_doctor_v1, run_project_with_engine_and_lock, run_project_with_shadow_compare,
+    render_profile_view, resolve_deps_v3, resolve_domain_selection_v1, resolve_universe_v1,
+    resolve_view_selection_v1, run_artifact, run_conformance_v1, run_kit_doctor_v1,
+    run_project_with_engine_and_lock, run_project_with_shadow_compare,
     run_project_with_trace_engine_and_lock, run_reactor_service_with_lock,
     run_reactor_service_with_shadow_compare, run_reactor_service_with_trace_engine_and_lock,
     sign_oclpkg, sync_cosmos_lock_v1, sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1,
@@ -24,8 +25,9 @@ use ocl_sdk::{
     verify_plugin_lock_v1, verify_supply_artifact, write_conformance_report_json,
     write_profile_json, write_shadow_compare_artifacts_v1, write_trace_jsonl,
     ConformanceRunOptionsV1, InputEnvelopeV1, ProfileViewOptions, ReactorRuntimeMode,
-    ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1, TraceViewOptions,
+    ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1,
 };
+use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
 
 fn main() {
@@ -684,10 +686,60 @@ fn run_cli(args: &[String]) -> i32 {
                 }
             }
         }
+        "dbg" => {
+            let Some(path) = args.get(1) else {
+                eprintln!("usage: ocl dbg <artifact_dir> [--script <file>]");
+                return 2;
+            };
+            let script_path = parse_string_flag(args, "--script").map(PathBuf::from);
+            match run_dbg_v11(Path::new(path), script_path.as_deref()) {
+                Ok(rendered) => {
+                    if !rendered.is_empty() {
+                        println!("{rendered}");
+                    }
+                    0
+                }
+                Err(err) => {
+                    eprintln!("{err}");
+                    1
+                }
+            }
+        }
+        "minimize" => {
+            let Some(path) = args.get(1) else {
+                eprintln!(
+                    "usage: ocl minimize <artifact_dir> --goal <error_code:X|divergence|kind:KIND> [--key <key>] [--against <artifactB>] [--out <dir>] [--json]"
+                );
+                return 2;
+            };
+            let Some(goal_raw) = parse_string_flag(args, "--goal") else {
+                eprintln!(
+                    "usage: ocl minimize <artifact_dir> --goal <error_code:X|divergence|kind:KIND> [--key <key>] [--against <artifactB>] [--out <dir>] [--json]"
+                );
+                return 2;
+            };
+            let options = MinimizerCliOptionsV11 {
+                goal_raw,
+                key: parse_string_flag(args, "--key"),
+                against: parse_string_flag(args, "--against").map(PathBuf::from),
+                out_dir: parse_string_flag(args, "--out").map(PathBuf::from),
+                json: args.iter().any(|a| a == "--json"),
+            };
+            match run_minimize_v11(Path::new(path), &options) {
+                Ok(rendered) => {
+                    println!("{rendered}");
+                    0
+                }
+                Err(err) => {
+                    eprintln!("{err}");
+                    1
+                }
+            }
+        }
         "trace" => {
             let Some(subcmd) = args.get(1).map(String::as_str) else {
                 eprintln!(
-                    "usage: ocl trace <run|view> ...\n  run  <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]\n  view <trace_file> [--tail N] [--json]"
+                    "usage: ocl trace <run|view|diff> ...\n  run  <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]\n  view <artifact_dir|audit.jsonl|legacy.trace> [--tail N] [--json] [--legacy-pipe] [--type <event>] [--key <key>] [--kind <kind>] [--reason <rc>] [--module <module_id>]\n  diff <artifactA|auditA> <artifactB|auditB> [--mode strict|align] [--json] [--out <dir>]"
                 );
                 return 2;
             };
@@ -931,21 +983,66 @@ fn run_cli(args: &[String]) -> i32 {
                 }
                 "view" => {
                     let Some(trace_path) = args.get(2) else {
-                        eprintln!("usage: ocl trace view <trace_file> [--tail N] [--json]");
+                        eprintln!(
+                            "usage: ocl trace view <artifact_dir|audit.jsonl|legacy.trace> [--tail N] [--json] [--legacy-pipe] [--type <event>] [--key <key>] [--kind <kind>] [--reason <rc>] [--module <module_id>]"
+                        );
                         return 2;
                     };
-                    let tail = parse_u32_flag(args, "--tail").map(|v| v as usize);
-                    let json_mode = args.iter().any(|a| a == "--json");
-                    match read_trace_jsonl(Path::new(trace_path)) {
+                    let options = TraceViewCliOptionsV11 {
+                        tail: parse_u32_flag(args, "--tail").map(|v| v as usize),
+                        json: args.iter().any(|a| a == "--json"),
+                        filter_type: parse_string_flag(args, "--type"),
+                        filter_key: parse_string_flag(args, "--key"),
+                        filter_kind: parse_string_flag(args, "--kind"),
+                        filter_reason: parse_string_flag(args, "--reason"),
+                        filter_module: parse_string_flag(args, "--module"),
+                        legacy_pipe: args.iter().any(|a| a == "--legacy-pipe"),
+                    };
+                    let input = Path::new(trace_path);
+                    match read_trace_events_for_view_v11(input, options.legacy_pipe) {
                         Ok(events) => {
-                            let report = render_trace_view(
-                                &events,
-                                TraceViewOptions {
-                                    tail,
-                                    json: json_mode,
-                                },
-                            );
-                            println!("{}", report.rendered);
+                            let rendered = render_trace_view_v11(input, &events, &options);
+                            println!("{}", rendered);
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "diff" => {
+                    let Some(left_path) = args.get(2) else {
+                        eprintln!(
+                            "usage: ocl trace diff <artifactA|auditA> <artifactB|auditB> [--mode strict|align] [--json] [--out <dir>]"
+                        );
+                        return 2;
+                    };
+                    let Some(right_path) = args.get(3) else {
+                        eprintln!(
+                            "usage: ocl trace diff <artifactA|auditA> <artifactB|auditB> [--mode strict|align] [--json] [--out <dir>]"
+                        );
+                        return 2;
+                    };
+                    let mode_raw =
+                        parse_string_flag(args, "--mode").unwrap_or_else(|| "strict".to_string());
+                    let mode = match mode_raw.as_str() {
+                        "strict" => TraceDiffModeV11::Strict,
+                        "align" => TraceDiffModeV11::Align,
+                        _ => {
+                            eprintln!("invalid diff mode: `{mode_raw}` (expected strict|align)");
+                            return 2;
+                        }
+                    };
+                    let options = TraceDiffOptionsV11 {
+                        mode,
+                        json: args.iter().any(|a| a == "--json"),
+                        out_dir: parse_string_flag(args, "--out").map(PathBuf::from),
+                    };
+                    match run_trace_diff_v11(Path::new(left_path), Path::new(right_path), &options)
+                    {
+                        Ok(rendered) => {
+                            println!("{rendered}");
                             0
                         }
                         Err(err) => {
@@ -955,7 +1052,7 @@ fn run_cli(args: &[String]) -> i32 {
                     }
                 }
                 _ => {
-                    eprintln!("usage: ocl trace <run|view> ...");
+                    eprintln!("usage: ocl trace <run|view|diff> ...");
                     2
                 }
             }
@@ -3755,6 +3852,13 @@ const CASSETTE_SCHEMA_VERSION_V08: &str = "v0.8";
 const CASSETTE_HASHER_VERSION_V08: &str = "sha256-v1";
 const CASSETTE_MODE_RECORD_V08: &str = "record";
 const CASSETTE_MODE_REPLAY_V08: &str = "replay";
+const TRACE_SCHEMA_VERSION_V11: u64 = 2;
+const CHECKPOINT_STATE_SCHEMA_VERSION_V11: &str = "v1";
+const CHECKPOINT_DEFAULT_EVERY_V11: u64 = 200;
+const CHECKPOINT_MAX_SELECTED_KEYS_V11: usize = 32;
+const CHECKPOINT_MAX_KEY_BYTES_V11: usize = 128;
+const DBG_LOCALS_MAX_KEYS_V11: usize = 16;
+const DBG_PRINT_MAX_BYTES_V11: usize = 4096;
 const ENV_PROJECT_LANE_V08: &str = "OCL_PROJECT_LANE";
 const ENV_QUARANTINE_MODE_V08: &str = "OCL_QUARANTINE_MODE";
 const ENV_WALLCLOCK_RECORD_PATH_V08: &str = "OCL_V08_WALLCLOCK_RECORD_PATH";
@@ -4560,7 +4664,251 @@ fn replay_v071(artifact_dir: &Path) -> Result<String, SdkError> {
             spec.root.display()
         )));
     }
+    let bundle = build_replay_checkpoint_bundle_v11(&trace.events, CHECKPOINT_DEFAULT_EVERY_V11)?;
+    if !bundle.rewind_match {
+        return Err(SdkError::MissingProject(
+            "X-DBG-CHECKPOINT-LOAD: rewind checkpoint validation mismatch".to_string(),
+        ));
+    }
+    write_replay_checkpoints_v11(artifact_dir, &bundle)?;
     Ok(actual)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReplayCheckpointV11 {
+    event_i: u64,
+    replay_cursor: u64,
+    state_digest: String,
+    env_digest: String,
+    selected_keys: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReplayCheckpointBundleV11 {
+    checkpoint_every: u64,
+    event_count: u64,
+    final_state_digest: String,
+    final_env_digest: String,
+    rewind_target_i: u64,
+    rewind_direct_digest: String,
+    rewind_restored_digest: String,
+    rewind_match: bool,
+    checkpoints: Vec<ReplayCheckpointV11>,
+}
+
+fn checkpoint_seed_state_digest_v11() -> String {
+    sha256_hex(b"ocl.v11.checkpoint.state.seed")
+}
+
+fn checkpoint_seed_env_digest_v11() -> String {
+    sha256_hex(b"ocl.v11.checkpoint.env.seed")
+}
+
+fn normalize_checkpoint_key_v11(raw: &str) -> String {
+    if raw.len() <= CHECKPOINT_MAX_KEY_BYTES_V11 {
+        return raw.to_string();
+    }
+    let mut end = CHECKPOINT_MAX_KEY_BYTES_V11;
+    while !raw.is_char_boundary(end) {
+        end = end.saturating_sub(1);
+    }
+    raw[..end].to_string()
+}
+
+fn checkpoint_event_fingerprint_v11(event: &TraceEventV1) -> String {
+    format!(
+        "seq={}|event={}|key={}|kind={}|reason={}|origin={}|allowed={}|value={}|steps={}|universe={}|domain={}|payload={}",
+        event.seq,
+        event.event,
+        event.key.as_deref().unwrap_or("-"),
+        event.kind.as_deref().unwrap_or("-"),
+        event.reason.as_deref().unwrap_or("-"),
+        event
+            .origin_id
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "-".to_string()),
+        event
+            .allowed
+            .map(|v| if v { "true" } else { "false" }.to_string())
+            .unwrap_or_else(|| "-".to_string()),
+        event
+            .value
+            .map(|v| if v { "true" } else { "false" }.to_string())
+            .unwrap_or_else(|| "-".to_string()),
+        event
+            .steps
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "-".to_string()),
+        event.universe_id,
+        event.domain_id,
+        event.payload_hash
+    )
+}
+
+fn advance_state_digest_v11(prev: &str, event: &TraceEventV1) -> String {
+    let canonical = format!("{prev}\n{}", checkpoint_event_fingerprint_v11(event));
+    sha256_hex(canonical.as_bytes())
+}
+
+fn advance_env_digest_v11(prev: &str, event: &TraceEventV1) -> String {
+    let canonical = format!(
+        "{prev}\nkey={}|kind={}|reason={}|origin={}",
+        event.key.as_deref().unwrap_or("-"),
+        event.kind.as_deref().unwrap_or("-"),
+        event.reason.as_deref().unwrap_or("-"),
+        event
+            .origin_id
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "-".to_string()),
+    );
+    sha256_hex(canonical.as_bytes())
+}
+
+fn push_checkpoint_key_v11(selected_keys: &mut Vec<String>, key: Option<&str>) {
+    let Some(raw_key) = key else {
+        return;
+    };
+    let key_norm = normalize_checkpoint_key_v11(raw_key);
+    if selected_keys.iter().any(|existing| existing == &key_norm) {
+        return;
+    }
+    selected_keys.push(key_norm);
+    if selected_keys.len() > CHECKPOINT_MAX_SELECTED_KEYS_V11 {
+        let overflow = selected_keys.len() - CHECKPOINT_MAX_SELECTED_KEYS_V11;
+        selected_keys.drain(0..overflow);
+    }
+}
+
+fn compute_state_digest_until_v11(events: &[TraceEventV1], target_event_i: u64) -> String {
+    let target = usize::min(target_event_i as usize, events.len());
+    let mut digest = checkpoint_seed_state_digest_v11();
+    for event in events.iter().take(target) {
+        digest = advance_state_digest_v11(&digest, event);
+    }
+    digest
+}
+
+fn restore_state_digest_from_checkpoints_v11(
+    events: &[TraceEventV1],
+    checkpoints: &[ReplayCheckpointV11],
+    target_event_i: u64,
+) -> Result<String, SdkError> {
+    let target = usize::min(target_event_i as usize, events.len());
+    if target == 0 {
+        return Ok(checkpoint_seed_state_digest_v11());
+    }
+    let mut digest = checkpoint_seed_state_digest_v11();
+    let mut start = 0usize;
+    if let Some(base) = checkpoints
+        .iter()
+        .filter(|cp| cp.event_i as usize <= target)
+        .max_by_key(|cp| cp.event_i)
+    {
+        digest = base.state_digest.clone();
+        start = base.event_i as usize;
+    }
+    for event in events.iter().skip(start).take(target.saturating_sub(start)) {
+        digest = advance_state_digest_v11(&digest, event);
+    }
+    Ok(digest)
+}
+
+fn build_replay_checkpoint_bundle_v11(
+    events: &[TraceEventV1],
+    checkpoint_every: u64,
+) -> Result<ReplayCheckpointBundleV11, SdkError> {
+    let checkpoint_stride = if checkpoint_every == 0 {
+        1
+    } else {
+        checkpoint_every
+    };
+    let mut checkpoints = Vec::<ReplayCheckpointV11>::new();
+    let mut state_digest = checkpoint_seed_state_digest_v11();
+    let mut env_digest = checkpoint_seed_env_digest_v11();
+    let mut selected_keys = Vec::<String>::new();
+
+    for (idx, event) in events.iter().enumerate() {
+        state_digest = advance_state_digest_v11(&state_digest, event);
+        env_digest = advance_env_digest_v11(&env_digest, event);
+        push_checkpoint_key_v11(&mut selected_keys, event.key.as_deref());
+
+        let event_i = (idx as u64).saturating_add(1);
+        if event_i % checkpoint_stride == 0 || event_i == events.len() as u64 {
+            checkpoints.push(ReplayCheckpointV11 {
+                event_i,
+                replay_cursor: event_i,
+                state_digest: state_digest.clone(),
+                env_digest: env_digest.clone(),
+                selected_keys: selected_keys.clone(),
+            });
+        }
+    }
+
+    let target = if events.is_empty() {
+        0
+    } else {
+        ((events.len() as u64).saturating_add(1)) / 2
+    };
+    let rewind_direct_digest = compute_state_digest_until_v11(events, target);
+    let rewind_restored_digest =
+        restore_state_digest_from_checkpoints_v11(events, &checkpoints, target)?;
+    let rewind_match = rewind_direct_digest == rewind_restored_digest;
+
+    Ok(ReplayCheckpointBundleV11 {
+        checkpoint_every: checkpoint_stride,
+        event_count: events.len() as u64,
+        final_state_digest: state_digest,
+        final_env_digest: env_digest,
+        rewind_target_i: target,
+        rewind_direct_digest,
+        rewind_restored_digest,
+        rewind_match,
+        checkpoints,
+    })
+}
+
+fn write_replay_checkpoints_v11(
+    artifact_dir: &Path,
+    bundle: &ReplayCheckpointBundleV11,
+) -> Result<PathBuf, SdkError> {
+    let checkpoints_dir = artifact_dir.join("checkpoints");
+    fs::create_dir_all(&checkpoints_dir)?;
+    let output_path = checkpoints_dir.join("replay.checkpoints.json");
+    let checkpoints_json: Vec<JsonValue> = bundle
+        .checkpoints
+        .iter()
+        .map(|cp| {
+            json!({
+                "event_i": cp.event_i,
+                "replay_cursor": cp.replay_cursor,
+                "state_digest": cp.state_digest,
+                "env_digest": cp.env_digest,
+                "selected_keys": cp.selected_keys,
+            })
+        })
+        .collect();
+    let rendered = serde_json::to_string_pretty(&json!({
+        "trace_schema_version": TRACE_SCHEMA_VERSION_V11,
+        "state_digest_schema_version": CHECKPOINT_STATE_SCHEMA_VERSION_V11,
+        "checkpoint_every": bundle.checkpoint_every,
+        "event_count": bundle.event_count,
+        "caps": {
+            "max_selected_keys": CHECKPOINT_MAX_SELECTED_KEYS_V11,
+            "max_key_bytes": CHECKPOINT_MAX_KEY_BYTES_V11,
+        },
+        "final_state_digest": bundle.final_state_digest,
+        "final_env_digest": bundle.final_env_digest,
+        "rewind_validation": {
+            "target_event_i": bundle.rewind_target_i,
+            "direct_state_digest": bundle.rewind_direct_digest,
+            "restored_state_digest": bundle.rewind_restored_digest,
+            "rewind_match": bundle.rewind_match,
+        },
+        "checkpoints": checkpoints_json,
+    }))
+    .map_err(|err| SdkError::MissingProject(format!("V-CHECKPOINT-JSON-ENCODE: {err}")))?;
+    fs::write(&output_path, rendered)?;
+    Ok(output_path)
 }
 
 fn json_opt_str(value: Option<&str>) -> String {
@@ -4597,10 +4945,148 @@ fn json_opt_bool(value: Option<bool>) -> String {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TraceSpanV11 {
+    module_id: String,
+    start_byte: u32,
+    end_byte: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TraceViewEventV11 {
+    base: TraceEventV1,
+    tick: u64,
+    seed: u64,
+    call_id: Option<u64>,
+    span: Option<TraceSpanV11>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct TraceViewCliOptionsV11 {
+    tail: Option<usize>,
+    json: bool,
+    filter_type: Option<String>,
+    filter_key: Option<String>,
+    filter_kind: Option<String>,
+    filter_reason: Option<String>,
+    filter_module: Option<String>,
+    legacy_pipe: bool,
+}
+
+#[derive(Debug, Clone)]
+enum DbgBreakpointV11 {
+    EventType(String),
+    Key(String),
+    Kind(String),
+    Reason(String),
+    Loc {
+        module_id: String,
+        line: Option<u32>,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct DbgCheckpointBundleViewV11 {
+    checkpoint_every: u64,
+    checkpoints: Vec<ReplayCheckpointV11>,
+}
+
+#[derive(Debug, Clone)]
+struct DbgSessionV11 {
+    events: Vec<TraceViewEventV11>,
+    base_events: Vec<TraceEventV1>,
+    cursor: usize,
+    breakpoints: Vec<DbgBreakpointV11>,
+    checkpoint_bundle: Option<DbgCheckpointBundleViewV11>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TraceDiffModeV11 {
+    Strict,
+    Align,
+}
+
+#[derive(Debug, Clone)]
+struct TraceDiffOptionsV11 {
+    mode: TraceDiffModeV11,
+    json: bool,
+    out_dir: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+struct TraceDiffPairV11 {
+    left_index: Option<usize>,
+    right_index: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+struct TraceDiffReportV11 {
+    mode: TraceDiffModeV11,
+    left_event_count: usize,
+    right_event_count: usize,
+    first_divergence_index: Option<usize>,
+    changed_outcomes: usize,
+    changed_key_calls: Vec<String>,
+    added_events: usize,
+    removed_events: usize,
+    compared_pairs: usize,
+    required_digest_left: String,
+    required_digest_right: String,
+}
+
+#[derive(Debug, Clone)]
+struct MinimizerCliOptionsV11 {
+    goal_raw: String,
+    key: Option<String>,
+    against: Option<PathBuf>,
+    out_dir: Option<PathBuf>,
+    json: bool,
+}
+
+#[derive(Debug, Clone)]
+enum MinimizerGoalV11 {
+    ErrorCode(String),
+    Divergence { against: PathBuf },
+    Kind { kind: String, key: Option<String> },
+}
+
+#[derive(Debug, Clone)]
+struct MinimizerEventLineV11 {
+    raw_line: String,
+    key: Option<String>,
+    kind: Option<String>,
+    reason: Option<String>,
+    error_code: Option<String>,
+    call_id: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+struct MinimizerReportV11 {
+    goal: String,
+    source_artifact: PathBuf,
+    output_artifact: PathBuf,
+    event_count_before: usize,
+    event_count_after: usize,
+    reduction_percent: u32,
+    ddmin_iterations: u32,
+    cassette_entries_before: usize,
+    cassette_entries_after: usize,
+    fixture_entries_before: usize,
+    fixture_entries_after: usize,
+}
+
+fn derive_call_id_for_trace_event_v11(event: &TraceEventV1) -> Option<u64> {
+    match event.event.as_str() {
+        "observe_start" | "observe_end" | "commit_attempt" | "commit_result" => Some(event.seq),
+        "wallclock_observe" | "proc_observe" | "net_http_observe" => event.steps.map(u64::from),
+        _ => None,
+    }
+}
+
 fn encode_v071_trace_event_line(index: usize, event: &TraceEventV1) -> String {
     format!(
         concat!(
-            "{{\"t\":\"TraceEvent\",\"i\":{},\"tick\":0,\"seed\":0,\"data\":{{",
+            "{{\"t\":\"TraceEvent\",\"i\":{},\"tick\":0,\"seed\":0,\"call_id\":{},\"span\":null,\"data\":{{",
             "\"seq\":{},\"run_id\":\"{}\",\"event\":\"{}\",",
             "\"key\":{},\"kind\":{},\"reason\":{},",
             "\"origin_id\":{},\"allowed\":{},\"value\":{},\"steps\":{},",
@@ -4608,6 +5094,7 @@ fn encode_v071_trace_event_line(index: usize, event: &TraceEventV1) -> String {
             "}}}}"
         ),
         index + 1,
+        json_opt_u64(derive_call_id_for_trace_event_v11(event)),
         event.seq,
         json_escape(&event.run_id),
         json_escape(&event.event),
@@ -4624,9 +5111,22 @@ fn encode_v071_trace_event_line(index: usize, event: &TraceEventV1) -> String {
     )
 }
 
+fn encode_v11_program_start_line(lane: &str) -> String {
+    format!(
+        concat!(
+            "{{\"t\":\"ProgramStart\",\"i\":0,\"tick\":0,\"seed\":0,",
+            "\"call_id\":null,\"span\":null,\"data\":{{",
+            "\"trace_schema_version\":{},\"lane\":\"{}\"",
+            "}}}}"
+        ),
+        TRACE_SCHEMA_VERSION_V11,
+        json_escape(lane)
+    )
+}
+
 fn encode_v071_lane_marker_line(lane: &str) -> String {
     format!(
-        "{{\"t\":\"Lane\",\"i\":0,\"tick\":0,\"seed\":0,\"data\":{{\"lane\":\"{}\"}}}}",
+        "{{\"t\":\"Lane\",\"i\":0,\"tick\":0,\"seed\":0,\"call_id\":null,\"span\":null,\"data\":{{\"lane\":\"{}\"}}}}",
         json_escape(lane)
     )
 }
@@ -4661,7 +5161,7 @@ fn encode_v071_error_line(
 ) -> String {
     format!(
         concat!(
-            "{{\"t\":\"Error\",\"i\":1,\"tick\":0,\"seed\":0,\"data\":{{",
+            "{{\"t\":\"Error\",\"i\":1,\"tick\":0,\"seed\":0,\"call_id\":null,\"span\":null,\"data\":{{",
             "\"code\":\"{}\",\"phase\":\"{}\",\"message\":\"{}\",",
             "\"hint\":{},\"root_reason\":{}",
             "}}}}"
@@ -4681,6 +5181,2222 @@ fn fnv1a64_hex(input: &str) -> String {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     format!("{hash:016x}")
+}
+
+fn trace_format_error_v11(message: impl Into<String>) -> SdkError {
+    SdkError::MissingProject(format!("X-TRACE-FORMAT-UNSUPPORTED: {}", message.into()))
+}
+
+fn json_obj_field<'a>(
+    obj: &'a JsonMap<String, JsonValue>,
+    key: &str,
+) -> Result<&'a JsonMap<String, JsonValue>, SdkError> {
+    match obj.get(key) {
+        Some(JsonValue::Object(value)) => Ok(value),
+        Some(_) => Err(trace_format_error_v11(format!(
+            "field `{key}` must be object"
+        ))),
+        None => Err(trace_format_error_v11(format!(
+            "missing required object field `{key}`"
+        ))),
+    }
+}
+
+fn json_string_field(obj: &JsonMap<String, JsonValue>, key: &str) -> Result<String, SdkError> {
+    match obj.get(key) {
+        Some(JsonValue::String(value)) => Ok(value.clone()),
+        Some(_) => Err(trace_format_error_v11(format!(
+            "field `{key}` must be string"
+        ))),
+        None => Err(trace_format_error_v11(format!(
+            "missing required string field `{key}`"
+        ))),
+    }
+}
+
+fn json_opt_string_field(
+    obj: &JsonMap<String, JsonValue>,
+    key: &str,
+) -> Result<Option<String>, SdkError> {
+    match obj.get(key) {
+        Some(JsonValue::Null) | None => Ok(None),
+        Some(JsonValue::String(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(trace_format_error_v11(format!(
+            "field `{key}` must be string|null"
+        ))),
+    }
+}
+
+fn json_opt_bool_field(
+    obj: &JsonMap<String, JsonValue>,
+    key: &str,
+) -> Result<Option<bool>, SdkError> {
+    match obj.get(key) {
+        Some(JsonValue::Null) | None => Ok(None),
+        Some(JsonValue::Bool(value)) => Ok(Some(*value)),
+        Some(_) => Err(trace_format_error_v11(format!(
+            "field `{key}` must be bool|null"
+        ))),
+    }
+}
+
+fn json_u64_field(obj: &JsonMap<String, JsonValue>, key: &str) -> Result<u64, SdkError> {
+    match obj.get(key) {
+        Some(JsonValue::Number(value)) => value.as_u64().ok_or_else(|| {
+            trace_format_error_v11(format!("field `{key}` must be unsigned integer"))
+        }),
+        Some(JsonValue::String(value)) => value.parse::<u64>().map_err(|_| {
+            trace_format_error_v11(format!("field `{key}` has invalid integer literal"))
+        }),
+        Some(_) => Err(trace_format_error_v11(format!(
+            "field `{key}` must be integer"
+        ))),
+        None => Err(trace_format_error_v11(format!(
+            "missing required integer field `{key}`"
+        ))),
+    }
+}
+
+fn json_opt_u64_field(
+    obj: &JsonMap<String, JsonValue>,
+    key: &str,
+) -> Result<Option<u64>, SdkError> {
+    match obj.get(key) {
+        Some(JsonValue::Null) | None => Ok(None),
+        Some(JsonValue::Number(value)) => value.as_u64().map(Some).ok_or_else(|| {
+            trace_format_error_v11(format!("field `{key}` must be unsigned integer|null"))
+        }),
+        Some(JsonValue::String(value)) => value.parse::<u64>().map(Some).map_err(|_| {
+            trace_format_error_v11(format!("field `{key}` has invalid integer literal"))
+        }),
+        Some(_) => Err(trace_format_error_v11(format!(
+            "field `{key}` must be integer|null"
+        ))),
+    }
+}
+
+fn json_opt_u32_field(
+    obj: &JsonMap<String, JsonValue>,
+    key: &str,
+) -> Result<Option<u32>, SdkError> {
+    let parsed = json_opt_u64_field(obj, key)?;
+    match parsed {
+        Some(value) if value <= u32::MAX as u64 => Ok(Some(value as u32)),
+        Some(_) => Err(trace_format_error_v11(format!(
+            "field `{key}` exceeds u32 range"
+        ))),
+        None => Ok(None),
+    }
+}
+
+fn parse_trace_event_v1_from_audit_data_v11(
+    data: &JsonMap<String, JsonValue>,
+) -> Result<TraceEventV1, SdkError> {
+    Ok(TraceEventV1 {
+        seq: json_u64_field(data, "seq")?,
+        run_id: json_string_field(data, "run_id")?,
+        event: json_string_field(data, "event")?,
+        key: json_opt_string_field(data, "key")?,
+        callsite_package_id: json_opt_string_field(data, "callsite_package_id")?,
+        kind: json_opt_string_field(data, "kind")?,
+        reason: json_opt_string_field(data, "reason")?,
+        origin_id: json_opt_u64_field(data, "origin_id")?,
+        allowed: json_opt_bool_field(data, "allowed")?,
+        value: json_opt_bool_field(data, "value")?,
+        steps: json_opt_u32_field(data, "steps")?,
+        universe_id: json_string_field(data, "universe_id")?,
+        domain_id: json_string_field(data, "domain_id")?,
+        payload_hash: json_string_field(data, "payload_hash")?,
+    })
+}
+
+fn parse_trace_error_event_v11(
+    data: &JsonMap<String, JsonValue>,
+    event_i: u64,
+) -> Result<TraceEventV1, SdkError> {
+    let code = json_string_field(data, "code")?;
+    let phase = json_string_field(data, "phase")?;
+    let message = json_string_field(data, "message")?;
+    let root_reason = json_opt_string_field(data, "root_reason")?;
+    let reason = root_reason.unwrap_or(code.clone());
+    let payload_hash = sha256_hex(message.as_bytes());
+    Ok(TraceEventV1 {
+        seq: event_i,
+        run_id: "replay.error".to_string(),
+        event: "error".to_string(),
+        key: None,
+        callsite_package_id: None,
+        kind: Some("error".to_string()),
+        reason: Some(reason),
+        origin_id: None,
+        allowed: None,
+        value: None,
+        steps: None,
+        universe_id: phase,
+        domain_id: "error".to_string(),
+        payload_hash,
+    })
+}
+
+fn parse_trace_span_v11(value: Option<&JsonValue>) -> Result<Option<TraceSpanV11>, SdkError> {
+    let Some(raw) = value else {
+        return Ok(None);
+    };
+    if raw.is_null() {
+        return Ok(None);
+    }
+    let obj = raw
+        .as_object()
+        .ok_or_else(|| trace_format_error_v11("field `span` must be object|null"))?;
+    let module_id = json_string_field(obj, "module_id")?;
+    if module_id.starts_with('/')
+        || module_id.contains("..")
+        || module_id.contains(':')
+        || module_id.starts_with('\\')
+    {
+        return Err(trace_format_error_v11(format!(
+            "invalid span.module_id `{module_id}`"
+        )));
+    }
+    let start_byte = match obj.get("start_byte").or_else(|| obj.get("start")) {
+        Some(JsonValue::Number(v)) => v
+            .as_u64()
+            .ok_or_else(|| trace_format_error_v11("span.start_byte must be unsigned integer"))?,
+        Some(JsonValue::String(v)) => v
+            .parse::<u64>()
+            .map_err(|_| trace_format_error_v11("span.start_byte has invalid integer literal"))?,
+        _ => return Err(trace_format_error_v11("missing span.start_byte")),
+    };
+    let end_byte = match obj.get("end_byte").or_else(|| obj.get("end")) {
+        Some(JsonValue::Number(v)) => v
+            .as_u64()
+            .ok_or_else(|| trace_format_error_v11("span.end_byte must be unsigned integer"))?,
+        Some(JsonValue::String(v)) => v
+            .parse::<u64>()
+            .map_err(|_| trace_format_error_v11("span.end_byte has invalid integer literal"))?,
+        _ => return Err(trace_format_error_v11("missing span.end_byte")),
+    };
+    if end_byte < start_byte {
+        return Err(trace_format_error_v11(
+            "span.end_byte must be >= span.start_byte",
+        ));
+    }
+    if end_byte > u32::MAX as u64 {
+        return Err(trace_format_error_v11("span.end_byte exceeds u32 range"));
+    }
+    Ok(Some(TraceSpanV11 {
+        module_id: module_id.replace('\\', "/"),
+        start_byte: start_byte as u32,
+        end_byte: end_byte as u32,
+    }))
+}
+
+fn trace_event_requires_call_id_v11(event_name: &str) -> bool {
+    matches!(
+        event_name,
+        "observe_start"
+            | "observe_end"
+            | "commit_attempt"
+            | "commit_result"
+            | "wallclock_observe"
+            | "proc_observe"
+            | "net_http_observe"
+    )
+}
+
+fn read_trace_events_from_audit_v11(path: &Path) -> Result<Vec<TraceViewEventV11>, SdkError> {
+    let raw = fs::read_to_string(path)?;
+    let mut events = Vec::new();
+    let mut saw_program_start = false;
+    for (idx, line) in raw.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let parsed: JsonValue = serde_json::from_str(trimmed).map_err(|err| {
+            trace_format_error_v11(format!(
+                "invalid json line at {} in {}: {err}",
+                idx + 1,
+                path.display()
+            ))
+        })?;
+        let obj = parsed.as_object().ok_or_else(|| {
+            trace_format_error_v11(format!(
+                "line {} in {} must be object",
+                idx + 1,
+                path.display()
+            ))
+        })?;
+        let kind = json_string_field(obj, "t")?;
+        if !saw_program_start {
+            if kind != "ProgramStart" {
+                return Err(trace_format_error_v11(format!(
+                    "line 1 in {} must be `ProgramStart` with `trace_schema_version=2`",
+                    path.display()
+                )));
+            }
+            let data = json_obj_field(obj, "data")?;
+            let version = json_u64_field(data, "trace_schema_version")?;
+            if version != TRACE_SCHEMA_VERSION_V11 {
+                return Err(trace_format_error_v11(format!(
+                    "unsupported trace_schema_version `{version}` in {}",
+                    path.display()
+                )));
+            }
+            saw_program_start = true;
+            continue;
+        }
+        match kind.as_str() {
+            "TraceEvent" => {
+                let tick = json_u64_field(obj, "tick")?;
+                let seed = json_u64_field(obj, "seed")?;
+                let call_id = json_opt_u64_field(obj, "call_id")?;
+                let span = parse_trace_span_v11(obj.get("span"))?;
+                let data = json_obj_field(obj, "data")?;
+                let event = parse_trace_event_v1_from_audit_data_v11(data)?;
+                if trace_event_requires_call_id_v11(&event.event) && call_id.is_none() {
+                    return Err(trace_format_error_v11(format!(
+                        "event `{}` requires non-null call_id in {}",
+                        event.event,
+                        path.display()
+                    )));
+                }
+                events.push(TraceViewEventV11 {
+                    base: event,
+                    tick,
+                    seed,
+                    call_id,
+                    span,
+                });
+            }
+            "Error" => {
+                let tick = json_u64_field(obj, "tick")?;
+                let seed = json_u64_field(obj, "seed")?;
+                let span = parse_trace_span_v11(obj.get("span"))?;
+                let data = json_obj_field(obj, "data")?;
+                let event = parse_trace_error_event_v11(data, json_u64_field(obj, "i")?)?;
+                events.push(TraceViewEventV11 {
+                    base: event,
+                    tick,
+                    seed,
+                    call_id: None,
+                    span,
+                });
+            }
+            _ => {}
+        }
+    }
+    if !saw_program_start {
+        return Err(trace_format_error_v11(format!(
+            "missing `ProgramStart` schema marker in {}",
+            path.display()
+        )));
+    }
+    Ok(events)
+}
+
+fn read_trace_events_for_view_v11(
+    path: &Path,
+    legacy_pipe: bool,
+) -> Result<Vec<TraceViewEventV11>, SdkError> {
+    if legacy_pipe {
+        let legacy = read_trace_jsonl(path)?;
+        let wrapped = legacy
+            .into_iter()
+            .map(|base| TraceViewEventV11 {
+                base,
+                tick: 0,
+                seed: 0,
+                call_id: None,
+                span: None,
+            })
+            .collect();
+        return Ok(wrapped);
+    }
+    let audit_path = if path.is_dir() {
+        path.join("audit.jsonl")
+    } else {
+        path.to_path_buf()
+    };
+    if !audit_path.exists() {
+        return Err(trace_format_error_v11(format!(
+            "missing audit.jsonl at {}",
+            audit_path.display()
+        )));
+    }
+    read_trace_events_from_audit_v11(&audit_path)
+}
+
+fn trace_diff_mode_label_v11(mode: TraceDiffModeV11) -> &'static str {
+    match mode {
+        TraceDiffModeV11::Strict => "strict",
+        TraceDiffModeV11::Align => "align",
+    }
+}
+
+fn read_trace_events_for_diff_v11(path: &Path) -> Result<Vec<TraceViewEventV11>, SdkError> {
+    read_trace_events_for_view_v11(path, false)
+}
+
+fn span_fingerprint_v11(span: Option<&TraceSpanV11>) -> String {
+    match span {
+        Some(value) => format!(
+            "{}:{}:{}",
+            value.module_id, value.start_byte, value.end_byte
+        ),
+        None => "-".to_string(),
+    }
+}
+
+fn align_identity_for_event_v11(event: &TraceViewEventV11, index: usize) -> String {
+    if trace_event_requires_call_id_v11(&event.base.event) {
+        if let Some(call_id) = event.call_id {
+            return format!(
+                "call|{}|{}|{}",
+                event.base.event,
+                call_id,
+                event.base.key.as_deref().unwrap_or("-")
+            );
+        }
+    }
+    if event.base.event.starts_with("stmt_") || event.base.event.starts_with("expr_") {
+        return format!(
+            "seq|{}|{}|{}",
+            event.base.event,
+            index,
+            span_fingerprint_v11(event.span.as_ref())
+        );
+    }
+    format!(
+        "fallback|{}|{}|{}",
+        event.base.event,
+        index,
+        span_fingerprint_v11(event.span.as_ref())
+    )
+}
+
+fn build_trace_diff_pairs_strict_v11(
+    left: &[TraceViewEventV11],
+    right: &[TraceViewEventV11],
+) -> Vec<TraceDiffPairV11> {
+    let total = usize::max(left.len(), right.len());
+    let mut pairs = Vec::with_capacity(total);
+    for idx in 0..total {
+        pairs.push(TraceDiffPairV11 {
+            left_index: (idx < left.len()).then_some(idx),
+            right_index: (idx < right.len()).then_some(idx),
+        });
+    }
+    pairs
+}
+
+fn build_trace_diff_pairs_align_v11(
+    left: &[TraceViewEventV11],
+    right: &[TraceViewEventV11],
+) -> Vec<TraceDiffPairV11> {
+    let mut right_by_identity: BTreeMap<String, VecDeque<usize>> = BTreeMap::new();
+    for (idx, event) in right.iter().enumerate() {
+        let identity = align_identity_for_event_v11(event, idx);
+        right_by_identity
+            .entry(identity)
+            .or_default()
+            .push_back(idx);
+    }
+
+    let mut pairs = Vec::new();
+    for (left_idx, left_event) in left.iter().enumerate() {
+        let identity = align_identity_for_event_v11(left_event, left_idx);
+        let right_idx = right_by_identity
+            .get_mut(&identity)
+            .and_then(VecDeque::pop_front);
+        pairs.push(TraceDiffPairV11 {
+            left_index: Some(left_idx),
+            right_index: right_idx,
+        });
+    }
+
+    let mut leftovers = Vec::new();
+    for queue in right_by_identity.values() {
+        for idx in queue {
+            leftovers.push(*idx);
+        }
+    }
+    leftovers.sort_unstable();
+    for right_idx in leftovers {
+        pairs.push(TraceDiffPairV11 {
+            left_index: None,
+            right_index: Some(right_idx),
+        });
+    }
+    pairs
+}
+
+fn events_equal_for_diff_v11(left: &TraceViewEventV11, right: &TraceViewEventV11) -> bool {
+    left.base.event == right.base.event
+        && left.base.key == right.base.key
+        && left.base.kind == right.base.kind
+        && left.base.reason == right.base.reason
+        && left.base.payload_hash == right.base.payload_hash
+        && left.call_id == right.call_id
+        && span_fingerprint_v11(left.span.as_ref()) == span_fingerprint_v11(right.span.as_ref())
+}
+
+fn build_trace_diff_report_v11(
+    left: &[TraceViewEventV11],
+    right: &[TraceViewEventV11],
+    mode: TraceDiffModeV11,
+) -> TraceDiffReportV11 {
+    let pairs = match mode {
+        TraceDiffModeV11::Strict => build_trace_diff_pairs_strict_v11(left, right),
+        TraceDiffModeV11::Align => build_trace_diff_pairs_align_v11(left, right),
+    };
+
+    let mut first_divergence_index = None::<usize>;
+    let mut changed_outcomes = 0usize;
+    let mut changed_keys = BTreeSet::<String>::new();
+    let mut added_events = 0usize;
+    let mut removed_events = 0usize;
+    let mut compared_pairs = 0usize;
+
+    for pair in &pairs {
+        match (pair.left_index, pair.right_index) {
+            (Some(left_idx), Some(right_idx)) => {
+                let left_event = &left[left_idx];
+                let right_event = &right[right_idx];
+                compared_pairs = compared_pairs.saturating_add(1);
+                let mismatch = !events_equal_for_diff_v11(left_event, right_event);
+                if mismatch && first_divergence_index.is_none() {
+                    first_divergence_index = Some(usize::min(left_idx, right_idx));
+                }
+                if left_event.base.kind != right_event.base.kind
+                    || left_event.base.reason != right_event.base.reason
+                {
+                    changed_outcomes = changed_outcomes.saturating_add(1);
+                    if let Some(key) = left_event.base.key.as_ref() {
+                        changed_keys.insert(key.clone());
+                    } else if let Some(key) = right_event.base.key.as_ref() {
+                        changed_keys.insert(key.clone());
+                    }
+                }
+            }
+            (Some(left_idx), None) => {
+                removed_events = removed_events.saturating_add(1);
+                if first_divergence_index.is_none() {
+                    first_divergence_index = Some(left_idx);
+                }
+                if let Some(key) = left[left_idx].base.key.as_ref() {
+                    changed_keys.insert(key.clone());
+                }
+            }
+            (None, Some(right_idx)) => {
+                added_events = added_events.saturating_add(1);
+                if first_divergence_index.is_none() {
+                    first_divergence_index = Some(right_idx);
+                }
+                if let Some(key) = right[right_idx].base.key.as_ref() {
+                    changed_keys.insert(key.clone());
+                }
+            }
+            (None, None) => {}
+        }
+    }
+
+    let left_base: Vec<TraceEventV1> = left.iter().map(|event| event.base.clone()).collect();
+    let right_base: Vec<TraceEventV1> = right.iter().map(|event| event.base.clone()).collect();
+    TraceDiffReportV11 {
+        mode,
+        left_event_count: left.len(),
+        right_event_count: right.len(),
+        first_divergence_index,
+        changed_outcomes,
+        changed_key_calls: changed_keys.into_iter().collect(),
+        added_events,
+        removed_events,
+        compared_pairs,
+        required_digest_left: trace_required_digest(&left_base),
+        required_digest_right: trace_required_digest(&right_base),
+    }
+}
+
+fn render_trace_diff_text_v11(report: &TraceDiffReportV11) -> String {
+    format!(
+        concat!(
+            "trace diff\n",
+            "mode={}\n",
+            "left_event_count={}\n",
+            "right_event_count={}\n",
+            "first_divergence_index={}\n",
+            "changed_outcomes={}\n",
+            "changed_key_calls={:?}\n",
+            "added_events={}\n",
+            "removed_events={}\n",
+            "compared_pairs={}\n",
+            "required_digest_left={}\n",
+            "required_digest_right={}\n"
+        ),
+        trace_diff_mode_label_v11(report.mode),
+        report.left_event_count,
+        report.right_event_count,
+        report
+            .first_divergence_index
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "none".to_string()),
+        report.changed_outcomes,
+        report.changed_key_calls,
+        report.added_events,
+        report.removed_events,
+        report.compared_pairs,
+        report.required_digest_left,
+        report.required_digest_right
+    )
+}
+
+fn render_trace_diff_json_v11(report: &TraceDiffReportV11) -> Result<String, SdkError> {
+    serde_json::to_string_pretty(&json!({
+        "trace_schema_version": TRACE_SCHEMA_VERSION_V11,
+        "mode": trace_diff_mode_label_v11(report.mode),
+        "left_event_count": report.left_event_count,
+        "right_event_count": report.right_event_count,
+        "first_divergence_index": report.first_divergence_index,
+        "changed_outcomes": report.changed_outcomes,
+        "changed_key_calls": report.changed_key_calls,
+        "added_events": report.added_events,
+        "removed_events": report.removed_events,
+        "compared_pairs": report.compared_pairs,
+        "required_digest_left": report.required_digest_left,
+        "required_digest_right": report.required_digest_right,
+    }))
+    .map_err(|err| SdkError::MissingProject(format!("X-TRACE-DIFF-ENCODE: {err}")))
+}
+
+fn run_trace_diff_v11(
+    left: &Path,
+    right: &Path,
+    options: &TraceDiffOptionsV11,
+) -> Result<String, SdkError> {
+    let left_events = read_trace_events_for_diff_v11(left)?;
+    let right_events = read_trace_events_for_diff_v11(right)?;
+    let report = build_trace_diff_report_v11(&left_events, &right_events, options.mode);
+    let text_report = render_trace_diff_text_v11(&report);
+    let json_report = render_trace_diff_json_v11(&report)?;
+
+    let mut out_note = String::new();
+    if let Some(dir) = options.out_dir.as_ref() {
+        fs::create_dir_all(dir)?;
+        let text_path = dir.join("diff_report.txt");
+        let json_path = dir.join("diff_report.json");
+        fs::write(&text_path, &text_report)?;
+        fs::write(&json_path, &json_report)?;
+        out_note.push_str(&format!(
+            "report_text={}\nreport_json={}\n",
+            text_path.display(),
+            json_path.display()
+        ));
+    }
+
+    if options.json {
+        if out_note.is_empty() {
+            Ok(json_report)
+        } else {
+            Ok(format!("{json_report}\n{out_note}"))
+        }
+    } else if out_note.is_empty() {
+        Ok(text_report)
+    } else {
+        Ok(format!("{text_report}{out_note}"))
+    }
+}
+
+fn parse_minimizer_goal_v11(
+    options: &MinimizerCliOptionsV11,
+) -> Result<MinimizerGoalV11, SdkError> {
+    let raw = options.goal_raw.trim();
+    if let Some(code) = raw.strip_prefix("error_code:") {
+        let code = code.trim();
+        if code.is_empty() {
+            return Err(SdkError::MissingProject(
+                "X-MINIMIZE-NO-SUCCESS: empty error code in --goal".to_string(),
+            ));
+        }
+        return Ok(MinimizerGoalV11::ErrorCode(code.to_string()));
+    }
+    if raw == "divergence" {
+        let Some(against) = options.against.as_ref() else {
+            return Err(SdkError::MissingProject(
+                "X-MINIMIZE-NO-SUCCESS: --goal divergence requires --against <artifactB>"
+                    .to_string(),
+            ));
+        };
+        return Ok(MinimizerGoalV11::Divergence {
+            against: against.clone(),
+        });
+    }
+    if let Some(kind) = raw.strip_prefix("kind:") {
+        let kind = kind.trim();
+        if kind.is_empty() {
+            return Err(SdkError::MissingProject(
+                "X-MINIMIZE-NO-SUCCESS: empty kind in --goal".to_string(),
+            ));
+        }
+        return Ok(MinimizerGoalV11::Kind {
+            kind: kind.to_string(),
+            key: options.key.clone(),
+        });
+    }
+    Err(SdkError::MissingProject(format!(
+        "X-MINIMIZE-NO-SUCCESS: unsupported goal `{raw}`"
+    )))
+}
+
+fn parse_minimizer_event_line_v11(
+    raw_line: &str,
+    parsed: &JsonMap<String, JsonValue>,
+) -> Result<Option<MinimizerEventLineV11>, SdkError> {
+    let line_type = json_string_field(parsed, "t")?;
+    match line_type.as_str() {
+        "ProgramStart" => Ok(None),
+        "TraceEvent" => {
+            let data = json_obj_field(parsed, "data")?;
+            Ok(Some(MinimizerEventLineV11 {
+                raw_line: raw_line.to_string(),
+                key: json_opt_string_field(data, "key")?,
+                kind: json_opt_string_field(data, "kind")?,
+                reason: json_opt_string_field(data, "reason")?,
+                error_code: None,
+                call_id: json_opt_u64_field(parsed, "call_id")?,
+            }))
+        }
+        "Error" => {
+            let data = json_obj_field(parsed, "data")?;
+            let code = json_string_field(data, "code")?;
+            let reason = json_opt_string_field(data, "root_reason")?.or(Some(code.clone()));
+            Ok(Some(MinimizerEventLineV11 {
+                raw_line: raw_line.to_string(),
+                key: None,
+                kind: Some("error".to_string()),
+                reason,
+                error_code: Some(code),
+                call_id: None,
+            }))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn read_minimizer_audit_v11(
+    artifact_dir: &Path,
+) -> Result<(String, Vec<MinimizerEventLineV11>), SdkError> {
+    let audit_path = artifact_dir.join("audit.jsonl");
+    if !audit_path.exists() {
+        return Err(SdkError::MissingProject(format!(
+            "X-MINIMIZE-NO-SUCCESS: missing audit.jsonl at {}",
+            audit_path.display()
+        )));
+    }
+    let raw = fs::read_to_string(&audit_path)?;
+    let mut program_start_line = None::<String>;
+    let mut events = Vec::<MinimizerEventLineV11>::new();
+    for (idx, line) in raw.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let parsed: JsonValue = serde_json::from_str(trimmed).map_err(|err| {
+            SdkError::MissingProject(format!(
+                "X-MINIMIZE-NO-SUCCESS: invalid json line {} in {} ({err})",
+                idx + 1,
+                audit_path.display()
+            ))
+        })?;
+        let obj = parsed.as_object().ok_or_else(|| {
+            SdkError::MissingProject(format!(
+                "X-MINIMIZE-NO-SUCCESS: line {} in {} must be object",
+                idx + 1,
+                audit_path.display()
+            ))
+        })?;
+        let line_type = json_string_field(obj, "t")?;
+        if line_type == "ProgramStart" {
+            if program_start_line.is_none() {
+                program_start_line = Some(trimmed.to_string());
+            }
+            continue;
+        }
+        if let Some(event) = parse_minimizer_event_line_v11(trimmed, obj)? {
+            events.push(event);
+        }
+    }
+    let Some(program_start) = program_start_line else {
+        return Err(SdkError::MissingProject(format!(
+            "X-MINIMIZE-NO-SUCCESS: missing ProgramStart in {}",
+            audit_path.display()
+        )));
+    };
+    Ok((program_start, events))
+}
+
+fn find_minimize_target_index_v11(
+    source_artifact: &Path,
+    events: &[MinimizerEventLineV11],
+    goal: &MinimizerGoalV11,
+) -> Result<usize, SdkError> {
+    match goal {
+        MinimizerGoalV11::ErrorCode(code) => events
+            .iter()
+            .position(|event| {
+                event.error_code.as_deref() == Some(code.as_str())
+                    || event.reason.as_deref() == Some(code.as_str())
+            })
+            .ok_or_else(|| {
+                SdkError::MissingProject(format!(
+                    "X-MINIMIZE-NO-SUCCESS: goal `error_code:{code}` not found in source trace"
+                ))
+            }),
+        MinimizerGoalV11::Kind { kind, key } => events
+            .iter()
+            .position(|event| {
+                event.kind.as_deref() == Some(kind.as_str())
+                    && key
+                        .as_ref()
+                        .map(|want| event.key.as_deref() == Some(want.as_str()))
+                        .unwrap_or(true)
+            })
+            .ok_or_else(|| {
+                SdkError::MissingProject(format!(
+                    "X-MINIMIZE-NO-SUCCESS: goal `kind:{kind}` not found in source trace"
+                ))
+            }),
+        MinimizerGoalV11::Divergence { against } => {
+            let left_events = read_trace_events_for_diff_v11(source_artifact)?;
+            let right_events = read_trace_events_for_diff_v11(against)?;
+            let report =
+                build_trace_diff_report_v11(&left_events, &right_events, TraceDiffModeV11::Strict);
+            report.first_divergence_index.ok_or_else(|| {
+                SdkError::MissingProject(
+                    "X-MINIMIZE-NO-SUCCESS: no divergence found between source and --against"
+                        .to_string(),
+                )
+            })
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum MinimizerGoalContextV11 {
+    Simple,
+    DivergenceAgainst { events: Vec<MinimizerEventLineV11> },
+}
+
+fn build_minimizer_goal_context_v11(
+    goal: &MinimizerGoalV11,
+) -> Result<MinimizerGoalContextV11, SdkError> {
+    match goal {
+        MinimizerGoalV11::Divergence { against } => {
+            let (_, events) = read_minimizer_audit_v11(against)?;
+            Ok(MinimizerGoalContextV11::DivergenceAgainst { events })
+        }
+        _ => Ok(MinimizerGoalContextV11::Simple),
+    }
+}
+
+fn first_divergence_index_for_minimizer_events_v11(
+    left: &[MinimizerEventLineV11],
+    right: &[MinimizerEventLineV11],
+) -> Option<usize> {
+    let total = usize::max(left.len(), right.len());
+    for idx in 0..total {
+        match (left.get(idx), right.get(idx)) {
+            (Some(a), Some(b)) => {
+                if a.raw_line != b.raw_line {
+                    return Some(idx);
+                }
+            }
+            (None, Some(_)) | (Some(_), None) => {
+                return Some(idx);
+            }
+            (None, None) => {}
+        }
+    }
+    None
+}
+
+fn goal_holds_for_candidate_v11(
+    goal: &MinimizerGoalV11,
+    context: &MinimizerGoalContextV11,
+    candidate: &[MinimizerEventLineV11],
+) -> bool {
+    if candidate.is_empty() {
+        return false;
+    }
+    match goal {
+        MinimizerGoalV11::ErrorCode(code) => candidate.iter().any(|event| {
+            event.error_code.as_deref() == Some(code.as_str())
+                || event.reason.as_deref() == Some(code.as_str())
+        }),
+        MinimizerGoalV11::Kind { kind, key } => candidate.iter().any(|event| {
+            event.kind.as_deref() == Some(kind.as_str())
+                && key
+                    .as_ref()
+                    .map(|want| event.key.as_deref() == Some(want.as_str()))
+                    .unwrap_or(true)
+        }),
+        MinimizerGoalV11::Divergence { .. } => match context {
+            MinimizerGoalContextV11::DivergenceAgainst { events } => {
+                first_divergence_index_for_minimizer_events_v11(candidate, events).is_some()
+            }
+            MinimizerGoalContextV11::Simple => false,
+        },
+    }
+}
+
+fn ddmin_events_v11(
+    initial: Vec<MinimizerEventLineV11>,
+    goal: &MinimizerGoalV11,
+    context: &MinimizerGoalContextV11,
+) -> (Vec<MinimizerEventLineV11>, u32) {
+    let mut current = initial;
+    let mut iterations = 0u32;
+    if current.len() < 2 {
+        return (current, iterations);
+    }
+
+    let mut granularity = 2usize;
+    while current.len() >= 2 {
+        let len = current.len();
+        let chunk_size = (len + granularity - 1) / granularity;
+        let mut reduced = false;
+        let mut start = 0usize;
+        while start < len {
+            let end = usize::min(start + chunk_size, len);
+            let mut candidate = Vec::with_capacity(len - (end - start));
+            candidate.extend_from_slice(&current[..start]);
+            candidate.extend_from_slice(&current[end..]);
+            iterations = iterations.saturating_add(1);
+            if goal_holds_for_candidate_v11(goal, context, &candidate) {
+                current = candidate;
+                granularity = usize::max(2, granularity.saturating_sub(1));
+                reduced = true;
+                break;
+            }
+            start = end;
+        }
+        if !reduced {
+            if granularity >= len {
+                break;
+            }
+            granularity = usize::min(len, granularity * 2);
+        }
+    }
+
+    (current, iterations)
+}
+
+fn read_fixture_manifest_entries_v11(
+    source_artifact: &Path,
+) -> Result<Vec<(String, String)>, SdkError> {
+    let manifest_path = source_artifact.join("io").join("fixtures_manifest.json");
+    if !manifest_path.exists() {
+        return Ok(Vec::new());
+    }
+    let raw = fs::read_to_string(&manifest_path)?;
+    let parsed: JsonValue = serde_json::from_str(&raw).map_err(|err| {
+        SdkError::MissingProject(format!(
+            "X-MINIMIZE-NO-SUCCESS: invalid fixtures manifest {} ({err})",
+            manifest_path.display()
+        ))
+    })?;
+    let rows = parsed.as_array().ok_or_else(|| {
+        SdkError::MissingProject(format!(
+            "X-MINIMIZE-NO-SUCCESS: fixtures manifest must be array ({})",
+            manifest_path.display()
+        ))
+    })?;
+
+    let mut entries = Vec::<(String, String)>::new();
+    for row in rows {
+        let obj = row.as_object().ok_or_else(|| {
+            SdkError::MissingProject(format!(
+                "X-MINIMIZE-NO-SUCCESS: fixtures manifest row must be object ({})",
+                manifest_path.display()
+            ))
+        })?;
+        let path = json_string_field(obj, "path")?;
+        let sha = json_string_field(obj, "sha256")?;
+        entries.push((path.replace('\\', "/"), sha));
+    }
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(entries)
+}
+
+fn normalize_fixture_reference_v11(value: &str) -> String {
+    value.replace('\\', "/").trim().to_string()
+}
+
+fn fixture_entry_is_referenced_v11(path: &str, events: &[MinimizerEventLineV11]) -> bool {
+    let normalized = normalize_fixture_reference_v11(path);
+    let dot_path = format!("./{normalized}");
+    let file_name = Path::new(&normalized)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_string());
+    events.iter().any(|event| {
+        event.raw_line.contains(&normalized)
+            || event.raw_line.contains(&dot_path)
+            || file_name
+                .as_ref()
+                .map(|name| event.raw_line.contains(name))
+                .unwrap_or(false)
+    })
+}
+
+fn write_fixture_manifest_entries_v11(
+    output_artifact: &Path,
+    entries: &[(String, String)],
+) -> Result<(), SdkError> {
+    let io_dir = output_artifact.join("io");
+    fs::create_dir_all(&io_dir)?;
+    let manifest_path = io_dir.join("fixtures_manifest.json");
+    let json_rows: Vec<JsonValue> = entries
+        .iter()
+        .map(|(path, sha)| {
+            json!({
+                "path": path,
+                "sha256": sha,
+            })
+        })
+        .collect();
+    fs::write(
+        &manifest_path,
+        serde_json::to_string_pretty(&json_rows)
+            .map_err(|err| SdkError::MissingProject(format!("X-MINIMIZE-NO-SUCCESS: {err}")))?,
+    )?;
+    Ok(())
+}
+
+fn copy_fixture_subset_for_minimizer_v11(
+    source_artifact: &Path,
+    output_artifact: &Path,
+    entries: &[(String, String)],
+) -> Result<(), SdkError> {
+    for (rel_path, _) in entries {
+        let src = source_artifact.join(rel_path.split('/').collect::<PathBuf>());
+        if !src.exists() || !src.is_file() {
+            continue;
+        }
+        let dst = output_artifact.join(rel_path.split('/').collect::<PathBuf>());
+        if let Some(parent) = dst.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(src, dst)?;
+    }
+    Ok(())
+}
+
+fn reduce_fixtures_for_minimizer_v11(
+    source_artifact: &Path,
+    output_artifact: &Path,
+    selected_events: &[MinimizerEventLineV11],
+) -> Result<(usize, usize), SdkError> {
+    let entries = read_fixture_manifest_entries_v11(source_artifact)?;
+    if entries.is_empty() {
+        return Ok((0, 0));
+    }
+    let before = entries.len();
+    let mut kept = Vec::<(String, String)>::new();
+    for (path, sha) in &entries {
+        if fixture_entry_is_referenced_v11(path, selected_events) {
+            kept.push((path.clone(), sha.clone()));
+        }
+    }
+    if kept.is_empty() {
+        kept = entries.clone();
+    }
+    kept.sort_by(|a, b| a.0.cmp(&b.0));
+    write_fixture_manifest_entries_v11(output_artifact, &kept)?;
+    copy_fixture_subset_for_minimizer_v11(source_artifact, output_artifact, &kept)?;
+    Ok((before, kept.len()))
+}
+
+fn copy_optional_file_v11(source: &Path, target: &Path) -> Result<(), SdkError> {
+    if source.exists() {
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(source, target)?;
+    }
+    Ok(())
+}
+
+fn reduce_cassette_for_minimizer_v11(
+    source_artifact: &Path,
+    output_artifact: &Path,
+    kept_call_ids: &BTreeSet<u64>,
+) -> Result<(usize, usize), SdkError> {
+    let source_cassette = source_artifact.join("cassette");
+    if !source_cassette.exists() {
+        return Ok((0, 0));
+    }
+    let output_cassette = output_artifact.join("cassette");
+    fs::create_dir_all(&output_cassette)?;
+
+    let source_index_path = source_cassette.join("cassette_index.json");
+    let source_jsonl_path = source_cassette.join("cassette.jsonl");
+    let source_meta_path = source_cassette.join("cassette_meta.toml");
+    let output_index_path = output_cassette.join("cassette_index.json");
+    let output_jsonl_path = output_cassette.join("cassette.jsonl");
+    let output_meta_path = output_cassette.join("cassette_meta.toml");
+    copy_optional_file_v11(&source_meta_path, &output_meta_path)?;
+
+    if !source_index_path.exists() || !source_jsonl_path.exists() {
+        copy_optional_file_v11(&source_index_path, &output_index_path)?;
+        copy_optional_file_v11(&source_jsonl_path, &output_jsonl_path)?;
+        return Ok((0, 0));
+    }
+
+    let index_raw = fs::read_to_string(&source_index_path)?;
+    let mut index_value: JsonValue = serde_json::from_str(&index_raw).map_err(|err| {
+        SdkError::MissingProject(format!(
+            "X-MINIMIZE-NO-SUCCESS: invalid cassette_index.json {} ({err})",
+            source_index_path.display()
+        ))
+    })?;
+    let index_obj = index_value.as_object_mut().ok_or_else(|| {
+        SdkError::MissingProject(format!(
+            "X-MINIMIZE-NO-SUCCESS: cassette_index.json must be object ({})",
+            source_index_path.display()
+        ))
+    })?;
+    let mapping_obj = index_obj
+        .get("call_id_to_entry_id")
+        .and_then(JsonValue::as_object)
+        .ok_or_else(|| {
+            SdkError::MissingProject(format!(
+                "X-MINIMIZE-NO-SUCCESS: cassette_index.json missing call_id_to_entry_id ({})",
+                source_index_path.display()
+            ))
+        })?;
+
+    let mut kept_mapping = JsonMap::<String, JsonValue>::new();
+    let mut kept_entry_ids = BTreeSet::<String>::new();
+    for call_id in kept_call_ids {
+        let key = call_id.to_string();
+        if let Some(entry_id) = mapping_obj.get(&key).and_then(JsonValue::as_str) {
+            kept_mapping.insert(key, JsonValue::String(entry_id.to_string()));
+            kept_entry_ids.insert(entry_id.to_string());
+        }
+    }
+
+    let jsonl_raw = fs::read_to_string(&source_jsonl_path)?;
+    let mut before_entries = 0usize;
+    let mut after_entries = 0usize;
+    let mut kept_lines = Vec::<String>::new();
+    for line in jsonl_raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        before_entries = before_entries.saturating_add(1);
+        let parsed: JsonValue = serde_json::from_str(trimmed).map_err(|err| {
+            SdkError::MissingProject(format!(
+                "X-MINIMIZE-NO-SUCCESS: invalid cassette line in {} ({err})",
+                source_jsonl_path.display()
+            ))
+        })?;
+        let entry_id = parsed
+            .as_object()
+            .and_then(|obj| obj.get("id"))
+            .and_then(JsonValue::as_str)
+            .ok_or_else(|| {
+                SdkError::MissingProject(format!(
+                    "X-MINIMIZE-NO-SUCCESS: cassette entry missing `id` in {}",
+                    source_jsonl_path.display()
+                ))
+            })?;
+        if kept_entry_ids.contains(entry_id) {
+            after_entries = after_entries.saturating_add(1);
+            kept_lines.push(trimmed.to_string());
+        }
+    }
+
+    index_obj.insert(
+        "call_id_to_entry_id".to_string(),
+        JsonValue::Object(kept_mapping),
+    );
+    index_obj.insert(
+        "entries".to_string(),
+        JsonValue::Number(serde_json::Number::from(after_entries as u64)),
+    );
+    index_obj.insert(
+        "next_call_id".to_string(),
+        JsonValue::Number(serde_json::Number::from(after_entries as u64)),
+    );
+
+    fs::write(
+        &output_index_path,
+        serde_json::to_string_pretty(&index_value)
+            .map_err(|err| SdkError::MissingProject(format!("X-MINIMIZE-NO-SUCCESS: {err}")))?,
+    )?;
+    let mut jsonl_out = String::new();
+    for line in kept_lines {
+        jsonl_out.push_str(&line);
+        jsonl_out.push('\n');
+    }
+    fs::write(&output_jsonl_path, jsonl_out)?;
+    Ok((before_entries, after_entries))
+}
+
+fn render_minimizer_report_v11(report: &MinimizerReportV11, json_mode: bool) -> String {
+    if json_mode {
+        return serde_json::to_string_pretty(&json!({
+            "goal": report.goal,
+            "source_artifact": report.source_artifact.to_string_lossy(),
+            "output_artifact": report.output_artifact.to_string_lossy(),
+            "event_count_before": report.event_count_before,
+            "event_count_after": report.event_count_after,
+            "reduction_percent": report.reduction_percent,
+            "ddmin_iterations": report.ddmin_iterations,
+            "cassette_entries_before": report.cassette_entries_before,
+            "cassette_entries_after": report.cassette_entries_after,
+            "fixture_entries_before": report.fixture_entries_before,
+            "fixture_entries_after": report.fixture_entries_after,
+        }))
+        .unwrap_or_else(|_| "{}".to_string());
+    }
+    format!(
+        concat!(
+            "minimize ok\n",
+            "goal={}\n",
+            "source_artifact={}\n",
+            "output_artifact={}\n",
+            "event_count_before={}\n",
+            "event_count_after={}\n",
+            "reduction_percent={}\n",
+            "ddmin_iterations={}\n",
+            "cassette_entries_before={}\n",
+            "cassette_entries_after={}\n",
+            "fixture_entries_before={}\n",
+            "fixture_entries_after={}\n"
+        ),
+        report.goal,
+        report.source_artifact.display(),
+        report.output_artifact.display(),
+        report.event_count_before,
+        report.event_count_after,
+        report.reduction_percent,
+        report.ddmin_iterations,
+        report.cassette_entries_before,
+        report.cassette_entries_after,
+        report.fixture_entries_before,
+        report.fixture_entries_after
+    )
+}
+
+fn run_minimize_v11(
+    artifact_dir: &Path,
+    options: &MinimizerCliOptionsV11,
+) -> Result<String, SdkError> {
+    if !artifact_dir.is_dir() {
+        return Err(SdkError::MissingProject(format!(
+            "X-MINIMIZE-NO-SUCCESS: artifact dir not found: {}",
+            artifact_dir.display()
+        )));
+    }
+    let goal = parse_minimizer_goal_v11(options)?;
+    let goal_context = build_minimizer_goal_context_v11(&goal)?;
+    let (program_start, events) = read_minimizer_audit_v11(artifact_dir)?;
+    if events.is_empty() {
+        return Err(SdkError::MissingProject(
+            "X-MINIMIZE-NO-SUCCESS: source audit has no minimizable events".to_string(),
+        ));
+    }
+    let target_index = find_minimize_target_index_v11(artifact_dir, &events, &goal)?;
+    if target_index >= events.len() {
+        return Err(SdkError::MissingProject(
+            "X-MINIMIZE-NO-SUCCESS: target index out of range".to_string(),
+        ));
+    }
+    let selected_events = events[..=target_index].to_vec();
+    let (selected_events, ddmin_iterations) =
+        ddmin_events_v11(selected_events, &goal, &goal_context);
+    let output_artifact = options
+        .out_dir
+        .clone()
+        .unwrap_or_else(|| artifact_dir.join("minimized"));
+    if output_artifact.exists() {
+        return Err(SdkError::MissingProject(format!(
+            "X-MINIMIZE-NO-SUCCESS: output dir already exists: {}",
+            output_artifact.display()
+        )));
+    }
+    fs::create_dir_all(&output_artifact)?;
+
+    let output_audit = output_artifact.join("audit.jsonl");
+    let mut audit_out = String::new();
+    audit_out.push_str(&program_start);
+    audit_out.push('\n');
+    for event in &selected_events {
+        audit_out.push_str(&event.raw_line);
+        audit_out.push('\n');
+    }
+    fs::write(&output_audit, audit_out)?;
+
+    let parsed = read_trace_events_from_audit_v11(&output_audit)?;
+    let parsed_base: Vec<TraceEventV1> = parsed.into_iter().map(|event| event.base).collect();
+    write_trace_index_v11(&output_artifact.join("trace_index.json"), &parsed_base)?;
+
+    copy_optional_file_v11(
+        &artifact_dir.join("replay.toml"),
+        &output_artifact.join("replay.toml"),
+    )?;
+    copy_optional_file_v11(
+        &artifact_dir.join("signature.txt"),
+        &output_artifact.join("signature.txt"),
+    )?;
+
+    let kept_call_ids: BTreeSet<u64> = selected_events
+        .iter()
+        .filter_map(|event| event.call_id)
+        .collect();
+    let (cassette_before, cassette_after) =
+        reduce_cassette_for_minimizer_v11(artifact_dir, &output_artifact, &kept_call_ids)?;
+    let (fixture_before, fixture_after) =
+        reduce_fixtures_for_minimizer_v11(artifact_dir, &output_artifact, &selected_events)?;
+
+    let before = events.len();
+    let after = selected_events.len();
+    let reduction_percent = if before == 0 {
+        0
+    } else {
+        (((before.saturating_sub(after)) * 100) / before) as u32
+    };
+    let goal_label = options.goal_raw.clone();
+    let report = MinimizerReportV11 {
+        goal: goal_label,
+        source_artifact: artifact_dir.to_path_buf(),
+        output_artifact: output_artifact.clone(),
+        event_count_before: before,
+        event_count_after: after,
+        reduction_percent,
+        ddmin_iterations,
+        cassette_entries_before: cassette_before,
+        cassette_entries_after: cassette_after,
+        fixture_entries_before: fixture_before,
+        fixture_entries_after: fixture_after,
+    };
+    let report_json = render_minimizer_report_v11(&report, true);
+    fs::write(output_artifact.join("minimize_report.json"), report_json)?;
+    Ok(render_minimizer_report_v11(&report, options.json))
+}
+
+fn compute_env_digest_until_v11(events: &[TraceEventV1], target_event_i: u64) -> String {
+    let target = usize::min(target_event_i as usize, events.len());
+    let mut digest = checkpoint_seed_env_digest_v11();
+    for event in events.iter().take(target) {
+        digest = advance_env_digest_v11(&digest, event);
+    }
+    digest
+}
+
+fn read_dbg_checkpoint_bundle_v11(
+    artifact_dir: &Path,
+) -> Result<Option<DbgCheckpointBundleViewV11>, SdkError> {
+    let path = artifact_dir
+        .join("checkpoints")
+        .join("replay.checkpoints.json");
+    if !path.exists() {
+        return Ok(None);
+    }
+    let raw = fs::read_to_string(&path)?;
+    let parsed: JsonValue = serde_json::from_str(&raw).map_err(|err| {
+        SdkError::MissingProject(format!(
+            "X-DBG-CHECKPOINT-LOAD: invalid checkpoint json {} ({err})",
+            path.display()
+        ))
+    })?;
+    let root = parsed.as_object().ok_or_else(|| {
+        SdkError::MissingProject(format!(
+            "X-DBG-CHECKPOINT-LOAD: checkpoint file must be json object ({})",
+            path.display()
+        ))
+    })?;
+    let schema_version = json_u64_field(root, "trace_schema_version")?;
+    if schema_version != TRACE_SCHEMA_VERSION_V11 {
+        return Err(SdkError::MissingProject(format!(
+            "X-DBG-CHECKPOINT-LOAD: unsupported trace schema `{schema_version}` in {}",
+            path.display()
+        )));
+    }
+    let checkpoint_every = json_u64_field(root, "checkpoint_every")?;
+    let checkpoint_rows = root
+        .get("checkpoints")
+        .and_then(JsonValue::as_array)
+        .ok_or_else(|| {
+            SdkError::MissingProject(format!(
+                "X-DBG-CHECKPOINT-LOAD: missing checkpoints array in {}",
+                path.display()
+            ))
+        })?;
+    let mut checkpoints = Vec::new();
+    for row in checkpoint_rows {
+        let item = row.as_object().ok_or_else(|| {
+            SdkError::MissingProject(format!(
+                "X-DBG-CHECKPOINT-LOAD: checkpoint row must be object in {}",
+                path.display()
+            ))
+        })?;
+        let event_i = json_u64_field(item, "event_i")?;
+        let replay_cursor = json_u64_field(item, "replay_cursor")?;
+        let state_digest = json_string_field(item, "state_digest")?;
+        let env_digest = json_string_field(item, "env_digest")?;
+        let selected_keys = match item.get("selected_keys") {
+            Some(JsonValue::Array(values)) => {
+                let mut out = Vec::new();
+                for value in values {
+                    let key = value.as_str().ok_or_else(|| {
+                        SdkError::MissingProject(format!(
+                            "X-DBG-CHECKPOINT-LOAD: selected_keys contains non-string in {}",
+                            path.display()
+                        ))
+                    })?;
+                    out.push(normalize_checkpoint_key_v11(key));
+                }
+                out
+            }
+            _ => {
+                return Err(SdkError::MissingProject(format!(
+                    "X-DBG-CHECKPOINT-LOAD: missing selected_keys array in {}",
+                    path.display()
+                )));
+            }
+        };
+        checkpoints.push(ReplayCheckpointV11 {
+            event_i,
+            replay_cursor,
+            state_digest,
+            env_digest,
+            selected_keys,
+        });
+    }
+    checkpoints.sort_by(|a, b| a.event_i.cmp(&b.event_i));
+    Ok(Some(DbgCheckpointBundleViewV11 {
+        checkpoint_every,
+        checkpoints,
+    }))
+}
+
+fn nearest_checkpoint_for_event_v11<'a>(
+    checkpoints: &'a [ReplayCheckpointV11],
+    target_event_i: u64,
+) -> Option<&'a ReplayCheckpointV11> {
+    checkpoints
+        .iter()
+        .filter(|cp| cp.event_i <= target_event_i)
+        .max_by_key(|cp| cp.event_i)
+}
+
+fn parse_dbg_index_arg_v11(raw: &str, max_len: usize) -> Result<usize, SdkError> {
+    let value = raw
+        .parse::<usize>()
+        .map_err(|_| SdkError::MissingProject(format!("X-DBG-COMMAND: invalid index `{raw}`")))?;
+    if value >= max_len {
+        return Err(SdkError::MissingProject(format!(
+            "X-DBG-COMMAND: index `{value}` out of range (event_count={max_len})"
+        )));
+    }
+    Ok(value)
+}
+
+fn parse_dbg_loc_breakpoint_v11(raw: &str) -> DbgBreakpointV11 {
+    if let Some((module, line_raw)) = raw.rsplit_once(':') {
+        if let Ok(line) = line_raw.parse::<u32>() {
+            return DbgBreakpointV11::Loc {
+                module_id: module.to_string(),
+                line: Some(line),
+            };
+        }
+    }
+    DbgBreakpointV11::Loc {
+        module_id: raw.to_string(),
+        line: None,
+    }
+}
+
+fn resolve_span_line_v11(span: &TraceSpanV11, sources_root: Option<&Path>) -> Option<u32> {
+    let root = sources_root?;
+    let rel = span.module_id.replace('\\', "/");
+    if rel.contains("..") || rel.starts_with('/') || rel.contains(':') {
+        return None;
+    }
+    let file_path = root.join(rel.split('/').collect::<PathBuf>());
+    let bytes = fs::read(file_path).ok()?;
+    let start = usize::min(span.start_byte as usize, bytes.len());
+    let line = bytes[..start].iter().filter(|b| **b == b'\n').count() + 1;
+    Some(line as u32)
+}
+
+fn dbg_breakpoint_matches_v11(
+    breakpoint: &DbgBreakpointV11,
+    event: &TraceViewEventV11,
+    sources_root: Option<&Path>,
+) -> bool {
+    match breakpoint {
+        DbgBreakpointV11::EventType(value) => event.base.event == *value,
+        DbgBreakpointV11::Key(value) => event.base.key.as_deref() == Some(value.as_str()),
+        DbgBreakpointV11::Kind(value) => event.base.kind.as_deref() == Some(value.as_str()),
+        DbgBreakpointV11::Reason(value) => event.base.reason.as_deref() == Some(value.as_str()),
+        DbgBreakpointV11::Loc { module_id, line } => {
+            let Some(span) = event.span.as_ref() else {
+                return false;
+            };
+            if span.module_id != *module_id {
+                return false;
+            }
+            if let Some(want_line) = line {
+                return resolve_span_line_v11(span, sources_root) == Some(*want_line);
+            }
+            true
+        }
+    }
+}
+
+fn format_dbg_where_line_v11(
+    cursor: usize,
+    event: &TraceViewEventV11,
+    sources_root: Option<&Path>,
+) -> String {
+    let module = event
+        .span
+        .as_ref()
+        .map(|value| value.module_id.as_str())
+        .unwrap_or("-");
+    let line = event
+        .span
+        .as_ref()
+        .and_then(|span| resolve_span_line_v11(span, sources_root))
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "-".to_string());
+    format!(
+        "cursor={} seq={} event={} key={} kind={} reason={} module={} line={} call_id={} tick={} seed={}",
+        cursor,
+        event.base.seq,
+        event.base.event,
+        event.base.key.as_deref().unwrap_or("-"),
+        event.base.kind.as_deref().unwrap_or("-"),
+        event.base.reason.as_deref().unwrap_or("-"),
+        module,
+        line,
+        event
+            .call_id
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "-".to_string()),
+        event.tick,
+        event.seed
+    )
+}
+
+fn dbg_cap_text_v11(raw: &str) -> String {
+    if raw.len() <= DBG_PRINT_MAX_BYTES_V11 {
+        return raw.to_string();
+    }
+    let mut end = DBG_PRINT_MAX_BYTES_V11;
+    while !raw.is_char_boundary(end) {
+        end = end.saturating_sub(1);
+    }
+    format!("{}...(truncated)", &raw[..end])
+}
+
+fn dbg_breakpoint_label_v11(breakpoint: &DbgBreakpointV11) -> String {
+    match breakpoint {
+        DbgBreakpointV11::EventType(value) => format!("type:{value}"),
+        DbgBreakpointV11::Key(value) => format!("key:{value}"),
+        DbgBreakpointV11::Kind(value) => format!("kind:{value}"),
+        DbgBreakpointV11::Reason(value) => format!("reason:{value}"),
+        DbgBreakpointV11::Loc { module_id, line } => match line {
+            Some(value) => format!("loc:{module_id}:{value}"),
+            None => format!("loc:{module_id}"),
+        },
+    }
+}
+
+fn dbg_find_last_focus_event_v11(session: &DbgSessionV11) -> Option<(usize, &TraceViewEventV11)> {
+    if session.events.is_empty() {
+        return None;
+    }
+    for idx in (0..=session.cursor).rev() {
+        let event = &session.events[idx];
+        let is_focus = event.base.event == "error"
+            || event.base.kind.as_deref() == Some("error")
+            || event.base.event == "observe_end"
+            || event.base.event == "commit_result"
+            || event.base.event.ends_with("_observe");
+        if is_focus {
+            return Some((idx, event));
+        }
+    }
+    None
+}
+
+fn dbg_selected_keys_for_index_v11(
+    bundle: Option<&DbgCheckpointBundleViewV11>,
+    index: usize,
+) -> Vec<String> {
+    let Some(bundle) = bundle else {
+        return Vec::new();
+    };
+    let Some(checkpoint) = nearest_checkpoint_for_event_v11(&bundle.checkpoints, index as u64 + 1)
+    else {
+        return Vec::new();
+    };
+    checkpoint
+        .selected_keys
+        .iter()
+        .take(DBG_LOCALS_MAX_KEYS_V11)
+        .cloned()
+        .collect()
+}
+
+fn dbg_render_print_expr_v11(
+    session: &DbgSessionV11,
+    expr: &str,
+    sources_root: Option<&Path>,
+) -> String {
+    let current = &session.events[session.cursor];
+    match expr {
+        "event" => {
+            let rendered = serde_json::to_string(&json!({
+                "cursor": session.cursor,
+                "seq": current.base.seq,
+                "event": current.base.event,
+                "key": current.base.key,
+                "kind": current.base.kind,
+                "reason": current.base.reason,
+                "call_id": current.call_id,
+                "tick": current.tick,
+                "seed": current.seed,
+                "module": current.span.as_ref().map(|v| v.module_id.clone()),
+            }))
+            .unwrap_or_else(|_| "{\"error\":\"encode\"}".to_string());
+            dbg_cap_text_v11(&rendered)
+        }
+        "event.key" => current
+            .base
+            .key
+            .clone()
+            .unwrap_or_else(|| "<null>".to_string()),
+        "event.kind" => current
+            .base
+            .kind
+            .clone()
+            .unwrap_or_else(|| "<null>".to_string()),
+        "event.reason" => current
+            .base
+            .reason
+            .clone()
+            .unwrap_or_else(|| "<null>".to_string()),
+        "event.type" => current.base.event.clone(),
+        "event.call_id" => current
+            .call_id
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "<null>".to_string()),
+        "where" => format_dbg_where_line_v11(session.cursor, current, sources_root),
+        "last" => {
+            if let Some((idx, event)) = dbg_find_last_focus_event_v11(session) {
+                format_dbg_where_line_v11(idx, event, sources_root)
+            } else {
+                "<none>".to_string()
+            }
+        }
+        _ => "<unavailable>".to_string(),
+    }
+}
+
+fn run_dbg_command_v11(
+    session: &mut DbgSessionV11,
+    command: &str,
+    sources_root: Option<&Path>,
+    out: &mut String,
+) -> Result<bool, SdkError> {
+    let trimmed = command.trim();
+    if trimmed.is_empty() || trimmed.starts_with('#') {
+        return Ok(true);
+    }
+    let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+    if tokens.is_empty() {
+        return Ok(true);
+    }
+    match tokens[0] {
+        "step" | "next" => {
+            if session.cursor + 1 < session.events.len() {
+                session.cursor += 1;
+            }
+            out.push_str("step ");
+            out.push_str(&format_dbg_where_line_v11(
+                session.cursor,
+                &session.events[session.cursor],
+                sources_root,
+            ));
+            out.push('\n');
+        }
+        "back" => {
+            if session.cursor > 0 {
+                session.cursor -= 1;
+            }
+            out.push_str("back ");
+            out.push_str(&format_dbg_where_line_v11(
+                session.cursor,
+                &session.events[session.cursor],
+                sources_root,
+            ));
+            out.push('\n');
+        }
+        "jump" => {
+            if tokens.len() < 2 {
+                return Err(SdkError::MissingProject(
+                    "X-DBG-COMMAND: `jump` requires index|first_error".to_string(),
+                ));
+            }
+            if tokens[1] == "first_error" {
+                if let Some(idx) = session.events.iter().position(|event| {
+                    event.base.event == "error" || event.base.kind.as_deref() == Some("error")
+                }) {
+                    session.cursor = idx;
+                    out.push_str("jump first_error ");
+                    out.push_str(&format_dbg_where_line_v11(
+                        session.cursor,
+                        &session.events[session.cursor],
+                        sources_root,
+                    ));
+                    out.push('\n');
+                } else {
+                    out.push_str("jump first_error <none>\n");
+                }
+            } else {
+                let index = parse_dbg_index_arg_v11(tokens[1], session.events.len())?;
+                session.cursor = index;
+                out.push_str("jump ");
+                out.push_str(&format_dbg_where_line_v11(
+                    session.cursor,
+                    &session.events[session.cursor],
+                    sources_root,
+                ));
+                out.push('\n');
+            }
+        }
+        "break" => {
+            if tokens.len() < 4 || tokens[1] != "on" {
+                return Err(SdkError::MissingProject(
+                    "X-DBG-COMMAND: usage `break on type|key|kind|reason|loc <value>`".to_string(),
+                ));
+            }
+            let value = tokens[3..].join(" ");
+            let breakpoint = match tokens[2] {
+                "type" => DbgBreakpointV11::EventType(value),
+                "key" => DbgBreakpointV11::Key(value),
+                "kind" => DbgBreakpointV11::Kind(value),
+                "reason" => DbgBreakpointV11::Reason(value),
+                "loc" => parse_dbg_loc_breakpoint_v11(&value),
+                other => {
+                    return Err(SdkError::MissingProject(format!(
+                        "X-DBG-COMMAND: unsupported breakpoint selector `{other}`"
+                    )));
+                }
+            };
+            let label = dbg_breakpoint_label_v11(&breakpoint);
+            session.breakpoints.push(breakpoint);
+            out.push_str("breakpoint added ");
+            out.push_str(&label);
+            out.push('\n');
+        }
+        "continue" => {
+            if session.breakpoints.is_empty() {
+                out.push_str("continue no_breakpoints\n");
+            } else {
+                let mut hit: Option<(usize, String)> = None;
+                for idx in session.cursor.saturating_add(1)..session.events.len() {
+                    let event = &session.events[idx];
+                    for breakpoint in &session.breakpoints {
+                        if dbg_breakpoint_matches_v11(breakpoint, event, sources_root) {
+                            hit = Some((idx, dbg_breakpoint_label_v11(breakpoint)));
+                            break;
+                        }
+                    }
+                    if hit.is_some() {
+                        break;
+                    }
+                }
+                if let Some((idx, label)) = hit {
+                    session.cursor = idx;
+                    out.push_str("continue hit ");
+                    out.push_str(&label);
+                    out.push(' ');
+                    out.push_str(&format_dbg_where_line_v11(
+                        session.cursor,
+                        &session.events[session.cursor],
+                        sources_root,
+                    ));
+                    out.push('\n');
+                } else {
+                    session.cursor = session.events.len().saturating_sub(1);
+                    out.push_str("continue reached_end ");
+                    out.push_str(&format_dbg_where_line_v11(
+                        session.cursor,
+                        &session.events[session.cursor],
+                        sources_root,
+                    ));
+                    out.push('\n');
+                }
+            }
+        }
+        "where" => {
+            out.push_str("where ");
+            out.push_str(&format_dbg_where_line_v11(
+                session.cursor,
+                &session.events[session.cursor],
+                sources_root,
+            ));
+            out.push('\n');
+        }
+        "locals" => {
+            let target_event_i = session.cursor as u64 + 1;
+            let checkpoint = session.checkpoint_bundle.as_ref().and_then(|bundle| {
+                nearest_checkpoint_for_event_v11(&bundle.checkpoints, target_event_i)
+            });
+            if let Some(cp) = checkpoint {
+                let keys: Vec<String> = cp
+                    .selected_keys
+                    .iter()
+                    .take(DBG_LOCALS_MAX_KEYS_V11)
+                    .cloned()
+                    .collect();
+                out.push_str(&format!(
+                    "locals checkpoint_event_i={} env_digest={} selected_keys={:?}\n",
+                    cp.event_i, cp.env_digest, keys
+                ));
+            } else {
+                let env_digest = compute_env_digest_until_v11(&session.base_events, target_event_i);
+                out.push_str(&format!(
+                    "locals checkpoint_event_i=0 env_digest={} selected_keys=[]\n",
+                    env_digest
+                ));
+            }
+        }
+        "last" => {
+            if let Some((idx, event)) = dbg_find_last_focus_event_v11(session) {
+                out.push_str("last ");
+                out.push_str(&format_dbg_where_line_v11(idx, event, sources_root));
+                out.push('\n');
+            } else {
+                out.push_str("last <none>\n");
+            }
+        }
+        "print" => {
+            let expr = trimmed
+                .strip_prefix("print")
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+                .ok_or_else(|| {
+                    SdkError::MissingProject(
+                        "X-DBG-COMMAND: usage `print <expr>` (event|event.key|event.kind|event.reason|event.type|event.call_id|where|last)"
+                            .to_string(),
+                    )
+                })?;
+            let value = dbg_render_print_expr_v11(session, expr, sources_root);
+            out.push_str("print ");
+            out.push_str(expr);
+            out.push_str(" => ");
+            out.push_str(&dbg_cap_text_v11(&value));
+            out.push('\n');
+        }
+        "diffenv" => {
+            let (left_idx, right_idx) = match tokens.len() {
+                1 => (session.cursor.saturating_sub(1), session.cursor),
+                2 => (
+                    parse_dbg_index_arg_v11(tokens[1], session.events.len())?,
+                    session.cursor,
+                ),
+                3 => (
+                    parse_dbg_index_arg_v11(tokens[1], session.events.len())?,
+                    parse_dbg_index_arg_v11(tokens[2], session.events.len())?,
+                ),
+                _ => {
+                    return Err(SdkError::MissingProject(
+                        "X-DBG-COMMAND: usage `diffenv [left_idx] [right_idx]`".to_string(),
+                    ));
+                }
+            };
+            let left_digest =
+                compute_env_digest_until_v11(&session.base_events, left_idx as u64 + 1);
+            let right_digest =
+                compute_env_digest_until_v11(&session.base_events, right_idx as u64 + 1);
+            let left_keys: BTreeSet<String> =
+                dbg_selected_keys_for_index_v11(session.checkpoint_bundle.as_ref(), left_idx)
+                    .into_iter()
+                    .collect();
+            let right_keys: BTreeSet<String> =
+                dbg_selected_keys_for_index_v11(session.checkpoint_bundle.as_ref(), right_idx)
+                    .into_iter()
+                    .collect();
+            let added: Vec<String> = right_keys
+                .difference(&left_keys)
+                .cloned()
+                .take(DBG_LOCALS_MAX_KEYS_V11)
+                .collect();
+            let removed: Vec<String> = left_keys
+                .difference(&right_keys)
+                .cloned()
+                .take(DBG_LOCALS_MAX_KEYS_V11)
+                .collect();
+            out.push_str(&format!(
+                "diffenv left={} right={} same={} left_digest={} right_digest={} added_keys={:?} removed_keys={:?}\n",
+                left_idx,
+                right_idx,
+                if left_digest == right_digest { "true" } else { "false" },
+                left_digest,
+                right_digest,
+                added,
+                removed
+            ));
+        }
+        "help" => {
+            out.push_str("help commands=step,next,back,jump,break,continue,where,locals,last,print,diffenv,exit\n");
+        }
+        "exit" | "quit" => {
+            out.push_str("exit\n");
+            return Ok(false);
+        }
+        other => {
+            return Err(SdkError::MissingProject(format!(
+                "X-DBG-COMMAND: unsupported command `{other}`"
+            )));
+        }
+    }
+    Ok(true)
+}
+
+fn run_dbg_v11(artifact_dir: &Path, script_path: Option<&Path>) -> Result<String, SdkError> {
+    if !artifact_dir.is_dir() {
+        return Err(SdkError::MissingProject(format!(
+            "X-DBG-COMMAND: artifact dir not found: {}",
+            artifact_dir.display()
+        )));
+    }
+    let events = read_trace_events_for_view_v11(artifact_dir, false)?;
+    if events.is_empty() {
+        return Err(SdkError::MissingProject(format!(
+            "X-DBG-COMMAND: no replay events found in {}",
+            artifact_dir.display()
+        )));
+    }
+    let checkpoint_bundle = match read_dbg_checkpoint_bundle_v11(artifact_dir)? {
+        Some(bundle) => Some(bundle),
+        None => {
+            let base_events: Vec<TraceEventV1> =
+                events.iter().map(|event| event.base.clone()).collect();
+            let computed =
+                build_replay_checkpoint_bundle_v11(&base_events, CHECKPOINT_DEFAULT_EVERY_V11)?;
+            Some(DbgCheckpointBundleViewV11 {
+                checkpoint_every: computed.checkpoint_every,
+                checkpoints: computed.checkpoints,
+            })
+        }
+    };
+    let mut session = DbgSessionV11 {
+        base_events: events.iter().map(|event| event.base.clone()).collect(),
+        events,
+        cursor: 0,
+        breakpoints: Vec::new(),
+        checkpoint_bundle,
+    };
+
+    let mut out = String::new();
+    out.push_str("dbg v11\n");
+    out.push_str(&format!("artifact={}\n", artifact_dir.display()));
+    out.push_str(&format!("event_count={}\n", session.events.len()));
+    if let Some(bundle) = session.checkpoint_bundle.as_ref() {
+        out.push_str(&format!(
+            "checkpoint_every={} checkpoint_count={}\n",
+            bundle.checkpoint_every,
+            bundle.checkpoints.len()
+        ));
+    } else {
+        out.push_str("checkpoint_every=- checkpoint_count=0\n");
+    }
+
+    let sources_root = resolve_sources_root_for_trace_view_v11(artifact_dir);
+    out.push_str("where ");
+    out.push_str(&format_dbg_where_line_v11(
+        session.cursor,
+        &session.events[session.cursor],
+        sources_root.as_deref(),
+    ));
+    out.push('\n');
+
+    let commands: Vec<String> = if let Some(path) = script_path {
+        let raw = fs::read_to_string(path).map_err(|err| {
+            SdkError::MissingProject(format!(
+                "X-DBG-COMMAND: cannot read script {} ({err})",
+                path.display()
+            ))
+        })?;
+        raw.lines().map(|line| line.to_string()).collect()
+    } else {
+        let mut stdin = String::new();
+        io::stdin().read_to_string(&mut stdin).map_err(|err| {
+            SdkError::MissingProject(format!("X-DBG-COMMAND: stdin read error ({err})"))
+        })?;
+        if stdin.trim().is_empty() {
+            out.push_str("help commands=step,next,back,jump,break,continue,where,locals,last,print,diffenv,exit\n");
+            return Ok(out);
+        }
+        stdin.lines().map(|line| line.to_string()).collect()
+    };
+
+    for (idx, command) in commands.iter().enumerate() {
+        let trimmed = command.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        out.push_str(&format!("cmd[{}]={}\n", idx + 1, trimmed));
+        let keep_running =
+            run_dbg_command_v11(&mut session, trimmed, sources_root.as_deref(), &mut out)?;
+        if !keep_running {
+            break;
+        }
+    }
+    Ok(out)
+}
+
+fn event_matches_filters_v11(event: &TraceViewEventV11, options: &TraceViewCliOptionsV11) -> bool {
+    if let Some(want) = options.filter_type.as_deref() {
+        if event.base.event != want {
+            return false;
+        }
+    }
+    if let Some(want) = options.filter_key.as_deref() {
+        if event.base.key.as_deref() != Some(want) {
+            return false;
+        }
+    }
+    if let Some(want) = options.filter_kind.as_deref() {
+        if event.base.kind.as_deref() != Some(want) {
+            return false;
+        }
+    }
+    if let Some(want) = options.filter_reason.as_deref() {
+        if event.base.reason.as_deref() != Some(want) {
+            return false;
+        }
+    }
+    if let Some(want) = options.filter_module.as_deref() {
+        if event.span.as_ref().map(|s| s.module_id.as_str()) != Some(want) {
+            return false;
+        }
+    }
+    true
+}
+
+fn resolve_sources_root_for_trace_view_v11(input: &Path) -> Option<PathBuf> {
+    let root = if input.is_dir() {
+        input.to_path_buf()
+    } else {
+        input.parent()?.to_path_buf()
+    };
+    let sources = root.join("sources");
+    if sources.exists() {
+        Some(sources)
+    } else {
+        None
+    }
+}
+
+fn build_source_snippet_v11(span: &TraceSpanV11, sources_root: &Path) -> Option<String> {
+    let rel = span.module_id.replace('\\', "/");
+    if rel.contains("..") || rel.starts_with('/') || rel.contains(':') {
+        return None;
+    }
+    let file_path = sources_root.join(rel.split('/').collect::<PathBuf>());
+    let bytes = fs::read(file_path).ok()?;
+    let start = usize::min(span.start_byte as usize, bytes.len());
+    let mut end = usize::min(span.end_byte as usize, bytes.len());
+    if end <= start {
+        end = usize::min(start.saturating_add(96), bytes.len());
+    }
+    let snippet = String::from_utf8_lossy(&bytes[start..end])
+        .replace('\r', "")
+        .replace('\n', "\\n");
+    if snippet.is_empty() {
+        None
+    } else {
+        Some(snippet)
+    }
+}
+
+fn render_trace_view_v11(
+    input: &Path,
+    events: &[TraceViewEventV11],
+    options: &TraceViewCliOptionsV11,
+) -> String {
+    let mut filtered: Vec<&TraceViewEventV11> = events
+        .iter()
+        .filter(|event| event_matches_filters_v11(event, options))
+        .collect();
+    if let Some(tail) = options.tail {
+        let start = filtered.len().saturating_sub(tail);
+        filtered = filtered[start..].to_vec();
+    }
+    let selected_base: Vec<TraceEventV1> = filtered.iter().map(|e| e.base.clone()).collect();
+    let digest = trace_required_digest(&selected_base);
+    let sources_root = resolve_sources_root_for_trace_view_v11(input);
+
+    let mut by_type: BTreeMap<String, usize> = BTreeMap::new();
+    let mut by_kind: BTreeMap<String, usize> = BTreeMap::new();
+    let mut by_reason: BTreeMap<String, usize> = BTreeMap::new();
+    for event in &filtered {
+        *by_type.entry(event.base.event.clone()).or_insert(0) += 1;
+        if let Some(kind) = event.base.kind.as_ref() {
+            *by_kind.entry(kind.clone()).or_insert(0) += 1;
+        }
+        if let Some(reason) = event.base.reason.as_ref() {
+            *by_reason.entry(reason.clone()).or_insert(0) += 1;
+        }
+    }
+
+    if options.json {
+        let events_json: Vec<JsonValue> = filtered
+            .iter()
+            .map(|event| {
+                let snippet = event
+                    .span
+                    .as_ref()
+                    .and_then(|span| sources_root.as_ref().and_then(|root| build_source_snippet_v11(span, root)));
+                json!({
+                    "seq": event.base.seq,
+                    "event": event.base.event,
+                    "key": event.base.key,
+                    "kind": event.base.kind,
+                    "reason": event.base.reason,
+                    "module": event.span.as_ref().map(|s| s.module_id.clone()),
+                    "span": event.span.as_ref().map(|s| json!({"start_byte": s.start_byte, "end_byte": s.end_byte})),
+                    "call_id": event.call_id,
+                    "tick": event.tick,
+                    "seed": event.seed,
+                    "snippet": snippet,
+                })
+            })
+            .collect();
+        return serde_json::to_string_pretty(&json!({
+            "trace_schema_version": TRACE_SCHEMA_VERSION_V11,
+            "event_count": filtered.len(),
+            "required_digest": digest,
+            "summary": {
+                "by_type": by_type,
+                "by_kind": by_kind,
+                "by_reason": by_reason,
+            },
+            "events": events_json
+        }))
+        .unwrap_or_else(|_| "{}".to_string());
+    }
+
+    let mut out = String::new();
+    out.push_str("trace view\n");
+    out.push_str("event_count=");
+    out.push_str(&filtered.len().to_string());
+    out.push('\n');
+    out.push_str("required_digest=");
+    out.push_str(&digest);
+    out.push('\n');
+    out.push_str("summary.by_type=");
+    out.push_str(&format!("{:?}", by_type));
+    out.push('\n');
+    out.push_str("summary.by_kind=");
+    out.push_str(&format!("{:?}", by_kind));
+    out.push('\n');
+    out.push_str("summary.by_reason=");
+    out.push_str(&format!("{:?}", by_reason));
+    out.push('\n');
+
+    for event in filtered {
+        let module = event
+            .span
+            .as_ref()
+            .map(|s| s.module_id.as_str())
+            .unwrap_or("-");
+        let snippet = event
+            .span
+            .as_ref()
+            .and_then(|span| {
+                sources_root
+                    .as_ref()
+                    .and_then(|root| build_source_snippet_v11(span, root))
+            })
+            .unwrap_or_else(|| "-".to_string());
+        out.push_str(&format!(
+            "#{} {} key={} kind={} reason={} module={} call_id={} tick={} seed={} snippet={}\n",
+            event.base.seq,
+            event.base.event,
+            event.base.key.as_deref().unwrap_or("-"),
+            event.base.kind.as_deref().unwrap_or("-"),
+            event.base.reason.as_deref().unwrap_or("-"),
+            module,
+            event
+                .call_id
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "-".to_string()),
+            event.tick,
+            event.seed,
+            snippet
+        ));
+    }
+    out
+}
+
+fn build_trace_index_json_v11(events: &[TraceEventV1]) -> String {
+    let mut by_type: BTreeMap<String, Vec<u64>> = BTreeMap::new();
+    let mut by_key: BTreeMap<String, Vec<u64>> = BTreeMap::new();
+    let mut by_reason: BTreeMap<String, Vec<u64>> = BTreeMap::new();
+
+    for event in events {
+        by_type
+            .entry(event.event.clone())
+            .or_default()
+            .push(event.seq);
+        if let Some(key) = event.key.as_ref() {
+            by_key.entry(key.clone()).or_default().push(event.seq);
+        }
+        if let Some(reason) = event.reason.as_ref() {
+            by_reason.entry(reason.clone()).or_default().push(event.seq);
+        }
+    }
+
+    let pack_bucket = |bucket: BTreeMap<String, Vec<u64>>| -> JsonValue {
+        let mut out = JsonMap::new();
+        for (name, indexes) in bucket {
+            let json_indexes: Vec<JsonValue> = indexes.into_iter().map(JsonValue::from).collect();
+            out.insert(
+                name,
+                json!({
+                    "count": json_indexes.len(),
+                    "event_indexes": json_indexes
+                }),
+            );
+        }
+        JsonValue::Object(out)
+    };
+
+    serde_json::to_string_pretty(&json!({
+        "trace_schema_version": TRACE_SCHEMA_VERSION_V11,
+        "event_count": events.len(),
+        "by_type": pack_bucket(by_type),
+        "by_key": pack_bucket(by_key),
+        "by_reason": pack_bucket(by_reason),
+    }))
+    .unwrap_or_else(|_| "{\"trace_schema_version\":2}".to_string())
+}
+
+fn write_trace_index_v11(path: &Path, events: &[TraceEventV1]) -> Result<(), SdkError> {
+    fs::write(path, build_trace_index_json_v11(events))?;
+    Ok(())
 }
 
 fn build_v071_replay_toml(
@@ -4738,6 +7454,7 @@ fn emit_v071_artifacts_for_project_run(
     fs::create_dir_all(&artifact_dir)?;
 
     let audit_path = artifact_dir.join("audit.jsonl");
+    let trace_index_path = artifact_dir.join("trace_index.json");
     let signature_path = artifact_dir.join("signature.txt");
     let replay_path = artifact_dir.join("replay.toml");
     let (lane, entry) = read_lane_and_entry_for_v071(project_root);
@@ -4821,6 +7538,8 @@ fn emit_v071_artifacts_for_project_run(
             let signature =
                 signature_with_lane_v071(&required_digest, &lane, cassette_hash.as_deref());
             let mut audit_text = String::new();
+            audit_text.push_str(&encode_v11_program_start_line(&lane));
+            audit_text.push('\n');
             audit_text.push_str(&encode_v071_lane_marker_line(&lane));
             audit_text.push('\n');
             for (idx, event) in trace_summary.events.iter().enumerate() {
@@ -4828,6 +7547,7 @@ fn emit_v071_artifacts_for_project_run(
                 audit_text.push('\n');
             }
             fs::write(&audit_path, audit_text)?;
+            write_trace_index_v11(&trace_index_path, &trace_summary.events)?;
             fs::write(&signature_path, format!("{signature}\n"))?;
             fs::write(
                 &replay_path,
@@ -4873,8 +7593,13 @@ fn emit_v071_artifacts_for_project_run(
             let signature = signature_with_lane_v071(&line, &lane, cassette_hash.as_deref());
             fs::write(
                 &audit_path,
-                format!("{}\n{line}\n", encode_v071_lane_marker_line(&lane)),
+                format!(
+                    "{}\n{}\n{line}\n",
+                    encode_v11_program_start_line(&lane),
+                    encode_v071_lane_marker_line(&lane)
+                ),
             )?;
+            write_trace_index_v11(&trace_index_path, &[])?;
             fs::write(&signature_path, format!("{signature}\n"))?;
             fs::write(
                 &replay_path,
@@ -5217,11 +7942,20 @@ fn print_help() {
         "  run   <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen ADDR --runtime-report FILE --replay-audit FILE] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"
     );
     eprintln!("  replay <artifact_dir>");
+    eprintln!("  dbg   <artifact_dir> [--script <file>]");
     eprintln!("  doc packs [--json]");
     eprintln!(
         "  trace run  <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"
     );
-    eprintln!("  trace view <trace_file> [--tail N] [--json]");
+    eprintln!(
+        "  trace view <artifact_dir|audit.jsonl|legacy.trace> [--tail N] [--json] [--legacy-pipe] [--type <event>] [--key <key>] [--kind <kind>] [--reason <rc>] [--module <module_id>]"
+    );
+    eprintln!(
+        "  trace diff <artifactA|auditA> <artifactB|auditB> [--mode strict|align] [--json] [--out <dir>]"
+    );
+    eprintln!(
+        "  minimize <artifact_dir> --goal <error_code:X|divergence|kind:KIND> [--key <key>] [--against <artifactB>] [--out <dir>] [--json]"
+    );
     eprintln!(
         "  profile run  <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"
     );
@@ -6326,6 +9060,7 @@ match query_res {
             "trace".to_string(),
             "view".to_string(),
             trace_out.to_string_lossy().to_string(),
+            "--legacy-pipe".to_string(),
             "--tail".to_string(),
             "8".to_string(),
             "--json".to_string(),

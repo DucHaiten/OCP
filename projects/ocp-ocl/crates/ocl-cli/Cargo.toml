@@ -7,3 +7,4 @@ edition = "2021"
 ocl-sdk = { path = "../ocl-sdk" }
 ocl-runtime-core = { path = "../ocl-runtime-core" }
 sha2 = "0.10"
+serde_json = "1"

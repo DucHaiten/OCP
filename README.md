@@ -21,3 +21,8 @@ OCP-OCL follows the principle “observe before collapse”: all world-data must
 As of v0.15, OCP-OCL evolves into a capability/permission-driven and replay-first platform: packages ship with permission manifests, lockfile + signing + attestation, deterministic-by-recording cassettes for non-deterministic I/O, bounded shadow/search (parallel “realities” under measurable budgets), plus trace/debug/diff/minimizer tooling, a global conformance suite, and an LTS rehearsal track.
 
 The underlying ideas synthesize concepts from TSS, ELW, RGOK, SHSM, a biologic direction, cosmology motifs (parallel/superposed/horizon), and Hive.
+
+## Developer Docs
+
+- Replay-native debug workflow (v0.11):
+  - `docs/OCL-DEBUG-REPLAY-WORKFLOW-v0.11.md`
