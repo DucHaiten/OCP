@@ -1,7 +1,7 @@
 # OCL v0.7.2 — Expansion Plan (Tool-grade Packs + Real File/Store + Deterministic IO Harness)
 
 Ngày tạo: 2026-03-03  
-Trạng thái: `DRAFT (LOCK WHEN CODING)`  
+Trạng thái: `DONE` (2026-03-04)
 Phạm vi: **OCL-only**.  
 Tiền đề: v0.7.1 đã có core (Value/JSON/import/sugar/loops), manifest permissions, replay-first artifacts, CLI nền.
 
@@ -59,7 +59,7 @@ kèm **fixture/record harness** để test IO một cách deterministic trong la
 #### Workstreams
 - WS-S (packs semantics + policy + determinism): `DONE` (2026-03-04; 7.2-A..7.2-F pass đầy đủ quality gates)
 - WS-C (CLI template + IO test/replay UX): `DONE` (2026-03-04; 7.2-F complete)
-- WS-I (workspace mapping/internal wiring): `IN_PROGRESS` (7.2-A wiring started)
+- WS-I (workspace mapping/internal wiring): `DONE` (covered by 7.2-A..7.2-F integration, 2026-03-04)
 
 #### Gate status (7.2-A .. 7.2-F)
 - Gate 7.2-A (Registry + manifest extensions for fs/kv/time): `DONE` (2026-03-04)

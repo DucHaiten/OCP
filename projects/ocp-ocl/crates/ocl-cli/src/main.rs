@@ -42,7 +42,7 @@ fn run_cli(args: &[String]) -> i32 {
         "init" => {
             let Some(path) = args.get(1) else {
                 eprintln!(
-                    "usage: ocl init <project_dir> [--template tool-cli] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]"
+                    "usage: ocl init <project_dir> [--template tool-cli|mini-game|shadow-preview] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]"
                 );
                 return 2;
             };
@@ -64,6 +64,14 @@ fn run_cli(args: &[String]) -> i32 {
                 Ok(layout) => {
                     if let Some(ref template_id) = template {
                         if let Err(err) = apply_init_template_v072(root, template_id) {
+                            if json_mode {
+                                println!("{}", error_to_json(&err));
+                            } else {
+                                eprintln!("{err}");
+                            }
+                            return 1;
+                        }
+                        if let Err(err) = sync_deps_lock_v1(root) {
                             if json_mode {
                                 println!("{}", error_to_json(&err));
                             } else {
@@ -238,7 +246,7 @@ fn run_cli(args: &[String]) -> i32 {
                 return 2;
             };
             let reactor_mode = args.iter().any(|a| a == "--reactor");
-            let locked = args.iter().any(|a| a == "--locked");
+            let force_locked = args.iter().any(|a| a == "--locked");
             let shadow_options = match parse_shadow_args(args) {
                 Ok(value) => value,
                 Err(code) => return code,
@@ -249,6 +257,29 @@ fn run_cli(args: &[String]) -> i32 {
                 .and_then(|v| v.to_str())
                 .map(|v| v.eq_ignore_ascii_case("oclpkg"))
                 .unwrap_or(false);
+            let lane = if path_is_artifact {
+                "locked_v071".to_string()
+            } else {
+                let (lane, _) = read_lane_and_entry_for_v071(path_ref);
+                lane
+            };
+            if !path_is_artifact {
+                if let Err(err) = parse_lane_mode_v071(&lane) {
+                    eprintln!("{err}");
+                    return 1;
+                }
+                if let Err(err) = enforce_quarantine_lane_gate_v073(&lane) {
+                    eprintln!("{err}");
+                    return 1;
+                }
+            }
+            let locked = if force_locked {
+                true
+            } else if path_is_artifact {
+                false
+            } else {
+                locked_from_lane_v071(&lane)
+            };
             let universe_id = parse_string_flag(args, "--universe");
             let domain_id = parse_string_flag(args, "--domain");
             let view_id = parse_string_flag(args, "--view");
@@ -2147,8 +2178,10 @@ fn parse_shadow_args(args: &[String]) -> Result<Option<ShadowOptionsV1>, i32> {
 fn apply_init_template_v072(root: &Path, template: &str) -> Result<(), SdkError> {
     match template {
         "tool-cli" => apply_tool_cli_template_v072(root),
+        "mini-game" => apply_mini_game_template_v073(root),
+        "shadow-preview" => apply_shadow_preview_template_v073(root),
         _ => Err(SdkError::MissingProject(format!(
-            "V-INIT-TEMPLATE-UNKNOWN: unsupported template `{template}` (expected `tool-cli`)"
+            "V-INIT-TEMPLATE-UNKNOWN: unsupported template `{template}` (expected `tool-cli`, `mini-game`, or `shadow-preview`)"
         ))),
     }
 }
@@ -2235,6 +2268,109 @@ fn apply_tool_cli_template_v072(root: &Path) -> Result<(), SdkError> {
         fixtures_expected.join("out.json"),
         "{\n  \"input\": \"sample\"\n}\n",
     )?;
+    Ok(())
+}
+
+fn apply_mini_game_template_v073(root: &Path) -> Result<(), SdkError> {
+    let project_name = root
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("mini_game")
+        .replace('-', "_");
+
+    let manifest = format!(
+        concat!(
+            "[package]\n",
+            "name = \"{}\"\n",
+            "version = \"0.1.0\"\n\n",
+            "[project]\n",
+            "lane = \"locked_v071\"\n",
+            "entry = \"src/main.ocl\"\n\n",
+            "[targets]\n",
+            "default = \"main\"\n\n",
+            "[dependencies]\n",
+            "std = \"0.1.0\"\n\n",
+            "[language]\n",
+            "guard_mode = \"return\"\n\n",
+            "[permissions.package]\n",
+            "allow = [\"engine.game.*\"]\n",
+            "deny = []\n\n",
+            "[permissions.std_game]\n",
+            "enabled = true\n",
+            "fixed_dt_ms = 16\n",
+            "rng_streams = [\"main\", \"loot\"]\n",
+            "rng_max_count = 32\n",
+            "state_delta_max_bytes = 65536\n"
+        ),
+        project_name
+    );
+    fs::write(root.join("Ocl.toml"), manifest)?;
+
+    let source = concat!(
+        "module app.mini_game;\n\n",
+        "observe(\"engine.game.run\", \"tier2\", ctx(\"entry_module=app.mini_game;phase=frame;tick=1;stream=main;count=4;input_cap=8;events=key:Space|text:start;draw_cap=8;draw_list=text:1,1,mini-game,12;state_json={\\\"score\\\":0}\"), budget(10)) -> frame;\n",
+        "condition(true);\n"
+    );
+    fs::write(root.join("src").join("main.ocl"), source)?;
+
+    let readme = concat!(
+        "# mini-game template\n\n",
+        "- Run: `ocl run .`\n",
+        "- Replay: `ocl replay ./.ocl_artifacts/<run_id>`\n"
+    );
+    fs::write(root.join("README.md"), readme)?;
+    Ok(())
+}
+
+fn apply_shadow_preview_template_v073(root: &Path) -> Result<(), SdkError> {
+    let project_name = root
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("shadow_preview")
+        .replace('-', "_");
+
+    let manifest = format!(
+        concat!(
+            "[package]\n",
+            "name = \"{}\"\n",
+            "version = \"0.1.0\"\n\n",
+            "[project]\n",
+            "lane = \"locked_v071\"\n",
+            "entry = \"src/main.ocl\"\n\n",
+            "[targets]\n",
+            "default = \"main\"\n\n",
+            "[dependencies]\n",
+            "std = \"0.1.0\"\n\n",
+            "[language]\n",
+            "guard_mode = \"return\"\n\n",
+            "[permissions.package]\n",
+            "allow = [\"engine.shadow.*\"]\n",
+            "deny = []\n\n",
+            "[permissions.std_shadow]\n",
+            "enabled = true\n",
+            "max_branches = 8\n",
+            "branch_step_cap = 5000\n",
+            "branch_budget_cap = 200000\n",
+            "max_diff_keys = 2000\n",
+            "max_report_bytes = 262144\n"
+        ),
+        project_name
+    );
+    fs::write(root.join("Ocl.toml"), manifest)?;
+
+    let source = concat!(
+        "module app.shadow_preview;\n\n",
+        "observe(\"engine.shadow.preview\", \"tier2\", ctx(\"entry_module=app.shadow_preview;tick=1;variants_json=[{\\\"move\\\":\\\"left\\\"},{\\\"move\\\":\\\"right\\\"}];baseline_id=0;max_diff_keys=8\"), budget(20)) -> preview;\n",
+        "condition(true);\n"
+    );
+    fs::write(root.join("src").join("main.ocl"), source)?;
+
+    let readme = concat!(
+        "# shadow-preview template\n\n",
+        "- Run: `ocl run .`\n",
+        "- Replay: `ocl replay ./.ocl_artifacts/<run_id>`\n"
+    );
+    fs::write(root.join("README.md"), readme)?;
     Ok(())
 }
 
@@ -2410,6 +2546,38 @@ fn read_lane_and_entry_for_v071(root: &Path) -> (String, String) {
     (lane, entry)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LaneModeV071 {
+    LockedV06,
+    LockedV071,
+    Quarantine,
+}
+
+fn parse_lane_mode_v071(lane: &str) -> Result<LaneModeV071, SdkError> {
+    match lane {
+        "locked_v06" => Ok(LaneModeV071::LockedV06),
+        "locked_v071" => Ok(LaneModeV071::LockedV071),
+        "quarantine" => Ok(LaneModeV071::Quarantine),
+        other => Err(SdkError::MissingProject(format!(
+            "V-LANE-INVALID: unsupported lane `{other}` (expected locked_v06|locked_v071|quarantine)"
+        ))),
+    }
+}
+
+fn quarantine_env_enabled_v073() -> bool {
+    matches!(std::env::var("OCL_QUARANTINE"), Ok(v) if v.trim() == "1")
+}
+
+fn enforce_quarantine_lane_gate_v073(lane: &str) -> Result<(), SdkError> {
+    let mode = parse_lane_mode_v071(lane)?;
+    if mode == LaneModeV071::Quarantine && !quarantine_env_enabled_v073() {
+        return Err(SdkError::MissingProject(
+            "V-QUARANTINE-DISABLED: lane `quarantine` requires env `OCL_QUARANTINE=1`".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 struct ReplaySpecV071 {
     root: PathBuf,
@@ -2496,7 +2664,16 @@ fn parse_replay_toml_v071(path: &Path) -> Result<ReplaySpecV071, SdkError> {
 }
 
 fn locked_from_lane_v071(lane: &str) -> bool {
-    lane != "locked_v06"
+    match parse_lane_mode_v071(lane) {
+        Ok(LaneModeV071::LockedV071) => true,
+        Ok(LaneModeV071::LockedV06) => false,
+        Ok(LaneModeV071::Quarantine) => false,
+        Err(_) => true,
+    }
+}
+
+fn signature_with_lane_v071(payload: &str, lane: &str) -> String {
+    fnv1a64_hex(&format!("lane={lane}\npayload={payload}"))
 }
 
 fn replay_v071(artifact_dir: &Path) -> Result<String, SdkError> {
@@ -2509,9 +2686,11 @@ fn replay_v071(artifact_dir: &Path) -> Result<String, SdkError> {
     }
 
     let spec = parse_replay_toml_v071(&replay_toml)?;
+    parse_lane_mode_v071(&spec.lane)?;
+    enforce_quarantine_lane_gate_v073(&spec.lane)?;
     let locked = locked_from_lane_v071(&spec.lane);
     let trace = run_project_with_trace_engine_and_lock(&spec.root, spec.engine, locked)?;
-    let actual = trace_required_digest(&trace.events);
+    let actual = signature_with_lane_v071(&trace_required_digest(&trace.events), &spec.lane);
     if actual != spec.signature {
         return Err(SdkError::MissingProject(format!(
             "V-REPLAY-SIGNATURE-MISMATCH: expected={} actual={} lane={} root={}",
@@ -2582,6 +2761,13 @@ fn encode_v071_trace_event_line(index: usize, event: &TraceEventV1) -> String {
         json_escape(&event.universe_id),
         json_escape(&event.domain_id),
         json_escape(&event.payload_hash)
+    )
+}
+
+fn encode_v071_lane_marker_line(lane: &str) -> String {
+    format!(
+        "{{\"t\":\"Lane\",\"i\":0,\"tick\":0,\"seed\":0,\"data\":{{\"lane\":\"{}\"}}}}",
+        json_escape(lane)
     )
 }
 
@@ -2679,11 +2865,16 @@ fn emit_v071_artifacts_for_project_run(
     let signature_path = artifact_dir.join("signature.txt");
     let replay_path = artifact_dir.join("replay.toml");
     let (lane, entry) = read_lane_and_entry_for_v071(project_root);
+    parse_lane_mode_v071(&lane)?;
+    enforce_quarantine_lane_gate_v073(&lane)?;
 
     match run_project_with_trace_engine_and_lock(project_root, run_engine, locked) {
         Ok(trace_summary) => {
-            let signature = trace_required_digest(&trace_summary.events);
+            let required_digest = trace_required_digest(&trace_summary.events);
+            let signature = signature_with_lane_v071(&required_digest, &lane);
             let mut audit_text = String::new();
+            audit_text.push_str(&encode_v071_lane_marker_line(&lane));
+            audit_text.push('\n');
             for (idx, event) in trace_summary.events.iter().enumerate() {
                 audit_text.push_str(&encode_v071_trace_event_line(idx, event));
                 audit_text.push('\n');
@@ -2712,8 +2903,11 @@ fn emit_v071_artifacts_for_project_run(
                 hint.as_deref(),
                 root_reason.as_deref(),
             );
-            let signature = fnv1a64_hex(&line);
-            fs::write(&audit_path, format!("{line}\n"))?;
+            let signature = signature_with_lane_v071(&line, &lane);
+            fs::write(
+                &audit_path,
+                format!("{}\n{line}\n", encode_v071_lane_marker_line(&lane)),
+            )?;
             fs::write(&signature_path, format!("{signature}\n"))?;
             fs::write(
                 &replay_path,
@@ -3043,7 +3237,7 @@ fn json_escape(input: &str) -> String {
 fn print_help() {
     eprintln!("ocl <command> [args]");
     eprintln!("commands:");
-    eprintln!("  init  <project_dir> [--template tool-cli] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]");
+    eprintln!("  init  <project_dir> [--template tool-cli|mini-game|shadow-preview] [--preset workflow_basic|agent_swarm_basic] [--locked] [--registry <index.toml>] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>] [--json]");
     eprintln!("  check <project_dir> [--json] [--locked] [--universe <id>]");
     eprintln!(
         "  run   <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen ADDR --runtime-report FILE --replay-audit FILE] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"

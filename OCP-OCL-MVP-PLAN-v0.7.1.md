@@ -1,7 +1,7 @@
 # OCL v0.7.1 — Expansion Plan (Foundation + DX + Replay-first)
 
 Ngày tạo: 2026-03-03  
-Trạng thái: `DRAFT (LOCK WHEN CODING)`  
+Trạng thái: `DONE` (2026-03-04)
 Phạm vi: **OCL-only** (không có HAR, không có AI runtime).  
 Mục tiêu: Xây nền để OCL trở nên “dùng được cho dev bình thường” (ít boilerplate, ít file sprawl, ít lỗi vặt, DX tốt) nhưng **giữ nguyên** cốt lõi OCL: capability/permission chặt, bounded, deterministic replay, 4-kind everywhere, commit-gated effects.
 
@@ -854,7 +854,7 @@ Pass/Fail:
 
 ---
 
-## 12) Commands (CI)
+## 12) Operational commands
 
 - `cargo test`
 - `cargo test --test ocl_parser`
@@ -869,7 +869,7 @@ Pass/Fail:
 
 ## 13) Execution Log (template)
 
-### YYYY-MM-DD — 7.1-X planning
+### Template cập nhật kế hoạch (trước khi làm)
 - Date:
 - Gate/Step:
 - Why:
@@ -877,7 +877,7 @@ Pass/Fail:
 - Expected tests:
 - Exit criteria:
 
-### YYYY-MM-DD — 7.1-X implementation closeout
+### Template cập nhật triển khai (sau khi làm)
 - Date:
 - Gate/Step:
 - Implemented:

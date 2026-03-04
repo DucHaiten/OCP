@@ -67,7 +67,7 @@ impl CapabilityRegistry {
     pub fn v1_baseline() -> Self {
         let mut enabled_families = HashSet::new();
         for f in [
-            "world", "render", "mem", "dlg", "self", "rel", "plan", "std", "custom",
+            "world", "render", "mem", "dlg", "self", "rel", "plan", "std", "engine", "custom",
         ] {
             enabled_families.insert(f.to_string());
         }
@@ -128,13 +128,37 @@ impl CapabilityRegistry {
             "std.db.exec".to_string(),
             vec!["dsn".to_string(), "sql".to_string()],
         );
+        ctx_required.insert("std.ui.frame_info".to_string(), Vec::new());
+        ctx_required.insert("std.ui.input".to_string(), vec!["cap".to_string()]);
+        ctx_required.insert("std.ui.draw".to_string(), vec!["cap".to_string()]);
+        ctx_required.insert("std.game.tick_info".to_string(), Vec::new());
         ctx_required.insert(
-            "std.ui.frame_info".to_string(),
-            vec!["ctx_tick".to_string()],
+            "std.game.rng".to_string(),
+            vec!["stream".to_string(), "count".to_string()],
         );
         ctx_required.insert(
-            "std.game.tick_info".to_string(),
-            vec!["ctx_tick".to_string()],
+            "std.game.state_delta".to_string(),
+            vec!["idempotency_key".to_string(), "delta".to_string()],
+        );
+        ctx_required.insert(
+            "std.shadow.run".to_string(),
+            vec!["variants_json".to_string()],
+        );
+        ctx_required.insert(
+            "std.shadow.compare".to_string(),
+            vec!["branches_json".to_string()],
+        );
+        ctx_required.insert(
+            "engine.ui.run".to_string(),
+            vec!["entry_module".to_string()],
+        );
+        ctx_required.insert(
+            "engine.game.run".to_string(),
+            vec!["entry_module".to_string()],
+        );
+        ctx_required.insert(
+            "engine.shadow.preview".to_string(),
+            vec!["entry_module".to_string(), "variants_json".to_string()],
         );
         ctx_required.insert(
             "std.view.render_text".to_string(),
@@ -155,7 +179,15 @@ impl CapabilityRegistry {
         commit_allowed.insert("std.tls.connect".to_string(), false);
         commit_allowed.insert("std.tls.handshake".to_string(), false);
         commit_allowed.insert("std.ui.frame_info".to_string(), false);
+        commit_allowed.insert("std.ui.input".to_string(), false);
         commit_allowed.insert("std.game.tick_info".to_string(), false);
+        commit_allowed.insert("std.game.rng".to_string(), false);
+        commit_allowed.insert("std.game.state_delta".to_string(), true);
+        commit_allowed.insert("std.shadow.run".to_string(), false);
+        commit_allowed.insert("std.shadow.compare".to_string(), false);
+        commit_allowed.insert("engine.ui.run".to_string(), false);
+        commit_allowed.insert("engine.game.run".to_string(), false);
+        commit_allowed.insert("engine.shadow.preview".to_string(), false);
         commit_allowed.insert("std.view.render_text".to_string(), false);
         commit_allowed.insert("std.view.render_tree".to_string(), false);
 

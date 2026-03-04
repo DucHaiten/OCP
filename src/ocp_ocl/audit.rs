@@ -14,6 +14,38 @@ pub enum TraceEvent {
         reason: Option<ReasonCode>,
         origin_id: u64,
     },
+    UiObserve {
+        key: String,
+        event_count: u32,
+        truncated: bool,
+        detail: String,
+        kind: ResultKind,
+        reason: Option<ReasonCode>,
+    },
+    GameObserve {
+        key: String,
+        stream: String,
+        value_count: u32,
+        tick: i64,
+        kind: ResultKind,
+        reason: Option<ReasonCode>,
+    },
+    ShadowRun {
+        key: String,
+        branch_count: u32,
+        truncated: bool,
+        detail: String,
+        kind: ResultKind,
+        reason: Option<ReasonCode>,
+    },
+    ShadowCompare {
+        key: String,
+        diff_count: u32,
+        report_bytes: u32,
+        truncated: bool,
+        kind: ResultKind,
+        reason: Option<ReasonCode>,
+    },
     MatchArmSelected {
         arm: ResultKind,
     },
@@ -23,6 +55,20 @@ pub enum TraceEvent {
     },
     CommitResult {
         allowed: bool,
+        reason: Option<ReasonCode>,
+    },
+    UiCommit {
+        key: String,
+        cmd_count: u32,
+        present: bool,
+        kind: ResultKind,
+        reason: Option<ReasonCode>,
+    },
+    GameCommit {
+        key: String,
+        delta_bytes: u32,
+        idempotency_hash: String,
+        kind: ResultKind,
         reason: Option<ReasonCode>,
     },
     ConditionCheck {
@@ -80,6 +126,57 @@ fn serialize_event(ev: &TraceEvent) -> String {
             kind,
             reason.map(|r| r.as_str()).unwrap_or("-")
         ),
+        TraceEvent::UiObserve {
+            key,
+            event_count,
+            truncated,
+            detail,
+            kind,
+            reason,
+        } => format!(
+            "UiObserve|{key}|{event_count}|{}|{:?}|{}|{detail}",
+            if *truncated { "1" } else { "0" },
+            kind,
+            reason.map(|r| r.as_str()).unwrap_or("-"),
+        ),
+        TraceEvent::GameObserve {
+            key,
+            stream,
+            value_count,
+            tick,
+            kind,
+            reason,
+        } => format!(
+            "GameObserve|{key}|{stream}|{value_count}|{tick}|{:?}|{}",
+            kind,
+            reason.map(|r| r.as_str()).unwrap_or("-"),
+        ),
+        TraceEvent::ShadowRun {
+            key,
+            branch_count,
+            truncated,
+            detail,
+            kind,
+            reason,
+        } => format!(
+            "ShadowRun|{key}|{branch_count}|{}|{detail}|{:?}|{}",
+            if *truncated { "1" } else { "0" },
+            kind,
+            reason.map(|r| r.as_str()).unwrap_or("-"),
+        ),
+        TraceEvent::ShadowCompare {
+            key,
+            diff_count,
+            report_bytes,
+            truncated,
+            kind,
+            reason,
+        } => format!(
+            "ShadowCompare|{key}|{diff_count}|{report_bytes}|{}|{:?}|{}",
+            if *truncated { "1" } else { "0" },
+            kind,
+            reason.map(|r| r.as_str()).unwrap_or("-"),
+        ),
         TraceEvent::MatchArmSelected { arm } => format!("MatchArmSelected|{:?}", arm),
         TraceEvent::CommitAttempt { origin_id, kind } => format!(
             "CommitAttempt|{}|{}",
@@ -93,6 +190,29 @@ fn serialize_event(ev: &TraceEvent) -> String {
             "CommitResult|{}|{}",
             if *allowed { "allow" } else { "deny" },
             reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::UiCommit {
+            key,
+            cmd_count,
+            present,
+            kind,
+            reason,
+        } => format!(
+            "UiCommit|{key}|{cmd_count}|{}|{:?}|{}",
+            if *present { "1" } else { "0" },
+            kind,
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::GameCommit {
+            key,
+            delta_bytes,
+            idempotency_hash,
+            kind,
+            reason,
+        } => format!(
+            "GameCommit|{key}|{delta_bytes}|{idempotency_hash}|{:?}|{}",
+            kind,
+            reason.map(|r| r.as_str()).unwrap_or("-"),
         ),
         TraceEvent::ConditionCheck { value } => format!("ConditionCheck|{value}"),
         TraceEvent::LoopIter {

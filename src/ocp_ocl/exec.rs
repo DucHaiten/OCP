@@ -42,6 +42,8 @@ struct ObservationMeta {
     pending_sqlite_write: Option<PendingSqliteWrite>,
     pending_kv_write: Option<PendingKvWrite>,
     pending_fs_write: Option<PendingFsWrite>,
+    pending_ui_write: Option<PendingUiWrite>,
+    pending_game_write: Option<PendingGameWrite>,
 }
 
 #[derive(Debug, Clone)]
@@ -100,6 +102,33 @@ enum FsCommitOp {
     },
 }
 
+#[derive(Debug, Clone)]
+struct PendingUiWrite {
+    op: UiCommitOp,
+    pending_write_id: String,
+}
+
+#[derive(Debug, Clone)]
+enum UiCommitOp {
+    Draw { cmd_count: usize },
+    Present,
+}
+
+#[derive(Debug, Clone)]
+struct PendingGameWrite {
+    op: GameCommitOp,
+    pending_write_id: String,
+}
+
+#[derive(Debug, Clone)]
+enum GameCommitOp {
+    StateDelta {
+        idempotency_key: String,
+        delta: Value,
+        delta_bytes: usize,
+    },
+}
+
 const CONDITION_TIME_BUDGET_NS: u64 = 20_000;
 const CONDITION_MAX_STEPS: usize = 64;
 const CONDITION_MAX_CONSTRAINTS: usize = 256;
@@ -152,6 +181,8 @@ pub struct Executor {
     applied_sqlite_writes: HashSet<String>,
     applied_kv_writes: HashSet<String>,
     applied_fs_writes: HashSet<String>,
+    applied_ui_writes: HashSet<String>,
+    applied_game_writes: HashSet<String>,
     commits: Vec<CommitEvent>,
     trace: TraceLog,
     constraints: ConstraintSession,
@@ -171,6 +202,8 @@ impl Executor {
             applied_sqlite_writes: HashSet::new(),
             applied_kv_writes: HashSet::new(),
             applied_fs_writes: HashSet::new(),
+            applied_ui_writes: HashSet::new(),
+            applied_game_writes: HashSet::new(),
             commits: Vec::new(),
             trace: TraceLog::default(),
             constraints: ConstraintSession::default(),
@@ -190,6 +223,8 @@ impl Executor {
             applied_sqlite_writes: HashSet::new(),
             applied_kv_writes: HashSet::new(),
             applied_fs_writes: HashSet::new(),
+            applied_ui_writes: HashSet::new(),
+            applied_game_writes: HashSet::new(),
             commits: Vec::new(),
             trace: TraceLog::default(),
             constraints: ConstraintSession::default(),
@@ -359,6 +394,8 @@ impl Executor {
                 let pending_sqlite_write = extract_pending_sqlite_write(key_lit, &r);
                 let pending_kv_write = extract_pending_kv_write(key_lit, &r);
                 let pending_fs_write = extract_pending_fs_write(key_lit, &r);
+                let pending_ui_write = extract_pending_ui_write(key_lit, &r);
+                let pending_game_write = extract_pending_game_write(key_lit, &r);
                 self.observations.insert(
                     origin_id,
                     ObservationMeta {
@@ -366,6 +403,8 @@ impl Executor {
                         pending_sqlite_write,
                         pending_kv_write,
                         pending_fs_write,
+                        pending_ui_write,
+                        pending_game_write,
                     },
                 );
                 self.trace.push(TraceEvent::ObserveEnd {
@@ -374,6 +413,9 @@ impl Executor {
                     reason: r.reason,
                     origin_id,
                 });
+                self.emit_ui_observe_trace(key_lit, &r);
+                self.emit_game_observe_trace(key_lit, &r);
+                self.emit_shadow_observe_trace(key_lit, &r);
                 self.env.insert(bind.clone(), Value::Result4(Box::new(r)));
                 Ok(Flow::Continue)
             }
@@ -916,6 +958,8 @@ impl Executor {
                         self.apply_pending_sqlite_write_if_needed(&meta, span)?;
                         self.apply_pending_kv_write_if_needed(&meta, span)?;
                         self.apply_pending_fs_write_if_needed(&meta, span)?;
+                        self.apply_pending_ui_write_if_needed(&meta, r.kind, r.reason);
+                        self.apply_pending_game_write_if_needed(&meta, r.kind, r.reason);
                         self.commits.push(CommitEvent {
                             origin_id,
                             key: meta.key.clone(),
@@ -935,6 +979,8 @@ impl Executor {
                         Ok(())
                     }
                     CommitPolicyMode::ShadowCommitLog => {
+                        self.apply_pending_ui_write_if_needed(&meta, r.kind, r.reason);
+                        self.apply_pending_game_write_if_needed(&meta, r.kind, r.reason);
                         self.commits.push(CommitEvent {
                             origin_id,
                             key: meta.key.clone(),
@@ -1116,7 +1162,7 @@ impl Executor {
                 let (full_path, _) = resolve_fs_path("write", path)?;
                 if full_path.exists() && !overwrite {
                     Err(ReasonCode::PolicyDenied)
-                } else if text.as_bytes().len() > fs_max_write_bytes() {
+                } else if text.len() > fs_max_write_bytes() {
                     Err(ReasonCode::LimitExceeded)
                 } else {
                     fs_write_text_atomic(&full_path, text)
@@ -1190,6 +1236,213 @@ impl Executor {
         self.applied_fs_writes
             .insert(pending.pending_write_id.clone());
         Ok(())
+    }
+
+    fn apply_pending_ui_write_if_needed(
+        &mut self,
+        meta: &ObservationMeta,
+        kind: ResultKind,
+        reason: Option<ReasonCode>,
+    ) {
+        let Some(pending) = meta.pending_ui_write.as_ref() else {
+            return;
+        };
+        if self.applied_ui_writes.contains(&pending.pending_write_id) {
+            return;
+        }
+
+        match &pending.op {
+            UiCommitOp::Draw { cmd_count } => {
+                self.trace.push(TraceEvent::UiCommit {
+                    key: meta.key.clone(),
+                    cmd_count: *cmd_count as u32,
+                    present: false,
+                    kind,
+                    reason,
+                });
+            }
+            UiCommitOp::Present => {
+                self.trace.push(TraceEvent::UiCommit {
+                    key: meta.key.clone(),
+                    cmd_count: 0,
+                    present: true,
+                    kind,
+                    reason,
+                });
+            }
+        }
+
+        self.applied_ui_writes
+            .insert(pending.pending_write_id.clone());
+    }
+
+    fn apply_pending_game_write_if_needed(
+        &mut self,
+        meta: &ObservationMeta,
+        kind: ResultKind,
+        reason: Option<ReasonCode>,
+    ) {
+        let Some(pending) = meta.pending_game_write.as_ref() else {
+            return;
+        };
+        if self.applied_game_writes.contains(&pending.pending_write_id) {
+            return;
+        }
+
+        match &pending.op {
+            GameCommitOp::StateDelta {
+                idempotency_key,
+                delta,
+                delta_bytes,
+            } => {
+                let delta_hash = stable_hash64_hex(&stringify_json_value(delta));
+                self.trace.push(TraceEvent::GameCommit {
+                    key: meta.key.clone(),
+                    delta_bytes: *delta_bytes as u32,
+                    idempotency_hash: stable_hash64_hex(&format!("{idempotency_key}|{delta_hash}")),
+                    kind,
+                    reason,
+                });
+            }
+        }
+
+        self.applied_game_writes
+            .insert(pending.pending_write_id.clone());
+    }
+
+    fn emit_ui_observe_trace(&mut self, key: &str, result: &Result4<Value>) {
+        if !key.starts_with("std.ui.") {
+            return;
+        }
+
+        let mut event_count = 0u32;
+        let mut truncated = false;
+        let detail = result
+            .payload
+            .as_ref()
+            .map(stringify_json_value)
+            .unwrap_or_else(|| "null".to_string());
+
+        if key == "std.ui.input" {
+            if let Some(Value::Map(map)) = result.payload.as_ref() {
+                if let Some(Value::List(events)) = map.get("events") {
+                    event_count = events.len() as u32;
+                }
+                if let Some(Value::Bool(flag)) = map.get("truncated") {
+                    truncated = *flag;
+                }
+            }
+        }
+
+        self.trace.push(TraceEvent::UiObserve {
+            key: key.to_string(),
+            event_count,
+            truncated,
+            detail,
+            kind: result.kind,
+            reason: result.reason,
+        });
+    }
+
+    fn emit_game_observe_trace(&mut self, key: &str, result: &Result4<Value>) {
+        if !key.starts_with("std.game.") {
+            return;
+        }
+
+        let mut stream = String::new();
+        let mut value_count = 0u32;
+        let mut tick = 0i64;
+        if let Some(Value::Map(map)) = result.payload.as_ref() {
+            if let Some(Value::String(v)) = map.get("stream") {
+                stream = v.clone();
+            }
+            if let Some(Value::List(values)) = map.get("values") {
+                value_count = values.len() as u32;
+            }
+            if let Some(Value::Int(v)) = map.get("tick") {
+                tick = *v;
+            }
+        } else if let Some(Value::Payload(map)) = result.payload.as_ref() {
+            if let Some(raw_tick) = map.get("tick") {
+                tick = raw_tick.trim().parse::<i64>().ok().unwrap_or(0);
+            }
+        }
+
+        self.trace.push(TraceEvent::GameObserve {
+            key: key.to_string(),
+            stream,
+            value_count,
+            tick,
+            kind: result.kind,
+            reason: result.reason,
+        });
+    }
+
+    fn emit_shadow_observe_trace(&mut self, key: &str, result: &Result4<Value>) {
+        if !key.starts_with("std.shadow.") {
+            return;
+        }
+
+        let Some(Value::Map(map)) = result.payload.as_ref() else {
+            return;
+        };
+
+        match key {
+            "std.shadow.run" => {
+                let branch_count = map
+                    .get("branches")
+                    .and_then(|v| match v {
+                        Value::List(items) => Some(items.len() as u32),
+                        _ => None,
+                    })
+                    .unwrap_or(0);
+                let truncated = map
+                    .get("truncated")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let detail = map
+                    .get("branch_digest")
+                    .and_then(Value::as_string)
+                    .unwrap_or_default();
+                self.trace.push(TraceEvent::ShadowRun {
+                    key: key.to_string(),
+                    branch_count,
+                    truncated,
+                    detail,
+                    kind: result.kind,
+                    reason: result.reason,
+                });
+            }
+            "std.shadow.compare" => {
+                let diff_count = map
+                    .get("diff_keys")
+                    .and_then(|v| match v {
+                        Value::List(items) => Some(items.len() as u32),
+                        _ => None,
+                    })
+                    .unwrap_or(0);
+                let report_bytes = map
+                    .get("report_bytes")
+                    .and_then(|v| match v {
+                        Value::Int(raw) => Some((*raw).max(0) as u32),
+                        _ => None,
+                    })
+                    .unwrap_or(0);
+                let truncated = map
+                    .get("truncated")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                self.trace.push(TraceEvent::ShadowCompare {
+                    key: key.to_string(),
+                    diff_count,
+                    report_bytes,
+                    truncated,
+                    kind: result.kind,
+                    reason: result.reason,
+                });
+            }
+            _ => {}
+        }
     }
 
     fn eval_expr(&mut self, expr: &Expr) -> Result<Value, Diagnostic> {
@@ -1848,6 +2101,65 @@ fn extract_pending_fs_write(key: &str, result: &Result4<Value>) -> Option<Pendin
     })
 }
 
+fn extract_pending_ui_write(key: &str, result: &Result4<Value>) -> Option<PendingUiWrite> {
+    if !matches!(key, "std.ui.draw" | "std.ui.present") {
+        return None;
+    }
+    let payload = result.payload.as_ref()?;
+    let Value::Map(map) = payload else {
+        return None;
+    };
+    let pending_write_id = map.get("pending_write_id")?.as_string()?;
+    let op = match key {
+        "std.ui.draw" => {
+            let cmd_count = match map.get("cmd_count") {
+                Some(Value::Int(v)) => (*v).max(0) as usize,
+                Some(Value::String(raw)) => raw.parse::<usize>().ok().unwrap_or(0),
+                _ => 0,
+            };
+            UiCommitOp::Draw { cmd_count }
+        }
+        "std.ui.present" => UiCommitOp::Present,
+        _ => return None,
+    };
+    Some(PendingUiWrite {
+        op,
+        pending_write_id,
+    })
+}
+
+fn extract_pending_game_write(key: &str, result: &Result4<Value>) -> Option<PendingGameWrite> {
+    if key != "std.game.state_delta" {
+        return None;
+    }
+    if !matches!(result.kind, ResultKind::Ok | ResultKind::Degraded) {
+        return None;
+    }
+    let Value::Map(map) = result.payload.as_ref()? else {
+        return None;
+    };
+    let pending_write_id = map.get("pending_write_id")?.as_string()?;
+    let idempotency_key = map.get("idempotency_key")?.as_string()?;
+    let delta = map.get("delta")?.clone();
+    let delta_bytes = map
+        .get("delta_bytes")
+        .and_then(|v| match v {
+            Value::Int(raw) => Some((*raw).max(0) as usize),
+            Value::String(raw) => raw.trim().parse::<usize>().ok(),
+            _ => None,
+        })
+        .unwrap_or_else(|| stringify_json_value(&delta).len());
+
+    Some(PendingGameWrite {
+        op: GameCommitOp::StateDelta {
+            idempotency_key,
+            delta,
+            delta_bytes,
+        },
+        pending_write_id,
+    })
+}
+
 fn kv_store_path() -> PathBuf {
     if let Ok(raw) = env::var("OCL_STD_KV_PATH") {
         let trimmed = raw.trim();
@@ -1936,6 +2248,579 @@ fn fs_max_list_entries() -> usize {
         .and_then(|v| v.trim().parse::<usize>().ok())
         .filter(|v| *v > 0)
         .unwrap_or(500)
+}
+
+fn ui_max_draw_cmds() -> usize {
+    env::var("OCL_STD_UI_MAX_DRAW_CMDS")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(5_000)
+}
+
+fn ui_max_input_events() -> usize {
+    env::var("OCL_STD_UI_MAX_INPUT_EVENTS")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(500)
+}
+
+fn game_enabled() -> bool {
+    match env::var("OCL_STD_GAME_ENABLED") {
+        Ok(raw) => !matches!(
+            raw.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "no"
+        ),
+        Err(_) => true,
+    }
+}
+
+fn game_fixed_dt_ms() -> i64 {
+    env::var("OCL_STD_GAME_FIXED_DT_MS")
+        .ok()
+        .and_then(|v| v.trim().parse::<i64>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(16)
+}
+
+fn game_rng_max_count() -> usize {
+    env::var("OCL_STD_GAME_RNG_MAX_COUNT")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(1024)
+}
+
+fn game_state_delta_max_bytes() -> usize {
+    env::var("OCL_STD_GAME_STATE_DELTA_MAX_BYTES")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(65_536)
+}
+
+fn game_rng_streams() -> Vec<String> {
+    let raw = env::var("OCL_STD_GAME_RNG_STREAMS").unwrap_or_else(|_| "main,loot".to_string());
+    raw.split(',')
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .map(|v| v.to_string())
+        .collect()
+}
+
+fn game_stream_allowed(stream: &str) -> bool {
+    game_rng_streams().iter().any(|v| v == stream)
+}
+
+fn game_base_seed() -> u64 {
+    env::var("OCL_STD_GAME_BASE_SEED")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .unwrap_or(0)
+}
+
+fn shadow_enabled() -> bool {
+    match env::var("OCL_STD_SHADOW_ENABLED") {
+        Ok(raw) => !matches!(
+            raw.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "no"
+        ),
+        Err(_) => true,
+    }
+}
+
+fn shadow_max_branches() -> usize {
+    env::var("OCL_STD_SHADOW_MAX_BRANCHES")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(8)
+}
+
+fn shadow_branch_step_cap() -> usize {
+    env::var("OCL_STD_SHADOW_BRANCH_STEP_CAP")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(5_000)
+}
+
+fn shadow_branch_budget_cap() -> usize {
+    env::var("OCL_STD_SHADOW_BRANCH_BUDGET_CAP")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(200_000)
+}
+
+fn shadow_max_diff_keys() -> usize {
+    env::var("OCL_STD_SHADOW_MAX_DIFF_KEYS")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(2_000)
+}
+
+fn shadow_max_report_bytes() -> usize {
+    env::var("OCL_STD_SHADOW_MAX_REPORT_BYTES")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(262_144)
+}
+
+fn shadow_disallowed_effect_keys(ctx: &HashMap<String, String>) -> Vec<String> {
+    let mut out = Vec::new();
+    let raw = ctx.get("effect_keys").cloned().unwrap_or_default();
+    for token in raw.split('|') {
+        let key = token.trim();
+        if key.is_empty() {
+            continue;
+        }
+        let disallowed = key.starts_with("std.fs.")
+            || key.starts_with("std.kv.")
+            || key == "std.ui.present"
+            || key == "std.game.state_delta";
+        if disallowed {
+            out.push(key.to_string());
+        }
+    }
+    out
+}
+
+fn parse_shadow_variants(ctx: &HashMap<String, String>) -> Result<Vec<Value>, ()> {
+    if let Some(raw_json) = ctx.get("variants_json") {
+        let parsed = parse_json_value(raw_json)?;
+        if let Value::List(items) = parsed {
+            return Ok(items);
+        }
+        return Err(());
+    }
+
+    if let Some(raw) = ctx.get("variants") {
+        let items = raw
+            .split('|')
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .map(|v| Value::String(v.to_string()))
+            .collect::<Vec<_>>();
+        return Ok(items);
+    }
+
+    Err(())
+}
+
+#[derive(Debug, Clone)]
+struct ShadowBranchView {
+    id: i64,
+    outcome: ResultKind,
+    reason: Option<ReasonCode>,
+    signature: String,
+    cost_steps: i64,
+    cost_budget: i64,
+    state_summary: Value,
+}
+
+fn parse_shadow_compare_branches(
+    ctx: &HashMap<String, String>,
+) -> Result<Vec<ShadowBranchView>, ()> {
+    let raw_json = ctx.get("branches_json").ok_or(())?;
+    let parsed = parse_json_value(raw_json)?;
+    let Value::List(items) = parsed else {
+        return Err(());
+    };
+
+    let mut out = Vec::new();
+    for item in items {
+        let Value::Map(map) = item else {
+            continue;
+        };
+        let id = map
+            .get("id")
+            .and_then(|v| match v {
+                Value::Int(raw) => Some(*raw),
+                Value::String(raw) => raw.trim().parse::<i64>().ok(),
+                _ => None,
+            })
+            .unwrap_or(0);
+        let outcome = map
+            .get("outcome")
+            .and_then(|v| match v {
+                Value::String(raw) => Some(parse_result_kind_token(raw)),
+                _ => None,
+            })
+            .unwrap_or(ResultKind::Ok);
+        let reason = map.get("reason_code").and_then(|v| match v {
+            Value::String(raw) => reason_code_from_str(raw),
+            _ => None,
+        });
+        let signature = map
+            .get("signature")
+            .and_then(Value::as_string)
+            .unwrap_or_default();
+        let (cost_steps, cost_budget) = match map.get("cost") {
+            Some(Value::Map(cost)) => {
+                let steps = cost
+                    .get("steps")
+                    .and_then(|v| match v {
+                        Value::Int(raw) => Some(*raw),
+                        Value::String(raw) => raw.trim().parse::<i64>().ok(),
+                        _ => None,
+                    })
+                    .unwrap_or(0);
+                let budget = cost
+                    .get("budget")
+                    .and_then(|v| match v {
+                        Value::Int(raw) => Some(*raw),
+                        Value::String(raw) => raw.trim().parse::<i64>().ok(),
+                        _ => None,
+                    })
+                    .unwrap_or(0);
+                (steps.max(0), budget.max(0))
+            }
+            _ => (0, 0),
+        };
+        let state_summary = map.get("state_summary").cloned().unwrap_or(Value::Unit);
+        out.push(ShadowBranchView {
+            id,
+            outcome,
+            reason,
+            signature,
+            cost_steps,
+            cost_budget,
+            state_summary,
+        });
+    }
+
+    if out.is_empty() {
+        return Err(());
+    }
+    out.sort_by_key(|v| v.id);
+    Ok(out)
+}
+
+fn parse_result_kind_token(raw: &str) -> ResultKind {
+    match raw.trim().to_ascii_uppercase().as_str() {
+        "DEGRADED" => ResultKind::Degraded,
+        "INSUFFICIENT" => ResultKind::Insufficient,
+        "DEFERRED" => ResultKind::Deferred,
+        _ => ResultKind::Ok,
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ShadowCompareBuild {
+    payload: BTreeMap<String, Value>,
+    reason: Option<ReasonCode>,
+}
+
+fn build_shadow_compare_report(
+    branches: &[ShadowBranchView],
+    baseline_id: i64,
+    max_diff_keys: usize,
+    max_report_bytes: usize,
+) -> ShadowCompareBuild {
+    let baseline = branches
+        .iter()
+        .find(|b| b.id == baseline_id)
+        .unwrap_or(&branches[0]);
+    let mut diff_keys = collect_shadow_diff_keys(&baseline.state_summary, branches);
+    let mut reason = None;
+    let mut truncated = false;
+
+    if diff_keys.len() > max_diff_keys {
+        diff_keys.truncate(max_diff_keys);
+        truncated = true;
+        reason = Some(ReasonCode::ShadowCapExceeded);
+    }
+
+    let mut cost_table = Vec::with_capacity(branches.len());
+    for branch in branches {
+        let mut row = BTreeMap::new();
+        row.insert("id".to_string(), Value::Int(branch.id));
+        row.insert(
+            "outcome".to_string(),
+            Value::String(format!("{:?}", branch.outcome).to_ascii_uppercase()),
+        );
+        if let Some(code) = branch.reason {
+            row.insert(
+                "reason_code".to_string(),
+                Value::String(code.as_str().to_string()),
+            );
+        }
+        row.insert("steps".to_string(), Value::Int(branch.cost_steps.max(0)));
+        row.insert("budget".to_string(), Value::Int(branch.cost_budget.max(0)));
+        row.insert(
+            "signature".to_string(),
+            Value::String(branch.signature.clone()),
+        );
+        cost_table.push(Value::Map(row));
+    }
+
+    let mut reason_counts = BTreeMap::<String, i64>::new();
+    for branch in branches {
+        if let Some(code) = branch.reason {
+            *reason_counts.entry(code.as_str().to_string()).or_insert(0) += 1;
+        }
+    }
+    let mut reason_table = Vec::new();
+    for (code, count) in reason_counts {
+        let mut row = BTreeMap::new();
+        row.insert("reason_code".to_string(), Value::String(code));
+        row.insert("count".to_string(), Value::Int(count.max(0)));
+        reason_table.push(Value::Map(row));
+    }
+
+    let mut diff_keys_for_report = diff_keys;
+    let mut report_reason = reason;
+    let mut report_truncated = truncated;
+    let mut report_bytes = 0usize;
+    loop {
+        let payload = build_shadow_compare_payload(
+            &diff_keys_for_report,
+            &cost_table,
+            &reason_table,
+            report_truncated,
+            report_bytes,
+        );
+        report_bytes = stringify_json_value(&Value::Map(payload.clone())).len();
+        if report_bytes <= max_report_bytes {
+            let mut stable = payload;
+            stable.insert("report_bytes".to_string(), Value::Int(report_bytes as i64));
+            return ShadowCompareBuild {
+                payload: stable,
+                reason: report_reason,
+            };
+        }
+
+        report_truncated = true;
+        report_reason = Some(ReasonCode::ShadowReportTooLarge);
+        if !reason_table.is_empty() {
+            reason_table.pop();
+            continue;
+        }
+        if diff_keys_for_report.len() > 1 {
+            diff_keys_for_report.pop();
+            continue;
+        }
+        if cost_table.len() > 1 {
+            cost_table.pop();
+            continue;
+        }
+        let mut stable = build_shadow_compare_payload(
+            &diff_keys_for_report,
+            &cost_table,
+            &reason_table,
+            report_truncated,
+            report_bytes,
+        );
+        stable.insert(
+            "report_bytes".to_string(),
+            Value::Int(max_report_bytes as i64),
+        );
+        return ShadowCompareBuild {
+            payload: stable,
+            reason: report_reason,
+        };
+    }
+}
+
+fn build_shadow_compare_payload(
+    diff_keys: &[String],
+    cost_table: &[Value],
+    reason_table: &[Value],
+    truncated: bool,
+    report_bytes: usize,
+) -> BTreeMap<String, Value> {
+    let mut divergence = BTreeMap::new();
+    for key in diff_keys {
+        divergence.insert(key.clone(), Value::Bool(true));
+    }
+
+    let mut payload = BTreeMap::new();
+    payload.insert(
+        "diff_keys".to_string(),
+        Value::List(diff_keys.iter().map(|v| Value::String(v.clone())).collect()),
+    );
+    payload.insert("divergence".to_string(), Value::Map(divergence));
+    payload.insert("cost_table".to_string(), Value::List(cost_table.to_vec()));
+    payload.insert(
+        "reason_table".to_string(),
+        Value::List(reason_table.to_vec()),
+    );
+    payload.insert("truncated".to_string(), Value::Bool(truncated));
+    payload.insert("report_bytes".to_string(), Value::Int(report_bytes as i64));
+    payload
+}
+
+fn collect_shadow_diff_keys(baseline: &Value, branches: &[ShadowBranchView]) -> Vec<String> {
+    let mut keys = Vec::new();
+    let baseline_map = match baseline {
+        Value::Map(map) => Some(map),
+        _ => None,
+    };
+    let mut key_set = BTreeMap::<String, bool>::new();
+
+    if let Some(map) = baseline_map {
+        for key in map.keys() {
+            key_set.insert(key.clone(), true);
+        }
+    }
+    for branch in branches {
+        if let Value::Map(map) = &branch.state_summary {
+            for key in map.keys() {
+                key_set.insert(key.clone(), true);
+            }
+        }
+    }
+
+    for key in key_set.keys() {
+        let baseline_value = baseline_map.and_then(|map| map.get(key));
+        let mut diverged = false;
+        for branch in branches {
+            let branch_value = match &branch.state_summary {
+                Value::Map(map) => map.get(key),
+                _ => None,
+            };
+            if branch_value != baseline_value {
+                diverged = true;
+                break;
+            }
+        }
+        if diverged {
+            keys.push(key.clone());
+        }
+    }
+    keys.sort();
+    keys
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Pcg32 {
+    state: u64,
+    inc: u64,
+}
+
+impl Pcg32 {
+    fn seeded(init_state: u64, init_seq: u64) -> Self {
+        let mut rng = Self {
+            state: 0,
+            inc: (init_seq << 1) | 1,
+        };
+        let _ = rng.next_u32();
+        rng.state = rng.state.wrapping_add(init_state);
+        let _ = rng.next_u32();
+        rng
+    }
+
+    fn next_u32(&mut self) -> u32 {
+        let old_state = self.state;
+        self.state = old_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(self.inc);
+        let xorshifted = (((old_state >> 18) ^ old_state) >> 27) as u32;
+        let rot = (old_state >> 59) as u32;
+        xorshifted.rotate_right(rot)
+    }
+}
+
+fn game_stream_seed(stream: &str, base_seed: u64) -> u64 {
+    let mut input = b"pcg32\0".to_vec();
+    input.extend_from_slice(stream.as_bytes());
+    fnv1a64_bytes(&input) ^ base_seed
+}
+
+fn game_tick_seed(tick: i64) -> u64 {
+    fnv1a64_bytes(format!("tick|{}", tick.max(0)).as_bytes())
+}
+
+fn game_rng_values(stream: &str, tick: i64, count: usize, base_seed: u64) -> Vec<Value> {
+    let stream_seed = game_stream_seed(stream, base_seed);
+    let init_state = stream_seed ^ game_tick_seed(tick);
+    let mut rng = Pcg32::seeded(init_state, stream_seed);
+    let mut out = Vec::with_capacity(count);
+    for _ in 0..count {
+        let value = i64::from(rng.next_u32() & 0x7fff_ffff);
+        out.push(Value::Int(value));
+    }
+    out
+}
+
+fn parse_ui_events(raw: &str) -> Vec<Value> {
+    raw.split('|')
+        .filter_map(|token| {
+            let token = token.trim();
+            if token.is_empty() {
+                return None;
+            }
+            Some(parse_ui_event_token(token))
+        })
+        .collect()
+}
+
+fn parse_ui_event_token(token: &str) -> Value {
+    let (kind_raw, payload_raw) = token
+        .split_once(':')
+        .map(|(k, p)| (k.trim(), p.trim()))
+        .unwrap_or((token.trim(), ""));
+    let kind = kind_raw.to_ascii_lowercase();
+    let mut attrs = BTreeMap::new();
+
+    match kind.as_str() {
+        "key" => {
+            attrs.insert("key".to_string(), Value::String(payload_raw.to_string()));
+        }
+        "mouse" => {
+            let mut parts = payload_raw.split(',');
+            let x = parts
+                .next()
+                .and_then(|v| v.trim().parse::<i64>().ok())
+                .unwrap_or(0);
+            let y = parts
+                .next()
+                .and_then(|v| v.trim().parse::<i64>().ok())
+                .unwrap_or(0);
+            attrs.insert("x".to_string(), Value::Int(x));
+            attrs.insert("y".to_string(), Value::Int(y));
+        }
+        "text" => {
+            attrs.insert("text".to_string(), Value::String(payload_raw.to_string()));
+        }
+        "quit" => {
+            attrs.insert("quit".to_string(), Value::Bool(true));
+        }
+        _ => {
+            attrs.insert("raw".to_string(), Value::String(payload_raw.to_string()));
+        }
+    }
+
+    let mut event = BTreeMap::new();
+    event.insert("t".to_string(), Value::String(kind));
+    event.insert("a".to_string(), Value::Map(attrs));
+    Value::Map(event)
+}
+
+fn parse_ui_draw_list(raw: &str) -> Vec<Value> {
+    raw.split('|')
+        .filter_map(|token| {
+            let token = token.trim();
+            if token.is_empty() {
+                return None;
+            }
+            let (kind_raw, payload_raw) = token
+                .split_once(':')
+                .map(|(k, p)| (k.trim(), p.trim()))
+                .unwrap_or((token, ""));
+            let mut cmd = BTreeMap::new();
+            cmd.insert(
+                "kind".to_string(),
+                Value::String(kind_raw.to_ascii_lowercase()),
+            );
+            cmd.insert("raw".to_string(), Value::String(payload_raw.to_string()));
+            Some(Value::Map(cmd))
+        })
+        .collect()
 }
 
 fn fs_allow_patterns_for_action(action: &str) -> Vec<String> {
@@ -2396,7 +3281,7 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             if full_path.exists() && !overwrite {
                 return Result4::insufficient(ReasonCode::PolicyDenied);
             }
-            if text.as_bytes().len() > fs_max_write_bytes() {
+            if text.len() > fs_max_write_bytes() {
                 return Result4::deferred(ReasonCode::LimitExceeded);
             }
             let mut map = BTreeMap::new();
@@ -2860,28 +3745,598 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             );
             Result4::ok(Value::Payload(map))
         }
+        "engine.ui.run" => {
+            let entry_module = match ctx.get("entry_module") {
+                Some(v) if !v.trim().is_empty() => v.clone(),
+                _ => return Result4::insufficient(ReasonCode::CtxInvalid),
+            };
+            let tick =
+                parse_nonnegative_i64(ctx.get("tick").or_else(|| ctx.get("ctx_tick"))).unwrap_or(0);
+            let phase = ctx
+                .get("phase")
+                .cloned()
+                .unwrap_or_else(|| if tick == 0 { "init" } else { "frame" }.to_string());
+            let dt_ms = parse_nonnegative_i64(ctx.get("dt_ms"))
+                .unwrap_or(game_fixed_dt_ms())
+                .max(1);
+
+            let w = parse_nonnegative_i64(ctx.get("w")).unwrap_or(1280).max(1);
+            let h = parse_nonnegative_i64(ctx.get("h")).unwrap_or(720).max(1);
+            let scale = parse_nonnegative_i64(ctx.get("scale")).unwrap_or(1).max(1);
+            let theme = ctx
+                .get("theme")
+                .cloned()
+                .unwrap_or_else(|| "default".to_string());
+            let locale = ctx
+                .get("locale")
+                .cloned()
+                .unwrap_or_else(|| "en-US".to_string());
+
+            let requested_input_cap = parse_nonnegative_usize(ctx.get("input_cap"))
+                .or_else(|| parse_nonnegative_usize(ctx.get("cap")))
+                .unwrap_or(ui_max_input_events());
+            let input_cap = requested_input_cap.min(ui_max_input_events());
+            let mut input_events =
+                parse_ui_events(ctx.get("events").map(String::as_str).unwrap_or(""));
+            let input_truncated = input_events.len() > input_cap;
+            if input_truncated {
+                input_events.truncate(input_cap);
+            }
+
+            let requested_draw_cap =
+                parse_nonnegative_usize(ctx.get("draw_cap")).unwrap_or(ui_max_draw_cmds());
+            let draw_cap = requested_draw_cap.min(ui_max_draw_cmds());
+            let mut draw_list =
+                parse_ui_draw_list(ctx.get("draw_list").map(String::as_str).unwrap_or(""));
+            let draw_truncated = draw_list.len() > draw_cap;
+            if draw_truncated {
+                draw_list.truncate(draw_cap);
+            }
+
+            let mut frame_info = BTreeMap::new();
+            frame_info.insert("w".to_string(), Value::Int(w));
+            frame_info.insert("h".to_string(), Value::Int(h));
+            frame_info.insert("scale".to_string(), Value::Int(scale));
+            frame_info.insert("theme".to_string(), Value::String(theme));
+            frame_info.insert("locale".to_string(), Value::String(locale));
+            frame_info.insert("tick".to_string(), Value::Int(tick));
+
+            let mut payload = BTreeMap::new();
+            payload.insert("entry_module".to_string(), Value::String(entry_module));
+            payload.insert("phase".to_string(), Value::String(phase));
+            payload.insert("tick".to_string(), Value::Int(tick));
+            payload.insert("dt_ms".to_string(), Value::Int(dt_ms));
+            payload.insert("frame_info".to_string(), Value::Map(frame_info));
+            payload.insert("input_events".to_string(), Value::List(input_events));
+            payload.insert("input_truncated".to_string(), Value::Bool(input_truncated));
+            payload.insert("draw".to_string(), Value::List(draw_list));
+            payload.insert("draw_truncated".to_string(), Value::Bool(draw_truncated));
+            payload.insert("state".to_string(), parse_engine_state_value(&ctx));
+            payload.insert(
+                "quit".to_string(),
+                Value::Bool(parse_bool_ctx(ctx.get("quit")).unwrap_or(false)),
+            );
+
+            if input_truncated
+                || draw_truncated
+                || requested_input_cap > ui_max_input_events()
+                || requested_draw_cap > ui_max_draw_cmds()
+            {
+                Result4::degraded(Value::Map(payload), ReasonCode::UiCapExceeded)
+            } else {
+                Result4::ok(Value::Map(payload))
+            }
+        }
+        "engine.game.run" => {
+            if !game_enabled() {
+                return Result4::insufficient(ReasonCode::GameDisabled);
+            }
+            let entry_module = match ctx.get("entry_module") {
+                Some(v) if !v.trim().is_empty() => v.clone(),
+                _ => return Result4::insufficient(ReasonCode::CtxInvalid),
+            };
+            let tick =
+                parse_nonnegative_i64(ctx.get("tick").or_else(|| ctx.get("ctx_tick"))).unwrap_or(0);
+            let phase = ctx
+                .get("phase")
+                .cloned()
+                .unwrap_or_else(|| if tick == 0 { "init" } else { "frame" }.to_string());
+            let dt_ms = game_fixed_dt_ms().max(1);
+
+            let stream = ctx
+                .get("stream")
+                .cloned()
+                .unwrap_or_else(|| "main".to_string());
+            if !game_stream_allowed(&stream) {
+                return Result4::insufficient(ReasonCode::GameRngInvalidStream);
+            }
+            let requested_count = parse_nonnegative_usize(ctx.get("count"))
+                .unwrap_or(1)
+                .max(1);
+            if requested_count > game_rng_max_count() {
+                return Result4::deferred(ReasonCode::LimitExceeded);
+            }
+            let rng_values = game_rng_values(&stream, tick, requested_count, game_base_seed());
+
+            let requested_input_cap = parse_nonnegative_usize(ctx.get("input_cap"))
+                .or_else(|| parse_nonnegative_usize(ctx.get("cap")))
+                .unwrap_or(ui_max_input_events());
+            let input_cap = requested_input_cap.min(ui_max_input_events());
+            let mut input_events =
+                parse_ui_events(ctx.get("events").map(String::as_str).unwrap_or(""));
+            let input_truncated = input_events.len() > input_cap;
+            if input_truncated {
+                input_events.truncate(input_cap);
+            }
+
+            let requested_draw_cap =
+                parse_nonnegative_usize(ctx.get("draw_cap")).unwrap_or(ui_max_draw_cmds());
+            let draw_cap = requested_draw_cap.min(ui_max_draw_cmds());
+            let mut draw_list =
+                parse_ui_draw_list(ctx.get("draw_list").map(String::as_str).unwrap_or(""));
+            let draw_truncated = draw_list.len() > draw_cap;
+            if draw_truncated {
+                draw_list.truncate(draw_cap);
+            }
+
+            let mut payload = BTreeMap::new();
+            payload.insert("entry_module".to_string(), Value::String(entry_module));
+            payload.insert("phase".to_string(), Value::String(phase));
+            payload.insert("tick".to_string(), Value::Int(tick));
+            payload.insert("dt_ms".to_string(), Value::Int(dt_ms));
+            payload.insert("stream".to_string(), Value::String(stream));
+            payload.insert("count".to_string(), Value::Int(requested_count as i64));
+            payload.insert("rng_values".to_string(), Value::List(rng_values));
+            payload.insert("state".to_string(), parse_engine_state_value(&ctx));
+            payload.insert("input_events".to_string(), Value::List(input_events));
+            payload.insert("input_truncated".to_string(), Value::Bool(input_truncated));
+            payload.insert("draw".to_string(), Value::List(draw_list));
+            payload.insert("draw_truncated".to_string(), Value::Bool(draw_truncated));
+            payload.insert(
+                "quit".to_string(),
+                Value::Bool(parse_bool_ctx(ctx.get("quit")).unwrap_or(false)),
+            );
+
+            if input_truncated
+                || draw_truncated
+                || requested_input_cap > ui_max_input_events()
+                || requested_draw_cap > ui_max_draw_cmds()
+            {
+                Result4::degraded(Value::Map(payload), ReasonCode::UiCapExceeded)
+            } else {
+                Result4::ok(Value::Map(payload))
+            }
+        }
+        "engine.shadow.preview" => {
+            if !shadow_enabled() {
+                return Result4::insufficient(ReasonCode::ShadowDisabled);
+            }
+            let entry_module = match ctx.get("entry_module") {
+                Some(v) if !v.trim().is_empty() => v.clone(),
+                _ => return Result4::insufficient(ReasonCode::CtxInvalid),
+            };
+            let disallowed_effects = shadow_disallowed_effect_keys(&ctx);
+            if !disallowed_effects.is_empty() {
+                return Result4::insufficient(ReasonCode::ShadowEffectDisallowed);
+            }
+            let variants = match parse_shadow_variants(&ctx) {
+                Ok(v) if !v.is_empty() => v,
+                _ => return Result4::insufficient(ReasonCode::CtxInvalid),
+            };
+
+            let requested_branches = parse_nonnegative_usize(ctx.get("branches"))
+                .unwrap_or(variants.len())
+                .max(1);
+            let requested_step_cap = parse_nonnegative_usize(ctx.get("branch_step_cap"))
+                .unwrap_or(shadow_branch_step_cap())
+                .max(1);
+            let requested_budget_cap = parse_nonnegative_usize(ctx.get("branch_budget_cap"))
+                .unwrap_or(shadow_branch_budget_cap())
+                .max(1);
+
+            let effective_branches = requested_branches
+                .min(variants.len())
+                .min(shadow_max_branches());
+            let effective_step_cap = requested_step_cap.min(shadow_branch_step_cap());
+            let effective_budget_cap = requested_budget_cap.min(shadow_branch_budget_cap());
+            let run_truncated = effective_branches < variants.len()
+                || requested_branches > shadow_max_branches()
+                || requested_step_cap > shadow_branch_step_cap()
+                || requested_budget_cap > shadow_branch_budget_cap();
+            let tick =
+                parse_nonnegative_i64(ctx.get("tick").or_else(|| ctx.get("ctx_tick"))).unwrap_or(0);
+
+            let mut branches = Vec::with_capacity(effective_branches);
+            let mut branch_views = Vec::with_capacity(effective_branches);
+            let mut signature_join = String::new();
+            for (idx, variant) in variants.into_iter().enumerate().take(effective_branches) {
+                let variant_json = stringify_json_value(&variant);
+                let signature =
+                    stable_hash64_hex(&format!("shadow_branch|{idx}|{tick}|{variant_json}"));
+                signature_join.push_str(&signature);
+                signature_join.push('|');
+
+                let steps =
+                    ((fnv1a64_bytes(signature.as_bytes()) % effective_step_cap as u64) + 1) as i64;
+                let budget = ((steps as usize)
+                    .saturating_mul(16)
+                    .min(effective_budget_cap)) as i64;
+
+                let mut cost = BTreeMap::new();
+                cost.insert("steps".to_string(), Value::Int(steps));
+                cost.insert("budget".to_string(), Value::Int(budget));
+
+                let mut state_summary = BTreeMap::new();
+                state_summary.insert("branch_id".to_string(), Value::Int(idx as i64));
+                state_summary.insert("variant".to_string(), variant.clone());
+                state_summary.insert("tick".to_string(), Value::Int(tick));
+
+                let mut branch = BTreeMap::new();
+                branch.insert("id".to_string(), Value::Int(idx as i64));
+                branch.insert("outcome".to_string(), Value::String("OK".to_string()));
+                branch.insert("signature".to_string(), Value::String(signature.clone()));
+                branch.insert("cost".to_string(), Value::Map(cost));
+                branch.insert(
+                    "state_summary".to_string(),
+                    Value::Map(state_summary.clone()),
+                );
+                branches.push(Value::Map(branch));
+
+                branch_views.push(ShadowBranchView {
+                    id: idx as i64,
+                    outcome: ResultKind::Ok,
+                    reason: None,
+                    signature,
+                    cost_steps: steps,
+                    cost_budget: budget,
+                    state_summary: Value::Map(state_summary),
+                });
+            }
+
+            let branch_digest = stable_hash64_hex(&signature_join);
+            let mut run_payload = BTreeMap::new();
+            run_payload.insert("branches".to_string(), Value::List(branches));
+            run_payload.insert("truncated".to_string(), Value::Bool(run_truncated));
+            run_payload.insert(
+                "max_branches".to_string(),
+                Value::Int(shadow_max_branches() as i64),
+            );
+            run_payload.insert(
+                "branch_step_cap".to_string(),
+                Value::Int(effective_step_cap as i64),
+            );
+            run_payload.insert(
+                "branch_budget_cap".to_string(),
+                Value::Int(effective_budget_cap as i64),
+            );
+            run_payload.insert("branch_digest".to_string(), Value::String(branch_digest));
+
+            let baseline_id = parse_nonnegative_i64(ctx.get("baseline_id")).unwrap_or(0);
+            let max_diff_keys = parse_nonnegative_usize(ctx.get("max_diff_keys"))
+                .unwrap_or(shadow_max_diff_keys())
+                .min(shadow_max_diff_keys());
+            let max_report_bytes = parse_nonnegative_usize(ctx.get("max_report_bytes"))
+                .unwrap_or(shadow_max_report_bytes())
+                .min(shadow_max_report_bytes());
+            let compare = build_shadow_compare_report(
+                &branch_views,
+                baseline_id,
+                max_diff_keys.max(1),
+                max_report_bytes.max(64),
+            );
+
+            let mut payload = BTreeMap::new();
+            payload.insert("entry_module".to_string(), Value::String(entry_module));
+            payload.insert("run".to_string(), Value::Map(run_payload));
+            payload.insert("compare".to_string(), Value::Map(compare.payload));
+
+            let reason = compare.reason.or(if run_truncated {
+                Some(ReasonCode::ShadowCapExceeded)
+            } else {
+                None
+            });
+            if let Some(reason) = reason {
+                Result4::degraded(Value::Map(payload), reason)
+            } else {
+                Result4::ok(Value::Map(payload))
+            }
+        }
         "std.ui.frame_info" => {
             let mut map = BTreeMap::new();
-            let tick = ctx
-                .get("ctx_tick")
+            let w = parse_nonnegative_i64(ctx.get("w")).unwrap_or(1280).max(1);
+            let h = parse_nonnegative_i64(ctx.get("h")).unwrap_or(720).max(1);
+            let scale = parse_nonnegative_i64(ctx.get("scale")).unwrap_or(1).max(1);
+            let theme = ctx
+                .get("theme")
                 .cloned()
-                .unwrap_or_else(|| "0".to_string());
-            map.insert("ctx_tick".to_string(), tick.clone());
-            map.insert("frame".to_string(), tick);
+                .unwrap_or_else(|| "default".to_string());
+            let locale = ctx
+                .get("locale")
+                .cloned()
+                .unwrap_or_else(|| "en-US".to_string());
+            let tick = parse_nonnegative_i64(ctx.get("ctx_tick").or_else(|| ctx.get("tick")))
+                .unwrap_or(0)
+                .max(0);
+            map.insert("w".to_string(), w.to_string());
+            map.insert("h".to_string(), h.to_string());
+            map.insert("scale".to_string(), scale.to_string());
+            map.insert("theme".to_string(), theme);
+            map.insert("locale".to_string(), locale);
+            map.insert("ctx_tick".to_string(), tick.to_string());
+            map.insert("frame".to_string(), tick.to_string());
             Result4::ok(Value::Payload(map))
         }
-        "std.game.tick_info" => {
+        "std.ui.input" => {
+            let requested_cap =
+                parse_nonnegative_usize(ctx.get("cap")).unwrap_or(ui_max_input_events());
+            let effective_cap = requested_cap.min(ui_max_input_events());
+            let mut events = parse_ui_events(ctx.get("events").map(String::as_str).unwrap_or(""));
+            let truncated = events.len() > effective_cap;
+            if truncated {
+                events.truncate(effective_cap);
+            }
             let mut map = BTreeMap::new();
-            let tick = ctx
-                .get("ctx_tick")
+            map.insert("events".to_string(), Value::List(events));
+            map.insert("truncated".to_string(), Value::Bool(truncated));
+            if truncated {
+                Result4::degraded(Value::Map(map), ReasonCode::UiCapExceeded)
+            } else {
+                Result4::ok(Value::Map(map))
+            }
+        }
+        "std.ui.draw" => {
+            let cap = parse_nonnegative_usize(ctx.get("cap")).unwrap_or(ui_max_draw_cmds());
+            if cap > ui_max_draw_cmds() {
+                return Result4::deferred(ReasonCode::UiCapExceeded);
+            }
+            let list_raw = ctx.get("list").cloned().unwrap_or_default();
+            let draw_list = parse_ui_draw_list(&list_raw);
+            let cmd_count = draw_list.len();
+            if cmd_count > cap {
+                return Result4::deferred(ReasonCode::UiCapExceeded);
+            }
+
+            let mut map = BTreeMap::new();
+            map.insert("op".to_string(), Value::String("draw".to_string()));
+            map.insert("list".to_string(), Value::List(draw_list));
+            map.insert("cmd_count".to_string(), Value::Int(cmd_count as i64));
+            map.insert("cap".to_string(), Value::Int(cap as i64));
+            map.insert(
+                "pending_write_id".to_string(),
+                Value::String(stable_hash64_hex(&format!("ui_draw|{cap}|{list_raw}"))),
+            );
+            Result4::ok(Value::Map(map))
+        }
+        "std.ui.present" => {
+            let mut map = BTreeMap::new();
+            map.insert("op".to_string(), Value::String("present".to_string()));
+            map.insert(
+                "pending_write_id".to_string(),
+                Value::String(stable_hash64_hex("ui_present")),
+            );
+            Result4::ok(Value::Map(map))
+        }
+        "std.game.tick_info" => {
+            if !game_enabled() {
+                return Result4::insufficient(ReasonCode::GameDisabled);
+            }
+            let tick =
+                parse_nonnegative_i64(ctx.get("tick").or_else(|| ctx.get("ctx_tick"))).unwrap_or(0);
+            let dt_ms = game_fixed_dt_ms().max(1);
+            let mut map = BTreeMap::new();
+            map.insert("tick".to_string(), Value::Int(tick));
+            map.insert("dt_ms".to_string(), Value::Int(dt_ms));
+            // Compatibility field kept for older fixtures that still read ctx_tick.
+            map.insert("ctx_tick".to_string(), Value::Int(tick));
+            Result4::ok(Value::Map(map))
+        }
+        "std.game.rng" => {
+            if !game_enabled() {
+                return Result4::insufficient(ReasonCode::GameDisabled);
+            }
+            let stream = ctx
+                .get("stream")
                 .cloned()
-                .unwrap_or_else(|| "0".to_string());
-            map.insert("ctx_tick".to_string(), tick.clone());
-            map.insert("tick".to_string(), tick);
-            Result4::ok(Value::Payload(map))
+                .unwrap_or_else(|| "main".to_string());
+            if !game_stream_allowed(&stream) {
+                return Result4::insufficient(ReasonCode::GameRngInvalidStream);
+            }
+            let count = ctx
+                .get("count")
+                .and_then(|v| v.trim().parse::<usize>().ok())
+                .unwrap_or(1);
+            if count > game_rng_max_count() {
+                return Result4::deferred(ReasonCode::LimitExceeded);
+            }
+            let tick =
+                parse_nonnegative_i64(ctx.get("tick").or_else(|| ctx.get("ctx_tick"))).unwrap_or(0);
+            let values = game_rng_values(&stream, tick, count, game_base_seed());
+            let mut map = BTreeMap::new();
+            map.insert("stream".to_string(), Value::String(stream));
+            map.insert("count".to_string(), Value::Int(count as i64));
+            map.insert("tick".to_string(), Value::Int(tick));
+            map.insert("values".to_string(), Value::List(values));
+            Result4::ok(Value::Map(map))
+        }
+        "std.game.state_delta" => {
+            if !game_enabled() {
+                return Result4::insufficient(ReasonCode::GameDisabled);
+            }
+            let idempotency_key = match ctx.get("idempotency_key") {
+                Some(v) if !v.trim().is_empty() => v.clone(),
+                _ => return Result4::insufficient(ReasonCode::CtxInvalid),
+            };
+            let delta = if let Some(raw_delta) = ctx.get("delta") {
+                parse_json_value(raw_delta).unwrap_or_else(|_| Value::String(raw_delta.clone()))
+            } else if let Some(raw_delta_json) = ctx.get("delta_json") {
+                parse_json_value(raw_delta_json)
+                    .unwrap_or_else(|_| Value::String(raw_delta_json.clone()))
+            } else {
+                return Result4::insufficient(ReasonCode::CtxInvalid);
+            };
+            let delta_text = stringify_json_value(&delta);
+            let delta_bytes = delta_text.len();
+            if delta_bytes > game_state_delta_max_bytes() {
+                return Result4::deferred(ReasonCode::LimitExceeded);
+            }
+
+            let mut map = BTreeMap::new();
+            map.insert("op".to_string(), Value::String("state_delta".to_string()));
+            map.insert(
+                "pending_write_id".to_string(),
+                Value::String(stable_hash64_hex(&format!(
+                    "game_state_delta|{idempotency_key}|{delta_text}"
+                ))),
+            );
+            map.insert(
+                "idempotency_key".to_string(),
+                Value::String(idempotency_key),
+            );
+            map.insert("delta".to_string(), delta);
+            map.insert("delta_bytes".to_string(), Value::Int(delta_bytes as i64));
+            Result4::ok(Value::Map(map))
+        }
+        "std.shadow.run" => {
+            if !shadow_enabled() {
+                return Result4::insufficient(ReasonCode::ShadowDisabled);
+            }
+            let disallowed_effects = shadow_disallowed_effect_keys(&ctx);
+            if !disallowed_effects.is_empty() {
+                return Result4::insufficient(ReasonCode::ShadowEffectDisallowed);
+            }
+            let variants = match parse_shadow_variants(&ctx) {
+                Ok(v) if !v.is_empty() => v,
+                _ => return Result4::insufficient(ReasonCode::CtxInvalid),
+            };
+
+            let requested_branches = parse_nonnegative_usize(ctx.get("branches"))
+                .unwrap_or(variants.len())
+                .max(1);
+            let requested_step_cap = parse_nonnegative_usize(ctx.get("branch_step_cap"))
+                .unwrap_or(shadow_branch_step_cap())
+                .max(1);
+            let requested_budget_cap = parse_nonnegative_usize(ctx.get("branch_budget_cap"))
+                .unwrap_or(shadow_branch_budget_cap())
+                .max(1);
+
+            let effective_branches = requested_branches
+                .min(variants.len())
+                .min(shadow_max_branches());
+            let effective_step_cap = requested_step_cap.min(shadow_branch_step_cap());
+            let effective_budget_cap = requested_budget_cap.min(shadow_branch_budget_cap());
+            let truncated = effective_branches < variants.len()
+                || requested_branches > shadow_max_branches()
+                || requested_step_cap > shadow_branch_step_cap()
+                || requested_budget_cap > shadow_branch_budget_cap();
+            let tick =
+                parse_nonnegative_i64(ctx.get("tick").or_else(|| ctx.get("ctx_tick"))).unwrap_or(0);
+
+            let mut branches = Vec::with_capacity(effective_branches);
+            let mut signature_join = String::new();
+            for (idx, variant) in variants.into_iter().enumerate().take(effective_branches) {
+                let variant_json = stringify_json_value(&variant);
+                let signature =
+                    stable_hash64_hex(&format!("shadow_branch|{idx}|{tick}|{variant_json}"));
+                signature_join.push_str(&signature);
+                signature_join.push('|');
+
+                let steps =
+                    ((fnv1a64_bytes(signature.as_bytes()) % effective_step_cap as u64) + 1) as i64;
+                let budget = ((steps as usize)
+                    .saturating_mul(16)
+                    .min(effective_budget_cap)) as i64;
+
+                let mut cost = BTreeMap::new();
+                cost.insert("steps".to_string(), Value::Int(steps));
+                cost.insert("budget".to_string(), Value::Int(budget));
+
+                let mut state_summary = BTreeMap::new();
+                state_summary.insert("branch_id".to_string(), Value::Int(idx as i64));
+                state_summary.insert("variant".to_string(), variant);
+                state_summary.insert("tick".to_string(), Value::Int(tick));
+
+                let mut branch = BTreeMap::new();
+                branch.insert("id".to_string(), Value::Int(idx as i64));
+                branch.insert("outcome".to_string(), Value::String("OK".to_string()));
+                branch.insert("signature".to_string(), Value::String(signature));
+                branch.insert("cost".to_string(), Value::Map(cost));
+                branch.insert("state_summary".to_string(), Value::Map(state_summary));
+                branches.push(Value::Map(branch));
+            }
+
+            let branch_digest = stable_hash64_hex(&signature_join);
+            let mut payload = BTreeMap::new();
+            payload.insert("branches".to_string(), Value::List(branches));
+            payload.insert("truncated".to_string(), Value::Bool(truncated));
+            payload.insert(
+                "max_branches".to_string(),
+                Value::Int(shadow_max_branches() as i64),
+            );
+            payload.insert(
+                "branch_step_cap".to_string(),
+                Value::Int(effective_step_cap as i64),
+            );
+            payload.insert(
+                "branch_budget_cap".to_string(),
+                Value::Int(effective_budget_cap as i64),
+            );
+            payload.insert("branch_digest".to_string(), Value::String(branch_digest));
+
+            if truncated {
+                Result4::degraded(Value::Map(payload), ReasonCode::ShadowCapExceeded)
+            } else {
+                Result4::ok(Value::Map(payload))
+            }
+        }
+        "std.shadow.compare" => {
+            if !shadow_enabled() {
+                return Result4::insufficient(ReasonCode::ShadowDisabled);
+            }
+
+            let branches = match parse_shadow_compare_branches(&ctx) {
+                Ok(v) if !v.is_empty() => v,
+                _ => return Result4::insufficient(ReasonCode::CtxInvalid),
+            };
+            let baseline_id = parse_nonnegative_i64(ctx.get("baseline_id")).unwrap_or(0);
+            let max_diff_keys = parse_nonnegative_usize(ctx.get("max_diff_keys"))
+                .unwrap_or(shadow_max_diff_keys())
+                .min(shadow_max_diff_keys());
+            let max_report_bytes = parse_nonnegative_usize(ctx.get("max_report_bytes"))
+                .unwrap_or(shadow_max_report_bytes())
+                .min(shadow_max_report_bytes());
+
+            let report = build_shadow_compare_report(
+                &branches,
+                baseline_id,
+                max_diff_keys.max(1),
+                max_report_bytes.max(64),
+            );
+            let result_kind = if report.reason.is_some() {
+                ResultKind::Degraded
+            } else {
+                ResultKind::Ok
+            };
+
+            if let Some(reason) = report.reason {
+                Result4::degraded(Value::Map(report.payload), reason)
+            } else if result_kind == ResultKind::Ok {
+                Result4::ok(Value::Map(report.payload))
+            } else {
+                Result4::degraded(Value::Map(report.payload), ReasonCode::ShadowCapExceeded)
+            }
         }
         _ => Result4::deferred(ReasonCode::NotImplemented),
     }
+}
+
+fn parse_engine_state_value(ctx: &HashMap<String, String>) -> Value {
+    if let Some(raw) = ctx.get("state_json") {
+        return parse_json_value(raw).unwrap_or_else(|_| Value::String(raw.clone()));
+    }
+    if let Some(raw) = ctx.get("state") {
+        return parse_json_value(raw).unwrap_or_else(|_| Value::String(raw.clone()));
+    }
+    Value::Map(BTreeMap::new())
 }
 
 #[derive(Debug, Clone)]
@@ -3329,6 +4784,14 @@ fn reason_code_from_str(raw: &str) -> Option<ReasonCode> {
         "RC-KV-CAP-EXCEEDED" => Some(ReasonCode::KvCapExceeded),
         "RC-KV-IO-ERROR" => Some(ReasonCode::KvIoError),
         "RC-TIME-DISABLED" => Some(ReasonCode::TimeDisabled),
+        "RC-GAME-DISABLED" => Some(ReasonCode::GameDisabled),
+        "RC-GAME-RNG-INVALID-STREAM" => Some(ReasonCode::GameRngInvalidStream),
+        "RC-SHADOW-DISABLED" => Some(ReasonCode::ShadowDisabled),
+        "RC-SHADOW-CAP-EXCEEDED" => Some(ReasonCode::ShadowCapExceeded),
+        "RC-SHADOW-REPORT-TOO-LARGE" => Some(ReasonCode::ShadowReportTooLarge),
+        "RC-SHADOW-EFFECT-DISALLOWED" => Some(ReasonCode::ShadowEffectDisallowed),
+        "RC-UI-DISABLED" => Some(ReasonCode::UiDisabled),
+        "RC-UI-CAP-EXCEEDED" => Some(ReasonCode::UiCapExceeded),
         "RC-LIMIT-EXCEEDED" => Some(ReasonCode::LimitExceeded),
         "RC-JSON-INVALID" => Some(ReasonCode::JsonInvalid),
         "RC-NOT-IMPLEMENTED" => Some(ReasonCode::NotImplemented),
@@ -3355,6 +4818,15 @@ fn json_escape_inline(input: &str) -> String {
     out
 }
 
+fn fnv1a64_bytes(input: &[u8]) -> u64 {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for b in input {
+        hash ^= u64::from(*b);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
 fn stable_hash256_hex(input: &str) -> String {
     let a = stable_hash64_hex(&format!("0|{input}"));
     let b = stable_hash64_hex(&format!("1|{input}"));
@@ -3364,12 +4836,7 @@ fn stable_hash256_hex(input: &str) -> String {
 }
 
 fn stable_hash64_hex(input: &str) -> String {
-    let mut hash: u64 = 0xcbf29ce484222325;
-    for b in input.as_bytes() {
-        hash ^= u64::from(*b);
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    format!("{hash:016x}")
+    format!("{:016x}", fnv1a64_bytes(input.as_bytes()))
 }
 
 fn stub_payload(key: &str) -> Value {

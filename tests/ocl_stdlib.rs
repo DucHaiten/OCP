@@ -324,6 +324,9 @@ observe("std.game.tick_info", "tier2", ctx("ctx_tick=42"), budget(5)) -> game;
         Some(Value::Payload(map)) => {
             assert_eq!(map.get("ctx_tick"), Some(&"42".to_string()));
         }
+        Some(Value::Map(map)) => {
+            assert_eq!(map.get("ctx_tick"), Some(&Value::Int(42)));
+        }
         _ => panic!("expected game payload"),
     }
 }

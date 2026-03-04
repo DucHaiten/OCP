@@ -38,12 +38,9 @@ function Unstage-GeneratedPaths {
 
 Unstage-GeneratedPaths -Paths $generatedPaths
 
-$stagedAfterUnstage = @(git diff --cached --name-only)
-if ($stagedAfterUnstage.Count -eq 0) {
-    Write-Host "[commit-safe] No staged changes found. Auto-stage workspace changes..."
-    git add -A -- .
-    Unstage-GeneratedPaths -Paths $generatedPaths
-}
+Write-Host "[commit-safe] Auto-stage workspace changes..."
+git add -A -- .
+Unstage-GeneratedPaths -Paths $generatedPaths
 
 $stagedForCommit = @(git diff --cached --name-only)
 if ($stagedForCommit.Count -eq 0) {

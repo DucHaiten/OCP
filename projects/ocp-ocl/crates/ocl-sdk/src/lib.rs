@@ -139,6 +139,9 @@ pub struct ProjectPermissions {
     pub std_fs: Option<StdFsPermissionConfig>,
     pub std_kv: Option<StdKvPermissionConfig>,
     pub std_time: Option<StdTimePermissionConfig>,
+    pub std_game: Option<StdGamePermissionConfig>,
+    pub std_shadow: Option<StdShadowPermissionConfig>,
+    pub std_ui: Option<StdUiPermissionConfig>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -200,6 +203,71 @@ impl Default for StdTimePermissionConfig {
             enabled: false,
             tick_mode: "logical".to_string(),
             dt_ms: 16,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StdGamePermissionConfig {
+    pub enabled: bool,
+    pub fixed_dt_ms: u32,
+    pub rng_streams: Vec<String>,
+    pub rng_max_count: u32,
+    pub state_delta_max_bytes: u64,
+}
+
+impl Default for StdGamePermissionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            fixed_dt_ms: 16,
+            rng_streams: vec!["main".to_string(), "loot".to_string()],
+            rng_max_count: 1024,
+            state_delta_max_bytes: 65_536,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StdShadowPermissionConfig {
+    pub enabled: bool,
+    pub max_branches: u32,
+    pub branch_step_cap: u32,
+    pub branch_budget_cap: u32,
+    pub max_diff_keys: u32,
+    pub max_report_bytes: u64,
+}
+
+impl Default for StdShadowPermissionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_branches: 8,
+            branch_step_cap: 5_000,
+            branch_budget_cap: 200_000,
+            max_diff_keys: 2_000,
+            max_report_bytes: 262_144,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StdUiPermissionConfig {
+    pub enabled: bool,
+    pub max_draw_cmds: u32,
+    pub max_input_events: u32,
+    pub assets_read: Vec<String>,
+    pub max_asset_bytes: u64,
+}
+
+impl Default for StdUiPermissionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_draw_cmds: 5_000,
+            max_input_events: 500,
+            assets_read: Vec::new(),
+            max_asset_bytes: 2_097_152,
         }
     }
 }
@@ -638,6 +706,113 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
                 _ => {}
             }
         }
+
+        if current_section == "permissions.std_game" {
+            let cfg = out
+                .std_game
+                .get_or_insert_with(StdGamePermissionConfig::default);
+            match key {
+                "enabled" => {
+                    if let Some(parsed) = parse_bool_literal(scalar_value) {
+                        cfg.enabled = parsed;
+                    }
+                }
+                "fixed_dt_ms" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.fixed_dt_ms = parsed.max(1);
+                    }
+                }
+                "rng_streams" => {
+                    cfg.rng_streams = values;
+                }
+                "rng_max_count" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.rng_max_count = parsed.max(1);
+                    }
+                }
+                "state_delta_max_bytes" => {
+                    if let Ok(parsed) = scalar_value.parse::<u64>() {
+                        cfg.state_delta_max_bytes = parsed.max(1);
+                    }
+                }
+                _ => {}
+            }
+            normalize_string_list(&mut cfg.rng_streams);
+            continue;
+        }
+
+        if current_section == "permissions.std_shadow" {
+            let cfg = out
+                .std_shadow
+                .get_or_insert_with(StdShadowPermissionConfig::default);
+            match key {
+                "enabled" => {
+                    if let Some(parsed) = parse_bool_literal(scalar_value) {
+                        cfg.enabled = parsed;
+                    }
+                }
+                "max_branches" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.max_branches = parsed.max(1);
+                    }
+                }
+                "branch_step_cap" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.branch_step_cap = parsed.max(1);
+                    }
+                }
+                "branch_budget_cap" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.branch_budget_cap = parsed.max(1);
+                    }
+                }
+                "max_diff_keys" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.max_diff_keys = parsed.max(1);
+                    }
+                }
+                "max_report_bytes" => {
+                    if let Ok(parsed) = scalar_value.parse::<u64>() {
+                        cfg.max_report_bytes = parsed.max(1);
+                    }
+                }
+                _ => {}
+            }
+            continue;
+        }
+
+        if current_section == "permissions.std_ui" {
+            let cfg = out
+                .std_ui
+                .get_or_insert_with(StdUiPermissionConfig::default);
+            match key {
+                "enabled" => {
+                    if let Some(parsed) = parse_bool_literal(scalar_value) {
+                        cfg.enabled = parsed;
+                    }
+                }
+                "max_draw_cmds" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.max_draw_cmds = parsed.max(1);
+                    }
+                }
+                "max_input_events" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.max_input_events = parsed.max(1);
+                    }
+                }
+                "assets_read" => {
+                    cfg.assets_read = values;
+                }
+                "max_asset_bytes" => {
+                    if let Ok(parsed) = scalar_value.parse::<u64>() {
+                        cfg.max_asset_bytes = parsed.max(1);
+                    }
+                }
+                _ => {}
+            }
+            normalize_string_list(&mut cfg.assets_read);
+        }
     }
 
     out
@@ -651,6 +826,59 @@ fn std_fs_action_from_key(key: &str) -> Option<&'static str> {
         "std.fs.remove" => Some("remove"),
         "std.fs.rename" => Some("rename"),
         _ if key.starts_with("std.fs.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn std_ui_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "std.ui.frame_info" | "std.ui.input" => Some("observe"),
+        "std.ui.draw" => Some("draw"),
+        "std.ui.present" => Some("present"),
+        _ if key.starts_with("std.ui.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn std_game_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "std.game.tick_info" => Some("tick_info"),
+        "std.game.rng" => Some("rng"),
+        "std.game.state_delta" => Some("state_delta"),
+        _ if key.starts_with("std.game.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn std_shadow_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "std.shadow.run" => Some("run"),
+        "std.shadow.compare" => Some("compare"),
+        _ if key.starts_with("std.shadow.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn engine_ui_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "engine.ui.run" => Some("run"),
+        _ if key.starts_with("engine.ui.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn engine_game_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "engine.game.run" => Some("run"),
+        _ if key.starts_with("engine.game.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn engine_shadow_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "engine.shadow.preview" => Some("preview"),
+        _ if key.starts_with("engine.shadow.") => Some("unknown"),
         _ => None,
     }
 }
@@ -688,6 +916,111 @@ fn verify_pack_permissions_for_key(
     file_path: &Path,
     key: &str,
 ) -> Result<(), SdkError> {
+    if let Some(action) = engine_ui_action_from_key(key) {
+        let Some(cfg) = permissions.std_ui.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-UI-DISABLED`; missing section `[permissions.std_ui]` required by engine.ui. Hint: add `[permissions.std_ui]` with `enabled = true` in Ocl.toml.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-UI-DISABLED`; `[permissions.std_ui].enabled = false` while using engine.ui.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if action == "run" {
+            return Ok(());
+        }
+        return Err(SdkError::PermissionDenied(format!(
+            "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-UI-DISABLED`; unsupported engine.ui action `{}`.",
+            key,
+            file_path.display(),
+            module_path
+                .map(|m| format!(" (module `{m}`)"))
+                .unwrap_or_default(),
+            action,
+        )));
+    }
+
+    if let Some(action) = engine_game_action_from_key(key) {
+        let Some(cfg) = permissions.std_game.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-GAME-DISABLED`; missing section `[permissions.std_game]` required by engine.game. Hint: add `[permissions.std_game]` with `enabled = true` in Ocl.toml.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-GAME-DISABLED`; `[permissions.std_game].enabled = false` while using engine.game.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if action == "run" {
+            return Ok(());
+        }
+        return Err(SdkError::PermissionDenied(format!(
+            "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-GAME-DISABLED`; unsupported engine.game action `{}`.",
+            key,
+            file_path.display(),
+            module_path
+                .map(|m| format!(" (module `{m}`)"))
+                .unwrap_or_default(),
+            action,
+        )));
+    }
+
+    if let Some(action) = engine_shadow_action_from_key(key) {
+        let Some(cfg) = permissions.std_shadow.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-SHADOW-DISABLED`; missing section `[permissions.std_shadow]` required by engine.shadow. Hint: add `[permissions.std_shadow]` with `enabled = true` in Ocl.toml.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-SHADOW-DISABLED`; `[permissions.std_shadow].enabled = false` while using engine.shadow.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if action == "preview" {
+            return Ok(());
+        }
+        return Err(SdkError::PermissionDenied(format!(
+            "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-SHADOW-DISABLED`; unsupported engine.shadow action `{}`.",
+            key,
+            file_path.display(),
+            module_path
+                .map(|m| format!(" (module `{m}`)"))
+                .unwrap_or_default(),
+            action,
+        )));
+    }
+
     if let Some(action) = std_fs_action_from_key(key) {
         let Some(cfg) = permissions.std_fs.as_ref() else {
             return Err(SdkError::PermissionDenied(format!(
@@ -771,6 +1104,115 @@ fn verify_pack_permissions_for_key(
             )));
         }
         return Ok(());
+    }
+
+    if let Some(action) = std_game_action_from_key(key) {
+        let Some(cfg) = permissions.std_game.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-GAME-DISABLED`; missing section `[permissions.std_game]`. Hint: add `[permissions.std_game]` with `enabled = true` in Ocl.toml.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-GAME-DISABLED`; `[permissions.std_game].enabled = false`. Hint: set `enabled = true` in `[permissions.std_game]`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if matches!(action, "tick_info" | "rng" | "state_delta") {
+            return Ok(());
+        }
+        return Err(SdkError::PermissionDenied(format!(
+            "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-GAME-DISABLED`; unsupported std.game action `{}`.",
+            key,
+            file_path.display(),
+            module_path
+                .map(|m| format!(" (module `{m}`)"))
+                .unwrap_or_default(),
+            action,
+        )));
+    }
+
+    if let Some(action) = std_shadow_action_from_key(key) {
+        let Some(cfg) = permissions.std_shadow.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-SHADOW-DISABLED`; missing section `[permissions.std_shadow]`. Hint: add `[permissions.std_shadow]` with `enabled = true` in Ocl.toml.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-SHADOW-DISABLED`; `[permissions.std_shadow].enabled = false`. Hint: set `enabled = true` in `[permissions.std_shadow]`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+
+        if matches!(action, "run" | "compare") {
+            return Ok(());
+        }
+
+        return Err(SdkError::PermissionDenied(format!(
+            "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-SHADOW-DISABLED`; unsupported std.shadow action `{}`.",
+            key,
+            file_path.display(),
+            module_path
+                .map(|m| format!(" (module `{m}`)"))
+                .unwrap_or_default(),
+            action,
+        )));
+    }
+
+    if let Some(action) = std_ui_action_from_key(key) {
+        let Some(cfg) = permissions.std_ui.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-UI-DISABLED`; missing section `[permissions.std_ui]`. Hint: add `[permissions.std_ui]` with `enabled = true` in Ocl.toml.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-UI-DISABLED`; `[permissions.std_ui].enabled = false`. Hint: set `enabled = true` in `[permissions.std_ui]`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+
+        if matches!(action, "draw" | "present" | "observe") {
+            return Ok(());
+        }
+
+        return Err(SdkError::PermissionDenied(format!(
+            "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-UI-DISABLED`; unsupported std.ui action `{}`.",
+            key,
+            file_path.display(),
+            module_path
+                .map(|m| format!(" (module `{m}`)"))
+                .unwrap_or_default(),
+            action,
+        )));
     }
 
     Ok(())
@@ -927,6 +1369,9 @@ fn verify_permissions_for_source(
         && permissions.std_fs.is_none()
         && permissions.std_kv.is_none()
         && permissions.std_time.is_none()
+        && permissions.std_game.is_none()
+        && permissions.std_shadow.is_none()
+        && permissions.std_ui.is_none()
     {
         return Ok(());
     }
@@ -3584,6 +4029,94 @@ fn map_trace_event(
             domain_id: domain_id.to_string(),
             payload_hash,
         },
+        TraceEvent::UiObserve {
+            key,
+            event_count,
+            truncated,
+            kind,
+            reason,
+            ..
+        } => TraceEventV1 {
+            seq,
+            run_id: run_id.to_string(),
+            event: "ui_observe".to_string(),
+            key: Some(key.clone()),
+            kind: Some(result_kind_label(*kind)),
+            reason: reason.map(|r| r.as_str().to_string()),
+            origin_id: None,
+            allowed: None,
+            value: Some(*truncated),
+            steps: Some(*event_count),
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload_hash,
+        },
+        TraceEvent::GameObserve {
+            key,
+            stream,
+            value_count,
+            tick,
+            kind,
+            reason,
+        } => TraceEventV1 {
+            seq,
+            run_id: run_id.to_string(),
+            event: "game_observe".to_string(),
+            key: Some(format!("{key}:{stream}:{tick}")),
+            kind: Some(result_kind_label(*kind)),
+            reason: reason.map(|r| r.as_str().to_string()),
+            origin_id: None,
+            allowed: None,
+            value: None,
+            steps: Some(*value_count),
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload_hash,
+        },
+        TraceEvent::ShadowRun {
+            key,
+            branch_count,
+            truncated,
+            detail,
+            kind,
+            reason,
+        } => TraceEventV1 {
+            seq,
+            run_id: run_id.to_string(),
+            event: "shadow_run".to_string(),
+            key: Some(format!("{key}:{detail}")),
+            kind: Some(result_kind_label(*kind)),
+            reason: reason.map(|r| r.as_str().to_string()),
+            origin_id: None,
+            allowed: None,
+            value: Some(*truncated),
+            steps: Some(*branch_count),
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload_hash,
+        },
+        TraceEvent::ShadowCompare {
+            key,
+            diff_count,
+            report_bytes,
+            truncated,
+            kind,
+            reason,
+        } => TraceEventV1 {
+            seq,
+            run_id: run_id.to_string(),
+            event: "shadow_compare".to_string(),
+            key: Some(format!("{key}:{report_bytes}")),
+            kind: Some(result_kind_label(*kind)),
+            reason: reason.map(|r| r.as_str().to_string()),
+            origin_id: None,
+            allowed: None,
+            value: Some(*truncated),
+            steps: Some(*diff_count),
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload_hash,
+        },
         TraceEvent::MatchArmSelected { arm } => TraceEventV1 {
             seq,
             run_id: run_id.to_string(),
@@ -3625,6 +4158,48 @@ fn map_trace_event(
             allowed: Some(*allowed),
             value: None,
             steps: None,
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload_hash,
+        },
+        TraceEvent::UiCommit {
+            key,
+            cmd_count,
+            present,
+            kind,
+            reason,
+        } => TraceEventV1 {
+            seq,
+            run_id: run_id.to_string(),
+            event: "ui_commit".to_string(),
+            key: Some(key.clone()),
+            kind: Some(result_kind_label(*kind)),
+            reason: reason.map(|r| r.as_str().to_string()),
+            origin_id: None,
+            allowed: None,
+            value: Some(*present),
+            steps: Some(*cmd_count),
+            universe_id: universe_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload_hash,
+        },
+        TraceEvent::GameCommit {
+            key,
+            delta_bytes,
+            idempotency_hash,
+            kind,
+            reason,
+        } => TraceEventV1 {
+            seq,
+            run_id: run_id.to_string(),
+            event: "game_commit".to_string(),
+            key: Some(format!("{key}:{idempotency_hash}")),
+            kind: Some(result_kind_label(*kind)),
+            reason: reason.map(|r| r.as_str().to_string()),
+            origin_id: None,
+            allowed: None,
+            value: None,
+            steps: Some(*delta_bytes),
             universe_id: universe_id.to_string(),
             domain_id: domain_id.to_string(),
             payload_hash,
@@ -3698,6 +4273,57 @@ fn canonical_trace_event_payload(event: &TraceEvent) -> String {
             result_kind_label(*kind),
             reason.map(|r| r.as_str()).unwrap_or("-")
         ),
+        TraceEvent::UiObserve {
+            key,
+            event_count,
+            truncated,
+            detail,
+            kind,
+            reason,
+        } => format!(
+            "UiObserve|{key}|{event_count}|{}|{}|{}|{detail}",
+            if *truncated { "1" } else { "0" },
+            result_kind_label(*kind),
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::GameObserve {
+            key,
+            stream,
+            value_count,
+            tick,
+            kind,
+            reason,
+        } => format!(
+            "GameObserve|{key}|{stream}|{value_count}|{tick}|{}|{}",
+            result_kind_label(*kind),
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::ShadowRun {
+            key,
+            branch_count,
+            truncated,
+            detail,
+            kind,
+            reason,
+        } => format!(
+            "ShadowRun|{key}|{branch_count}|{}|{detail}|{}|{}",
+            if *truncated { "1" } else { "0" },
+            result_kind_label(*kind),
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::ShadowCompare {
+            key,
+            diff_count,
+            report_bytes,
+            truncated,
+            kind,
+            reason,
+        } => format!(
+            "ShadowCompare|{key}|{diff_count}|{report_bytes}|{}|{}|{}",
+            if *truncated { "1" } else { "0" },
+            result_kind_label(*kind),
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
         TraceEvent::MatchArmSelected { arm } => {
             format!("MatchArmSelected|{}", result_kind_label(*arm))
         }
@@ -3714,6 +4340,29 @@ fn canonical_trace_event_payload(event: &TraceEvent) -> String {
         TraceEvent::CommitResult { allowed, reason } => format!(
             "CommitResult|{}|{}",
             if *allowed { "allow" } else { "deny" },
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::UiCommit {
+            key,
+            cmd_count,
+            present,
+            kind,
+            reason,
+        } => format!(
+            "UiCommit|{key}|{cmd_count}|{}|{}|{}",
+            if *present { "1" } else { "0" },
+            result_kind_label(*kind),
+            reason.map(|r| r.as_str()).unwrap_or("-")
+        ),
+        TraceEvent::GameCommit {
+            key,
+            delta_bytes,
+            idempotency_hash,
+            kind,
+            reason,
+        } => format!(
+            "GameCommit|{key}|{delta_bytes}|{idempotency_hash}|{}|{}",
+            result_kind_label(*kind),
             reason.map(|r| r.as_str()).unwrap_or("-")
         ),
         TraceEvent::ConditionCheck { value } => format!("ConditionCheck|{value}"),
