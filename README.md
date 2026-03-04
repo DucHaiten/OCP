@@ -1,28 +1,27 @@
 # OCP-OCL
 
-**Bản tiếng Việt:**
+**English:**
 
-OCP-OCL (Observation-Collapse Programming / Observation Collapse Language) là DSL + runtime cho mô hình observe → 4-kind → commit, deterministic và commit-gated I/O.
+OCP-OCL (Observation-Collapse Programming / Observation Collapse Language) is a governed general-purpose language/runtime, built around observe → 4-kind → commit to achieve determinism, bounded execution, and capability/permission-controlled side effects.
 
-OCP-OCL được thiết kế quanh nguyên lý “quan sát rồi mới sụp trạng thái”: mọi world-data bắt buộc đi qua observe, mọi kết quả chuẩn hoá theo 4-kind (OK/DEGRADED/INSUFFICIENT/DEFERRED), và chỉ side-effect hợp lệ mới được đi qua commit. Mục tiêu là giữ tính xác định, bounded execution (budgets/caps), và kiểm soát I/O theo quyền hạn.
-
-Từ v0.15, OCP-OCL mở rộng thành nền tảng capability/permission-driven và replay-first: packages kèm permission manifests, lockfile + signing + attestation, deterministic-by-recording (cassette) cho I/O không xác định, shadow/search bounded (song song các “nhánh thực tại” trong ngân sách đo được), cùng toolchain trace/debug/diff/minimizer, conformance suite và LTS rehearsal.
-
-Nền tảng ý tưởng tổng hợp từ TSS, ELW, RGOK, SHSM, hướng Biologic, vũ trụ học (song song/chồng chập/chân trời) và Hive.
-
-#
-
-**English version:**
-
-OCP-OCL (Observation-Collapse Programming / Observation Collapse Language) is a DSL + runtime built around observe → 4-kind → commit, with deterministic execution and commit-gated I/O.
+OCP-OCL is not a “narrow domain-only DSL”: it can power tools/apps/games/agent runtimes via packs/engines, packaging + lockfiles, trace/debug/diff tooling, conformance suites, and an LTS rehearsal track. Yet it still feels DSL-strict because the core semantics are deliberately constrained: all reads must go through observe, all outcomes are normalized into 4 kinds (OK/DEGRADED/INSUFFICIENT/DEFERRED), and all I/O/side effects are commit-gated under explicit policy.
 
 OCP-OCL follows the principle “observe before collapse”: all world-data must go through observe, all outcomes are normalized into a 4-kind contract (OK/DEGRADED/INSUFFICIENT/DEFERRED), and only valid side-effects may pass through commit. The goal is deterministic behavior, bounded execution (budgets/caps), and permissioned control over I/O.
 
-As of v0.15, OCP-OCL evolves into a capability/permission-driven and replay-first platform: packages ship with permission manifests, lockfile + signing + attestation, deterministic-by-recording cassettes for non-deterministic I/O, bounded shadow/search (parallel “realities” under measurable budgets), plus trace/debug/diff/minimizer tooling, a global conformance suite, and an LTS rehearsal track.
+OCP-OCL evolves into a capability/permission-driven and replay-first platform: packages ship with permission manifests, lockfile + signing + attestation, deterministic-by-recording cassettes for non-deterministic I/O, bounded shadow/search (parallel “realities” under measurable budgets), plus trace/debug/diff/minimizer tooling, a global conformance suite, and an LTS rehearsal track.
 
 The underlying ideas synthesize concepts from TSS, ELW, RGOK, SHSM, a biologic direction, cosmology motifs (parallel/superposed/horizon), and Hive.
 
-## Developer Docs
+#
 
-- Replay-native debug workflow (v0.11):
-  - `docs/OCL-DEBUG-REPLAY-WORKFLOW-v0.11.md`
+**Tiếng Việt:**
+
+OCP-OCL (Observation-Collapse Programming / Observation Collapse Language) là một ngôn ngữ + runtime đa dụng có kiểm soát (governed GPL), được thiết kế quanh mô hình observe → 4-kind → commit để đạt determinism, bounded execution, và kiểm soát side-effect theo capability/permission.
+
+OCP-OCL không phải “DSL thuần theo domain hẹp” nó có thể xây tool/app/game/agent runtime nhờ hệ packs/engines, packaging/lockfile, trace/debug/diff, conformance và LTS. Tuy nhiên nó vẫn mang “dáng dấp khắt khe của DSL” vì semantics lõi bị ràng buộc nghiêm ngặt: mọi đọc world-data phải qua observe, mọi kết quả đi qua 4-kind (OK/DEGRADED/INSUFFICIENT/DEFERRED), và mọi I/O/side-effect chỉ được phép xảy ra qua commit theo policy.
+
+OCP-OCL được thiết kế quanh nguyên lý “quan sát rồi mới sụp trạng thái”: mọi world-data bắt buộc đi qua observe, mọi kết quả chuẩn hoá theo 4-kind (OK/DEGRADED/INSUFFICIENT/DEFERRED), và chỉ side-effect hợp lệ mới được đi qua commit. Mục tiêu là giữ tính xác định, bounded execution (budgets/caps), và kiểm soát I/O theo quyền hạn.
+
+OCP-OCL mở rộng thành nền tảng capability/permission-driven và replay-first: packages kèm permission manifests, lockfile + signing + attestation, deterministic-by-recording (cassette) cho I/O không xác định, shadow/search bounded (song song các “nhánh thực tại” trong ngân sách đo được), cùng toolchain trace/debug/diff/minimizer, conformance suite và LTS rehearsal.
+
+Nền tảng ý tưởng tổng hợp từ TSS, ELW, RGOK, SHSM, hướng Biologic, vũ trụ học (song song/chồng chập/chân trời) và Hive.
