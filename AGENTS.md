@@ -223,3 +223,45 @@ Mục tiêu: giảm tối đa rủi ro mất dữ liệu khi trợ lý làm vi�
   - chạy guard staged,
   - commit khi guard pass.
 - Không dùng commit trực tiếp nếu đang có nhiều file build/generated trong danh sách thay đổi.
+
+## 18) Luật cứng phát triển: MAXIMAL-FIRST + IMPOSSIBILITY-PROOF (bắt buộc)
+- Mặc định mọi thiết kế/triển khai phải theo `MAXIMAL_FIRST_MODE`:
+  - luôn ưu tiên phương án tốt nhất có thể đồng thời trên các trục: đúng thiết kế, an toàn, determinism, hiệu năng, DX, vận hành, mở hệ sinh thái.
+  - không được tự hạ chuẩn chỉ vì khó, tốn thời gian, hoặc bất tiện triển khai.
+- Chỉ được phép hạ chuẩn khi có `IMPOSSIBILITY_PROOF` hợp lệ.
+
+### 18.1) Điều kiện công nhận bất khả thi
+- Một hạng mục chỉ được coi là bất khả thi khi có ít nhất một trong các nhóm bằng chứng:
+  - xung đột nền tảng khiến các ràng buộc không thể đồng thời thỏa;
+  - giới hạn vật lý/toán học/hạ tầng hiện tại;
+  - đã thử tối thiểu 2 kiến trúc độc lập và đều thất bại với bằng chứng tái lập.
+- Không được gắn nhãn “bất khả thi” cho các trường hợp:
+  - chỉ thiếu thời gian,
+  - chỉ thiếu nhân lực,
+  - chỉ chưa tối ưu xong.
+
+### 18.2) Hồ sơ bằng chứng bắt buộc trước khi hạ chuẩn
+- Mọi quyết định hạ chuẩn phải có `Evidence Packet`:
+  - mục tiêu tối đa ban đầu,
+  - các phương án đã thử,
+  - lệnh đã chạy thật + kết quả,
+  - lý do loại từng phương án,
+  - ảnh hưởng nếu hạ chuẩn,
+  - phương án bù để giảm thiệt hại.
+- Thiếu `Evidence Packet` thì:
+  - không được đổi thiết kế,
+  - không được kết luận `DONE`.
+
+### 18.3) Quy tắc chốt gate theo luật mới
+- Nếu còn phương án hợp lý chưa thử và chưa có proof bất khả thi:
+  - trạng thái bắt buộc là `IN_PROGRESS` hoặc `PARTIAL`.
+- Chỉ được chuyển `DONE` khi:
+  - đạt đầy đủ thiết kế tối đa đã khóa, hoặc
+  - có `IMPOSSIBILITY_PROOF` đã ghi rõ trong closeout và được chấp thuận.
+
+### 18.4) Phân loại blocker bắt buộc
+- `TEMPORARY_BLOCKER`:
+  - có thể xử lý trong phạm vi dự án/phiên bản tiếp theo.
+- `FUNDAMENTAL_IMPOSSIBILITY`:
+  - cần đột phá nền tảng quy mô rất dài hạn (horizon cỡ >= 10 năm tiến bộ công nghệ/nhân loại).
+- Chỉ `FUNDAMENTAL_IMPOSSIBILITY` mới cho phép từ bỏ mục tiêu “hoàn hảo nhất có thể”.

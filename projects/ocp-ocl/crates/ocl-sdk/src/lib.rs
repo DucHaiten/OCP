@@ -34,7 +34,9 @@ use ocl_runtime_core::{
     Span, Stmt, TraceEvent, TypecheckCompatConfig,
 };
 pub use perm_v15::{
-    approve_permission_diff_v15, write_permission_diff_report_v15, write_permission_snapshot_v15,
+    apply_permission_fix_plan_v17, approve_permission_diff_v15, write_permission_diff_report_v15,
+    write_permission_doctor_report_v17, write_permission_fix_plan_v17,
+    write_permission_snapshot_v15,
 };
 pub use w1::{
     enforce_universe_match_v1, init_cosmos_v1, resolve_hive_caps_v1, resolve_universe_v1,
@@ -536,6 +538,55 @@ pub struct PermissionApproveSummaryV15 {
     pub approval_path: PathBuf,
     pub diff_hash: String,
     pub approvals_total: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PermissionDoctorFindingV17 {
+    pub code: String,
+    pub reason: String,
+    pub severity: String,
+    pub location: String,
+    pub value: String,
+    pub hint: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PermissionDoctorSummaryV17 {
+    pub report_path: PathBuf,
+    pub lane: String,
+    pub findings_total: usize,
+    pub blocking_total: usize,
+    pub risk_score: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PermissionFixPlanSummaryV17 {
+    pub plan_path: PathBuf,
+    pub plan_hash_sha256: String,
+    pub lane: String,
+    pub findings_total: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PermissionFixApplySummaryV17 {
+    pub plan_path: PathBuf,
+    pub patch_path: PathBuf,
+    pub report_path: PathBuf,
+    pub approval_path: PathBuf,
+    pub plan_hash_sha256: String,
+    pub findings_total: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PermissionFixApplyOptionsV17 {
+    pub plan_path: Option<PathBuf>,
+    pub patch_path: Option<PathBuf>,
+    pub report_path: Option<PathBuf>,
+    pub approval_path: Option<PathBuf>,
+    pub approved_by: String,
+    pub date: String,
+    pub justification: String,
+    pub ack_risk: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -8,26 +8,28 @@ use ocl_runtime_core::{
     RuntimeCoreError,
 };
 use ocl_sdk::{
-    approve_permission_diff_v15, build_attestation_v15, build_oclpkg_with_lock,
-    build_profile_from_trace, build_project_with_lock, build_run_id_deterministic,
-    check_project_with_lock, compare_shadow_traces_v1, compose_phenotype,
-    default_conformance_manifest_path, enforce_universe_match_v1, fetch_artifact, fmt_project,
-    init_cosmos_v1, init_project, install_organs_v1, list_kits_from_cosmos_v1,
-    parse_conformance_manifest_v1, parse_shadow_policy_v1, publish_artifact, read_profile_json,
-    read_trace_jsonl, render_conformance_report_json, render_profile_view, resolve_deps_v3,
-    resolve_domain_selection_v1, resolve_universe_v1, resolve_view_selection_v1, run_artifact,
-    run_conformance_v1, run_kit_doctor_v1, run_project_with_engine_and_lock,
-    run_project_with_shadow_compare, run_project_with_trace_engine_and_lock,
-    run_project_with_trace_engine_config_and_lock, run_reactor_service_with_lock,
-    run_reactor_service_with_shadow_compare, run_reactor_service_with_trace_engine_and_lock,
-    sign_deps_lock_v3_v15, sign_oclpkg, sync_cosmos_lock_v1, sync_deps_lock_v1,
-    sync_organs_lock_v1, sync_plugin_lock_v1, sync_policy_lock_v1, test_project_with_lock,
-    trace_required_digest, verify_assembly, verify_build_attestation_v15, verify_build_repro_v15,
-    verify_deps_lock_v3, verify_deps_lock_v3_signature_v15, verify_deps_signing_and_trust_v10,
-    verify_organs_lock_v1, verify_plugin_lock_v1, verify_supply_artifact,
-    write_conformance_report_json, write_permission_diff_report_v15, write_permission_snapshot_v15,
-    write_profile_json, write_shadow_compare_artifacts_v1, write_trace_jsonl,
-    ConformanceManifestV1, ConformanceRunOptionsV1, InputEnvelopeV1, ProfileViewOptions,
+    apply_permission_fix_plan_v17, approve_permission_diff_v15, build_attestation_v15,
+    build_oclpkg_with_lock, build_profile_from_trace, build_project_with_lock,
+    build_run_id_deterministic, check_project_with_lock, compare_shadow_traces_v1,
+    compose_phenotype, default_conformance_manifest_path, enforce_universe_match_v1,
+    fetch_artifact, fmt_project, init_cosmos_v1, init_project, install_organs_v1,
+    list_kits_from_cosmos_v1, parse_conformance_manifest_v1, parse_shadow_policy_v1,
+    publish_artifact, read_profile_json, read_trace_jsonl, render_conformance_report_json,
+    render_profile_view, resolve_deps_v3, resolve_domain_selection_v1, resolve_universe_v1,
+    resolve_view_selection_v1, run_artifact, run_conformance_v1, run_kit_doctor_v1,
+    run_project_with_engine_and_lock, run_project_with_shadow_compare,
+    run_project_with_trace_engine_and_lock, run_project_with_trace_engine_config_and_lock,
+    run_reactor_service_with_lock, run_reactor_service_with_shadow_compare,
+    run_reactor_service_with_trace_engine_and_lock, sign_deps_lock_v3_v15, sign_oclpkg,
+    sync_cosmos_lock_v1, sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1,
+    sync_policy_lock_v1, test_project_with_lock, trace_required_digest, verify_assembly,
+    verify_build_attestation_v15, verify_build_repro_v15, verify_deps_lock_v3,
+    verify_deps_lock_v3_signature_v15, verify_deps_signing_and_trust_v10, verify_organs_lock_v1,
+    verify_plugin_lock_v1, verify_supply_artifact, write_conformance_report_json,
+    write_permission_diff_report_v15, write_permission_doctor_report_v17,
+    write_permission_fix_plan_v17, write_permission_snapshot_v15, write_profile_json,
+    write_shadow_compare_artifacts_v1, write_trace_jsonl, ConformanceManifestV1,
+    ConformanceRunOptionsV1, InputEnvelopeV1, PermissionFixApplyOptionsV17, ProfileViewOptions,
     ReactorRuntimeMode, ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1,
     TraceRunSummary,
 };
@@ -2593,11 +2595,139 @@ fn run_cli(args: &[String]) -> i32 {
         }
         "perm" => {
             let Some(sub_raw) = args.get(1).map(String::as_str) else {
-                eprintln!("usage: ocl perm <snapshot|diff|approve|review> ...");
+                eprintln!("usage: ocl perm <snapshot|diff|approve|review|doctor|fix> ...");
                 return 2;
             };
             let sub = if sub_raw == "review" { "diff" } else { sub_raw };
             match sub {
+                "doctor" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!("usage: ocl perm doctor <project_dir> [--out <report.json>]");
+                        return 2;
+                    };
+                    let out_path = parse_string_flag(args, "--out").map(PathBuf::from);
+                    match write_permission_doctor_report_v17(Path::new(path), out_path.as_deref()) {
+                        Ok(summary) => {
+                            println!(
+                                "perm doctor ok (lane={}, findings_total={}, blocking_total={}, risk_score={}, report={})",
+                                summary.lane,
+                                summary.findings_total,
+                                summary.blocking_total,
+                                summary.risk_score,
+                                summary.report_path.display()
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "fix" => {
+                    let Some(mode) = args.get(2).map(String::as_str) else {
+                        eprintln!("usage: ocl perm fix <--plan|--apply> <project_dir> [options]");
+                        return 2;
+                    };
+                    match mode {
+                        "--plan" | "plan" => {
+                            let Some(path) = args.get(3) else {
+                                eprintln!(
+                                    "usage: ocl perm fix --plan <project_dir> [--out <permission_fix_plan.json>]"
+                                );
+                                return 2;
+                            };
+                            let out_path = parse_string_flag(args, "--out").map(PathBuf::from);
+                            match write_permission_fix_plan_v17(
+                                Path::new(path),
+                                out_path.as_deref(),
+                            ) {
+                                Ok(summary) => {
+                                    println!(
+                                        "perm fix plan ok (lane={}, findings_total={}, plan_hash={}, plan={})",
+                                        summary.lane,
+                                        summary.findings_total,
+                                        summary.plan_hash_sha256,
+                                        summary.plan_path.display()
+                                    );
+                                    0
+                                }
+                                Err(err) => {
+                                    eprintln!("{err}");
+                                    1
+                                }
+                            }
+                        }
+                        "--apply" | "apply" => {
+                            let Some(path) = args.get(3) else {
+                                eprintln!(
+                                    "usage: ocl perm fix --apply <project_dir> [--plan-file <permission_fix_plan.json>] [--patch <permission_fix.patch.toml>] [--out <permission_fix_safety_report.json>] [--approval <permissions.approval.toml>] --ack-risk --justification <text> --by <id> --date <YYYY-MM-DD>"
+                                );
+                                return 2;
+                            };
+                            let Some(approved_by) = parse_string_flag(args, "--by") else {
+                                eprintln!(
+                                    "usage: ocl perm fix --apply <project_dir> ... --by <id> --date <YYYY-MM-DD>"
+                                );
+                                return 2;
+                            };
+                            let Some(date) = parse_string_flag(args, "--date") else {
+                                eprintln!(
+                                    "usage: ocl perm fix --apply <project_dir> ... --by <id> --date <YYYY-MM-DD>"
+                                );
+                                return 2;
+                            };
+                            let Some(justification) = parse_string_flag(args, "--justification")
+                            else {
+                                eprintln!(
+                                    "usage: ocl perm fix --apply <project_dir> ... --justification <text> --ack-risk"
+                                );
+                                return 2;
+                            };
+                            let plan_file =
+                                parse_string_flag(args, "--plan-file").map(PathBuf::from);
+                            let patch_path = parse_string_flag(args, "--patch").map(PathBuf::from);
+                            let out_path = parse_string_flag(args, "--out").map(PathBuf::from);
+                            let approval_path =
+                                parse_string_flag(args, "--approval").map(PathBuf::from);
+                            let ack_risk = has_flag(args, "--ack-risk");
+                            let options = PermissionFixApplyOptionsV17 {
+                                plan_path: plan_file,
+                                patch_path,
+                                report_path: out_path,
+                                approval_path,
+                                approved_by,
+                                date,
+                                justification,
+                                ack_risk,
+                            };
+                            match apply_permission_fix_plan_v17(Path::new(path), &options) {
+                                Ok(summary) => {
+                                    println!(
+                                        "perm fix apply ok (findings_total={}, plan_hash={}, plan={}, patch={}, report={}, approval={})",
+                                        summary.findings_total,
+                                        summary.plan_hash_sha256,
+                                        summary.plan_path.display(),
+                                        summary.patch_path.display(),
+                                        summary.report_path.display(),
+                                        summary.approval_path.display()
+                                    );
+                                    0
+                                }
+                                Err(err) => {
+                                    eprintln!("{err}");
+                                    1
+                                }
+                            }
+                        }
+                        _ => {
+                            eprintln!(
+                                "usage: ocl perm fix <--plan|--apply> <project_dir> [options]"
+                            );
+                            2
+                        }
+                    }
+                }
                 "snapshot" => {
                     let Some(path) = args.get(2) else {
                         eprintln!("usage: ocl perm snapshot <project_dir> [--out-dir <dir>]");
@@ -2708,11 +2838,13 @@ fn run_cli(args: &[String]) -> i32 {
                     }
                 }
                 _ => {
-                    eprintln!("usage: ocl perm <snapshot|diff|approve|review> ...");
+                    eprintln!("usage: ocl perm <snapshot|diff|approve|review|doctor|fix> ...");
                     2
                 }
             }
         }
+        "cassette" => run_cassette_command(args),
+        "budget" => run_budget_command(args),
         "policy" => {
             if args.get(1).map(String::as_str) != Some("lock")
                 || args.get(2).map(String::as_str) != Some("sync")
@@ -4070,6 +4202,10 @@ fn parse_u32_flag(args: &[String], flag: &str) -> Option<u32> {
     None
 }
 
+fn has_flag(args: &[String], flag: &str) -> bool {
+    args.iter().any(|arg| arg == flag)
+}
+
 fn parse_string_flag(args: &[String], flag: &str) -> Option<String> {
     let mut idx = 0usize;
     while idx < args.len() {
@@ -4079,6 +4215,1031 @@ fn parse_string_flag(args: &[String], flag: &str) -> Option<String> {
         idx += 1;
     }
     None
+}
+
+const CASSETTE_SCHEMA_VERSION_V17: u64 = 17;
+const CASSETTE_BLOCK_STORE_VERSION_V17: u64 = 1;
+const CASSETTE_HASHER_VERSION_V17: &str = "sha256-v1";
+const CASSETTE_BLOCKS_INDEX_FILE_V17: &str = "cassette_blocks_index.json";
+const CASSETTE_STORAGE_META_FILE_V17: &str = "cassette_storage_meta.toml";
+const CASSETTE_BLOCKS_DIR_V17: &str = "blocks";
+const CASSETTE_DEFAULT_MAX_ENTRIES_V17: usize = 200_000;
+const CASSETTE_DEFAULT_MAX_BLOCK_BYTES_V17: usize = 256 * 1024;
+
+#[derive(Debug, Clone)]
+struct CassetteEntryUpgradeV17 {
+    entry_id: String,
+    canonical_entry: String,
+    block_id: String,
+}
+
+#[derive(Debug, Clone, Default)]
+struct CassettePrunePlanV17 {
+    total_blocks: usize,
+    referenced_blocks: usize,
+    orphan_blocks: Vec<String>,
+    missing_blocks: Vec<String>,
+    prune_bytes: u64,
+    ttl_days: Option<u32>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct BudgetEdgeAggV17 {
+    caller: String,
+    key: String,
+    observe_count: u32,
+    insufficient_count: u32,
+    deferred_count: u32,
+    budget_pressure_count: u32,
+}
+
+fn run_cassette_command(args: &[String]) -> i32 {
+    let Some(subcmd) = args.get(1).map(String::as_str) else {
+        eprintln!(
+            "usage: ocl cassette <stats|prune|gc|upgrade> ...\n  stats <artifact_dir> [--json]\n  prune <artifact_dir> --plan|--apply [--ttl-days <u32>] [--json]\n  gc <artifact_dir> [--json]\n  upgrade <artifact_dir> --plan|--apply [--max-entries <u32>] [--max-block-bytes <u32>] [--json]"
+        );
+        return 2;
+    };
+    match subcmd {
+        "stats" => run_cassette_stats_command_v17(args),
+        "prune" => run_cassette_prune_command_v17(args),
+        "gc" => run_cassette_gc_command_v17(args),
+        "upgrade" => run_cassette_upgrade_command_v17(args),
+        _ => {
+            eprintln!(
+                "usage: ocl cassette <stats|prune|gc|upgrade> ...\n  stats <artifact_dir> [--json]\n  prune <artifact_dir> --plan|--apply [--ttl-days <u32>] [--json]\n  gc <artifact_dir> [--json]\n  upgrade <artifact_dir> --plan|--apply [--max-entries <u32>] [--max-block-bytes <u32>] [--json]"
+            );
+            2
+        }
+    }
+}
+
+fn run_budget_command(args: &[String]) -> i32 {
+    let Some(subcmd) = args.get(1).map(String::as_str) else {
+        eprintln!(
+            "usage: ocl budget <analyze|doctor> <artifact_dir|audit.jsonl> [--json]"
+        );
+        return 2;
+    };
+    let Some(path) = args.get(2) else {
+        eprintln!(
+            "usage: ocl budget <analyze|doctor> <artifact_dir|audit.jsonl> [--json]"
+        );
+        return 2;
+    };
+    let json_mode = has_flag(args, "--json");
+    let events = match read_trace_events_for_view_v11(Path::new(path), false) {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("{err}");
+            return 1;
+        }
+    };
+    let report = build_budget_analyze_report_v17(&events);
+    match subcmd {
+        "analyze" => {
+            if json_mode {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string())
+                );
+            } else {
+                println!("budget analyze");
+                println!(
+                    "observe_events={}",
+                    json_u64_or_zero(&report, "observe_events")
+                );
+                println!(
+                    "budget_pressure_events={}",
+                    json_u64_or_zero(&report, "budget_pressure_events")
+                );
+                println!("edges={}", json_u64_or_zero(&report, "edge_count"));
+            }
+            0
+        }
+        "doctor" => {
+            let doctor = build_budget_doctor_report_v17(&report);
+            if json_mode {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&doctor).unwrap_or_else(|_| "{}".to_string())
+                );
+            } else {
+                println!("budget doctor");
+                println!(
+                    "issues={}",
+                    doctor
+                        .get("issues")
+                        .and_then(JsonValue::as_array)
+                        .map(|v| v.len())
+                        .unwrap_or(0)
+                );
+                if let Some(items) = doctor.get("issues").and_then(JsonValue::as_array) {
+                    for item in items.iter().take(5) {
+                        let caller = item
+                            .get("caller")
+                            .and_then(JsonValue::as_str)
+                            .unwrap_or("-");
+                        let key = item
+                            .get("key")
+                            .and_then(JsonValue::as_str)
+                            .unwrap_or("-");
+                        let pressure = item
+                            .get("budget_pressure_count")
+                            .and_then(JsonValue::as_u64)
+                            .unwrap_or(0);
+                        println!("  - caller={caller} key={key} pressure={pressure}");
+                    }
+                }
+            }
+            0
+        }
+        _ => {
+            eprintln!(
+                "usage: ocl budget <analyze|doctor> <artifact_dir|audit.jsonl> [--json]"
+            );
+            2
+        }
+    }
+}
+
+fn json_u64_or_zero(value: &JsonValue, key: &str) -> u64 {
+    value.get(key).and_then(JsonValue::as_u64).unwrap_or(0)
+}
+
+fn resolve_artifact_dir_for_cassette_arg_v17(path: &Path) -> Result<PathBuf, SdkError> {
+    if path.join("cassette").is_dir() {
+        return Ok(path.to_path_buf());
+    }
+    let artifacts_root = path.join(".ocl_artifacts");
+    if artifacts_root.is_dir() {
+        return latest_artifact_dir_v17(&artifacts_root);
+    }
+    Err(SdkError::MissingProject(format!(
+        "V-CASSETTE-PATH: `{}` is neither an artifact dir nor a project dir with .ocl_artifacts",
+        path.display()
+    )))
+}
+
+fn latest_artifact_dir_v17(artifacts_root: &Path) -> Result<PathBuf, SdkError> {
+    let mut dirs = Vec::new();
+    for entry in fs::read_dir(artifacts_root)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            dirs.push(path);
+        }
+    }
+    dirs.sort();
+    dirs.pop().ok_or_else(|| {
+        SdkError::MissingProject(format!(
+            "V-CASSETTE-PATH: no artifact directories found in {}",
+            artifacts_root.display()
+        ))
+    })
+}
+
+fn run_cassette_stats_command_v17(args: &[String]) -> i32 {
+    let Some(path) = args.get(2) else {
+        eprintln!("usage: ocl cassette stats <artifact_dir> [--json]");
+        return 2;
+    };
+    let json_mode = has_flag(args, "--json");
+    let artifact_dir = match resolve_artifact_dir_for_cassette_arg_v17(Path::new(path)) {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("{err}");
+            return 1;
+        }
+    };
+    match build_cassette_stats_report_v17(&artifact_dir) {
+        Ok((report, report_path)) => {
+            if json_mode {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string())
+                );
+            } else {
+                println!("cassette stats");
+                println!("artifact={}", artifact_dir.display());
+                println!("entries={}", json_u64_or_zero(&report, "entries"));
+                println!("blocks={}", json_u64_or_zero(&report, "blocks"));
+                println!(
+                    "referenced_blocks={}",
+                    json_u64_or_zero(&report, "referenced_blocks")
+                );
+                println!("orphan_blocks={}", json_u64_or_zero(&report, "orphan_blocks"));
+                println!("bytes_total={}", json_u64_or_zero(&report, "bytes_total"));
+                println!("report={}", report_path.display());
+            }
+            0
+        }
+        Err(err) => {
+            eprintln!("{err}");
+            1
+        }
+    }
+}
+
+fn run_cassette_prune_command_v17(args: &[String]) -> i32 {
+    let Some(path) = args.get(2) else {
+        eprintln!("usage: ocl cassette prune <artifact_dir> --plan|--apply [--ttl-days <u32>] [--json]");
+        return 2;
+    };
+    let plan_mode = has_flag(args, "--plan");
+    let apply_mode = has_flag(args, "--apply");
+    if plan_mode == apply_mode {
+        eprintln!("usage: ocl cassette prune <artifact_dir> --plan|--apply [--ttl-days <u32>] [--json]");
+        return 2;
+    }
+    let ttl_days = parse_u32_flag(args, "--ttl-days");
+    let json_mode = has_flag(args, "--json");
+    let artifact_dir = match resolve_artifact_dir_for_cassette_arg_v17(Path::new(path)) {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("{err}");
+            return 1;
+        }
+    };
+    let plan = match build_cassette_prune_plan_v17(&artifact_dir, ttl_days) {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("{err}");
+            return 1;
+        }
+    };
+    if apply_mode {
+        match apply_cassette_prune_plan_v17(&artifact_dir, &plan) {
+            Ok(applied_blocks) => {
+                let payload = json!({
+                    "mode": "apply",
+                    "applied_blocks": applied_blocks,
+                    "orphan_blocks": plan.orphan_blocks,
+                    "missing_blocks": plan.missing_blocks,
+                    "ttl_days": plan.ttl_days,
+                    "prune_bytes": plan.prune_bytes
+                });
+                if json_mode {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&payload)
+                            .unwrap_or_else(|_| "{}".to_string())
+                    );
+                } else {
+                    println!("cassette prune apply");
+                    println!("artifact={}", artifact_dir.display());
+                    println!("applied_blocks={applied_blocks}");
+                    println!(
+                        "prune_bytes={}",
+                        payload
+                            .get("prune_bytes")
+                            .and_then(JsonValue::as_u64)
+                            .unwrap_or(0)
+                    );
+                }
+                0
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                1
+            }
+        }
+    } else {
+        let payload = render_cassette_prune_plan_json_v17(&plan);
+        if json_mode {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".to_string())
+            );
+        } else {
+            println!("cassette prune plan");
+            println!("artifact={}", artifact_dir.display());
+            println!("orphan_blocks={}", plan.orphan_blocks.len());
+            println!("missing_blocks={}", plan.missing_blocks.len());
+            println!("prune_bytes={}", plan.prune_bytes);
+        }
+        0
+    }
+}
+
+fn run_cassette_gc_command_v17(args: &[String]) -> i32 {
+    let Some(path) = args.get(2) else {
+        eprintln!("usage: ocl cassette gc <artifact_dir> [--json]");
+        return 2;
+    };
+    let json_mode = has_flag(args, "--json");
+    let artifact_dir = match resolve_artifact_dir_for_cassette_arg_v17(Path::new(path)) {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("{err}");
+            return 1;
+        }
+    };
+    let plan = match build_cassette_prune_plan_v17(&artifact_dir, None) {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("{err}");
+            return 1;
+        }
+    };
+    if !plan.missing_blocks.is_empty() {
+        eprintln!(
+            "X-CASSETTE-MISSING-BLOCK: cannot run gc because {} referenced blocks are missing",
+            plan.missing_blocks.len()
+        );
+        return 1;
+    }
+    match apply_cassette_prune_plan_v17(&artifact_dir, &plan) {
+        Ok(applied_blocks) => {
+            let payload = json!({
+                "mode": "gc",
+                "applied_blocks": applied_blocks,
+                "orphan_blocks_before": plan.orphan_blocks.len(),
+                "missing_blocks": plan.missing_blocks,
+            });
+            if json_mode {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".to_string())
+                );
+            } else {
+                println!("cassette gc");
+                println!("artifact={}", artifact_dir.display());
+                println!("applied_blocks={applied_blocks}");
+            }
+            0
+        }
+        Err(err) => {
+            eprintln!("{err}");
+            1
+        }
+    }
+}
+
+fn run_cassette_upgrade_command_v17(args: &[String]) -> i32 {
+    let Some(path) = args.get(2) else {
+        eprintln!("usage: ocl cassette upgrade <artifact_dir> --plan|--apply [--max-entries <u32>] [--max-block-bytes <u32>] [--json]");
+        return 2;
+    };
+    let plan_mode = has_flag(args, "--plan");
+    let apply_mode = has_flag(args, "--apply");
+    if plan_mode == apply_mode {
+        eprintln!("usage: ocl cassette upgrade <artifact_dir> --plan|--apply [--max-entries <u32>] [--max-block-bytes <u32>] [--json]");
+        return 2;
+    }
+    let max_entries = parse_u32_flag(args, "--max-entries")
+        .map(|v| v as usize)
+        .unwrap_or(CASSETTE_DEFAULT_MAX_ENTRIES_V17);
+    let max_block_bytes = parse_u32_flag(args, "--max-block-bytes")
+        .map(|v| v as usize)
+        .unwrap_or(CASSETTE_DEFAULT_MAX_BLOCK_BYTES_V17);
+    let json_mode = has_flag(args, "--json");
+    let artifact_dir = match resolve_artifact_dir_for_cassette_arg_v17(Path::new(path)) {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("{err}");
+            return 1;
+        }
+    };
+    if plan_mode {
+        match build_cassette_upgrade_plan_v17(&artifact_dir, max_entries, max_block_bytes) {
+            Ok(payload) => {
+                if json_mode {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".to_string())
+                    );
+                } else {
+                    println!("cassette upgrade plan");
+                    println!("artifact={}", artifact_dir.display());
+                    println!(
+                        "requires_upgrade={}",
+                        payload
+                            .get("requires_upgrade")
+                            .and_then(JsonValue::as_bool)
+                            .unwrap_or(false)
+                    );
+                    println!("entries={}", json_u64_or_zero(&payload, "entries"));
+                    println!("blocks={}", json_u64_or_zero(&payload, "unique_blocks"));
+                }
+                0
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                1
+            }
+        }
+    } else {
+        match apply_cassette_upgrade_v17(&artifact_dir, max_entries, max_block_bytes) {
+            Ok((payload, report_path)) => {
+                if json_mode {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".to_string())
+                    );
+                } else {
+                    println!("cassette upgrade apply");
+                    println!("artifact={}", artifact_dir.display());
+                    println!("entries={}", json_u64_or_zero(&payload, "entries"));
+                    println!("blocks={}", json_u64_or_zero(&payload, "unique_blocks"));
+                    println!("report={}", report_path.display());
+                }
+                0
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                1
+            }
+        }
+    }
+}
+
+fn read_cassette_entries_for_upgrade_v17(
+    artifact_dir: &Path,
+    max_entries: usize,
+    max_block_bytes: usize,
+) -> Result<Vec<CassetteEntryUpgradeV17>, SdkError> {
+    let cassette_path = artifact_dir.join("cassette").join("cassette.jsonl");
+    if !cassette_path.exists() {
+        return Err(SdkError::MissingProject(format!(
+            "V-CASSETTE-MISSING: missing cassette.jsonl at {}",
+            cassette_path.display()
+        )));
+    }
+    let raw = fs::read_to_string(&cassette_path)?;
+    let mut out = Vec::new();
+    for (idx, line) in raw.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if out.len() >= max_entries {
+            return Err(SdkError::MissingProject(format!(
+                "X-CASSETTE-MAX-ENTRIES: entry cap exceeded (max_entries={max_entries})"
+            )));
+        }
+        let parsed: JsonValue = serde_json::from_str(trimmed).map_err(|err| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-FORMAT: invalid json at line {} in {} ({err})",
+                idx + 1,
+                cassette_path.display()
+            ))
+        })?;
+        let Some(entry_id) = parsed
+            .as_object()
+            .and_then(|obj| obj.get("id"))
+            .and_then(JsonValue::as_str)
+        else {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-FORMAT: line {} missing `id` in {}",
+                idx + 1,
+                cassette_path.display()
+            )));
+        };
+        let canonical_entry = serde_json::to_string(&parsed).map_err(|err| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-FORMAT: cannot canonicalize entry `{entry_id}` ({err})"
+            ))
+        })?;
+        if canonical_entry.len() > max_block_bytes {
+            return Err(SdkError::MissingProject(format!(
+                "X-CASSETTE-BLOCK-TOO-LARGE: entry `{entry_id}` size={} exceeds max_block_bytes={max_block_bytes}",
+                canonical_entry.len()
+            )));
+        }
+        out.push(CassetteEntryUpgradeV17 {
+            entry_id: entry_id.to_string(),
+            block_id: sha256_hex(canonical_entry.as_bytes()),
+            canonical_entry,
+        });
+    }
+    Ok(out)
+}
+
+fn read_cassette_block_index_v17(
+    artifact_dir: &Path,
+) -> Result<BTreeMap<String, Vec<String>>, SdkError> {
+    let index_path = artifact_dir
+        .join("cassette")
+        .join(CASSETTE_BLOCKS_INDEX_FILE_V17);
+    if !index_path.exists() {
+        return Ok(BTreeMap::new());
+    }
+    let parsed: JsonValue = serde_json::from_str(&fs::read_to_string(&index_path)?).map_err(|err| {
+        SdkError::MissingProject(format!(
+            "V-CASSETTE-INDEX: invalid json {} ({err})",
+            index_path.display()
+        ))
+    })?;
+    let Some(entries) = parsed.get("entry_refs").and_then(JsonValue::as_array) else {
+        return Err(SdkError::MissingProject(format!(
+            "V-CASSETTE-INDEX: missing entry_refs in {}",
+            index_path.display()
+        )));
+    };
+    let mut out = BTreeMap::new();
+    for row in entries {
+        let Some(entry_id) = row.get("entry_id").and_then(JsonValue::as_str) else {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-INDEX: entry_refs missing entry_id in {}",
+                index_path.display()
+            )));
+        };
+        let Some(blocks) = row.get("blocks").and_then(JsonValue::as_array) else {
+            return Err(SdkError::MissingProject(format!(
+                "V-CASSETTE-INDEX: entry_refs missing blocks array for `{entry_id}`"
+            )));
+        };
+        let mut refs = Vec::new();
+        for block in blocks {
+            let Some(id) = block.as_str() else {
+                return Err(SdkError::MissingProject(format!(
+                    "V-CASSETTE-INDEX: block id must be string for `{entry_id}`"
+                )));
+            };
+            refs.push(id.to_string());
+        }
+        out.insert(entry_id.to_string(), refs);
+    }
+    Ok(out)
+}
+
+fn collect_block_files_v17(artifact_dir: &Path) -> Result<BTreeMap<String, PathBuf>, SdkError> {
+    let blocks_dir = artifact_dir.join("cassette").join(CASSETTE_BLOCKS_DIR_V17);
+    if !blocks_dir.exists() {
+        return Ok(BTreeMap::new());
+    }
+    let mut out = BTreeMap::new();
+    for entry in fs::read_dir(&blocks_dir)? {
+        let path = entry?.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(stem) = path.file_stem() else {
+            continue;
+        };
+        let block_id = stem.to_string_lossy().to_string();
+        out.insert(block_id, path);
+    }
+    Ok(out)
+}
+
+fn verify_cassette_block_integrity_v17(artifact_dir: &Path) -> Result<(), SdkError> {
+    let index = read_cassette_block_index_v17(artifact_dir)?;
+    if index.is_empty() {
+        return Ok(());
+    }
+    let blocks = collect_block_files_v17(artifact_dir)?;
+    for block_refs in index.values() {
+        for block_id in block_refs {
+            let Some(path) = blocks.get(block_id) else {
+                return Err(SdkError::MissingProject(format!(
+                    "X-CASSETTE-UPGRADE-TAMPER: missing block `{block_id}` referenced by index"
+                )));
+            };
+            let bytes = fs::read(path)?;
+            let actual = sha256_hex(&bytes);
+            if actual != *block_id {
+                return Err(SdkError::MissingProject(format!(
+                    "X-CASSETTE-UPGRADE-TAMPER: block `{block_id}` hash mismatch (actual={actual})"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn build_cassette_upgrade_plan_v17(
+    artifact_dir: &Path,
+    max_entries: usize,
+    max_block_bytes: usize,
+) -> Result<JsonValue, SdkError> {
+    let entries = read_cassette_entries_for_upgrade_v17(artifact_dir, max_entries, max_block_bytes)?;
+    let mut unique_blocks = BTreeSet::<String>::new();
+    let mut total_entry_bytes = 0u64;
+    for entry in &entries {
+        unique_blocks.insert(entry.block_id.clone());
+        total_entry_bytes = total_entry_bytes.saturating_add(entry.canonical_entry.len() as u64);
+    }
+    let v17_index_exists = artifact_dir
+        .join("cassette")
+        .join(CASSETTE_BLOCKS_INDEX_FILE_V17)
+        .exists();
+    let blocks_dir_exists = artifact_dir
+        .join("cassette")
+        .join(CASSETTE_BLOCKS_DIR_V17)
+        .is_dir();
+    if v17_index_exists || blocks_dir_exists {
+        verify_cassette_block_integrity_v17(artifact_dir)?;
+    }
+    Ok(json!({
+        "cassette_schema_version": CASSETTE_SCHEMA_VERSION_V17,
+        "block_store_version": CASSETTE_BLOCK_STORE_VERSION_V17,
+        "hasher_version": CASSETTE_HASHER_VERSION_V17,
+        "requires_upgrade": !(v17_index_exists && blocks_dir_exists),
+        "entries": entries.len(),
+        "unique_blocks": unique_blocks.len(),
+        "total_entry_bytes": total_entry_bytes,
+        "artifact_dir": artifact_dir.to_string_lossy(),
+    }))
+}
+
+fn build_cassette_v17_index_json(entries: &[CassetteEntryUpgradeV17]) -> JsonValue {
+    let mut entry_refs = Vec::new();
+    let mut block_ids = BTreeSet::<String>::new();
+    for entry in entries {
+        block_ids.insert(entry.block_id.clone());
+        entry_refs.push(json!({
+            "entry_id": entry.entry_id,
+            "blocks": [entry.block_id],
+        }));
+    }
+    json!({
+        "cassette_schema_version": CASSETTE_SCHEMA_VERSION_V17,
+        "block_store_version": CASSETTE_BLOCK_STORE_VERSION_V17,
+        "hasher_version": CASSETTE_HASHER_VERSION_V17,
+        "entry_refs": entry_refs,
+        "block_ids": block_ids.into_iter().collect::<Vec<_>>(),
+    })
+}
+
+fn infer_project_root_from_artifact_dir_v17(artifact_dir: &Path) -> PathBuf {
+    let parent = artifact_dir.parent();
+    let grand = parent.and_then(Path::parent);
+    if let Some(artifacts_root) = parent {
+        if artifacts_root
+            .file_name()
+            .map(|v| v.to_string_lossy() == ".ocl_artifacts")
+            .unwrap_or(false)
+        {
+            if let Some(root) = grand {
+                return root.to_path_buf();
+            }
+        }
+    }
+    PathBuf::from(".")
+}
+
+fn write_w17_cassette_report_v17(
+    artifact_dir: &Path,
+    file_name: &str,
+    payload: &JsonValue,
+) -> Result<PathBuf, SdkError> {
+    let root = infer_project_root_from_artifact_dir_v17(artifact_dir);
+    let report_path = root
+        .join("target")
+        .join("ocl")
+        .join("w17")
+        .join("cassette")
+        .join(file_name);
+    if let Some(parent) = report_path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    fs::write(
+        &report_path,
+        serde_json::to_string_pretty(payload).unwrap_or_else(|_| "{}".to_string()),
+    )?;
+    Ok(report_path)
+}
+
+fn apply_cassette_upgrade_v17(
+    artifact_dir: &Path,
+    max_entries: usize,
+    max_block_bytes: usize,
+) -> Result<(JsonValue, PathBuf), SdkError> {
+    let entries = read_cassette_entries_for_upgrade_v17(artifact_dir, max_entries, max_block_bytes)?;
+    let blocks_dir = artifact_dir.join("cassette").join(CASSETTE_BLOCKS_DIR_V17);
+    fs::create_dir_all(&blocks_dir)?;
+
+    let mut unique_block_map = BTreeMap::<String, String>::new();
+    let mut total_block_bytes = 0u64;
+    for entry in &entries {
+        unique_block_map
+            .entry(entry.block_id.clone())
+            .or_insert_with(|| entry.canonical_entry.clone());
+    }
+    for (block_id, content) in &unique_block_map {
+        let block_path = blocks_dir.join(format!("{block_id}.json"));
+        fs::write(&block_path, content)?;
+        total_block_bytes = total_block_bytes.saturating_add(content.len() as u64);
+    }
+
+    let index_json = build_cassette_v17_index_json(&entries);
+    let index_path = artifact_dir
+        .join("cassette")
+        .join(CASSETTE_BLOCKS_INDEX_FILE_V17);
+    fs::write(
+        &index_path,
+        serde_json::to_string_pretty(&index_json).unwrap_or_else(|_| "{}".to_string()),
+    )?;
+
+    let meta_path = artifact_dir
+        .join("cassette")
+        .join(CASSETTE_STORAGE_META_FILE_V17);
+    let meta_text = format!(
+        concat!(
+            "cassette_schema_version = {}\n",
+            "block_store_version = {}\n",
+            "hasher_version = \"{}\"\n",
+            "entry_count = {}\n",
+            "block_count = {}\n"
+        ),
+        CASSETTE_SCHEMA_VERSION_V17,
+        CASSETTE_BLOCK_STORE_VERSION_V17,
+        CASSETTE_HASHER_VERSION_V17,
+        entries.len(),
+        unique_block_map.len()
+    );
+    fs::write(&meta_path, meta_text)?;
+
+    verify_cassette_block_integrity_v17(artifact_dir)?;
+
+    let payload = json!({
+        "cassette_schema_version": CASSETTE_SCHEMA_VERSION_V17,
+        "block_store_version": CASSETTE_BLOCK_STORE_VERSION_V17,
+        "hasher_version": CASSETTE_HASHER_VERSION_V17,
+        "artifact_dir": artifact_dir.to_string_lossy(),
+        "entries": entries.len(),
+        "unique_blocks": unique_block_map.len(),
+        "total_block_bytes": total_block_bytes,
+        "index_path": index_path.to_string_lossy(),
+        "meta_path": meta_path.to_string_lossy(),
+    });
+    let report_path = write_w17_cassette_report_v17(
+        artifact_dir,
+        "cassette_migration_report.json",
+        &payload,
+    )?;
+    Ok((payload, report_path))
+}
+
+fn build_cassette_prune_plan_v17(
+    artifact_dir: &Path,
+    ttl_days: Option<u32>,
+) -> Result<CassettePrunePlanV17, SdkError> {
+    let index = read_cassette_block_index_v17(artifact_dir)?;
+    let blocks = collect_block_files_v17(artifact_dir)?;
+
+    let mut referenced = BTreeSet::<String>::new();
+    for refs in index.values() {
+        for block_id in refs {
+            referenced.insert(block_id.clone());
+        }
+    }
+
+    let mut orphan_blocks = Vec::new();
+    let mut missing_blocks = Vec::new();
+    let mut prune_bytes = 0u64;
+
+    for block_id in &referenced {
+        if !blocks.contains_key(block_id) {
+            missing_blocks.push(block_id.clone());
+        }
+    }
+    for (block_id, path) in &blocks {
+        if !referenced.contains(block_id) {
+            orphan_blocks.push(block_id.clone());
+            let size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+            prune_bytes = prune_bytes.saturating_add(size);
+        }
+    }
+
+    orphan_blocks.sort();
+    missing_blocks.sort();
+
+    Ok(CassettePrunePlanV17 {
+        total_blocks: blocks.len(),
+        referenced_blocks: referenced.len(),
+        orphan_blocks,
+        missing_blocks,
+        prune_bytes,
+        ttl_days,
+    })
+}
+
+fn render_cassette_prune_plan_json_v17(plan: &CassettePrunePlanV17) -> JsonValue {
+    json!({
+        "total_blocks": plan.total_blocks,
+        "referenced_blocks": plan.referenced_blocks,
+        "orphan_blocks": plan.orphan_blocks,
+        "missing_blocks": plan.missing_blocks,
+        "prune_bytes": plan.prune_bytes,
+        "ttl_days": plan.ttl_days,
+    })
+}
+
+fn apply_cassette_prune_plan_v17(
+    artifact_dir: &Path,
+    plan: &CassettePrunePlanV17,
+) -> Result<usize, SdkError> {
+    let blocks_dir = artifact_dir.join("cassette").join(CASSETTE_BLOCKS_DIR_V17);
+    if !blocks_dir.exists() {
+        return Ok(0);
+    }
+    let mut removed = 0usize;
+    for block_id in &plan.orphan_blocks {
+        let path = blocks_dir.join(format!("{block_id}.json"));
+        if path.exists() {
+            fs::remove_file(path)?;
+            removed = removed.saturating_add(1);
+        }
+    }
+    Ok(removed)
+}
+
+fn detect_sensitive_marker_v17(raw: &str) -> Option<&'static str> {
+    let lower = raw.to_ascii_lowercase();
+    if lower.contains("authorization:") {
+        return Some("authorization");
+    }
+    if lower.contains("bearer ") {
+        return Some("bearer");
+    }
+    if lower.contains("api_key") || lower.contains("api-key") {
+        return Some("api_key");
+    }
+    if lower.contains("password=") || lower.contains("\"password\"") {
+        return Some("password");
+    }
+    if lower.contains("secret=") || lower.contains("\"secret\"") {
+        return Some("secret");
+    }
+    None
+}
+
+fn build_cassette_stats_report_v17(artifact_dir: &Path) -> Result<(JsonValue, PathBuf), SdkError> {
+    let cassette_dir = artifact_dir.join("cassette");
+    let cassette_path = cassette_dir.join("cassette.jsonl");
+    if !cassette_path.exists() {
+        return Err(SdkError::MissingProject(format!(
+            "V-CASSETTE-MISSING: missing cassette.jsonl at {}",
+            cassette_path.display()
+        )));
+    }
+    let cassette_raw = fs::read_to_string(&cassette_path)?;
+    if let Some(marker) = detect_sensitive_marker_v17(&cassette_raw) {
+        return Err(SdkError::PermissionDenied(format!(
+            "X-CASSETTE-PRIVACY-LEAK: sensitive marker `{marker}` detected in {}",
+            cassette_path.display()
+        )));
+    }
+
+    let entries = cassette_raw
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .count() as u64;
+    let index = read_cassette_block_index_v17(artifact_dir)?;
+    let blocks = collect_block_files_v17(artifact_dir)?;
+    let mut referenced = BTreeSet::<String>::new();
+    for refs in index.values() {
+        for block_id in refs {
+            referenced.insert(block_id.clone());
+        }
+    }
+    let orphan_blocks = blocks
+        .keys()
+        .filter(|id| !referenced.contains(*id))
+        .count() as u64;
+    let bytes_total = {
+        let mut total = 0u64;
+        for path in blocks.values() {
+            total = total.saturating_add(fs::metadata(path).map(|m| m.len()).unwrap_or(0));
+        }
+        total
+    };
+    let payload = json!({
+        "cassette_schema_version": CASSETTE_SCHEMA_VERSION_V17,
+        "block_store_version": CASSETTE_BLOCK_STORE_VERSION_V17,
+        "hasher_version": CASSETTE_HASHER_VERSION_V17,
+        "artifact_dir": artifact_dir.to_string_lossy(),
+        "entries": entries,
+        "blocks": blocks.len() as u64,
+        "referenced_blocks": referenced.len() as u64,
+        "orphan_blocks": orphan_blocks,
+        "bytes_total": bytes_total,
+    });
+    let report_path = write_w17_cassette_report_v17(
+        artifact_dir,
+        "cassette_operability_report.json",
+        &payload,
+    )?;
+    Ok((payload, report_path))
+}
+
+fn build_budget_analyze_report_v17(events: &[TraceViewEventV11]) -> JsonValue {
+    let mut edge_map = BTreeMap::<(String, String), BudgetEdgeAggV17>::new();
+    let mut budget_path = Vec::<JsonValue>::new();
+    let mut observe_events = 0u32;
+    for event in events {
+        if event.base.event != "observe_end" {
+            continue;
+        }
+        observe_events = observe_events.saturating_add(1);
+        let caller = event
+            .base
+            .callsite_package_id
+            .clone()
+            .unwrap_or_else(|| "root".to_string());
+        let key = event
+            .base
+            .key
+            .clone()
+            .unwrap_or_else(|| "-".to_string());
+        let kind = event
+            .base
+            .kind
+            .clone()
+            .unwrap_or_else(|| "-".to_string());
+        let reason = event
+            .base
+            .reason
+            .clone()
+            .unwrap_or_else(|| "-".to_string());
+        let edge_key = (caller.clone(), key.clone());
+        let entry = edge_map.entry(edge_key).or_insert_with(|| BudgetEdgeAggV17 {
+            caller: caller.clone(),
+            key: key.clone(),
+            ..BudgetEdgeAggV17::default()
+        });
+        entry.observe_count = entry.observe_count.saturating_add(1);
+        if kind == "insufficient" {
+            entry.insufficient_count = entry.insufficient_count.saturating_add(1);
+        }
+        if kind == "deferred" {
+            entry.deferred_count = entry.deferred_count.saturating_add(1);
+        }
+        let is_budget_pressure =
+            reason.contains("BUDGET") || reason.contains("LIMIT") || reason.contains("CAP");
+        if is_budget_pressure {
+            entry.budget_pressure_count = entry.budget_pressure_count.saturating_add(1);
+            budget_path.push(json!({
+                "seq": event.base.seq,
+                "call_id": event.call_id,
+                "caller": caller,
+                "key": key,
+                "kind": kind,
+                "reason": reason,
+            }));
+        }
+    }
+
+    let mut edges = edge_map.into_values().collect::<Vec<_>>();
+    edges.sort_by(|a, b| {
+        b.budget_pressure_count
+            .cmp(&a.budget_pressure_count)
+            .then_with(|| b.observe_count.cmp(&a.observe_count))
+            .then_with(|| a.caller.cmp(&b.caller))
+            .then_with(|| a.key.cmp(&b.key))
+    });
+
+    json!({
+        "observe_events": observe_events,
+        "budget_pressure_events": budget_path.len() as u64,
+        "edge_count": edges.len() as u64,
+        "edges": edges.into_iter().map(|edge| json!({
+            "caller": edge.caller,
+            "key": edge.key,
+            "observe_count": edge.observe_count,
+            "insufficient_count": edge.insufficient_count,
+            "deferred_count": edge.deferred_count,
+            "budget_pressure_count": edge.budget_pressure_count,
+        })).collect::<Vec<_>>(),
+        "budget_path": budget_path,
+    })
+}
+
+fn build_budget_doctor_report_v17(analyze: &JsonValue) -> JsonValue {
+    let mut issues = Vec::<JsonValue>::new();
+    if let Some(edges) = analyze.get("edges").and_then(JsonValue::as_array) {
+        for edge in edges {
+            let pressure = edge
+                .get("budget_pressure_count")
+                .and_then(JsonValue::as_u64)
+                .unwrap_or(0);
+            if pressure == 0 {
+                continue;
+            }
+            let caller = edge
+                .get("caller")
+                .and_then(JsonValue::as_str)
+                .unwrap_or("root");
+            let key = edge
+                .get("key")
+                .and_then(JsonValue::as_str)
+                .unwrap_or("-");
+            issues.push(json!({
+                "caller": caller,
+                "key": key,
+                "budget_pressure_count": pressure,
+                "suggestion": "increase edge budget cap or split call-path to isolate pressure",
+            }));
+        }
+    }
+    json!({
+        "issue_count": issues.len(),
+        "issues": issues,
+    })
 }
 
 fn verify_dependency_override_guardrails_v10(root: &Path) -> Result<(), SdkError> {
@@ -10316,6 +11477,14 @@ fn print_help() {
     eprintln!(
         "  cache bench <project_dir> [--engine interpreter|bytecode|dual] [--locked] [--json]"
     );
+    eprintln!("  cassette stats <artifact_dir> [--json]");
+    eprintln!("  cassette prune <artifact_dir> --plan|--apply [--ttl-days <u32>] [--json]");
+    eprintln!("  cassette gc <artifact_dir> [--json]");
+    eprintln!(
+        "  cassette upgrade <artifact_dir> --plan|--apply [--max-entries <u32>] [--max-block-bytes <u32>] [--json]"
+    );
+    eprintln!("  budget analyze <artifact_dir|audit.jsonl> [--json]");
+    eprintln!("  budget doctor <artifact_dir|audit.jsonl> [--json]");
     eprintln!("  dbg   <artifact_dir> [--script <file>]");
     eprintln!("  doc packs [--json]");
     eprintln!(
@@ -10363,6 +11532,9 @@ fn print_help() {
     );
     eprintln!("  perm  approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]");
     eprintln!("  perm  review <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]  # alias of perm diff");
+    eprintln!("  perm  doctor <project_dir> [--out <report.json>]");
+    eprintln!("  perm  fix --plan <project_dir> [--out <permission_fix_plan.json>]");
+    eprintln!("  perm  fix --apply <project_dir> [--plan-file <permission_fix_plan.json>] [--patch <permission_fix.patch.toml>] [--out <permission_fix_safety_report.json>] [--approval <permissions.approval.toml>] --ack-risk --justification <text> --by <id> --date <YYYY-MM-DD>");
     eprintln!("  policy lock sync <project_dir>");
     eprintln!("  cosmos init <project_dir> [--preset default|ci]");
     eprintln!("  cosmos lock sync <project_dir> [--locked] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>]");

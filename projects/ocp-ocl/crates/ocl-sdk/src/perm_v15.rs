@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
@@ -8,11 +8,12 @@ use super::{
     dep_package_id_v10, load_permissions_for_layout, parse_manifest_dependencies,
     parse_project_language_config_v071, parse_requested_permissions_from_package_manifest_v10,
     project_layout, project_package_id_v10, sha256_hex, verify_project_exists,
-    PermissionApproveSummaryV15, PermissionDiffSummaryV15, PermissionRules,
-    PermissionSnapshotSummaryV15, ProjectPermissions, SdkError, StdFsPermissionConfig,
-    StdGamePermissionConfig, StdKvPermissionConfig, StdNetHttpPermissionConfig,
-    StdProcPermissionConfig, StdShadowPermissionConfig, StdTimePermissionConfig,
-    StdUiPermissionConfig,
+    PermissionApproveSummaryV15, PermissionDiffSummaryV15, PermissionDoctorFindingV17,
+    PermissionDoctorSummaryV17, PermissionFixApplyOptionsV17, PermissionFixApplySummaryV17,
+    PermissionFixPlanSummaryV17, PermissionRules, PermissionSnapshotSummaryV15, ProjectPermissions,
+    SdkError, StdFsPermissionConfig, StdGamePermissionConfig, StdKvPermissionConfig,
+    StdNetHttpPermissionConfig, StdProcPermissionConfig, StdShadowPermissionConfig,
+    StdTimePermissionConfig, StdUiPermissionConfig,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1055,4 +1056,520 @@ pub(crate) fn enforce_permission_review_policy_v15(root: &Path) -> Result<(), Sd
         )));
     }
     Ok(())
+}
+
+const PERM_WILDCARD_GUARD_CODE_V17: &str = "X-PERM-RUBBERSTAMP-GUARD";
+const PERM_WILDCARD_GUARD_REASON_V17: &str = "RC-PERM-WILDCARD-DENIED";
+const PERM_WILDCARD_GUARD_ALIAS_V17: &str = "X-PERMISSION-REVIEW-REQUIRED";
+const PERM_RISK_ACK_CODE_V17: &str = "X-PERMISSION-RISK-ACK-REQUIRED";
+const PERM_RISK_ACK_REASON_V17: &str = "RC-PERMISSION-RISK-ACK-REQUIRED";
+
+fn default_w17_dx_root_v17(root: &Path) -> PathBuf {
+    root.join("target").join("ocl").join("w17").join("dx")
+}
+
+fn wildcard_risk_hint_v17() -> String {
+    "Run `ocl perm fix --plan <project_dir>` and replace wildcard with explicit scoped allowlist."
+        .to_string()
+}
+
+fn looks_like_wildcard_risk_v17(value: &str) -> bool {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    trimmed.contains('*') || lower == "0.0.0.0/0" || lower == "::/0"
+}
+
+fn push_wildcard_findings_v17(
+    values: &[String],
+    location_prefix: &str,
+    lane: &str,
+    findings: &mut Vec<PermissionDoctorFindingV17>,
+) {
+    let severity = if lane == "locked_v071" {
+        "error"
+    } else {
+        "warn"
+    };
+    for (idx, value) in values.iter().enumerate() {
+        if !looks_like_wildcard_risk_v17(value) {
+            continue;
+        }
+        findings.push(PermissionDoctorFindingV17 {
+            code: PERM_WILDCARD_GUARD_CODE_V17.to_string(),
+            reason: PERM_WILDCARD_GUARD_REASON_V17.to_string(),
+            severity: severity.to_string(),
+            location: format!("{location_prefix}[{idx}]"),
+            value: value.clone(),
+            hint: wildcard_risk_hint_v17(),
+        });
+    }
+}
+
+fn collect_permission_findings_v17(
+    root: &Path,
+) -> Result<(String, Vec<PermissionDoctorFindingV17>), SdkError> {
+    let layout = project_layout(root);
+    verify_project_exists(&layout)?;
+    let manifest_text = fs::read_to_string(&layout.manifest)?;
+    let language_cfg = parse_project_language_config_v071(&manifest_text);
+    let lane = language_cfg.lane.trim().to_string();
+    let permissions = load_permissions_for_layout(&layout, false)?;
+
+    let mut findings = Vec::<PermissionDoctorFindingV17>::new();
+
+    if let Some(package) = permissions.package.as_ref() {
+        push_wildcard_findings_v17(
+            &package.allow,
+            "permissions.package.allow",
+            &lane,
+            &mut findings,
+        );
+    }
+    for (module_id, rules) in &permissions.modules {
+        push_wildcard_findings_v17(
+            &rules.allow,
+            &format!("permissions.module.{module_id}.allow"),
+            &lane,
+            &mut findings,
+        );
+    }
+    if let Some(std_fs) = permissions.std_fs.as_ref() {
+        push_wildcard_findings_v17(
+            &std_fs.read,
+            "permissions.std_fs.read",
+            &lane,
+            &mut findings,
+        );
+        push_wildcard_findings_v17(
+            &std_fs.write,
+            "permissions.std_fs.write",
+            &lane,
+            &mut findings,
+        );
+        push_wildcard_findings_v17(
+            &std_fs.remove,
+            "permissions.std_fs.remove",
+            &lane,
+            &mut findings,
+        );
+        push_wildcard_findings_v17(
+            &std_fs.rename,
+            "permissions.std_fs.rename",
+            &lane,
+            &mut findings,
+        );
+        push_wildcard_findings_v17(
+            &std_fs.list,
+            "permissions.std_fs.list",
+            &lane,
+            &mut findings,
+        );
+    }
+    if let Some(std_net_http) = permissions.std_net_http.as_ref() {
+        push_wildcard_findings_v17(
+            &std_net_http.allow_hosts,
+            "permissions.std_net_http.allow_hosts",
+            &lane,
+            &mut findings,
+        );
+        push_wildcard_findings_v17(
+            &std_net_http.allow_methods,
+            "permissions.std_net_http.allow_methods",
+            &lane,
+            &mut findings,
+        );
+    }
+    if let Some(std_proc) = permissions.std_proc.as_ref() {
+        push_wildcard_findings_v17(
+            &std_proc.allow_bins,
+            "permissions.std_proc.allow_bins",
+            &lane,
+            &mut findings,
+        );
+    }
+    if let Some(std_ui) = permissions.std_ui.as_ref() {
+        push_wildcard_findings_v17(
+            &std_ui.assets_read,
+            "permissions.std_ui.assets_read",
+            &lane,
+            &mut findings,
+        );
+    }
+    findings.sort_by(|a, b| {
+        a.location
+            .cmp(&b.location)
+            .then(a.value.cmp(&b.value))
+            .then(a.code.cmp(&b.code))
+    });
+    findings.dedup_by(|a, b| {
+        a.location == b.location && a.value == b.value && a.code == b.code && a.reason == b.reason
+    });
+    Ok((lane, findings))
+}
+
+fn doctor_report_json_v17(
+    lane: &str,
+    findings: &[PermissionDoctorFindingV17],
+    report_path: &Path,
+) -> JsonValue {
+    let blocking_total = findings.iter().filter(|f| f.severity == "error").count();
+    let risk_score = (findings.len().min(10) as u32) * 10;
+    let findings_json = findings
+        .iter()
+        .map(|finding| {
+            let mut row = JsonMap::new();
+            row.insert("code".to_string(), JsonValue::String(finding.code.clone()));
+            row.insert(
+                "reason".to_string(),
+                JsonValue::String(finding.reason.clone()),
+            );
+            row.insert(
+                "severity".to_string(),
+                JsonValue::String(finding.severity.clone()),
+            );
+            row.insert(
+                "location".to_string(),
+                JsonValue::String(finding.location.clone()),
+            );
+            row.insert(
+                "value".to_string(),
+                JsonValue::String(finding.value.clone()),
+            );
+            row.insert("hint".to_string(), JsonValue::String(finding.hint.clone()));
+            JsonValue::Object(row)
+        })
+        .collect::<Vec<JsonValue>>();
+    let mut out = JsonMap::new();
+    out.insert("schema_version".to_string(), JsonValue::from(1u64));
+    out.insert(
+        "hasher_version".to_string(),
+        JsonValue::String("sha256-v1".to_string()),
+    );
+    out.insert("lane".to_string(), JsonValue::String(lane.to_string()));
+    out.insert(
+        "report_path".to_string(),
+        JsonValue::String(report_path.to_string_lossy().replace('\\', "/")),
+    );
+    out.insert(
+        "findings_total".to_string(),
+        JsonValue::from(findings.len() as u64),
+    );
+    out.insert(
+        "blocking_total".to_string(),
+        JsonValue::from(blocking_total as u64),
+    );
+    out.insert("risk_score".to_string(), JsonValue::from(risk_score));
+    out.insert("findings".to_string(), JsonValue::Array(findings_json));
+    JsonValue::Object(out)
+}
+
+pub fn write_permission_doctor_report_v17(
+    root: &Path,
+    out_path: Option<&Path>,
+) -> Result<PermissionDoctorSummaryV17, SdkError> {
+    let (lane, findings) = collect_permission_findings_v17(root)?;
+    let out_path = out_path
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| default_w17_dx_root_v17(root).join("dx_friction_report.json"));
+    if let Some(parent) = out_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let report_json = doctor_report_json_v17(&lane, &findings, &out_path);
+    let _ = write_canonical_json_file_v15(&out_path, &report_json)?;
+
+    let blocking_total = findings.iter().filter(|f| f.severity == "error").count();
+    let risk_score = (findings.len().min(10) as u32) * 10;
+    if lane == "locked_v071" && blocking_total > 0 {
+        return Err(SdkError::PermissionDenied(format!(
+            "{PERM_WILDCARD_GUARD_CODE_V17}: wildcard permissions are blocked in locked_v071; reason=`{PERM_WILDCARD_GUARD_REASON_V17}`; alias=`{PERM_WILDCARD_GUARD_ALIAS_V17}`; severity=`error`; hint=`{}`; report=`{}`",
+            wildcard_risk_hint_v17(),
+            out_path.display()
+        )));
+    }
+    Ok(PermissionDoctorSummaryV17 {
+        report_path: out_path,
+        lane,
+        findings_total: findings.len(),
+        blocking_total,
+        risk_score,
+    })
+}
+
+fn recommended_value_for_location_v17(location: &str) -> String {
+    if location.contains("permissions.std_fs.read") || location.contains("permissions.std_fs.list")
+    {
+        "./data/**".to_string()
+    } else if location.contains("permissions.std_fs.write")
+        || location.contains("permissions.std_fs.remove")
+        || location.contains("permissions.std_fs.rename")
+    {
+        "./out/**".to_string()
+    } else if location.contains("permissions.std_net_http.allow_hosts") {
+        "api.example.com".to_string()
+    } else if location.contains("permissions.std_net_http.allow_methods") {
+        "GET".to_string()
+    } else if location.contains("permissions.std_proc.allow_bins") {
+        "tool.exe".to_string()
+    } else if location.contains("permissions.std_ui.assets_read") {
+        "./assets/**".to_string()
+    } else if location.contains("permissions.package.allow")
+        || location.contains("permissions.module.")
+    {
+        "std.log.info".to_string()
+    } else {
+        "<explicit-scope>".to_string()
+    }
+}
+
+fn fix_plan_json_v17(lane: &str, findings: &[PermissionDoctorFindingV17]) -> JsonValue {
+    let suggestions = findings
+        .iter()
+        .map(|finding| {
+            let mut row = JsonMap::new();
+            row.insert(
+                "location".to_string(),
+                JsonValue::String(finding.location.clone()),
+            );
+            row.insert(
+                "current".to_string(),
+                JsonValue::String(finding.value.clone()),
+            );
+            row.insert(
+                "recommended".to_string(),
+                JsonValue::String(recommended_value_for_location_v17(&finding.location)),
+            );
+            row.insert("hint".to_string(), JsonValue::String(finding.hint.clone()));
+            JsonValue::Object(row)
+        })
+        .collect::<Vec<JsonValue>>();
+    let mut out = JsonMap::new();
+    out.insert("schema_version".to_string(), JsonValue::from(1u64));
+    out.insert(
+        "hasher_version".to_string(),
+        JsonValue::String("sha256-v1".to_string()),
+    );
+    out.insert("lane".to_string(), JsonValue::String(lane.to_string()));
+    out.insert(
+        "findings_total".to_string(),
+        JsonValue::from(findings.len() as u64),
+    );
+    out.insert("suggestions".to_string(), JsonValue::Array(suggestions));
+    JsonValue::Object(out)
+}
+
+pub fn write_permission_fix_plan_v17(
+    root: &Path,
+    out_path: Option<&Path>,
+) -> Result<PermissionFixPlanSummaryV17, SdkError> {
+    let (lane, findings) = collect_permission_findings_v17(root)?;
+    let out_path = out_path
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| default_w17_dx_root_v17(root).join("permission_fix_plan.json"));
+    if let Some(parent) = out_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let plan_json = fix_plan_json_v17(&lane, &findings);
+    let plan_hash_sha256 = write_canonical_json_file_v15(&out_path, &plan_json)?;
+    Ok(PermissionFixPlanSummaryV17 {
+        plan_path: out_path,
+        plan_hash_sha256,
+        lane,
+        findings_total: findings.len(),
+    })
+}
+
+fn plan_hash_from_json_v17(plan_json: &JsonValue) -> Result<String, SdkError> {
+    let canonical = canonical_json_string_v15(plan_json)?;
+    Ok(sha256_hex(canonical.as_bytes()))
+}
+
+fn extract_string_field_v17(value: &JsonValue, path: &str) -> Option<String> {
+    value
+        .pointer(path)
+        .and_then(JsonValue::as_str)
+        .map(ToString::to_string)
+}
+
+pub fn apply_permission_fix_plan_v17(
+    root: &Path,
+    options: &PermissionFixApplyOptionsV17,
+) -> Result<PermissionFixApplySummaryV17, SdkError> {
+    if !options.ack_risk {
+        return Err(SdkError::PermissionDenied(format!(
+            "{PERM_RISK_ACK_CODE_V17}: missing `--ack-risk`; reason=`{PERM_RISK_ACK_REASON_V17}`; alias=`X-PERMISSION-APPROVAL-REQUIRED`; severity=`error`; hint=`rerun with --ack-risk --justification <text> --by <id> --date <YYYY-MM-DD>`."
+        )));
+    }
+    let justification = options.justification.trim();
+    if justification.is_empty() {
+        return Err(SdkError::PermissionDenied(format!(
+            "{PERM_RISK_ACK_CODE_V17}: empty justification; reason=`{PERM_RISK_ACK_REASON_V17}`; alias=`X-PERMISSION-APPROVAL-REQUIRED`; severity=`error`; hint=`provide --justification with concrete risk rationale`."
+        )));
+    }
+    if options.approved_by.trim().is_empty() || options.date.trim().is_empty() {
+        return Err(SdkError::SupplyInvalid(
+            "perm fix --apply requires non-empty --by and --date".to_string(),
+        ));
+    }
+
+    let dx_root = default_w17_dx_root_v17(root);
+    fs::create_dir_all(&dx_root)?;
+    let plan_path = options
+        .plan_path
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| dx_root.join("permission_fix_plan.json"));
+    if !plan_path.exists() {
+        write_permission_fix_plan_v17(root, Some(&plan_path))?;
+    }
+    let plan_json = read_json_file_v15(&plan_path)?;
+    let plan_hash_sha256 = plan_hash_from_json_v17(&plan_json)?;
+    let lane =
+        extract_string_field_v17(&plan_json, "/lane").unwrap_or_else(|| "unknown".to_string());
+    let findings_total = plan_json
+        .pointer("/findings_total")
+        .and_then(JsonValue::as_u64)
+        .unwrap_or(0) as usize;
+
+    let patch_path = options
+        .patch_path
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| dx_root.join("permission_fix.patch.toml"));
+    if let Some(parent) = patch_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut patch = String::new();
+    patch.push_str("# OCL v0.17 permission fix patch (advisory-only)\n");
+    patch.push_str("# This file does not auto-apply permissions.\n");
+    patch.push_str("# Review and patch Ocl.toml manually.\n");
+    patch.push_str("# plan_hash = \"");
+    patch.push_str(&plan_hash_sha256);
+    patch.push_str("\"\n");
+    patch.push_str("# lane = \"");
+    patch.push_str(&lane);
+    patch.push_str("\"\n");
+    patch.push_str("# justification = \"");
+    patch.push_str(&justification.replace('"', "'").replace(['\n', '\r'], " "));
+    patch.push_str("\"\n");
+    if let Some(suggestions) = plan_json.get("suggestions").and_then(JsonValue::as_array) {
+        for suggestion in suggestions {
+            let location = suggestion
+                .get("location")
+                .and_then(JsonValue::as_str)
+                .unwrap_or("<unknown>");
+            let current = suggestion
+                .get("current")
+                .and_then(JsonValue::as_str)
+                .unwrap_or("");
+            let recommended = suggestion
+                .get("recommended")
+                .and_then(JsonValue::as_str)
+                .unwrap_or("<explicit-scope>");
+            patch.push_str("\n# location: ");
+            patch.push_str(location);
+            patch.push_str("\n# current: \"");
+            patch.push_str(&current.replace('"', "'"));
+            patch.push_str("\"\n# recommended: \"");
+            patch.push_str(&recommended.replace('"', "'"));
+            patch.push_str("\"\n");
+        }
+    }
+    fs::write(&patch_path, patch)?;
+
+    let approval_path = options
+        .approval_path
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| root.join("permissions.approval.toml"));
+    let virtual_diff_path = dx_root.join("permission_fix_virtual_diff.json");
+    let mut virtual_report = JsonMap::new();
+    virtual_report.insert("schema_version".to_string(), JsonValue::from(1u64));
+    virtual_report.insert(
+        "hasher_version".to_string(),
+        JsonValue::String("sha256-v1".to_string()),
+    );
+    virtual_report.insert(
+        "permission_diff_hash".to_string(),
+        JsonValue::String(plan_hash_sha256.clone()),
+    );
+    let mut payload = JsonMap::new();
+    payload.insert(
+        "plan_path".to_string(),
+        JsonValue::String(plan_path.to_string_lossy().replace('\\', "/")),
+    );
+    payload.insert(
+        "note".to_string(),
+        JsonValue::String("virtual diff for perm fix apply".to_string()),
+    );
+    virtual_report.insert("report".to_string(), JsonValue::Object(payload));
+    let _ = write_canonical_json_file_v15(&virtual_diff_path, &JsonValue::Object(virtual_report))?;
+    let _ = approve_permission_diff_v15(
+        &virtual_diff_path,
+        &approval_path,
+        options.approved_by.trim(),
+        options.date.trim(),
+        Some(&format!("perm fix apply: {justification}")),
+    )?;
+
+    let report_path = options
+        .report_path
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| dx_root.join("permission_fix_safety_report.json"));
+    if let Some(parent) = report_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut report = JsonMap::new();
+    report.insert("schema_version".to_string(), JsonValue::from(1u64));
+    report.insert(
+        "hasher_version".to_string(),
+        JsonValue::String("sha256-v1".to_string()),
+    );
+    report.insert("lane".to_string(), JsonValue::String(lane));
+    report.insert(
+        "plan_path".to_string(),
+        JsonValue::String(plan_path.to_string_lossy().replace('\\', "/")),
+    );
+    report.insert(
+        "patch_path".to_string(),
+        JsonValue::String(patch_path.to_string_lossy().replace('\\', "/")),
+    );
+    report.insert(
+        "approval_path".to_string(),
+        JsonValue::String(approval_path.to_string_lossy().replace('\\', "/")),
+    );
+    report.insert(
+        "plan_hash_sha256".to_string(),
+        JsonValue::String(plan_hash_sha256.clone()),
+    );
+    report.insert(
+        "findings_total".to_string(),
+        JsonValue::from(findings_total as u64),
+    );
+    report.insert("ack_risk".to_string(), JsonValue::Bool(options.ack_risk));
+    report.insert(
+        "approved_by".to_string(),
+        JsonValue::String(options.approved_by.trim().to_string()),
+    );
+    report.insert(
+        "date".to_string(),
+        JsonValue::String(options.date.trim().to_string()),
+    );
+    report.insert(
+        "justification".to_string(),
+        JsonValue::String(justification.to_string()),
+    );
+    let _ = write_canonical_json_file_v15(&report_path, &JsonValue::Object(report))?;
+
+    Ok(PermissionFixApplySummaryV17 {
+        plan_path,
+        patch_path,
+        report_path,
+        approval_path,
+        plan_hash_sha256,
+        findings_total,
+    })
 }

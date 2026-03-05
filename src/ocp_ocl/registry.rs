@@ -816,6 +816,11 @@ impl CapabilityRegistry {
                     ("path", FieldSpec::required(SchemaType::String)),
                     ("text", FieldSpec::required(SchemaType::String)),
                     ("overwrite", FieldSpec::required(SchemaType::Bool)),
+                    (
+                        "precondition_exists",
+                        FieldSpec::optional(SchemaType::Bool),
+                    ),
+                    ("precondition_len", FieldSpec::optional(SchemaType::Int)),
                     ("pending_write_id", FieldSpec::required(SchemaType::String)),
                 ]),
                 open_row: false,

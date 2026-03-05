@@ -99,6 +99,7 @@ enum KvCommitOp {
 struct PendingFsWrite {
     op: FsCommitOp,
     pending_write_id: String,
+    precondition: Option<FsCommitPrecondition>,
 }
 
 #[derive(Debug, Clone)]
@@ -121,6 +122,12 @@ enum FsCommitOp {
         to: String,
         overwrite: bool,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FsCommitPrecondition {
+    exists: bool,
+    len_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -1303,6 +1310,25 @@ impl Executor {
                 overwrite,
             } => {
                 let (full_path, _) = resolve_fs_path("write", path)?;
+                if let Some(precondition) = pending.precondition.as_ref() {
+                    let current_exists = full_path.exists();
+                    if current_exists != precondition.exists {
+                        return Err(ReasonCode::PolicyDenied);
+                    }
+                    let current_len = if current_exists {
+                        let meta = fs::metadata(&full_path).map_err(|_| ReasonCode::FsIoError)?;
+                        if meta.is_file() {
+                            Some(meta.len())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    if current_len != precondition.len_bytes {
+                        return Err(ReasonCode::PolicyDenied);
+                    }
+                }
                 if full_path.exists() && !overwrite {
                     Err(ReasonCode::PolicyDenied)
                 } else if text.len() > fs_max_write_bytes() {
@@ -3797,42 +3823,69 @@ fn extract_pending_fs_write(key: &str, result: &Result4<Value>) -> Option<Pendin
         return None;
     };
     let pending_write_id = map.get("pending_write_id")?.as_string()?;
-    let op = match key {
-        "std.fs.write_text" => FsCommitOp::WriteText {
-            path: map.get("path")?.as_string()?,
-            text: map.get("text")?.as_string()?,
-            overwrite: map
-                .get("overwrite")
+    let (op, precondition) = match key {
+        "std.fs.write_text" => {
+            let precondition_exists = map
+                .get("precondition_exists")
                 .and_then(Value::as_bool)
-                .unwrap_or(false),
-        },
-        "std.fs.mkdir" => FsCommitOp::Mkdir {
-            path: map.get("path")?.as_string()?,
-            recursive: map
-                .get("recursive")
-                .and_then(Value::as_bool)
-                .unwrap_or(false),
-        },
-        "std.fs.remove" => FsCommitOp::Remove {
-            path: map.get("path")?.as_string()?,
-            recursive: map
-                .get("recursive")
-                .and_then(Value::as_bool)
-                .unwrap_or(false),
-        },
-        "std.fs.rename" => FsCommitOp::Rename {
-            from: map.get("from")?.as_string()?,
-            to: map.get("to")?.as_string()?,
-            overwrite: map
-                .get("overwrite")
-                .and_then(Value::as_bool)
-                .unwrap_or(false),
-        },
+                .unwrap_or(false);
+            let precondition_len = match map.get("precondition_len") {
+                Some(Value::Int(v)) if *v >= 0 => Some(*v as u64),
+                Some(Value::String(raw)) => raw.parse::<u64>().ok(),
+                _ => None,
+            };
+            (
+                FsCommitOp::WriteText {
+                    path: map.get("path")?.as_string()?,
+                    text: map.get("text")?.as_string()?,
+                    overwrite: map
+                        .get("overwrite")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
+                },
+                Some(FsCommitPrecondition {
+                    exists: precondition_exists,
+                    len_bytes: precondition_len,
+                }),
+            )
+        }
+        "std.fs.mkdir" => (
+            FsCommitOp::Mkdir {
+                path: map.get("path")?.as_string()?,
+                recursive: map
+                    .get("recursive")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+            },
+            None,
+        ),
+        "std.fs.remove" => (
+            FsCommitOp::Remove {
+                path: map.get("path")?.as_string()?,
+                recursive: map
+                    .get("recursive")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+            },
+            None,
+        ),
+        "std.fs.rename" => (
+            FsCommitOp::Rename {
+                from: map.get("from")?.as_string()?,
+                to: map.get("to")?.as_string()?,
+                overwrite: map
+                    .get("overwrite")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+            },
+            None,
+        ),
         _ => return None,
     };
     Some(PendingFsWrite {
         op,
         pending_write_id,
+        precondition,
     })
 }
 
@@ -5608,6 +5661,20 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
                 Ok(v) => v,
                 Err(reason) => return Result4::insufficient(reason),
             };
+            let precondition_exists = full_path.exists();
+            let precondition_len = if precondition_exists {
+                let meta = match fs::metadata(&full_path) {
+                    Ok(v) => v,
+                    Err(_) => return Result4::insufficient(ReasonCode::FsIoError),
+                };
+                if meta.is_file() {
+                    Some(meta.len())
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
             if full_path.exists() && !overwrite {
                 return Result4::insufficient(ReasonCode::PolicyDenied);
             }
@@ -5620,10 +5687,21 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             map.insert("text".to_string(), Value::String(text.clone()));
             map.insert("overwrite".to_string(), Value::Bool(overwrite));
             map.insert(
+                "precondition_exists".to_string(),
+                Value::Bool(precondition_exists),
+            );
+            if let Some(pre_len) = precondition_len {
+                map.insert("precondition_len".to_string(), Value::Int(pre_len as i64));
+            }
+            map.insert(
                 "pending_write_id".to_string(),
                 Value::String(stable_hash64_hex(&format!(
-                    "fs_write_text|{path}|{overwrite}|{}",
-                    stable_hash64_hex(&text)
+                    "fs_write_text|{path}|{overwrite}|{}|{}|{}",
+                    stable_hash64_hex(&text),
+                    precondition_exists,
+                    precondition_len
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "-".to_string())
                 ))),
             );
             Result4::ok(Value::Map(map))
