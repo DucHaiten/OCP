@@ -1,0 +1,22 @@
+[project]
+lane = "quarantine"
+
+[package]
+name = "quarantine_wallclock_replay"
+version = "0.1.0"
+
+[targets]
+default = "main"
+
+[dependencies]
+std = "0.1.0"
+
+[permissions.package]
+allow = ["std.time.wallclock.now"]
+deny = []
+
+[permissions.std_time_wallclock]
+enabled = true
+
+[permissions.std_time]
+enabled = true

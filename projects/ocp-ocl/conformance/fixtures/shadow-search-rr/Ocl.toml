@@ -1,0 +1,21 @@
+[package]
+name = "shadow_search_rr"
+version = "0.1.0"
+
+[targets]
+default = "main"
+
+[dependencies]
+std = "0.1.0"
+
+[permissions.package]
+allow = ["std.shadow.*"]
+deny = []
+
+[permissions.std_shadow]
+enabled = true
+max_branches = 8
+branch_step_cap = 5000
+branch_budget_cap = 200000
+max_diff_keys = 2000
+max_report_bytes = 262144

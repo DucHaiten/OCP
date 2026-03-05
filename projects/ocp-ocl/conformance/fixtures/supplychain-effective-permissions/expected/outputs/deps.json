@@ -1,0 +1,11 @@
+{
+  "schema":"ocl.conformance.deps.v14",
+  "packages":[
+    "dep:toolkit@1.0.0#2d1e872836e2",
+    "project:supplychain_effective_permissions"
+  ],
+  "provenance":[
+    {"module_id":"main","package_id":"project:supplychain_effective_permissions"},
+    {"module_id":"worker","package_id":"dep:toolkit@1.0.0#2d1e872836e2"}
+  ]
+}

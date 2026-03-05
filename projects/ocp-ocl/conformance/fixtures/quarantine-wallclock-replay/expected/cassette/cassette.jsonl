@@ -1,0 +1,1 @@
+{"seq":0,"id":"entry-000000","cap":"std.time.wallclock.now","call_id":0,"kind":"OK","req":{},"res":{"unix_ms":"1710000000000","iso":"2024-03-09T16:00:00Z"},"hash":"fixture-wallclock-entry"}

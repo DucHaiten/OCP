@@ -1,0 +1,3 @@
+observe("std.ui.frame_info", "tier2", ctx("ctx_tick=3"), budget(5)) -> frame;
+observe("std.ui.input", "tier2", ctx("cap=2;events=key:W|quit"), budget(5)) -> input;
+condition(true);

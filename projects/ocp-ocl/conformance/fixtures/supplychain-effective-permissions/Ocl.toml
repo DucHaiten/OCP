@@ -1,0 +1,23 @@
+[package]
+name = "supplychain_effective_permissions"
+version = "0.1.0"
+
+[targets]
+default = "main"
+
+[dependencies]
+toolkit = { name="toolkit", version="1.0.0", source="path" }
+
+[permissions.package]
+allow = ["std.*"]
+deny = []
+
+[deny]
+patterns = ["std.net.*"]
+
+[permissions.std_proc]
+enabled = true
+allow_bins = ["python", "git"]
+timeout_ms = 4000
+max_stdout_bytes = 900
+max_stderr_bytes = 700

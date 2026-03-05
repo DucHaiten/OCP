@@ -1,15 +1,19 @@
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use ocl_runtime_core::RunEngine;
+use sha2::{Digest, Sha256};
 
 use crate::{
-    build_project_with_lock, check_project_with_lock, compose_phenotype, enforce_universe_match_v1,
-    install_organs_v1, resolve_domain_selection_v1, resolve_universe_v1, run_kit_doctor_v1,
-    run_project_with_engine_and_lock, run_reactor_service_with_lock, sync_deps_lock_v1,
-    test_project_with_lock, verify_assembly, verify_organs_lock_v1, ReactorRuntimeMode,
-    ReactorServiceOptions, SdkError,
+    build_project_with_lock, check_project_with_lock, compose_phenotype,
+    compute_effective_permissions_v10, enforce_universe_match_v1, install_organs_v1,
+    resolve_domain_selection_v1, resolve_universe_v1, run_kit_doctor_v1,
+    run_project_with_engine_and_lock, run_project_with_trace_engine_and_lock,
+    run_reactor_service_with_lock, sync_deps_lock_v1, test_project_with_lock,
+    trace_required_digest, verify_assembly, verify_dependency_exports_and_collect_provenance_v10,
+    verify_organs_lock_v1, ProjectPermissions, ReactorRuntimeMode, ReactorServiceOptions, SdkError,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -33,6 +37,7 @@ pub enum ConformanceStepV1 {
     Composer,
     Check,
     Run,
+    ReplayArtifact,
     Reactor,
     Test,
     Build,
@@ -47,6 +52,7 @@ impl ConformanceStepV1 {
             Self::Composer => "composer",
             Self::Check => "check",
             Self::Run => "run",
+            Self::ReplayArtifact => "replay_artifact",
             Self::Reactor => "reactor",
             Self::Test => "test",
             Self::Build => "build",
@@ -61,6 +67,7 @@ impl ConformanceStepV1 {
             "composer" => Ok(Self::Composer),
             "check" => Ok(Self::Check),
             "run" => Ok(Self::Run),
+            "replay_artifact" => Ok(Self::ReplayArtifact),
             "reactor" => Ok(Self::Reactor),
             "test" => Ok(Self::Test),
             "build" => Ok(Self::Build),
@@ -78,10 +85,14 @@ impl ConformanceStepV1 {
 pub struct ConformanceScenarioV1 {
     pub name: String,
     pub path: String,
+    pub lane: String,
     pub reactor_ticks: u32,
     pub composer: bool,
     pub expected_status: ConformanceExpectedStatusV1,
     pub expected_error_code: Option<String>,
+    pub expected_signature_file: Option<String>,
+    pub expected_deps_file: Option<String>,
+    pub expected_permissions_effective_file: Option<String>,
     pub steps: Vec<ConformanceStepV1>,
     pub organ_name: Option<String>,
     pub organ_version: Option<String>,
@@ -202,6 +213,7 @@ pub fn parse_conformance_manifest_v1(path: &Path) -> Result<ConformanceManifestV
         match key {
             "name" => current.name = Some(strip_quotes(value).to_string()),
             "path" => current.path = Some(strip_quotes(value).to_string()),
+            "lane" => current.lane = Some(normalize_lane_v14(strip_quotes(value))),
             "reactor_ticks" => {
                 let ticks = strip_quotes(value).parse::<u32>().map_err(|_| {
                     SdkError::MissingProject(
@@ -237,6 +249,15 @@ pub fn parse_conformance_manifest_v1(path: &Path) -> Result<ConformanceManifestV
             }
             "expected_error_code" => {
                 current.expected_error_code = Some(strip_quotes(value).to_string())
+            }
+            "expected_signature_file" => {
+                current.expected_signature_file = Some(strip_quotes(value).to_string())
+            }
+            "expected_deps_file" => {
+                current.expected_deps_file = Some(strip_quotes(value).to_string())
+            }
+            "expected_permissions_effective_file" => {
+                current.expected_permissions_effective_file = Some(strip_quotes(value).to_string())
             }
             "steps" => {
                 current.steps = Some(parse_step_list(value)?);
@@ -312,6 +333,7 @@ pub fn run_conformance_v1(
 
         let outcome = run_scenario(
             workspace_root,
+            &source_root,
             &copied_root,
             scenario,
             &options,
@@ -427,10 +449,14 @@ pub fn write_conformance_report_json(
 struct ScenarioBuilder {
     name: Option<String>,
     path: Option<String>,
+    lane: Option<String>,
     reactor_ticks: Option<u32>,
     composer: Option<bool>,
     expected_status: Option<ConformanceExpectedStatusV1>,
     expected_error_code: Option<String>,
+    expected_signature_file: Option<String>,
+    expected_deps_file: Option<String>,
+    expected_permissions_effective_file: Option<String>,
     steps: Option<Vec<ConformanceStepV1>>,
     organ_name: Option<String>,
     organ_version: Option<String>,
@@ -449,9 +475,19 @@ impl ScenarioBuilder {
                 "invalid conformance manifest: scenario missing `path`".to_string(),
             )
         })?;
+        let lane = normalize_lane_v14(self.lane.as_deref().unwrap_or("locked_v071"));
         let steps = self.steps.unwrap_or_default();
         let expected_status = self.expected_status.unwrap_or_default();
         let expected_error_code = self.expected_error_code;
+        let expected_signature_file = self.expected_signature_file;
+        let expected_deps_file = self.expected_deps_file;
+        let expected_permissions_effective_file = self.expected_permissions_effective_file;
+
+        if !matches!(lane.as_str(), "locked_v071" | "locked_v06" | "quarantine") {
+            return Err(SdkError::MissingProject(format!(
+                "invalid conformance manifest: scenario `{name}` has unsupported `lane={lane}`"
+            )));
+        }
 
         if expected_status == ConformanceExpectedStatusV1::Fail && expected_error_code.is_none() {
             return Err(SdkError::MissingProject(format!(
@@ -474,10 +510,14 @@ impl ScenarioBuilder {
         Ok(ConformanceScenarioV1 {
             name,
             path,
+            lane,
             reactor_ticks: self.reactor_ticks.unwrap_or(0),
             composer: self.composer.unwrap_or(false),
             expected_status,
             expected_error_code,
+            expected_signature_file,
+            expected_deps_file,
+            expected_permissions_effective_file,
             steps,
             organ_name: self.organ_name,
             organ_version: self.organ_version,
@@ -570,12 +610,14 @@ fn evaluate_scenario_outcome(
 
 fn run_scenario(
     workspace_root: &Path,
+    source_root: &Path,
     app_root: &Path,
     scenario: &ConformanceScenarioV1,
     options: &ConformanceRunOptionsV1,
     copied_registry_root: Option<&Path>,
 ) -> Result<(), SdkError> {
     sync_deps_lock_v1(app_root)?;
+    let scenario_locked = is_locked_lane_v14(&scenario.lane);
 
     let steps = if scenario.steps.is_empty() {
         vec![
@@ -597,19 +639,22 @@ fn run_scenario(
                 if scenario.composer {
                     let phenotype_path = app_root.join("phenotype.toml");
                     let registry_root = app_root.join("registry");
-                    compose_phenotype(app_root, &phenotype_path, &registry_root, options.locked)?;
-                    verify_assembly(app_root, &phenotype_path, &registry_root, options.locked)?;
+                    compose_phenotype(app_root, &phenotype_path, &registry_root, scenario_locked)?;
+                    verify_assembly(app_root, &phenotype_path, &registry_root, scenario_locked)?;
                 }
             }
             ConformanceStepV1::Check => {
-                check_project_with_lock(app_root, options.locked)?;
+                check_project_with_lock(app_root, scenario_locked)?;
             }
             ConformanceStepV1::Run => {
                 if runtime_ctx.is_none() {
                     runtime_ctx = Some(resolve_runtime_context(app_root, options)?);
                 }
                 let ctx = runtime_ctx.as_ref().expect("runtime context must exist");
-                run_project_with_engine_and_lock(app_root, ctx.run_engine, options.locked)?;
+                run_project_with_engine_and_lock(app_root, ctx.run_engine, scenario_locked)?;
+            }
+            ConformanceStepV1::ReplayArtifact => {
+                run_replay_artifact_step(workspace_root, source_root, app_root, scenario, options)?;
             }
             ConformanceStepV1::Reactor => {
                 if scenario.reactor_ticks == 0 {
@@ -631,19 +676,19 @@ fn run_scenario(
                     universe_id: ctx.reactor_universe_id.clone(),
                     domain_id: ctx.reactor_domain_id.clone(),
                 };
-                run_reactor_service_with_lock(app_root, &reactor_options, options.locked)?;
+                run_reactor_service_with_lock(app_root, &reactor_options, scenario_locked)?;
             }
             ConformanceStepV1::Test => {
-                test_project_with_lock(app_root, options.locked)?;
+                test_project_with_lock(app_root, scenario_locked)?;
             }
             ConformanceStepV1::Build => {
-                build_project_with_lock(app_root, options.locked)?;
+                build_project_with_lock(app_root, scenario_locked)?;
             }
             ConformanceStepV1::KitDoctor => {
-                run_kit_doctor_v1(app_root, options.locked)?;
+                run_kit_doctor_v1(app_root, scenario_locked)?;
             }
             ConformanceStepV1::OrganVerify => {
-                verify_organs_lock_v1(app_root, options.locked)?;
+                verify_organs_lock_v1(app_root, scenario_locked)?;
             }
             ConformanceStepV1::OrganInstall => {
                 let name = scenario.organ_name.as_deref().ok_or_else(|| {
@@ -662,10 +707,39 @@ fn run_scenario(
                     scenario,
                     copied_registry_root,
                 );
-                install_organs_v1(app_root, &registry_index, name, version, options.locked)?;
+                install_organs_v1(app_root, &registry_index, name, version, scenario_locked)?;
             }
         }
     }
+
+    if let Some(expected_signature_file) = scenario.expected_signature_file.as_deref() {
+        let expected_path = resolve_expected_signature_path_v14(
+            workspace_root,
+            source_root,
+            expected_signature_file,
+        );
+        if !expected_path.exists() {
+            return Err(SdkError::MissingProject(format!(
+                "X-CONFORMANCE-SIGNATURE-MISMATCH: expected signature file missing `{}`",
+                expected_path.display()
+            )));
+        }
+        let expected = read_trimmed_file_v14(&expected_path)?;
+        let actual = compute_actual_signature_v14(app_root, scenario, options)?;
+        if expected != actual {
+            return Err(SdkError::MissingProject(format!(
+                "X-CONFORMANCE-SIGNATURE-MISMATCH: expected={} actual={} scenario={}",
+                expected, actual, scenario.name
+            )));
+        }
+    }
+
+    if scenario.expected_deps_file.is_some()
+        || scenario.expected_permissions_effective_file.is_some()
+    {
+        assert_supplychain_outputs_v14(workspace_root, source_root, app_root, scenario)?;
+    }
+
     Ok(())
 }
 
@@ -690,6 +764,480 @@ fn resolve_organ_registry_index_path(
         return local;
     }
     workspace_root.join("projects/ocp-ocl/registry/organs/index.toml")
+}
+
+fn is_locked_lane_v14(lane: &str) -> bool {
+    matches!(lane, "locked_v071" | "locked_v06")
+}
+
+fn resolve_expected_signature_path_v14(
+    workspace_root: &Path,
+    source_root: &Path,
+    raw: &str,
+) -> PathBuf {
+    let path = PathBuf::from(raw);
+    if path.is_absolute() {
+        return path;
+    }
+    let candidate = source_root.join(&path);
+    if candidate.exists() {
+        return candidate;
+    }
+    if let Some(parent) = source_root.parent() {
+        let from_parent = parent.join(&path);
+        if from_parent.exists() {
+            return from_parent;
+        }
+    }
+    workspace_root.join(path)
+}
+
+fn resolve_expected_cassette_dir_v14(source_root: &Path) -> Option<PathBuf> {
+    let direct = source_root.join("expected").join("cassette");
+    if direct.exists() {
+        return Some(direct);
+    }
+    source_root
+        .parent()
+        .map(|p| p.join("expected").join("cassette"))
+        .filter(|p| p.exists())
+}
+
+fn run_replay_artifact_step(
+    workspace_root: &Path,
+    source_root: &Path,
+    app_root: &Path,
+    scenario: &ConformanceScenarioV1,
+    options: &ConformanceRunOptionsV1,
+) -> Result<(), SdkError> {
+    if scenario.lane != "quarantine" {
+        return Err(SdkError::MissingProject(format!(
+            "invalid conformance scenario `{}`: step `replay_artifact` requires lane=quarantine",
+            scenario.name
+        )));
+    }
+
+    let cassette_src = resolve_expected_cassette_dir_v14(source_root).ok_or_else(|| {
+        SdkError::MissingProject(format!(
+            "V-W14-CASSETTE-MISSING: expected/cassette not found for scenario `{}` (source root `{}`)",
+            scenario.name,
+            source_root.display()
+        ))
+    })?;
+    let artifact_dir = app_root.join(".ocl_artifacts").join("conformance.replay");
+    let cassette_dst = artifact_dir.join("cassette");
+    if cassette_dst.exists() {
+        fs::remove_dir_all(&cassette_dst)?;
+    }
+    copy_tree(&cassette_src, &cassette_dst)?;
+
+    let replay_toml = artifact_dir.join("replay.toml");
+    let mut replay_signature = None::<String>;
+    let mut replay_cassette_hash = None::<String>;
+    if replay_toml.exists() {
+        replay_signature = parse_replay_signature_v14(&replay_toml)?;
+        replay_cassette_hash = parse_replay_cassette_hash_v14(&replay_toml)?;
+        if let Some(hash) = replay_cassette_hash.as_deref() {
+            let cassette_jsonl_path = cassette_dst.join("cassette.jsonl");
+            let cassette_index_path = cassette_dst.join("cassette_index.json");
+            if !cassette_jsonl_path.exists() || !cassette_index_path.exists() {
+                return Err(SdkError::MissingProject(format!(
+                    "V-W14-CASSETTE-MISSING: replay requires cassette.jsonl and cassette_index.json in {}",
+                    cassette_dst.display()
+                )));
+            }
+            let cassette_jsonl = fs::read_to_string(cassette_jsonl_path)?;
+            let cassette_index = fs::read_to_string(cassette_index_path)?;
+            let actual_hash = compute_cassette_hash_v14(&cassette_jsonl, &cassette_index);
+            if actual_hash != hash {
+                return Err(SdkError::MissingProject(format!(
+                    "V-W14-CASSETTE-HASH-MISMATCH: expected={} actual={}",
+                    hash, actual_hash
+                )));
+            }
+        }
+    }
+
+    let cassette_jsonl_path = cassette_dst.join("cassette.jsonl");
+    let cassette_index_path = cassette_dst.join("cassette_index.json");
+    if !cassette_jsonl_path.exists() || !cassette_index_path.exists() {
+        return Err(SdkError::MissingProject(format!(
+            "V-W14-CASSETTE-MISSING: replay requires cassette.jsonl and cassette_index.json in {}",
+            cassette_dst.display()
+        )));
+    }
+
+    let trace = with_runtime_env_v14(
+        vec![
+            (ENV_PROJECT_LANE_V08, Some("quarantine".to_string())),
+            (
+                ENV_QUARANTINE_MODE_V08,
+                Some(CASSETTE_MODE_REPLAY_V08.to_string()),
+            ),
+            (ENV_WALLCLOCK_RECORD_PATH_V08, None),
+            (ENV_PROC_RECORD_PATH_V08, None),
+            (ENV_HTTP_RECORD_PATH_V08, None),
+            (
+                ENV_CASSETTE_JSONL_PATH_V08,
+                Some(cassette_jsonl_path.to_string_lossy().to_string()),
+            ),
+            (
+                ENV_CASSETTE_INDEX_PATH_V08,
+                Some(cassette_index_path.to_string_lossy().to_string()),
+            ),
+        ],
+        || run_project_with_trace_engine_and_lock(app_root, options.engine, false),
+    )?;
+    let actual_signature = signature_with_lane_v14(
+        &trace_required_digest(&trace.events),
+        &scenario.lane,
+        replay_cassette_hash.as_deref(),
+    );
+    if let Some(expected) = replay_signature.as_deref() {
+        if expected != actual_signature {
+            return Err(SdkError::MissingProject(format!(
+                "V-REPLAY-SIGNATURE-MISMATCH: expected={} actual={} scenario={}",
+                expected, actual_signature, scenario.name
+            )));
+        }
+    }
+    fs::write(
+        artifact_dir.join("signature.txt"),
+        format!("{actual_signature}\n"),
+    )?;
+
+    let _ = workspace_root;
+    Ok(())
+}
+
+fn parse_replay_cassette_hash_v14(path: &Path) -> Result<Option<String>, SdkError> {
+    let raw = fs::read_to_string(path)?;
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') || trimmed.is_empty() {
+            continue;
+        }
+        if let Some(value) = trimmed.strip_prefix("cassette_hash") {
+            if let Some((_, rhs)) = value.split_once('=') {
+                let hash = strip_quotes(rhs.trim()).to_string();
+                if hash.is_empty() {
+                    return Ok(None);
+                }
+                return Ok(Some(hash));
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn parse_replay_signature_v14(path: &Path) -> Result<Option<String>, SdkError> {
+    let raw = fs::read_to_string(path)?;
+    let mut in_replay = false;
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_replay = trimmed == "[replay]";
+            continue;
+        }
+        if !in_replay || trimmed.starts_with('#') || trimmed.is_empty() {
+            continue;
+        }
+        if let Some(value) = trimmed.strip_prefix("signature") {
+            if let Some((_, rhs)) = value.split_once('=') {
+                let signature = strip_quotes(rhs.trim()).to_string();
+                if signature.is_empty() {
+                    return Ok(None);
+                }
+                return Ok(Some(signature));
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn compute_cassette_hash_v14(cassette_jsonl: &str, cassette_index_json: &str) -> String {
+    let canonical = format!(
+        concat!(
+            "schema_version={}\n",
+            "hasher_version={}\n",
+            "lane={}\n",
+            "mode={}\n",
+            "---cassette.jsonl---\n{}\n",
+            "---cassette_index.json---\n{}\n"
+        ),
+        "ocl.cassette.v08",
+        "sha256-v1",
+        "quarantine",
+        "replay",
+        cassette_jsonl,
+        cassette_index_json
+    );
+    sha256_hex_v14(canonical.as_bytes())
+}
+
+fn compute_actual_signature_v14(
+    app_root: &Path,
+    scenario: &ConformanceScenarioV1,
+    options: &ConformanceRunOptionsV1,
+) -> Result<String, SdkError> {
+    if scenario.lane == "quarantine" {
+        let signature_path = app_root
+            .join(".ocl_artifacts")
+            .join("conformance.replay")
+            .join("signature.txt");
+        if !signature_path.exists() {
+            return Err(SdkError::MissingProject(format!(
+                "V-W14-QUARANTINE-SIGNATURE-MISSING: {}",
+                signature_path.display()
+            )));
+        }
+        return read_trimmed_file_v14(&signature_path);
+    }
+    let trace = run_project_with_trace_engine_and_lock(app_root, options.engine, true)?;
+    let required_digest = trace_required_digest(&trace.events);
+    Ok(fnv1a64_hex(&format!(
+        "lane={}\npayload={required_digest}",
+        scenario.lane
+    )))
+}
+
+fn assert_supplychain_outputs_v14(
+    workspace_root: &Path,
+    source_root: &Path,
+    app_root: &Path,
+    scenario: &ConformanceScenarioV1,
+) -> Result<(), SdkError> {
+    let output_dir = app_root.join(".ocl_artifacts").join("conformance.outputs");
+    fs::create_dir_all(&output_dir)?;
+
+    if let Some(expected_deps_file) = scenario.expected_deps_file.as_deref() {
+        let expected_path =
+            resolve_expected_signature_path_v14(workspace_root, source_root, expected_deps_file);
+        if !expected_path.exists() {
+            return Err(SdkError::MissingProject(format!(
+                "X-CONFORMANCE-OUTPUT-MISMATCH: expected deps file missing `{}`",
+                expected_path.display()
+            )));
+        }
+        let actual = render_deps_output_v14(app_root)?;
+        fs::write(output_dir.join("deps.json"), &actual)?;
+        let expected = fs::read_to_string(&expected_path)?;
+        if normalize_text_v14(&expected) != normalize_text_v14(&actual) {
+            return Err(SdkError::MissingProject(format!(
+                "X-CONFORMANCE-OUTPUT-MISMATCH: deps.json mismatch scenario={}",
+                scenario.name
+            )));
+        }
+    }
+
+    if let Some(expected_perm_file) = scenario.expected_permissions_effective_file.as_deref() {
+        let expected_path =
+            resolve_expected_signature_path_v14(workspace_root, source_root, expected_perm_file);
+        if !expected_path.exists() {
+            return Err(SdkError::MissingProject(format!(
+                "X-CONFORMANCE-OUTPUT-MISMATCH: expected permissions file missing `{}`",
+                expected_path.display()
+            )));
+        }
+        let actual = render_permissions_effective_output_v14(app_root)?;
+        fs::write(output_dir.join("permissions_effective.json"), &actual)?;
+        let expected = fs::read_to_string(&expected_path)?;
+        if normalize_text_v14(&expected) != normalize_text_v14(&actual) {
+            return Err(SdkError::MissingProject(format!(
+                "X-CONFORMANCE-OUTPUT-MISMATCH: permissions_effective.json mismatch scenario={}",
+                scenario.name
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn render_deps_output_v14(app_root: &Path) -> Result<String, SdkError> {
+    let mut provenance = verify_dependency_exports_and_collect_provenance_v10(app_root)?;
+    provenance.sort_by(|a, b| {
+        a.module_id
+            .cmp(&b.module_id)
+            .then(a.package_id.cmp(&b.package_id))
+    });
+    let mut packages = BTreeSet::<String>::new();
+    for row in &provenance {
+        packages.insert(row.package_id.clone());
+    }
+
+    let mut out = String::new();
+    out.push_str("{\n");
+    out.push_str("  \"schema\":\"ocl.conformance.deps.v14\",\n");
+    out.push_str("  \"packages\":[");
+    let package_list = packages.into_iter().collect::<Vec<_>>();
+    if package_list.is_empty() {
+        out.push_str("],\n");
+    } else {
+        out.push('\n');
+        for (idx, package_id) in package_list.iter().enumerate() {
+            out.push_str("    \"");
+            out.push_str(&json_escape(package_id));
+            out.push('"');
+            if idx + 1 != package_list.len() {
+                out.push(',');
+            }
+            out.push('\n');
+        }
+        out.push_str("  ],\n");
+    }
+    out.push_str("  \"provenance\":[");
+    if provenance.is_empty() {
+        out.push_str("]\n");
+    } else {
+        out.push('\n');
+        for (idx, row) in provenance.iter().enumerate() {
+            out.push_str("    {\"module_id\":\"");
+            out.push_str(&json_escape(&row.module_id));
+            out.push_str("\",\"package_id\":\"");
+            out.push_str(&json_escape(&row.package_id));
+            out.push_str("\"}");
+            if idx + 1 != provenance.len() {
+                out.push(',');
+            }
+            out.push('\n');
+        }
+        out.push_str("  ]\n");
+    }
+    out.push_str("}\n");
+    Ok(out)
+}
+
+fn render_permissions_effective_output_v14(app_root: &Path) -> Result<String, SdkError> {
+    let mut effective = compute_effective_permissions_v10(app_root)?
+        .into_iter()
+        .collect::<Vec<(String, ProjectPermissions)>>();
+    effective.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let mut out = String::new();
+    out.push_str("{\n");
+    out.push_str("  \"schema\":\"ocl.conformance.permissions_effective.v14\",\n");
+    out.push_str("  \"packages\":[");
+    if effective.is_empty() {
+        out.push_str("]\n");
+    } else {
+        out.push('\n');
+        for (idx, (package_id, permissions)) in effective.iter().enumerate() {
+            out.push_str("    {\n");
+            out.push_str("      \"package_id\":\"");
+            out.push_str(&json_escape(package_id));
+            out.push_str("\",\n");
+            out.push_str("      \"global_deny\":");
+            out.push_str(&render_string_array_v14(&permissions.global_deny));
+            out.push_str(",\n");
+            if let Some(pkg) = permissions.package.as_ref() {
+                out.push_str("      \"package_allow\":");
+                out.push_str(&render_string_array_v14(&pkg.allow));
+                out.push_str(",\n");
+                out.push_str("      \"package_deny\":");
+                out.push_str(&render_string_array_v14(&pkg.deny));
+                out.push_str(",\n");
+            }
+            if let Some(proc_cfg) = permissions.std_proc.as_ref() {
+                out.push_str("      \"std_proc\":{\n");
+                out.push_str("        \"enabled\":");
+                out.push_str(if proc_cfg.enabled { "true" } else { "false" });
+                out.push_str(",\n");
+                out.push_str("        \"allow_bins\":");
+                out.push_str(&render_string_array_v14(&proc_cfg.allow_bins));
+                out.push_str(",\n");
+                out.push_str("        \"timeout_ms\":");
+                out.push_str(&proc_cfg.timeout_ms.to_string());
+                out.push_str(",\n");
+                out.push_str("        \"max_stdout_bytes\":");
+                out.push_str(&proc_cfg.max_stdout_bytes.to_string());
+                out.push_str(",\n");
+                out.push_str("        \"max_stderr_bytes\":");
+                out.push_str(&proc_cfg.max_stderr_bytes.to_string());
+                out.push_str("\n");
+                out.push_str("      }\n");
+            } else {
+                out.push_str("      \"std_proc\":null\n");
+            }
+            out.push_str("    }");
+            if idx + 1 != effective.len() {
+                out.push(',');
+            }
+            out.push('\n');
+        }
+        out.push_str("  ]\n");
+    }
+    out.push_str("}\n");
+    Ok(out)
+}
+
+fn render_string_array_v14(values: &[String]) -> String {
+    let mut sorted = values.to_vec();
+    sorted.sort();
+    let mut out = String::new();
+    out.push('[');
+    for (idx, value) in sorted.iter().enumerate() {
+        if idx > 0 {
+            out.push(',');
+        }
+        out.push('"');
+        out.push_str(&json_escape(value));
+        out.push('"');
+    }
+    out.push(']');
+    out
+}
+
+fn normalize_text_v14(raw: &str) -> String {
+    raw.replace("\r\n", "\n").trim().to_string()
+}
+
+const ENV_PROJECT_LANE_V08: &str = "OCL_PROJECT_LANE";
+const ENV_QUARANTINE_MODE_V08: &str = "OCL_QUARANTINE_MODE";
+const ENV_WALLCLOCK_RECORD_PATH_V08: &str = "OCL_V08_WALLCLOCK_RECORD_PATH";
+const ENV_PROC_RECORD_PATH_V08: &str = "OCL_V08_PROC_RECORD_PATH";
+const ENV_HTTP_RECORD_PATH_V08: &str = "OCL_V08_HTTP_RECORD_PATH";
+const ENV_CASSETTE_JSONL_PATH_V08: &str = "OCL_V08_CASSETTE_JSONL_PATH";
+const ENV_CASSETTE_INDEX_PATH_V08: &str = "OCL_V08_CASSETTE_INDEX_PATH";
+const CASSETTE_MODE_REPLAY_V08: &str = "replay";
+
+fn with_runtime_env_v14<R, F>(
+    updates: Vec<(&'static str, Option<String>)>,
+    op: F,
+) -> Result<R, SdkError>
+where
+    F: FnOnce() -> Result<R, SdkError>,
+{
+    let mut previous = Vec::<(&'static str, Option<String>)>::with_capacity(updates.len());
+    for (key, value) in &updates {
+        previous.push((*key, env::var(key).ok()));
+        match value {
+            Some(v) => env::set_var(key, v),
+            None => env::remove_var(key),
+        }
+    }
+    let result = op();
+    for (key, value) in previous {
+        match value {
+            Some(v) => env::set_var(key, v),
+            None => env::remove_var(key),
+        }
+    }
+    result
+}
+
+fn signature_with_lane_v14(payload: &str, lane: &str, cassette_hash: Option<&str>) -> String {
+    if lane == "quarantine" {
+        let canonical = format!(
+            "lane={lane}\npayload={payload}\ncassette_hash={}\n",
+            cassette_hash.unwrap_or_default()
+        );
+        return sha256_hex_v14(canonical.as_bytes());
+    }
+    fnv1a64_hex(&format!("lane={lane}\npayload={payload}"))
+}
+
+fn read_trimmed_file_v14(path: &Path) -> Result<String, SdkError> {
+    Ok(fs::read_to_string(path)?.trim().to_string())
 }
 
 #[derive(Debug, Clone)]
@@ -825,6 +1373,15 @@ fn strip_quotes(input: &str) -> &str {
     input.trim_matches('"')
 }
 
+fn normalize_lane_v14(raw: &str) -> String {
+    match raw.trim() {
+        "locked" | "locked_v071" => "locked_v071".to_string(),
+        "locked_v06" => "locked_v06".to_string(),
+        "quarantine" => "quarantine".to_string(),
+        other => other.to_string(),
+    }
+}
+
 fn fnv1a64_hex(input: &str) -> String {
     let mut hash: u64 = 0xcbf29ce484222325;
     for b in input.as_bytes() {
@@ -832,6 +1389,17 @@ fn fnv1a64_hex(input: &str) -> String {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     format!("{hash:016x}")
+}
+
+fn sha256_hex_v14(input: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(input);
+    let digest = hasher.finalize();
+    let mut out = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        out.push_str(&format!("{byte:02x}"));
+    }
+    out
 }
 
 fn json_escape(input: &str) -> String {

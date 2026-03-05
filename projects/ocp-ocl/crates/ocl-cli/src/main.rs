@@ -24,9 +24,9 @@ use ocl_sdk::{
     test_project_with_lock, trace_required_digest, verify_assembly, verify_deps_lock_v3,
     verify_deps_signing_and_trust_v10, verify_organs_lock_v1, verify_plugin_lock_v1,
     verify_supply_artifact, write_conformance_report_json, write_profile_json,
-    write_shadow_compare_artifacts_v1, write_trace_jsonl, ConformanceRunOptionsV1, InputEnvelopeV1,
-    ProfileViewOptions, ReactorRuntimeMode, ReactorServiceOptions, SdkError, ShadowOptionsV1,
-    TraceEventV1, TraceRunSummary,
+    write_shadow_compare_artifacts_v1, write_trace_jsonl, ConformanceManifestV1,
+    ConformanceRunOptionsV1, InputEnvelopeV1, ProfileViewOptions, ReactorRuntimeMode,
+    ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1, TraceRunSummary,
 };
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
@@ -1458,8 +1458,216 @@ fn run_cli(args: &[String]) -> i32 {
                 }
             }
         }
+        "conformance" => {
+            if args.len() < 2 {
+                eprintln!(
+                    "usage: ocl conformance <run|list> [--manifest <file>] [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--locked] [--universe <id>] [--trust-store <file>] [--signer-id <id>] [--sign-key <file>] [--json]"
+                );
+                return 2;
+            }
+            let mut forwarded = vec!["test".to_string(), "--conformance".to_string()];
+            forwarded.extend_from_slice(&args[1..]);
+            run_cli(&forwarded)
+        }
+        "upgrade-check" => {
+            let Some(project_dir) = args.get(1) else {
+                eprintln!(
+                    "usage: ocl upgrade-check <project_dir> [--manifest <file>] [--target-runtime <id>] [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--locked] [--universe <id>] [--json]"
+                );
+                return 2;
+            };
+            let json_mode = args.iter().any(|a| a == "--json");
+            let locked = args.iter().any(|a| a == "--locked");
+            let universe_id = parse_string_flag(args, "--universe");
+            let manifest_path = parse_string_flag(args, "--manifest")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| default_conformance_manifest_path(Path::new(".")));
+            let out_path = parse_string_flag(args, "--out")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| {
+                    PathBuf::from("target/ocl/w9/reports/upgrade_check_report.json")
+                });
+            let target_runtime = parse_string_flag(args, "--target-runtime")
+                .unwrap_or_else(|| "current".to_string());
+            let runtime_mode_raw =
+                parse_string_flag(args, "--runtime").unwrap_or_else(|| "deterministic".to_string());
+            let runtime_mode = match runtime_mode_raw.as_str() {
+                "deterministic" => ReactorRuntimeMode::Deterministic,
+                "throughput" => ReactorRuntimeMode::Throughput,
+                _ => {
+                    eprintln!(
+                        "invalid runtime mode: `{runtime_mode_raw}` (expected deterministic|throughput)"
+                    );
+                    return 2;
+                }
+            };
+            let engine_raw =
+                parse_string_flag(args, "--engine").unwrap_or_else(|| "dual".to_string());
+            let run_engine = match engine_raw.as_str() {
+                "interpreter" => RunEngine::Interpreter,
+                "bytecode" => RunEngine::Bytecode,
+                "dual" => RunEngine::Dual,
+                _ => {
+                    eprintln!(
+                        "invalid engine mode: `{engine_raw}` (expected interpreter|bytecode|dual)"
+                    );
+                    return 2;
+                }
+            };
+
+            let manifest = match parse_conformance_manifest_v1(&manifest_path) {
+                Ok(value) => value,
+                Err(err) => {
+                    if json_mode {
+                        println!("{}", error_to_json(&err));
+                    } else {
+                        eprintln!("{err}");
+                    }
+                    return 9;
+                }
+            };
+            let project_root = Path::new(project_dir);
+            let features = detect_upgrade_check_features_v14(project_root);
+            let selected_manifest = select_upgrade_manifest_subset_v14(&manifest, &features);
+            let selected_names: Vec<String> = selected_manifest
+                .scenarios
+                .iter()
+                .map(|s| s.name.clone())
+                .collect();
+            if selected_manifest.scenarios.is_empty() {
+                let err = SdkError::MissingProject(
+                    "X-UPGRADE-CHECK-FAILED: no conformance scenarios selected from manifest"
+                        .to_string(),
+                );
+                if json_mode {
+                    println!("{}", error_to_json(&err));
+                } else {
+                    eprintln!("{err}");
+                }
+                return 10;
+            }
+
+            // Use canonical conformance runner pipeline (same runner as `ocl test --conformance`).
+            let conformance = run_conformance_v1(
+                Path::new("."),
+                &selected_manifest,
+                ConformanceRunOptionsV1 {
+                    locked,
+                    engine: run_engine,
+                    runtime_mode,
+                    universe_id,
+                },
+            );
+            let first_divergence = conformance
+                .results
+                .iter()
+                .enumerate()
+                .find(|(_, item)| !item.ok)
+                .map(|(idx, item)| {
+                    json!({
+                        "index": idx,
+                        "scenario": item.name,
+                        "reason": item.reason.clone().unwrap_or_default(),
+                    })
+                });
+            let ok = conformance.scenarios_failed == 0;
+            let report_json = json!({
+                "schema": "ocl.upgrade_check.v1",
+                "project_dir": project_dir,
+                "target_runtime": target_runtime,
+                "runner_contract": "ocl test --conformance",
+                "manifest_path": manifest_path.to_string_lossy(),
+                "selected_scenarios": selected_names,
+                "features": {
+                    "uses_tool_packs": features.uses_tool_packs,
+                    "uses_consumer_packs": features.uses_consumer_packs,
+                    "uses_shadow": features.uses_shadow,
+                    "uses_quarantine": features.uses_quarantine,
+                    "has_dependencies": features.has_dependencies,
+                },
+                "conformance": {
+                    "run_id": conformance.run_id,
+                    "scenarios_total": conformance.scenarios_total,
+                    "scenarios_passed": conformance.scenarios_passed,
+                    "scenarios_failed": conformance.scenarios_failed,
+                    "required_digest": conformance.required_digest,
+                },
+                "first_divergence": first_divergence,
+                "ok": ok,
+                "error_code": if ok { JsonValue::Null } else { JsonValue::String("X-UPGRADE-CHECK-FAILED".to_string()) }
+            });
+
+            if let Some(parent) = out_path.parent() {
+                if let Err(err) = fs::create_dir_all(parent) {
+                    if json_mode {
+                        println!("{}", error_to_json(&SdkError::Io(err)));
+                    } else {
+                        eprintln!("{}", SdkError::Io(err));
+                    }
+                    return 11;
+                }
+            }
+            if let Err(err) = fs::write(
+                &out_path,
+                serde_json::to_string_pretty(&report_json).unwrap_or_else(|_| "{}".to_string()),
+            ) {
+                if json_mode {
+                    println!("{}", error_to_json(&SdkError::Io(err)));
+                } else {
+                    eprintln!("{}", SdkError::Io(err));
+                }
+                return 11;
+            }
+
+            if json_mode {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&report_json).unwrap_or_else(|_| "{}".to_string())
+                );
+            } else {
+                println!(
+                    "upgrade-check done (ok={}, selected={}, fail={}, digest={}, out={})",
+                    ok,
+                    report_json["selected_scenarios"]
+                        .as_array()
+                        .map(|v| v.len())
+                        .unwrap_or(0),
+                    conformance.scenarios_failed,
+                    conformance.required_digest,
+                    out_path.display()
+                );
+                if !ok {
+                    if let Some(first) = report_json["first_divergence"].as_object() {
+                        let scenario = first
+                            .get("scenario")
+                            .and_then(JsonValue::as_str)
+                            .unwrap_or("unknown");
+                        let reason = first
+                            .get("reason")
+                            .and_then(JsonValue::as_str)
+                            .unwrap_or("");
+                        eprintln!(
+                            "X-UPGRADE-CHECK-FAILED: first_divergence={scenario} reason={reason}"
+                        );
+                    } else {
+                        eprintln!("X-UPGRADE-CHECK-FAILED: conformance subset failed");
+                    }
+                }
+            }
+
+            if ok {
+                0
+            } else {
+                10
+            }
+        }
         "test" => {
             if args.iter().any(|a| a == "--conformance") {
+                let conformance_marker =
+                    args.iter().position(|a| a == "--conformance").unwrap_or(0);
+                let conformance_mode = args
+                    .get(conformance_marker.saturating_add(1))
+                    .map(String::as_str);
                 let locked = args.iter().any(|a| a == "--locked");
                 let json_mode = args.iter().any(|a| a == "--json");
                 let universe_id = parse_string_flag(args, "--universe");
@@ -1494,6 +1702,65 @@ fn run_cli(args: &[String]) -> i32 {
                         return 2;
                     }
                 };
+
+                if conformance_mode == Some("list") {
+                    let manifest = match parse_conformance_manifest_v1(&manifest_path) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            if json_mode {
+                                println!("{}", error_to_json(&err));
+                            } else {
+                                eprintln!("{err}");
+                            }
+                            return 9;
+                        }
+                    };
+                    if json_mode {
+                        let scenarios: Vec<JsonValue> = manifest
+                            .scenarios
+                            .iter()
+                            .map(|s| {
+                                json!({
+                                    "name": s.name,
+                                    "path": s.path,
+                                    "lane": s.lane,
+                                    "steps": s.steps.iter().map(|st| st.as_str()).collect::<Vec<_>>(),
+                                })
+                            })
+                            .collect();
+                        println!(
+                            "{}",
+                            json!({
+                                "schema": manifest.schema,
+                                "total": scenarios.len(),
+                                "scenarios": scenarios
+                            })
+                        );
+                    } else {
+                        println!(
+                            "conformance list (schema={}, total={})",
+                            manifest.schema,
+                            manifest.scenarios.len()
+                        );
+                        for scenario in &manifest.scenarios {
+                            let steps = if scenario.steps.is_empty() {
+                                "-".to_string()
+                            } else {
+                                scenario
+                                    .steps
+                                    .iter()
+                                    .map(|s| s.as_str())
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            };
+                            println!(
+                                "- {} lane={} path={} steps={}",
+                                scenario.name, scenario.lane, scenario.path, steps
+                            );
+                        }
+                    }
+                    return 0;
+                }
 
                 let trust_store = parse_string_flag(args, "--trust-store").map(PathBuf::from);
                 let signer_id = parse_string_flag(args, "--signer-id");
@@ -2744,6 +3011,129 @@ where
         }
     }
     out
+}
+
+#[derive(Debug, Default)]
+struct UpgradeCheckFeaturesV14 {
+    uses_tool_packs: bool,
+    uses_consumer_packs: bool,
+    uses_shadow: bool,
+    uses_quarantine: bool,
+    has_dependencies: bool,
+}
+
+fn detect_upgrade_check_features_v14(project_root: &Path) -> UpgradeCheckFeaturesV14 {
+    let mut out = UpgradeCheckFeaturesV14::default();
+    let manifest_path = project_root.join("Ocl.toml");
+    if let Ok(raw_manifest) = fs::read_to_string(&manifest_path) {
+        let lowered = raw_manifest.to_ascii_lowercase();
+        if lowered.contains("[dependencies]")
+            || lowered.contains("[dependency.")
+            || lowered.contains("source =")
+        {
+            out.has_dependencies = true;
+        }
+        if lowered.contains("lane = \"quarantine\"") {
+            out.uses_quarantine = true;
+        }
+    }
+
+    let mut ocl_files = Vec::<PathBuf>::new();
+    collect_ocl_sources_v14(&project_root.join("src"), &mut ocl_files);
+    if ocl_files.is_empty() {
+        collect_ocl_sources_v14(project_root, &mut ocl_files);
+    }
+
+    for path in ocl_files {
+        if let Ok(raw) = fs::read_to_string(path) {
+            let lowered = raw.to_ascii_lowercase();
+            if lowered.contains("std.fs.")
+                || lowered.contains("std.kv.")
+                || lowered.contains("std.time.")
+            {
+                out.uses_tool_packs = true;
+            }
+            if lowered.contains("std.ui.") || lowered.contains("std.game.") {
+                out.uses_consumer_packs = true;
+            }
+            if lowered.contains("std.shadow.") {
+                out.uses_shadow = true;
+            }
+            if lowered.contains("std.net.")
+                || lowered.contains("std.proc.")
+                || lowered.contains("std.time.wallclock")
+            {
+                out.uses_quarantine = true;
+            }
+        }
+    }
+
+    out
+}
+
+fn collect_ocl_sources_v14(root: &Path, out: &mut Vec<PathBuf>) {
+    if !root.exists() {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_ocl_sources_v14(&path, out);
+            continue;
+        }
+        if path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.eq_ignore_ascii_case("ocl"))
+            .unwrap_or(false)
+        {
+            out.push(path);
+        }
+    }
+}
+
+fn select_upgrade_manifest_subset_v14(
+    manifest: &ConformanceManifestV1,
+    features: &UpgradeCheckFeaturesV14,
+) -> ConformanceManifestV1 {
+    let scenarios = manifest
+        .scenarios
+        .iter()
+        .filter(|sc| is_upgrade_scenario_relevant_v14(&sc.name, features))
+        .cloned()
+        .collect::<Vec<_>>();
+    if scenarios.is_empty() {
+        return manifest.clone();
+    }
+    ConformanceManifestV1 {
+        schema: manifest.schema.clone(),
+        scenarios,
+    }
+}
+
+fn is_upgrade_scenario_relevant_v14(name: &str, features: &UpgradeCheckFeaturesV14) -> bool {
+    if name.starts_with("core-") || name.starts_with("foundation-") || name.starts_with("cache-") {
+        return true;
+    }
+    if name.starts_with("packs-tool-") {
+        return features.uses_tool_packs;
+    }
+    if name.starts_with("packs-consumer-") {
+        return features.uses_consumer_packs;
+    }
+    if name.starts_with("shadow-") {
+        return features.uses_shadow;
+    }
+    if name.starts_with("quarantine-") {
+        return features.uses_quarantine;
+    }
+    if name.starts_with("supplychain-") {
+        return features.has_dependencies;
+    }
+    true
 }
 
 fn parse_path_with_flag(args: &[String], flag: &str) -> (Option<PathBuf>, bool) {
@@ -8439,7 +8829,9 @@ fn print_help() {
     eprintln!("  profile view <profile_file> [--top N] [--json]");
     eprintln!("  fmt   <project_dir> [--check]");
     eprintln!("  test  <project_dir> [--locked] [--universe <id>] [--domain <id>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--golden <dir>] [--clean]");
-    eprintln!("  test  --conformance --manifest <file> [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--locked] [--universe <id>] [--trust-store <file>] [--signer-id <id>] [--sign-key <file>] [--json]");
+    eprintln!("  test  --conformance [run|list] --manifest <file> [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--locked] [--universe <id>] [--trust-store <file>] [--signer-id <id>] [--sign-key <file>] [--json]");
+    eprintln!("  conformance <run|list> --manifest <file> [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--locked] [--universe <id>] [--trust-store <file>] [--signer-id <id>] [--sign-key <file>] [--json]");
+    eprintln!("  upgrade-check <project_dir> [--manifest <file>] [--target-runtime <id>] [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--locked] [--universe <id>] [--json]");
     eprintln!("  build <project_dir> [--locked] [--source-only] [--universe <id>]");
     eprintln!("  publish <artifact.oclpkg> [--registry <dir>]");
     eprintln!("  fetch <artifact|package> [--registry <dir>] [--out <dir>]");
@@ -9988,5 +10380,113 @@ match query_res {
         ];
         assert_eq!(run_cli(&args), 0);
         assert!(out_path.exists(), "missing W9 report output");
+    }
+
+    #[test]
+    fn w14_cli_conformance_list_alias_json_pass() {
+        let root = temp_project_dir("w14_list_alias");
+        prepare_runtime_project(&root);
+        let manifest_path = root.join("conformance.v1.toml");
+        let root_value = manifest_path_value(&root);
+        let manifest = format!(
+            concat!(
+                "version = 1\n\n",
+                "[[scenario]]\n",
+                "name = \"single\"\n",
+                "path = \"{}\"\n",
+                "lane = \"locked_v071\"\n",
+                "steps = [\"run\"]\n"
+            ),
+            root_value
+        );
+        fs::write(&manifest_path, manifest).expect("write conformance manifest");
+        let args = vec![
+            "conformance".to_string(),
+            "list".to_string(),
+            "--manifest".to_string(),
+            manifest_path_value(&manifest_path),
+            "--json".to_string(),
+        ];
+        assert_eq!(run_cli(&args), 0);
+    }
+
+    #[test]
+    fn w14_cli_test_conformance_list_mode_pass() {
+        let root = temp_project_dir("w14_list_test_mode");
+        prepare_runtime_project(&root);
+        let manifest_path = root.join("conformance.v1.toml");
+        let root_value = manifest_path_value(&root);
+        let manifest = format!(
+            concat!(
+                "version = 1\n\n",
+                "[[scenario]]\n",
+                "name = \"single\"\n",
+                "path = \"{}\"\n",
+                "lane = \"locked_v071\"\n",
+                "steps = [\"run\"]\n"
+            ),
+            root_value
+        );
+        fs::write(&manifest_path, manifest).expect("write conformance manifest");
+        let args = vec![
+            "test".to_string(),
+            "--conformance".to_string(),
+            "list".to_string(),
+            "--manifest".to_string(),
+            manifest_path_value(&manifest_path),
+            "--json".to_string(),
+        ];
+        assert_eq!(run_cli(&args), 0);
+    }
+
+    #[test]
+    fn w14_cli_test_conformance_run_subcommand_pass() {
+        let root = temp_project_dir("w14_test_run_mode");
+        prepare_runtime_project(&root);
+        let manifest_path = root.join("conformance.v1.toml");
+        let out_path = root.join("w14_report.json");
+        let root_value = manifest_path_value(&root);
+        let manifest = format!(
+            concat!(
+                "version = 1\n\n",
+                "[[scenario]]\n",
+                "name = \"single\"\n",
+                "path = \"{}\"\n",
+                "reactor_ticks = 0\n",
+                "composer = false\n",
+                "lane = \"locked_v071\"\n",
+                "steps = [\"run\"]\n"
+            ),
+            root_value
+        );
+        fs::write(&manifest_path, manifest).expect("write conformance manifest");
+
+        let repo_root = repo_root_dir();
+        let trust_store = repo_root.join("projects/ocp-ocl/security/trust.store.toml");
+        let sign_key = repo_root.join("projects/ocp-ocl/security/dev-root-1.signing.key.toml");
+
+        let args = vec![
+            "test".to_string(),
+            "--conformance".to_string(),
+            "run".to_string(),
+            "--manifest".to_string(),
+            manifest_path_value(&manifest_path),
+            "--out".to_string(),
+            manifest_path_value(&out_path),
+            "--runtime".to_string(),
+            "deterministic".to_string(),
+            "--engine".to_string(),
+            "dual".to_string(),
+            "--locked".to_string(),
+            "--trust-store".to_string(),
+            manifest_path_value(&trust_store),
+            "--signer-id".to_string(),
+            "dev-root-1".to_string(),
+            "--sign-key".to_string(),
+            manifest_path_value(&sign_key),
+            "--json".to_string(),
+        ];
+        assert_eq!(run_cli(&args), 0);
+        assert!(out_path.exists(), "missing W14 report output");
     }
 }

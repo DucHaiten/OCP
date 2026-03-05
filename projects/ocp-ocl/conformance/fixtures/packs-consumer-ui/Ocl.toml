@@ -1,0 +1,20 @@
+[package]
+name = "packs_consumer_ui"
+version = "0.1.0"
+
+[targets]
+default = "main"
+
+[dependencies]
+std = "0.1.0"
+
+[permissions.package]
+allow = ["std.ui.*"]
+deny = []
+
+[permissions.std_ui]
+enabled = true
+max_draw_cmds = 200
+max_input_events = 50
+assets_read = ["./assets/**"]
+max_asset_bytes = 2048

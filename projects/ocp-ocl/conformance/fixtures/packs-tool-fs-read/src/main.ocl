@@ -1,0 +1,2 @@
+observe("std.fs.read_text", "tier2", ctx("path=./data/sample.txt"), budget(5)) -> r;
+condition(true);

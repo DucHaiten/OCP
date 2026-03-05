@@ -1,0 +1,2 @@
+observe("std.shadow.search", "tier2", ctx("policy=round_robin;variants_json=[{\"x\":1},{\"x\":2},{\"x\":3}];max_branches=3;per_branch_step_cap=80;per_branch_budget_cap=2000;global_step_cap=240;global_budget_cap=12000;top_k=3;rounds=2"), budget(5)) -> s;
+condition(true);

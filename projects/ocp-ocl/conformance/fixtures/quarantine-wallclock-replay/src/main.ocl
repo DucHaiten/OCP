@@ -1,0 +1,2 @@
+observe("std.time.wallclock.now", "tier2", ctx("scope=tool"), budget(5)) -> now_res;
+condition(true);

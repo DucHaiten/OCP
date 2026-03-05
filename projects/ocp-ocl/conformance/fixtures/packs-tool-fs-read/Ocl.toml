@@ -1,0 +1,16 @@
+[package]
+name = "packs_tool_fs_read"
+version = "0.1.0"
+
+[targets]
+default = "main"
+
+[dependencies]
+std = "0.1.0"
+
+[permissions.package]
+allow = ["std.fs.*"]
+deny = []
+
+[permissions.std_fs]
+read = ["./data/**"]

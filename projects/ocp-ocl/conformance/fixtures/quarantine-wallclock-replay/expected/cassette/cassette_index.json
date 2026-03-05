@@ -1,0 +1,9 @@
+{
+  "schema_version":"v0.8",
+  "mode":"replay",
+  "call_id_to_entry_id":{
+    "0":"entry-000000"
+  },
+  "entries":1,
+  "next_call_id":1
+}
