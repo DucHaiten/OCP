@@ -27,6 +27,12 @@ pub enum KeyCapabilityKind {
     ObserveAndCommit,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeterminismClass {
+    Deterministic,
+    NonDeterministic,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyPattern {
     Any,
@@ -64,6 +70,7 @@ pub struct CapabilityRegistry {
     ctx_schemas: HashMap<String, SchemaType>,
     payload_schemas: HashMap<String, SchemaType>,
     commit_allowed: HashMap<String, bool>,
+    determinism_classes: HashMap<String, DeterminismClass>,
 }
 
 impl Default for CapabilityRegistry {
@@ -160,6 +167,10 @@ impl CapabilityRegistry {
             vec!["variants_json".to_string()],
         );
         ctx_required.insert(
+            "std.shadow.search".to_string(),
+            vec!["variants_json".to_string()],
+        );
+        ctx_required.insert(
             "std.shadow.compare".to_string(),
             vec!["branches_json".to_string()],
         );
@@ -202,12 +213,39 @@ impl CapabilityRegistry {
         commit_allowed.insert("std.net.http.request".to_string(), false);
         commit_allowed.insert("std.game.state_delta".to_string(), true);
         commit_allowed.insert("std.shadow.run".to_string(), false);
+        commit_allowed.insert("std.shadow.search".to_string(), false);
         commit_allowed.insert("std.shadow.compare".to_string(), false);
         commit_allowed.insert("engine.ui.run".to_string(), false);
         commit_allowed.insert("engine.game.run".to_string(), false);
         commit_allowed.insert("engine.shadow.preview".to_string(), false);
         commit_allowed.insert("std.view.render_text".to_string(), false);
         commit_allowed.insert("std.view.render_tree".to_string(), false);
+
+        let mut determinism_classes = HashMap::new();
+        determinism_classes.insert(
+            "std.time.tick_info".to_string(),
+            DeterminismClass::Deterministic,
+        );
+        determinism_classes.insert(
+            "std.game.tick_info".to_string(),
+            DeterminismClass::Deterministic,
+        );
+        determinism_classes.insert(
+            "std.ui.frame_info".to_string(),
+            DeterminismClass::Deterministic,
+        );
+        determinism_classes.insert(
+            "std.shadow.run".to_string(),
+            DeterminismClass::Deterministic,
+        );
+        determinism_classes.insert(
+            "std.shadow.search".to_string(),
+            DeterminismClass::Deterministic,
+        );
+        determinism_classes.insert(
+            "std.shadow.compare".to_string(),
+            DeterminismClass::Deterministic,
+        );
 
         let mut ctx_schemas = HashMap::new();
         ctx_schemas.insert(
@@ -655,6 +693,50 @@ impl CapabilityRegistry {
                     ("branches", FieldSpec::optional(SchemaType::Int)),
                     ("branch_step_cap", FieldSpec::optional(SchemaType::Int)),
                     ("branch_budget_cap", FieldSpec::optional(SchemaType::Int)),
+                    ("checkpoint_every", FieldSpec::optional(SchemaType::Int)),
+                    ("tick", FieldSpec::optional(SchemaType::Int)),
+                    ("ctx_tick", FieldSpec::optional(SchemaType::Int)),
+                ]),
+                open_row: false,
+            },
+        );
+        ctx_schemas.insert(
+            "std.shadow.search".to_string(),
+            SchemaType::Record {
+                fields: btree_fields(vec![
+                    ("variants_json", FieldSpec::required(SchemaType::String)),
+                    ("effect_keys", FieldSpec::optional(SchemaType::String)),
+                    ("policy", FieldSpec::optional(SchemaType::String)),
+                    ("max_branches", FieldSpec::optional(SchemaType::Int)),
+                    ("branches", FieldSpec::optional(SchemaType::Int)),
+                    ("per_branch_step_cap", FieldSpec::optional(SchemaType::Int)),
+                    ("branch_step_cap", FieldSpec::optional(SchemaType::Int)),
+                    (
+                        "per_branch_budget_cap",
+                        FieldSpec::optional(SchemaType::Int),
+                    ),
+                    ("branch_budget_cap", FieldSpec::optional(SchemaType::Int)),
+                    ("global_step_cap", FieldSpec::optional(SchemaType::Int)),
+                    ("global_budget_cap", FieldSpec::optional(SchemaType::Int)),
+                    ("rounds", FieldSpec::optional(SchemaType::Int)),
+                    ("beam_width", FieldSpec::optional(SchemaType::Int)),
+                    ("top_k", FieldSpec::optional(SchemaType::Int)),
+                    ("score_field", FieldSpec::optional(SchemaType::String)),
+                    ("outcome_weight", FieldSpec::optional(SchemaType::Int)),
+                    ("cost_budget_weight", FieldSpec::optional(SchemaType::Int)),
+                    ("cost_steps_weight", FieldSpec::optional(SchemaType::Int)),
+                    (
+                        "reason_penalty_weight",
+                        FieldSpec::optional(SchemaType::Int),
+                    ),
+                    ("state_score_weight", FieldSpec::optional(SchemaType::Int)),
+                    (
+                        "reason_penalties_json",
+                        FieldSpec::optional(SchemaType::String),
+                    ),
+                    ("max_diff_keys", FieldSpec::optional(SchemaType::Int)),
+                    ("max_report_bytes", FieldSpec::optional(SchemaType::Int)),
+                    ("checkpoint_every", FieldSpec::optional(SchemaType::Int)),
                     ("tick", FieldSpec::optional(SchemaType::Int)),
                     ("ctx_tick", FieldSpec::optional(SchemaType::Int)),
                 ]),
@@ -1220,8 +1302,53 @@ impl CapabilityRegistry {
                     ("branch_step_cap", FieldSpec::required(SchemaType::Int)),
                     ("branch_budget_cap", FieldSpec::required(SchemaType::Int)),
                     ("branch_digest", FieldSpec::required(SchemaType::String)),
+                    ("prefix_key", FieldSpec::optional(SchemaType::String)),
+                    ("checkpoint_every", FieldSpec::optional(SchemaType::Int)),
+                    (
+                        "checkpoint_cache",
+                        FieldSpec::optional(SchemaType::Map {
+                            value: Box::new(SchemaType::Union {
+                                types: vec![SchemaType::Int, SchemaType::Bool, SchemaType::String],
+                            }),
+                            cap: Some(16),
+                        }),
+                    ),
+                    (
+                        "memo",
+                        FieldSpec::optional(SchemaType::Map {
+                            value: Box::new(SchemaType::Union {
+                                types: vec![SchemaType::Int, SchemaType::Bool, SchemaType::String],
+                            }),
+                            cap: Some(16),
+                        }),
+                    ),
                 ]),
                 open_row: false,
+            },
+        );
+        payload_schemas.insert(
+            "std.shadow.search".to_string(),
+            SchemaType::Record {
+                fields: btree_fields(vec![
+                    ("truncated", FieldSpec::required(SchemaType::Bool)),
+                    (
+                        "report",
+                        FieldSpec::required(SchemaType::Record {
+                            fields: btree_fields(vec![
+                                (
+                                    "schema",
+                                    FieldSpec::required(SchemaType::Enum {
+                                        values: vec!["shadow.report.v2".to_string()],
+                                    }),
+                                ),
+                                ("truncated", FieldSpec::required(SchemaType::Bool)),
+                                ("report_bytes", FieldSpec::required(SchemaType::Int)),
+                            ]),
+                            open_row: true,
+                        }),
+                    ),
+                ]),
+                open_row: true,
             },
         );
         payload_schemas.insert(
@@ -1286,6 +1413,7 @@ impl CapabilityRegistry {
             ctx_schemas,
             payload_schemas,
             commit_allowed,
+            determinism_classes,
         }
     }
 
@@ -1339,6 +1467,14 @@ impl CapabilityRegistry {
         self.set_commit_allowed_for_key(key, matches!(kind, KeyCapabilityKind::ObserveAndCommit));
     }
 
+    pub fn set_determinism_class_for_key(
+        &mut self,
+        key_pattern: impl Into<String>,
+        class: DeterminismClass,
+    ) {
+        self.determinism_classes.insert(key_pattern.into(), class);
+    }
+
     pub fn key_kind_for_key(&self, key: &str) -> KeyCapabilityKind {
         if self.commit_allowed_for_key(key) {
             KeyCapabilityKind::ObserveAndCommit
@@ -1347,12 +1483,19 @@ impl CapabilityRegistry {
         }
     }
 
+    pub fn determinism_class_for_key(&self, key: &str) -> DeterminismClass {
+        best_determinism_for_key(&self.determinism_classes, key)
+            .copied()
+            .unwrap_or(DeterminismClass::NonDeterministic)
+    }
+
     pub fn documented_keys(&self) -> Vec<String> {
         let mut keys = BTreeSet::<String>::new();
         keys.extend(self.ctx_required.keys().cloned());
         keys.extend(self.ctx_schemas.keys().cloned());
         keys.extend(self.payload_schemas.keys().cloned());
         keys.extend(self.commit_allowed.keys().cloned());
+        keys.extend(self.determinism_classes.keys().cloned());
         keys.into_iter().collect()
     }
 
@@ -1459,4 +1602,22 @@ fn best_schema_for_key<'a>(
         }
     }
     best.map(|(schema, _)| schema)
+}
+
+fn best_determinism_for_key<'a>(
+    classes: &'a HashMap<String, DeterminismClass>,
+    key: &str,
+) -> Option<&'a DeterminismClass> {
+    let mut best: Option<(&DeterminismClass, usize)> = None;
+    for (pattern, class) in classes {
+        let kp = KeyPattern::from_pattern(pattern);
+        if kp.matches(key) {
+            let score = pattern.trim_end_matches('*').len();
+            match best {
+                Some((_, best_score)) if best_score >= score => {}
+                _ => best = Some((class, score)),
+            }
+        }
+    }
+    best.map(|(class, _)| class)
 }

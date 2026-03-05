@@ -46,6 +46,7 @@ fn registry_has_ctx_and_payload_schema_for_consumer_pack_keys() {
         "std.game.rng",
         "std.game.state_delta",
         "std.shadow.run",
+        "std.shadow.search",
         "std.shadow.compare",
     ];
 
@@ -123,6 +124,23 @@ observe("std.shadow.compare", "tier2", ctx("branches_json=[{\"id\":0,\"outcome\"
     let payload = r.payload.as_ref().expect("payload");
     let payload_schema = reg
         .payload_schema_for_key("std.shadow.compare")
+        .expect("payload schema");
+    validate_schema_value(payload_schema, payload).expect("payload should satisfy schema");
+}
+
+#[test]
+fn runtime_payload_schema_matches_std_shadow_search_payload() {
+    let src = r#"
+observe("std.shadow.search", "tier2", ctx("policy=round_robin;variants_json=[{\"x\":1},{\"x\":2},{\"x\":3}];max_branches=3;per_branch_step_cap=80;per_branch_budget_cap=2000;global_step_cap=240;global_budget_cap=12000;rounds=2;top_k=3"), budget(5)) -> r;
+"#;
+    let (reg, result) = run_with_registry(src, CapabilityRegistry::v1_baseline());
+    let Value::Result4(r) = result else {
+        panic!("expected Result4");
+    };
+    assert!(matches!(r.kind, ResultKind::Ok | ResultKind::Degraded));
+    let payload = r.payload.as_ref().expect("payload");
+    let payload_schema = reg
+        .payload_schema_for_key("std.shadow.search")
         .expect("payload schema");
     validate_schema_value(payload_schema, payload).expect("payload should satisfy schema");
 }

@@ -3158,7 +3158,7 @@ fn apply_shadow_preview_template_v073(root: &Path) -> Result<(), SdkError> {
             "[language]\n",
             "guard_mode = \"return\"\n\n",
             "[permissions.package]\n",
-            "allow = [\"engine.shadow.*\"]\n",
+            "allow = [\"std.shadow.*\"]\n",
             "deny = []\n\n",
             "[permissions.std_shadow]\n",
             "enabled = true\n",
@@ -3174,7 +3174,7 @@ fn apply_shadow_preview_template_v073(root: &Path) -> Result<(), SdkError> {
 
     let source = concat!(
         "module app.shadow_preview;\n\n",
-        "observe(\"engine.shadow.preview\", \"tier2\", ctx(\"entry_module=app.shadow_preview;tick=1;variants_json=[{\\\"move\\\":\\\"left\\\"},{\\\"move\\\":\\\"right\\\"}];baseline_id=0;max_diff_keys=8\"), budget(20)) -> preview;\n",
+        "observe(\"std.shadow.search\", \"tier2\", ctx(\"policy=portfolio;variants_json=[{\\\"score\\\":50,\\\"move\\\":\\\"hold\\\"},{\\\"score\\\":50,\\\"move\\\":\\\"hold\\\"},{\\\"score\\\":50,\\\"move\\\":\\\"hold\\\"},{\\\"score\\\":50,\\\"move\\\":\\\"hold\\\"},{\\\"score\\\":50,\\\"move\\\":\\\"hold\\\"},{\\\"score\\\":50,\\\"move\\\":\\\"hold\\\"},{\\\"score\\\":50,\\\"move\\\":\\\"hold\\\"},{\\\"score\\\":50,\\\"move\\\":\\\"hold\\\"}];max_branches=8;rounds=8;top_k=8;per_branch_step_cap=80;per_branch_budget_cap=5000;global_step_cap=640;global_budget_cap=40000;state_score_weight=1;outcome_weight=0;cost_budget_weight=0;cost_steps_weight=0;reason_penalty_weight=0;max_diff_keys=32;max_report_bytes=4096\"), budget(20)) -> search;\n",
         "condition(true);\n"
     );
     fs::write(root.join("src").join("main.ocl"), source)?;

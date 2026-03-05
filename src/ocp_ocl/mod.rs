@@ -32,7 +32,9 @@ pub use pilot::{
     build_closeout_report, replay_pilot_sequence, run_pilot_sequence, PilotReplayResult,
     PilotSummary, PilotTurnResult, PilotTurnStatus,
 };
-pub use registry::{CapabilityRegistry, KeyCapabilityKind, KeyPattern, RegistryCheckError};
+pub use registry::{
+    CapabilityRegistry, DeterminismClass, KeyCapabilityKind, KeyPattern, RegistryCheckError,
+};
 pub use result_kind::{Result4, ResultKind};
 pub use runner::{run_fixture_file, run_fixture_source, FixtureRunnerError};
 pub use schema::{

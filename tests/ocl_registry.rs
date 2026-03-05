@@ -107,3 +107,16 @@ fn registry_denies_std_net_poll_by_default() {
         .expect_err("std.net.poll must be denied in user path");
     assert_eq!(err.to_reason_code(), ReasonCode::CapabilityDenied);
 }
+
+#[test]
+fn registry_determinism_class_defaults_to_non_deterministic() {
+    let reg = CapabilityRegistry::v1_baseline();
+    assert_eq!(
+        reg.determinism_class_for_key("std.game.tick_info"),
+        ocp_ocl::ocp_ocl::DeterminismClass::Deterministic
+    );
+    assert_eq!(
+        reg.determinism_class_for_key("std.time.wallclock.now"),
+        ocp_ocl::ocp_ocl::DeterminismClass::NonDeterministic
+    );
+}

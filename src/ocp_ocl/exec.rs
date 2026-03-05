@@ -12,7 +12,7 @@ use crate::ocp_ocl::ast::{Expr, LetPattern, MatchStmt, Program, Stmt};
 use crate::ocp_ocl::audit::{TraceEvent, TraceLog};
 use crate::ocp_ocl::budget::{BudgetMeter, CommitPolicyMode, ExecConfig, GuardMode};
 use crate::ocp_ocl::diag::{DiagPhase, Diagnostic, ErrorCode, ReasonCode};
-use crate::ocp_ocl::registry::CapabilityRegistry;
+use crate::ocp_ocl::registry::{CapabilityRegistry, DeterminismClass};
 use crate::ocp_ocl::result_kind::{Result4, ResultKind};
 use crate::ocp_ocl::schema::{validate_schema_value, SchemaType};
 use crate::ocp_ocl::value::Value;
@@ -1464,10 +1464,51 @@ impl Executor {
                     .get("truncated")
                     .and_then(Value::as_bool)
                     .unwrap_or(false);
-                let detail = map
+                let branch_digest = map
                     .get("branch_digest")
                     .and_then(Value::as_string)
                     .unwrap_or_default();
+                let memo_detail = map.get("memo").and_then(|v| match v {
+                    Value::Map(m) => {
+                        let hits = m
+                            .get("hits")
+                            .and_then(|v| match v {
+                                Value::Int(raw) => Some(*raw),
+                                _ => None,
+                            })
+                            .unwrap_or(0);
+                        let misses = m
+                            .get("misses")
+                            .and_then(|v| match v {
+                                Value::Int(raw) => Some(*raw),
+                                _ => None,
+                            })
+                            .unwrap_or(0);
+                        let charged = m
+                            .get("observe_calls_charged")
+                            .and_then(|v| match v {
+                                Value::Int(raw) => Some(*raw),
+                                _ => None,
+                            })
+                            .unwrap_or(0);
+                        let executed = m
+                            .get("observe_calls_executed")
+                            .and_then(|v| match v {
+                                Value::Int(raw) => Some(*raw),
+                                _ => None,
+                            })
+                            .unwrap_or(0);
+                        Some(format!(
+                            "memo(h={hits},m={misses},c={charged},e={executed})"
+                        ))
+                    }
+                    _ => None,
+                });
+                let detail = if let Some(memo) = memo_detail {
+                    format!("{branch_digest}|{memo}")
+                } else {
+                    branch_digest
+                };
                 self.trace.push(TraceEvent::ShadowRun {
                     key: key.to_string(),
                     branch_count,
@@ -3716,6 +3757,231 @@ fn shadow_max_report_bytes() -> usize {
         .unwrap_or(262_144)
 }
 
+fn shadow_checkpoint_every() -> usize {
+    env::var("OCL_STD_SHADOW_CHECKPOINT_EVERY")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(200)
+}
+
+fn shadow_checkpoint_cache_max_entries() -> usize {
+    env::var("OCL_STD_SHADOW_CHECKPOINT_CACHE_MAX_ENTRIES")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(2_048)
+}
+
+fn shadow_checkpoint_reuse_enabled() -> bool {
+    match env::var("OCL_STD_SHADOW_CHECKPOINT_REUSE") {
+        Ok(raw) => !matches!(
+            raw.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "no"
+        ),
+        Err(_) => true,
+    }
+}
+
+fn shadow_memoize_deterministic_observe_enabled() -> bool {
+    match env::var("OCL_STD_SHADOW_MEMOIZE_DETERMINISTIC_OBSERVE") {
+        Ok(raw) => !matches!(
+            raw.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "no"
+        ),
+        Err(_) => true,
+    }
+}
+
+fn shadow_memo_observe_key() -> String {
+    let raw = env::var("OCL_STD_SHADOW_MEMO_OBSERVE_KEY")
+        .unwrap_or_else(|_| "std.game.tick_info".to_string());
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        "std.game.tick_info".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn shadow_scheduler_policy_allow() -> Vec<String> {
+    let raw = env::var("OCL_STD_SHADOW_SCHEDULER_POLICY_ALLOW")
+        .unwrap_or_else(|_| "beam,portfolio,round_robin".to_string());
+    let mut out = Vec::new();
+    for token in raw.split([',', '|']) {
+        let normalized = token.trim().to_ascii_lowercase();
+        if normalized.is_empty() {
+            continue;
+        }
+        if !out.iter().any(|existing| existing == &normalized) {
+            out.push(normalized);
+        }
+    }
+    if out.is_empty() {
+        vec![
+            "beam".to_string(),
+            "portfolio".to_string(),
+            "round_robin".to_string(),
+        ]
+    } else {
+        out
+    }
+}
+
+fn shadow_policy_allowed(policy: &str) -> bool {
+    shadow_scheduler_policy_allow()
+        .into_iter()
+        .any(|entry| entry == policy)
+}
+
+fn shadow_max_rounds() -> usize {
+    env::var("OCL_STD_SHADOW_MAX_ROUNDS")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(50)
+}
+
+fn shadow_global_step_cap_max() -> usize {
+    env::var("OCL_STD_SHADOW_GLOBAL_STEP_CAP")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or_else(|| shadow_max_branches().saturating_mul(shadow_branch_step_cap()))
+}
+
+fn shadow_global_budget_cap_max() -> usize {
+    env::var("OCL_STD_SHADOW_GLOBAL_BUDGET_CAP")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or_else(|| shadow_max_branches().saturating_mul(shadow_branch_budget_cap()))
+}
+
+fn shadow_beam_width_max() -> usize {
+    env::var("OCL_STD_SHADOW_BEAM_WIDTH_MAX")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(8)
+}
+
+#[derive(Debug, Clone)]
+struct ShadowScoreConfig {
+    score_field: String,
+    outcome_weight: i64,
+    cost_budget_weight: i64,
+    cost_steps_weight: i64,
+    reason_penalty_weight: i64,
+    state_score_weight: i64,
+    reason_penalties: BTreeMap<String, i64>,
+}
+
+fn shadow_parse_weight(raw: Option<&String>, default_value: i64) -> i64 {
+    parse_nonnegative_i64(raw)
+        .unwrap_or(default_value)
+        .clamp(0, 1000)
+}
+
+fn shadow_score_config_from_ctx(ctx: &HashMap<String, String>) -> ShadowScoreConfig {
+    let mut reason_penalties = BTreeMap::<String, i64>::new();
+    if let Some(raw_penalties) = ctx.get("reason_penalties_json") {
+        if let Ok(Value::Map(map)) = parse_json_value(raw_penalties) {
+            for (reason, raw) in map {
+                if let Value::Int(score) = raw {
+                    reason_penalties.insert(reason, score.clamp(-1_000_000, 0));
+                }
+            }
+        }
+    }
+    let score_field = ctx
+        .get("score_field")
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .unwrap_or("score")
+        .to_string();
+
+    ShadowScoreConfig {
+        score_field,
+        outcome_weight: shadow_parse_weight(ctx.get("outcome_weight"), 1),
+        cost_budget_weight: shadow_parse_weight(ctx.get("cost_budget_weight"), 1),
+        cost_steps_weight: shadow_parse_weight(ctx.get("cost_steps_weight"), 1),
+        reason_penalty_weight: shadow_parse_weight(ctx.get("reason_penalty_weight"), 1),
+        state_score_weight: shadow_parse_weight(ctx.get("state_score_weight"), 1),
+        reason_penalties,
+    }
+}
+
+fn shadow_outcome_base(kind: ResultKind) -> i64 {
+    match kind {
+        ResultKind::Ok => 1000,
+        ResultKind::Degraded => 300,
+        ResultKind::Deferred => -300,
+        ResultKind::Insufficient => -700,
+    }
+}
+
+fn shadow_extract_state_score(branch: &ShadowBranchView, score_field: &str) -> i64 {
+    let Value::Map(map) = &branch.state_summary else {
+        return 0;
+    };
+    let from_direct = match map.get(score_field) {
+        Some(Value::Int(v)) => Some(*v),
+        _ => None,
+    };
+    let from_variant = map
+        .get("variant")
+        .and_then(|value| match value {
+            Value::Map(variant) => variant.get(score_field),
+            _ => None,
+        })
+        .and_then(|value| match value {
+            Value::Int(v) => Some(*v),
+            _ => None,
+        });
+    from_direct
+        .or(from_variant)
+        .unwrap_or(0)
+        .clamp(-1_000_000, 1_000_000)
+}
+
+fn shadow_reason_base(reason: Option<ReasonCode>, config: &ShadowScoreConfig) -> i64 {
+    let Some(reason_code) = reason else {
+        return 0;
+    };
+    config
+        .reason_penalties
+        .get(reason_code.as_str())
+        .copied()
+        .unwrap_or(-100)
+}
+
+fn shadow_compute_score(branch: &ShadowBranchView, config: &ShadowScoreConfig) -> i64 {
+    let state_score = shadow_extract_state_score(branch, &config.score_field);
+    let outcome_base = shadow_outcome_base(branch.outcome);
+    let reason_base = shadow_reason_base(branch.reason, config);
+    let total = (config.outcome_weight as i128) * (outcome_base as i128)
+        + (config.state_score_weight as i128) * (state_score as i128)
+        + (config.reason_penalty_weight as i128) * (reason_base as i128)
+        - (config.cost_budget_weight as i128) * (branch.cost_budget.max(0) as i128)
+        - (config.cost_steps_weight as i128) * (branch.cost_steps.max(0) as i128);
+    total.clamp(i64::MIN as i128, i64::MAX as i128) as i64
+}
+
+fn shadow_branch_steps_executed(branch: &Value, fallback_steps: i64) -> i64 {
+    let steps = match branch {
+        Value::Map(map) => match map.get("cost") {
+            Some(Value::Map(cost)) => match cost.get("steps_executed") {
+                Some(Value::Int(v)) => Some(*v),
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    };
+    steps.unwrap_or(fallback_steps).max(0)
+}
+
 fn shadow_disallowed_effect_keys(ctx: &HashMap<String, String>) -> Vec<String> {
     let mut out = Vec::new();
     let raw = ctx.get("effect_keys").cloned().unwrap_or_default();
@@ -3766,6 +4032,375 @@ struct ShadowBranchView {
     cost_steps: i64,
     cost_budget: i64,
     state_summary: Value,
+}
+
+#[derive(Debug, Clone)]
+struct ShadowCheckpointStats {
+    reuse_enabled: bool,
+    hits: i64,
+    misses: i64,
+    entries: i64,
+    cap: i64,
+    truncated: bool,
+}
+
+#[derive(Debug, Clone)]
+struct ShadowMemoStats {
+    enabled: bool,
+    observe_key: String,
+    determinism_class: String,
+    hits: i64,
+    misses: i64,
+    entries: i64,
+    observe_calls_charged: i64,
+    observe_calls_executed: i64,
+    memo_saved_steps: i64,
+}
+
+#[derive(Debug, Clone)]
+struct ShadowRunBuild {
+    branches: Vec<Value>,
+    branch_views: Vec<ShadowBranchView>,
+    branch_digest: String,
+    truncated: bool,
+    effective_step_cap: usize,
+    effective_budget_cap: usize,
+    checkpoint_every: usize,
+    prefix_key: String,
+    checkpoint_stats: ShadowCheckpointStats,
+    memo_stats: ShadowMemoStats,
+}
+
+fn shadow_prefix_key(
+    entry_scope: &str,
+    tick: i64,
+    max_branches: usize,
+    step_cap: usize,
+    budget_cap: usize,
+    checkpoint_every: usize,
+) -> String {
+    let source = format!(
+        "shadow_prefix|entry={entry_scope}|lane=locked_v071|seed=0|tick={tick}|max_branches={max_branches}|step_cap={step_cap}|budget_cap={budget_cap}|checkpoint_every={checkpoint_every}"
+    );
+    stable_hash256_hex(&source)
+}
+
+fn shadow_variant_prefix_digest(variant: &Value) -> String {
+    stable_hash256_hex(&stringify_json_value(variant))
+}
+
+fn shadow_checkpoint_key(
+    prefix_key: &str,
+    variant_digest: &str,
+    checkpoint_index: usize,
+) -> String {
+    format!("{prefix_key}|{variant_digest}|{checkpoint_index}")
+}
+
+fn shadow_checkpoint_digest(
+    prefix_key: &str,
+    variant_digest: &str,
+    checkpoint_index: usize,
+) -> String {
+    stable_hash256_hex(&format!(
+        "shadow_checkpoint|{prefix_key}|{variant_digest}|{checkpoint_index}"
+    ))
+}
+
+fn shadow_state_digest(
+    prefix_key: &str,
+    variant_digest: &str,
+    steps: i64,
+    budget: i64,
+    signature: &str,
+) -> String {
+    stable_hash256_hex(&format!(
+        "shadow_state|{prefix_key}|{variant_digest}|steps={steps}|budget={budget}|sig={signature}"
+    ))
+}
+
+fn shadow_checkpoint_indices(steps: i64, checkpoint_every: usize) -> Vec<usize> {
+    let steps_u = steps.max(1) as usize;
+    let stride = checkpoint_every.max(1);
+    let mut out = Vec::new();
+    let mut cursor = stride;
+    while cursor < steps_u {
+        out.push(cursor);
+        cursor = cursor.saturating_add(stride);
+    }
+    out.push(steps_u);
+    out
+}
+
+fn shadow_checkpoint_stats_value(stats: &ShadowCheckpointStats) -> Value {
+    let mut map = BTreeMap::new();
+    map.insert(
+        "reuse_enabled".to_string(),
+        Value::Bool(stats.reuse_enabled),
+    );
+    map.insert("hits".to_string(), Value::Int(stats.hits.max(0)));
+    map.insert("misses".to_string(), Value::Int(stats.misses.max(0)));
+    map.insert("entries".to_string(), Value::Int(stats.entries.max(0)));
+    map.insert("cap".to_string(), Value::Int(stats.cap.max(1)));
+    map.insert("truncated".to_string(), Value::Bool(stats.truncated));
+    Value::Map(map)
+}
+
+fn shadow_memo_stats_value(stats: &ShadowMemoStats) -> Value {
+    let mut map = BTreeMap::new();
+    map.insert("enabled".to_string(), Value::Bool(stats.enabled));
+    map.insert(
+        "observe_key".to_string(),
+        Value::String(stats.observe_key.clone()),
+    );
+    map.insert(
+        "determinism_class".to_string(),
+        Value::String(stats.determinism_class.clone()),
+    );
+    map.insert("hits".to_string(), Value::Int(stats.hits.max(0)));
+    map.insert("misses".to_string(), Value::Int(stats.misses.max(0)));
+    map.insert("entries".to_string(), Value::Int(stats.entries.max(0)));
+    map.insert(
+        "observe_calls_charged".to_string(),
+        Value::Int(stats.observe_calls_charged.max(0)),
+    );
+    map.insert(
+        "observe_calls_executed".to_string(),
+        Value::Int(stats.observe_calls_executed.max(0)),
+    );
+    map.insert(
+        "memo_saved_steps".to_string(),
+        Value::Int(stats.memo_saved_steps.max(0)),
+    );
+    Value::Map(map)
+}
+
+fn shadow_memo_observe_cost_steps() -> i64 {
+    env::var("OCL_STD_SHADOW_MEMO_OBSERVE_COST_STEPS")
+        .ok()
+        .and_then(|v| v.trim().parse::<i64>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(64)
+}
+
+fn build_shadow_run(
+    entry_scope: &str,
+    tick: i64,
+    variants: Vec<Value>,
+    requested_branches: usize,
+    requested_step_cap: usize,
+    requested_budget_cap: usize,
+    requested_checkpoint_every: Option<usize>,
+) -> ShadowRunBuild {
+    let effective_branches = requested_branches
+        .min(variants.len())
+        .min(shadow_max_branches());
+    let effective_step_cap = requested_step_cap.min(shadow_branch_step_cap()).max(1);
+    let effective_budget_cap = requested_budget_cap.min(shadow_branch_budget_cap()).max(1);
+    let checkpoint_every = requested_checkpoint_every
+        .unwrap_or(shadow_checkpoint_every())
+        .max(1)
+        .min(effective_step_cap);
+    let prefix_key = shadow_prefix_key(
+        entry_scope,
+        tick,
+        effective_branches.max(1),
+        effective_step_cap,
+        effective_budget_cap,
+        checkpoint_every,
+    );
+
+    let mut branches = Vec::with_capacity(effective_branches);
+    let mut branch_views = Vec::with_capacity(effective_branches);
+    let mut signature_join = String::new();
+    let mut memo_table = BTreeMap::<String, String>::new();
+    let mut cache = BTreeMap::<String, String>::new();
+    let cache_cap = shadow_checkpoint_cache_max_entries().max(1);
+    let checkpoint_reuse_enabled = shadow_checkpoint_reuse_enabled();
+    let mut hits: i64 = 0;
+    let mut misses: i64 = 0;
+    let mut cache_truncated = false;
+    let memo_requested = shadow_memoize_deterministic_observe_enabled();
+    let memo_observe_key = shadow_memo_observe_key();
+    let memo_determinism_class =
+        CapabilityRegistry::default().determinism_class_for_key(&memo_observe_key);
+    let memo_enabled = memo_requested
+        && memo_determinism_class == DeterminismClass::Deterministic
+        && entry_scope != "quarantine";
+    let memo_cost_steps = shadow_memo_observe_cost_steps();
+    let mut memo_hits: i64 = 0;
+    let mut memo_misses: i64 = 0;
+    let mut memo_observe_calls_charged: i64 = 0;
+    let mut memo_observe_calls_executed: i64 = 0;
+    let mut memo_saved_steps: i64 = 0;
+
+    for (idx, variant) in variants.into_iter().enumerate().take(effective_branches) {
+        let variant_json = stringify_json_value(&variant);
+        let variant_digest = shadow_variant_prefix_digest(&variant);
+        let signature = stable_hash64_hex(&format!("shadow_branch|{idx}|{tick}|{variant_json}"));
+        signature_join.push_str(&signature);
+        signature_join.push('|');
+
+        let steps_seed = format!("shadow_steps|{variant_digest}|{tick}");
+        let base_steps =
+            ((fnv1a64_bytes(steps_seed.as_bytes()) % effective_step_cap as u64) + 1) as i64;
+        let steps_charged = (base_steps.saturating_add(memo_cost_steps))
+            .min(effective_step_cap as i64)
+            .max(1);
+        memo_observe_calls_charged = memo_observe_calls_charged.saturating_add(1);
+        let memo_lookup_key = {
+            let ctx_hash = stable_hash256_hex(&format!("variant={variant_digest}|tick={tick}"));
+            format!(
+                "key={}|tier=tier2|ctx={ctx_hash}|budget_units={}|lane=locked_v071",
+                memo_observe_key, effective_budget_cap
+            )
+        };
+        let memo_hit = if memo_enabled {
+            match memo_table.entry(memo_lookup_key) {
+                std::collections::btree_map::Entry::Occupied(_) => {
+                    memo_hits = memo_hits.saturating_add(1);
+                    true
+                }
+                std::collections::btree_map::Entry::Vacant(slot) => {
+                    slot.insert(signature.clone());
+                    memo_misses = memo_misses.saturating_add(1);
+                    false
+                }
+            }
+        } else {
+            false
+        };
+        let steps_executed = if memo_hit {
+            (steps_charged - memo_cost_steps).max(1)
+        } else {
+            steps_charged
+        };
+        memo_observe_calls_executed =
+            memo_observe_calls_executed.saturating_add(if memo_hit { 0 } else { 1 });
+        memo_saved_steps = memo_saved_steps.saturating_add((steps_charged - steps_executed).max(0));
+        let budget = ((steps_charged as usize)
+            .saturating_mul(16)
+            .min(effective_budget_cap)) as i64;
+
+        let checkpoint_indices = shadow_checkpoint_indices(steps_charged, checkpoint_every);
+        let mut resume_index = None::<usize>;
+        for checkpoint_index in checkpoint_indices.iter().copied() {
+            let cache_key = shadow_checkpoint_key(&prefix_key, &variant_digest, checkpoint_index);
+            if checkpoint_reuse_enabled && cache.contains_key(&cache_key) {
+                hits = hits.saturating_add(1);
+                resume_index = Some(checkpoint_index);
+                continue;
+            }
+            if cache.len() < cache_cap {
+                let digest =
+                    shadow_checkpoint_digest(&prefix_key, &variant_digest, checkpoint_index);
+                cache.insert(cache_key, digest);
+                misses = misses.saturating_add(1);
+            } else {
+                cache_truncated = true;
+            }
+        }
+
+        let state_digest_full = shadow_state_digest(
+            &prefix_key,
+            &variant_digest,
+            steps_charged,
+            budget,
+            &signature,
+        );
+        let state_digest_resumed = state_digest_full.clone();
+
+        let mut cost = BTreeMap::new();
+        cost.insert("steps".to_string(), Value::Int(steps_charged));
+        cost.insert("steps_charged".to_string(), Value::Int(steps_charged));
+        cost.insert("steps_executed".to_string(), Value::Int(steps_executed));
+        cost.insert("budget".to_string(), Value::Int(budget));
+
+        let mut state_summary = BTreeMap::new();
+        state_summary.insert("branch_id".to_string(), Value::Int(idx as i64));
+        state_summary.insert("variant".to_string(), variant.clone());
+        state_summary.insert("tick".to_string(), Value::Int(tick));
+        state_summary.insert(
+            "checkpoint_resume_index".to_string(),
+            Value::Int(resume_index.unwrap_or(0) as i64),
+        );
+        state_summary.insert(
+            "checkpoint_count".to_string(),
+            Value::Int(checkpoint_indices.len() as i64),
+        );
+        state_summary.insert(
+            "variant_prefix_digest".to_string(),
+            Value::String(variant_digest.clone()),
+        );
+        state_summary.insert(
+            "state_digest_full".to_string(),
+            Value::String(state_digest_full.clone()),
+        );
+        state_summary.insert(
+            "state_digest_resumed".to_string(),
+            Value::String(state_digest_resumed.clone()),
+        );
+        state_summary.insert("memo_hit".to_string(), Value::Bool(memo_hit));
+        state_summary.insert(
+            "memo_observe_key".to_string(),
+            Value::String(memo_observe_key.clone()),
+        );
+
+        let mut branch = BTreeMap::new();
+        branch.insert("id".to_string(), Value::Int(idx as i64));
+        branch.insert("outcome".to_string(), Value::String("OK".to_string()));
+        branch.insert("signature".to_string(), Value::String(signature.clone()));
+        branch.insert("cost".to_string(), Value::Map(cost));
+        branch.insert(
+            "state_summary".to_string(),
+            Value::Map(state_summary.clone()),
+        );
+        branches.push(Value::Map(branch));
+
+        branch_views.push(ShadowBranchView {
+            id: idx as i64,
+            outcome: ResultKind::Ok,
+            reason: None,
+            signature,
+            cost_steps: steps_charged,
+            cost_budget: budget,
+            state_summary: Value::Map(state_summary),
+        });
+    }
+
+    let branch_digest = stable_hash64_hex(&signature_join);
+    ShadowRunBuild {
+        branches,
+        branch_views,
+        branch_digest,
+        truncated: cache_truncated,
+        effective_step_cap,
+        effective_budget_cap,
+        checkpoint_every,
+        prefix_key,
+        checkpoint_stats: ShadowCheckpointStats {
+            reuse_enabled: checkpoint_reuse_enabled,
+            hits,
+            misses,
+            entries: cache.len() as i64,
+            cap: cache_cap as i64,
+            truncated: cache_truncated,
+        },
+        memo_stats: ShadowMemoStats {
+            enabled: memo_enabled,
+            observe_key: memo_observe_key,
+            determinism_class: match memo_determinism_class {
+                DeterminismClass::Deterministic => "deterministic".to_string(),
+                DeterminismClass::NonDeterministic => "non_deterministic".to_string(),
+            },
+            hits: memo_hits,
+            misses: memo_misses,
+            entries: memo_table.len() as i64,
+            observe_calls_charged: memo_observe_calls_charged,
+            observe_calls_executed: memo_observe_calls_executed,
+            memo_saved_steps,
+        },
+    }
 }
 
 fn parse_shadow_compare_branches(
@@ -5279,69 +5914,28 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             let requested_budget_cap = parse_nonnegative_usize(ctx.get("branch_budget_cap"))
                 .unwrap_or(shadow_branch_budget_cap())
                 .max(1);
-
-            let effective_branches = requested_branches
+            let run_truncated_caps = requested_branches
                 .min(variants.len())
-                .min(shadow_max_branches());
-            let effective_step_cap = requested_step_cap.min(shadow_branch_step_cap());
-            let effective_budget_cap = requested_budget_cap.min(shadow_branch_budget_cap());
-            let run_truncated = effective_branches < variants.len()
+                .min(shadow_max_branches())
+                < variants.len()
                 || requested_branches > shadow_max_branches()
                 || requested_step_cap > shadow_branch_step_cap()
                 || requested_budget_cap > shadow_branch_budget_cap();
             let tick =
                 parse_nonnegative_i64(ctx.get("tick").or_else(|| ctx.get("ctx_tick"))).unwrap_or(0);
-
-            let mut branches = Vec::with_capacity(effective_branches);
-            let mut branch_views = Vec::with_capacity(effective_branches);
-            let mut signature_join = String::new();
-            for (idx, variant) in variants.into_iter().enumerate().take(effective_branches) {
-                let variant_json = stringify_json_value(&variant);
-                let signature =
-                    stable_hash64_hex(&format!("shadow_branch|{idx}|{tick}|{variant_json}"));
-                signature_join.push_str(&signature);
-                signature_join.push('|');
-
-                let steps =
-                    ((fnv1a64_bytes(signature.as_bytes()) % effective_step_cap as u64) + 1) as i64;
-                let budget = ((steps as usize)
-                    .saturating_mul(16)
-                    .min(effective_budget_cap)) as i64;
-
-                let mut cost = BTreeMap::new();
-                cost.insert("steps".to_string(), Value::Int(steps));
-                cost.insert("budget".to_string(), Value::Int(budget));
-
-                let mut state_summary = BTreeMap::new();
-                state_summary.insert("branch_id".to_string(), Value::Int(idx as i64));
-                state_summary.insert("variant".to_string(), variant.clone());
-                state_summary.insert("tick".to_string(), Value::Int(tick));
-
-                let mut branch = BTreeMap::new();
-                branch.insert("id".to_string(), Value::Int(idx as i64));
-                branch.insert("outcome".to_string(), Value::String("OK".to_string()));
-                branch.insert("signature".to_string(), Value::String(signature.clone()));
-                branch.insert("cost".to_string(), Value::Map(cost));
-                branch.insert(
-                    "state_summary".to_string(),
-                    Value::Map(state_summary.clone()),
-                );
-                branches.push(Value::Map(branch));
-
-                branch_views.push(ShadowBranchView {
-                    id: idx as i64,
-                    outcome: ResultKind::Ok,
-                    reason: None,
-                    signature,
-                    cost_steps: steps,
-                    cost_budget: budget,
-                    state_summary: Value::Map(state_summary),
-                });
-            }
-
-            let branch_digest = stable_hash64_hex(&signature_join);
+            let requested_checkpoint_every = parse_nonnegative_usize(ctx.get("checkpoint_every"));
+            let shadow_run = build_shadow_run(
+                &entry_module,
+                tick,
+                variants,
+                requested_branches,
+                requested_step_cap,
+                requested_budget_cap,
+                requested_checkpoint_every,
+            );
+            let run_truncated = run_truncated_caps || shadow_run.truncated;
             let mut run_payload = BTreeMap::new();
-            run_payload.insert("branches".to_string(), Value::List(branches));
+            run_payload.insert("branches".to_string(), Value::List(shadow_run.branches));
             run_payload.insert("truncated".to_string(), Value::Bool(run_truncated));
             run_payload.insert(
                 "max_branches".to_string(),
@@ -5349,13 +5943,32 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             );
             run_payload.insert(
                 "branch_step_cap".to_string(),
-                Value::Int(effective_step_cap as i64),
+                Value::Int(shadow_run.effective_step_cap as i64),
             );
             run_payload.insert(
                 "branch_budget_cap".to_string(),
-                Value::Int(effective_budget_cap as i64),
+                Value::Int(shadow_run.effective_budget_cap as i64),
             );
-            run_payload.insert("branch_digest".to_string(), Value::String(branch_digest));
+            run_payload.insert(
+                "branch_digest".to_string(),
+                Value::String(shadow_run.branch_digest),
+            );
+            run_payload.insert(
+                "prefix_key".to_string(),
+                Value::String(shadow_run.prefix_key),
+            );
+            run_payload.insert(
+                "checkpoint_every".to_string(),
+                Value::Int(shadow_run.checkpoint_every as i64),
+            );
+            run_payload.insert(
+                "checkpoint_cache".to_string(),
+                shadow_checkpoint_stats_value(&shadow_run.checkpoint_stats),
+            );
+            run_payload.insert(
+                "memo".to_string(),
+                shadow_memo_stats_value(&shadow_run.memo_stats),
+            );
 
             let baseline_id = parse_nonnegative_i64(ctx.get("baseline_id")).unwrap_or(0);
             let max_diff_keys = parse_nonnegative_usize(ctx.get("max_diff_keys"))
@@ -5365,7 +5978,7 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
                 .unwrap_or(shadow_max_report_bytes())
                 .min(shadow_max_report_bytes());
             let compare = build_shadow_compare_report(
-                &branch_views,
+                &shadow_run.branch_views,
                 baseline_id,
                 max_diff_keys.max(1),
                 max_report_bytes.max(64),
@@ -5564,55 +6177,28 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             let requested_budget_cap = parse_nonnegative_usize(ctx.get("branch_budget_cap"))
                 .unwrap_or(shadow_branch_budget_cap())
                 .max(1);
-
-            let effective_branches = requested_branches
+            let truncated_caps = requested_branches
                 .min(variants.len())
-                .min(shadow_max_branches());
-            let effective_step_cap = requested_step_cap.min(shadow_branch_step_cap());
-            let effective_budget_cap = requested_budget_cap.min(shadow_branch_budget_cap());
-            let truncated = effective_branches < variants.len()
+                .min(shadow_max_branches())
+                < variants.len()
                 || requested_branches > shadow_max_branches()
                 || requested_step_cap > shadow_branch_step_cap()
                 || requested_budget_cap > shadow_branch_budget_cap();
             let tick =
                 parse_nonnegative_i64(ctx.get("tick").or_else(|| ctx.get("ctx_tick"))).unwrap_or(0);
-
-            let mut branches = Vec::with_capacity(effective_branches);
-            let mut signature_join = String::new();
-            for (idx, variant) in variants.into_iter().enumerate().take(effective_branches) {
-                let variant_json = stringify_json_value(&variant);
-                let signature =
-                    stable_hash64_hex(&format!("shadow_branch|{idx}|{tick}|{variant_json}"));
-                signature_join.push_str(&signature);
-                signature_join.push('|');
-
-                let steps =
-                    ((fnv1a64_bytes(signature.as_bytes()) % effective_step_cap as u64) + 1) as i64;
-                let budget = ((steps as usize)
-                    .saturating_mul(16)
-                    .min(effective_budget_cap)) as i64;
-
-                let mut cost = BTreeMap::new();
-                cost.insert("steps".to_string(), Value::Int(steps));
-                cost.insert("budget".to_string(), Value::Int(budget));
-
-                let mut state_summary = BTreeMap::new();
-                state_summary.insert("branch_id".to_string(), Value::Int(idx as i64));
-                state_summary.insert("variant".to_string(), variant);
-                state_summary.insert("tick".to_string(), Value::Int(tick));
-
-                let mut branch = BTreeMap::new();
-                branch.insert("id".to_string(), Value::Int(idx as i64));
-                branch.insert("outcome".to_string(), Value::String("OK".to_string()));
-                branch.insert("signature".to_string(), Value::String(signature));
-                branch.insert("cost".to_string(), Value::Map(cost));
-                branch.insert("state_summary".to_string(), Value::Map(state_summary));
-                branches.push(Value::Map(branch));
-            }
-
-            let branch_digest = stable_hash64_hex(&signature_join);
+            let requested_checkpoint_every = parse_nonnegative_usize(ctx.get("checkpoint_every"));
+            let shadow_run = build_shadow_run(
+                "std.shadow.run",
+                tick,
+                variants,
+                requested_branches,
+                requested_step_cap,
+                requested_budget_cap,
+                requested_checkpoint_every,
+            );
+            let truncated = truncated_caps || shadow_run.truncated;
             let mut payload = BTreeMap::new();
-            payload.insert("branches".to_string(), Value::List(branches));
+            payload.insert("branches".to_string(), Value::List(shadow_run.branches));
             payload.insert("truncated".to_string(), Value::Bool(truncated));
             payload.insert(
                 "max_branches".to_string(),
@@ -5620,16 +6206,735 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             );
             payload.insert(
                 "branch_step_cap".to_string(),
-                Value::Int(effective_step_cap as i64),
+                Value::Int(shadow_run.effective_step_cap as i64),
             );
             payload.insert(
                 "branch_budget_cap".to_string(),
-                Value::Int(effective_budget_cap as i64),
+                Value::Int(shadow_run.effective_budget_cap as i64),
             );
-            payload.insert("branch_digest".to_string(), Value::String(branch_digest));
+            payload.insert(
+                "branch_digest".to_string(),
+                Value::String(shadow_run.branch_digest),
+            );
+            payload.insert(
+                "prefix_key".to_string(),
+                Value::String(shadow_run.prefix_key),
+            );
+            payload.insert(
+                "checkpoint_every".to_string(),
+                Value::Int(shadow_run.checkpoint_every as i64),
+            );
+            payload.insert(
+                "checkpoint_cache".to_string(),
+                shadow_checkpoint_stats_value(&shadow_run.checkpoint_stats),
+            );
+            payload.insert(
+                "memo".to_string(),
+                shadow_memo_stats_value(&shadow_run.memo_stats),
+            );
 
             if truncated {
                 Result4::degraded(Value::Map(payload), ReasonCode::ShadowCapExceeded)
+            } else {
+                Result4::ok(Value::Map(payload))
+            }
+        }
+        "std.shadow.search" => {
+            if !shadow_enabled() {
+                return Result4::insufficient(ReasonCode::ShadowDisabled);
+            }
+            let disallowed_effects = shadow_disallowed_effect_keys(&ctx);
+            if !disallowed_effects.is_empty() {
+                return Result4::insufficient(ReasonCode::ShadowEffectDisallowed);
+            }
+
+            let policy = ctx
+                .get("policy")
+                .map(|v| v.trim().to_ascii_lowercase())
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| "round_robin".to_string());
+            if !shadow_policy_allowed(&policy) {
+                return Result4::deferred(ReasonCode::ShadowPolicyDenied);
+            }
+            if policy != "round_robin" && policy != "beam" && policy != "portfolio" {
+                return Result4::deferred(ReasonCode::NotImplemented);
+            }
+
+            let variants = match parse_shadow_variants(&ctx) {
+                Ok(v) if !v.is_empty() => v,
+                _ => return Result4::insufficient(ReasonCode::CtxInvalid),
+            };
+            let requested_max_branches =
+                parse_nonnegative_usize(ctx.get("max_branches").or_else(|| ctx.get("branches")))
+                    .unwrap_or(variants.len())
+                    .max(1);
+            let requested_step_cap = parse_nonnegative_usize(
+                ctx.get("per_branch_step_cap")
+                    .or_else(|| ctx.get("branch_step_cap")),
+            )
+            .unwrap_or(shadow_branch_step_cap())
+            .max(1);
+            let requested_budget_cap = parse_nonnegative_usize(
+                ctx.get("per_branch_budget_cap")
+                    .or_else(|| ctx.get("branch_budget_cap")),
+            )
+            .unwrap_or(shadow_branch_budget_cap())
+            .max(1);
+            let max_rounds = shadow_max_rounds();
+            let rounds = parse_nonnegative_usize(ctx.get("rounds"))
+                .unwrap_or(1)
+                .max(1)
+                .min(max_rounds);
+            let default_global_step_cap = requested_max_branches
+                .max(1)
+                .saturating_mul(requested_step_cap.max(1));
+            let default_global_budget_cap = requested_max_branches
+                .max(1)
+                .saturating_mul(requested_budget_cap.max(1));
+            let global_step_cap = parse_nonnegative_usize(ctx.get("global_step_cap"))
+                .unwrap_or(default_global_step_cap)
+                .max(1)
+                .min(shadow_global_step_cap_max());
+            let global_budget_cap = parse_nonnegative_usize(ctx.get("global_budget_cap"))
+                .unwrap_or(default_global_budget_cap)
+                .max(1)
+                .min(shadow_global_budget_cap_max());
+            let top_k = parse_nonnegative_usize(ctx.get("top_k"))
+                .unwrap_or(requested_max_branches)
+                .max(1)
+                .min(requested_max_branches.max(1));
+            let beam_width = parse_nonnegative_usize(ctx.get("beam_width"))
+                .unwrap_or(requested_max_branches)
+                .max(1)
+                .min(shadow_beam_width_max())
+                .min(requested_max_branches.max(1));
+            let tick =
+                parse_nonnegative_i64(ctx.get("tick").or_else(|| ctx.get("ctx_tick"))).unwrap_or(0);
+            let requested_checkpoint_every = parse_nonnegative_usize(ctx.get("checkpoint_every"));
+            let score_config = shadow_score_config_from_ctx(&ctx);
+            let max_report_bytes = parse_nonnegative_usize(ctx.get("max_report_bytes"))
+                .unwrap_or(shadow_max_report_bytes())
+                .min(shadow_max_report_bytes())
+                .max(64);
+            let max_diff_keys = parse_nonnegative_usize(ctx.get("max_diff_keys"))
+                .unwrap_or(shadow_max_diff_keys())
+                .min(shadow_max_diff_keys())
+                .max(1);
+
+            let shadow_run = build_shadow_run(
+                "std.shadow.search",
+                tick,
+                variants,
+                requested_max_branches,
+                requested_step_cap,
+                requested_budget_cap,
+                requested_checkpoint_every,
+            );
+
+            #[derive(Clone)]
+            struct SearchCandidate {
+                branch_value: Value,
+                branch_view: ShadowBranchView,
+                score: i64,
+                outcome_text: String,
+                reason_text: String,
+                steps_charged: i64,
+                steps_executed: i64,
+                budget_charged: i64,
+            }
+
+            let mut candidates = Vec::<SearchCandidate>::new();
+            for (branch_value, branch_view) in shadow_run
+                .branches
+                .iter()
+                .cloned()
+                .zip(shadow_run.branch_views.iter())
+            {
+                let outcome_text = match branch_view.outcome {
+                    ResultKind::Ok => "OK",
+                    ResultKind::Degraded => "DEGRADED",
+                    ResultKind::Insufficient => "INSUFFICIENT",
+                    ResultKind::Deferred => "DEFERRED",
+                }
+                .to_string();
+                let reason_text = branch_view
+                    .reason
+                    .map(|v| v.as_str().to_string())
+                    .unwrap_or_else(|| "RC-OK".to_string());
+                let steps_charged = branch_view.cost_steps.max(0);
+                let steps_executed = shadow_branch_steps_executed(&branch_value, steps_charged);
+                let budget_charged = branch_view.cost_budget.max(0);
+                let score = shadow_compute_score(branch_view, &score_config);
+                candidates.push(SearchCandidate {
+                    branch_value,
+                    branch_view: branch_view.clone(),
+                    score,
+                    outcome_text,
+                    reason_text,
+                    steps_charged,
+                    steps_executed,
+                    budget_charged,
+                });
+            }
+
+            let compare_by_score = |left: &SearchCandidate, right: &SearchCandidate| {
+                right
+                    .score
+                    .cmp(&left.score)
+                    .then_with(|| left.steps_charged.cmp(&right.steps_charged))
+                    .then_with(|| left.branch_view.id.cmp(&right.branch_view.id))
+            };
+            let outcome_priority = |kind: ResultKind| match kind {
+                ResultKind::Ok => 3_i32,
+                ResultKind::Degraded => 2_i32,
+                ResultKind::Deferred => 1_i32,
+                ResultKind::Insufficient => 0_i32,
+            };
+
+            let mut policy_pruned = false;
+            if policy == "beam" {
+                candidates.sort_by(|left, right| compare_by_score(left, right));
+                if candidates.len() > beam_width {
+                    candidates.truncate(beam_width);
+                    policy_pruned = true;
+                }
+            } else {
+                candidates.sort_by(|left, right| left.branch_view.id.cmp(&right.branch_view.id));
+            }
+
+            let selection_limit = top_k.min(candidates.len());
+            let mut selected = Vec::<SearchCandidate>::new();
+            let mut global_steps_charged: i64 = 0;
+            let mut global_steps_executed: i64 = 0;
+            let mut global_budget_used: i64 = 0;
+            let mut cap_truncated = shadow_run.truncated;
+            let mut cost_curve_rows = Vec::<Value>::new();
+            let mut portfolio_strategies_used = Vec::<String>::new();
+
+            if policy == "portfolio" {
+                let strategies = ["outcome_first", "cost_first", "balanced"];
+                let rounds_effective = rounds.max(1);
+                let round_step_slice = ((global_step_cap as i64) + (rounds_effective as i64 - 1))
+                    / rounds_effective as i64;
+                let round_budget_slice = ((global_budget_cap as i64)
+                    + (rounds_effective as i64 - 1))
+                    / rounds_effective as i64;
+                let mut remaining = candidates;
+
+                for round_index in 0..rounds_effective {
+                    if selected.len() >= selection_limit || remaining.is_empty() {
+                        break;
+                    }
+                    let strategy = strategies[round_index % strategies.len()];
+                    portfolio_strategies_used.push(strategy.to_string());
+                    match strategy {
+                        "outcome_first" => {
+                            remaining.sort_by(|left, right| {
+                                outcome_priority(right.branch_view.outcome)
+                                    .cmp(&outcome_priority(left.branch_view.outcome))
+                                    .then_with(|| compare_by_score(left, right))
+                            });
+                        }
+                        "cost_first" => {
+                            remaining.sort_by(|left, right| {
+                                left.steps_charged
+                                    .cmp(&right.steps_charged)
+                                    .then_with(|| left.budget_charged.cmp(&right.budget_charged))
+                                    .then_with(|| compare_by_score(left, right))
+                            });
+                        }
+                        _ => {
+                            remaining.sort_by(|left, right| compare_by_score(left, right));
+                        }
+                    }
+
+                    let mut picked_index = None::<usize>;
+                    for (idx, candidate) in remaining.iter().enumerate() {
+                        let next_global_steps =
+                            global_steps_charged.saturating_add(candidate.steps_charged);
+                        let next_global_budget =
+                            global_budget_used.saturating_add(candidate.budget_charged);
+                        if next_global_steps > global_step_cap as i64
+                            || next_global_budget > global_budget_cap as i64
+                        {
+                            continue;
+                        }
+                        if candidate.steps_charged > round_step_slice.max(1)
+                            || candidate.budget_charged > round_budget_slice.max(1)
+                        {
+                            continue;
+                        }
+                        picked_index = Some(idx);
+                        break;
+                    }
+
+                    if let Some(idx) = picked_index {
+                        let candidate = remaining.remove(idx);
+                        global_steps_charged =
+                            global_steps_charged.saturating_add(candidate.steps_charged);
+                        global_steps_executed =
+                            global_steps_executed.saturating_add(candidate.steps_executed);
+                        global_budget_used =
+                            global_budget_used.saturating_add(candidate.budget_charged);
+                        selected.push(candidate);
+                    } else {
+                        cap_truncated = true;
+                    }
+
+                    cost_curve_rows.push(Value::Map(BTreeMap::from([
+                        ("round".to_string(), Value::Int((round_index + 1) as i64)),
+                        ("strategy".to_string(), Value::String(strategy.to_string())),
+                        (
+                            "active_branches".to_string(),
+                            Value::Int(remaining.len() as i64),
+                        ),
+                        (
+                            "steps_charged".to_string(),
+                            Value::Int(global_steps_charged),
+                        ),
+                        (
+                            "steps_executed".to_string(),
+                            Value::Int(global_steps_executed),
+                        ),
+                        ("budget_used".to_string(), Value::Int(global_budget_used)),
+                    ])));
+                }
+                if selected.len() < selection_limit {
+                    policy_pruned = true;
+                }
+            } else {
+                for candidate in candidates {
+                    if selected.len() >= selection_limit {
+                        break;
+                    }
+                    let next_steps = global_steps_charged.saturating_add(candidate.steps_charged);
+                    let next_budget = global_budget_used.saturating_add(candidate.budget_charged);
+                    if next_steps > global_step_cap as i64 || next_budget > global_budget_cap as i64
+                    {
+                        cap_truncated = true;
+                        break;
+                    }
+                    global_steps_charged = next_steps;
+                    global_steps_executed =
+                        global_steps_executed.saturating_add(candidate.steps_executed);
+                    global_budget_used = next_budget;
+                    selected.push(candidate);
+                }
+            }
+
+            if selected.is_empty() {
+                return Result4::deferred(ReasonCode::ShadowCapExceeded);
+            }
+
+            let mut selected_ranked = selected.clone();
+            selected_ranked.sort_by(|left, right| compare_by_score(left, right));
+            let mut ranking_full = Vec::<Value>::new();
+            let mut reason_table_counts = BTreeMap::<String, i64>::new();
+            for branch in &selected_ranked {
+                let counter = reason_table_counts
+                    .entry(branch.reason_text.clone())
+                    .or_insert(0);
+                *counter = counter.saturating_add(1);
+
+                let mut item = BTreeMap::new();
+                item.insert("branch_id".to_string(), Value::Int(branch.branch_view.id));
+                item.insert("score".to_string(), Value::Int(branch.score));
+                item.insert(
+                    "outcome_kind".to_string(),
+                    Value::String(branch.outcome_text.clone()),
+                );
+                item.insert(
+                    "reason_code".to_string(),
+                    Value::String(branch.reason_text.clone()),
+                );
+                item.insert("cost_steps".to_string(), Value::Int(branch.steps_charged));
+                item.insert("cost_budget".to_string(), Value::Int(branch.budget_charged));
+                item.insert(
+                    "steps_executed".to_string(),
+                    Value::Int(branch.steps_executed),
+                );
+                item.insert(
+                    "cost".to_string(),
+                    Value::Map(BTreeMap::from([
+                        (
+                            "steps_charged".to_string(),
+                            Value::Int(branch.steps_charged),
+                        ),
+                        (
+                            "steps_executed".to_string(),
+                            Value::Int(branch.steps_executed),
+                        ),
+                        (
+                            "budget_charged".to_string(),
+                            Value::Int(branch.budget_charged),
+                        ),
+                    ])),
+                );
+                ranking_full.push(Value::Map(item));
+            }
+
+            let best = selected_ranked
+                .first()
+                .map(|branch| branch.branch_value.clone())
+                .unwrap_or(Value::Unknown);
+            let tie_break = match policy.as_str() {
+                "beam" | "portfolio" => "score_desc_steps_charged_asc_branch_id_asc".to_string(),
+                _ => "branch_id_asc".to_string(),
+            };
+            let mut digest_parts = format!(
+                "policy={}|rounds={}|branch_digest={}|selected={}|steps={}|executed={}|budget={}",
+                policy,
+                rounds,
+                shadow_run.branch_digest,
+                selected_ranked.len(),
+                global_steps_charged,
+                global_steps_executed,
+                global_budget_used
+            );
+            for branch in &selected_ranked {
+                digest_parts.push_str(&format!(
+                    "|id={}:score={}:steps={}:budget={}",
+                    branch.branch_view.id,
+                    branch.score,
+                    branch.steps_charged,
+                    branch.budget_charged
+                ));
+            }
+            if policy == "portfolio" {
+                for strategy in &portfolio_strategies_used {
+                    digest_parts.push_str(&format!("|strategy={strategy}"));
+                }
+            }
+            let schedule_digest = stable_hash64_hex(&digest_parts);
+            if cost_curve_rows.is_empty() {
+                let curve_rounds = if policy == "beam" { rounds } else { 1 };
+                for round in 1..=curve_rounds {
+                    cost_curve_rows.push(Value::Map(BTreeMap::from([
+                        ("round".to_string(), Value::Int(round as i64)),
+                        (
+                            "active_branches".to_string(),
+                            Value::Int(selected.len() as i64),
+                        ),
+                        (
+                            "steps_charged".to_string(),
+                            Value::Int(global_steps_charged),
+                        ),
+                        (
+                            "steps_executed".to_string(),
+                            Value::Int(global_steps_executed),
+                        ),
+                        ("budget_used".to_string(), Value::Int(global_budget_used)),
+                    ])));
+                }
+            }
+            let reason_table_full = reason_table_counts
+                .into_iter()
+                .map(|(reason_code, count)| {
+                    Value::Map(BTreeMap::from([
+                        ("reason_code".to_string(), Value::String(reason_code)),
+                        ("count".to_string(), Value::Int(count.max(0))),
+                    ]))
+                })
+                .collect::<Vec<_>>();
+            let selected_views = selected_ranked
+                .iter()
+                .map(|candidate| candidate.branch_view.clone())
+                .collect::<Vec<_>>();
+            let mut diff_summary_keys = if let Some(first) = selected_views.first() {
+                collect_shadow_diff_keys(&first.state_summary, &selected_views)
+            } else {
+                Vec::new()
+            };
+            if diff_summary_keys.len() > max_diff_keys {
+                diff_summary_keys.truncate(max_diff_keys);
+                cap_truncated = true;
+            }
+            let diff_summary_full = diff_summary_keys
+                .iter()
+                .map(|key| Value::String(key.clone()))
+                .collect::<Vec<_>>();
+            let affected_branch_ids = selected_views
+                .iter()
+                .map(|branch| Value::Int(branch.id))
+                .collect::<Vec<_>>();
+            let divergence_points_full = diff_summary_keys
+                .iter()
+                .enumerate()
+                .map(|(idx, key)| {
+                    Value::Map(BTreeMap::from([
+                        (
+                            "point_id".to_string(),
+                            Value::String(format!("point-{}", idx + 1)),
+                        ),
+                        (
+                            "description".to_string(),
+                            Value::String(format!("state_diff:{key}")),
+                        ),
+                        (
+                            "affected_branches".to_string(),
+                            Value::List(affected_branch_ids.clone()),
+                        ),
+                    ]))
+                })
+                .collect::<Vec<_>>();
+            let score_weights = Value::Map(BTreeMap::from([
+                (
+                    "outcome_weight".to_string(),
+                    Value::Int(score_config.outcome_weight),
+                ),
+                (
+                    "cost_budget_weight".to_string(),
+                    Value::Int(score_config.cost_budget_weight),
+                ),
+                (
+                    "cost_steps_weight".to_string(),
+                    Value::Int(score_config.cost_steps_weight),
+                ),
+                (
+                    "reason_penalty_weight".to_string(),
+                    Value::Int(score_config.reason_penalty_weight),
+                ),
+                (
+                    "state_score_weight".to_string(),
+                    Value::Int(score_config.state_score_weight),
+                ),
+            ]));
+            let mut report_ranking = ranking_full.clone();
+            let mut report_cost_curve = cost_curve_rows.clone();
+            let mut report_reason_table = reason_table_full.clone();
+            let mut report_diff_summary = diff_summary_full.clone();
+            let mut report_divergence_points = divergence_points_full.clone();
+            let mut report_truncated = cap_truncated;
+            let mut report_reason_too_large = false;
+            let report = loop {
+                let mut meta = BTreeMap::new();
+                meta.insert("policy".to_string(), Value::String(policy.clone()));
+                meta.insert("tie_break".to_string(), Value::String(tie_break.clone()));
+                meta.insert("rounds".to_string(), Value::Int(rounds as i64));
+                meta.insert(
+                    "total_variants".to_string(),
+                    Value::Int(shadow_run.branches.len() as i64),
+                );
+                meta.insert(
+                    "explored_branches".to_string(),
+                    Value::Int(selected.len() as i64),
+                );
+                meta.insert("beam_width".to_string(), Value::Int(beam_width as i64));
+                meta.insert(
+                    "score_field".to_string(),
+                    Value::String(score_config.score_field.clone()),
+                );
+                meta.insert("score_weights".to_string(), score_weights.clone());
+                meta.insert(
+                    "cache_hits".to_string(),
+                    Value::Int(
+                        shadow_run
+                            .checkpoint_stats
+                            .hits
+                            .saturating_add(shadow_run.memo_stats.hits)
+                            .max(0),
+                    ),
+                );
+                meta.insert(
+                    "cache_misses".to_string(),
+                    Value::Int(
+                        shadow_run
+                            .checkpoint_stats
+                            .misses
+                            .saturating_add(shadow_run.memo_stats.misses)
+                            .max(0),
+                    ),
+                );
+                meta.insert("pruned_by_policy".to_string(), Value::Bool(policy_pruned));
+                if policy == "portfolio" {
+                    meta.insert(
+                        "strategies".to_string(),
+                        Value::List(
+                            portfolio_strategies_used
+                                .iter()
+                                .map(|strategy| Value::String(strategy.clone()))
+                                .collect(),
+                        ),
+                    );
+                }
+                let mut artifacts = BTreeMap::new();
+                artifacts.insert(
+                    "branch_digest".to_string(),
+                    Value::String(shadow_run.branch_digest.clone()),
+                );
+                artifacts.insert(
+                    "prefix_key".to_string(),
+                    Value::String(shadow_run.prefix_key.clone()),
+                );
+                artifacts.insert(
+                    "schedule_digest".to_string(),
+                    Value::String(schedule_digest.clone()),
+                );
+                let mut candidate = BTreeMap::new();
+                candidate.insert(
+                    "schema".to_string(),
+                    Value::String("shadow.report.v2".to_string()),
+                );
+                candidate.insert("policy".to_string(), Value::String(policy.clone()));
+                candidate.insert("tie_break".to_string(), Value::String(tie_break.clone()));
+                candidate.insert("rounds".to_string(), Value::Int(rounds as i64));
+                candidate.insert(
+                    "total_variants".to_string(),
+                    Value::Int(shadow_run.branches.len() as i64),
+                );
+                candidate.insert(
+                    "explored_branches".to_string(),
+                    Value::Int(selected.len() as i64),
+                );
+                candidate.insert("beam_width".to_string(), Value::Int(beam_width as i64));
+                if policy == "portfolio" {
+                    candidate.insert(
+                        "strategies".to_string(),
+                        Value::List(
+                            portfolio_strategies_used
+                                .iter()
+                                .map(|strategy| Value::String(strategy.clone()))
+                                .collect(),
+                        ),
+                    );
+                }
+                candidate.insert(
+                    "score_field".to_string(),
+                    Value::String(score_config.score_field.clone()),
+                );
+                candidate.insert("score_weights".to_string(), score_weights.clone());
+                candidate.insert(
+                    "global_step_cap".to_string(),
+                    Value::Int(global_step_cap as i64),
+                );
+                candidate.insert(
+                    "global_budget_cap".to_string(),
+                    Value::Int(global_budget_cap as i64),
+                );
+                candidate.insert(
+                    "global_steps_charged".to_string(),
+                    Value::Int(global_steps_charged),
+                );
+                candidate.insert(
+                    "global_steps_executed".to_string(),
+                    Value::Int(global_steps_executed),
+                );
+                candidate.insert(
+                    "global_steps_used".to_string(),
+                    Value::Int(global_steps_charged),
+                );
+                candidate.insert(
+                    "global_budget_used".to_string(),
+                    Value::Int(global_budget_used),
+                );
+                candidate.insert(
+                    "schedule_digest".to_string(),
+                    Value::String(schedule_digest.clone()),
+                );
+                candidate.insert("truncated".to_string(), Value::Bool(report_truncated));
+                candidate.insert("pruned_by_policy".to_string(), Value::Bool(policy_pruned));
+                candidate.insert("meta".to_string(), Value::Map(meta));
+                candidate.insert("ranking".to_string(), Value::List(report_ranking.clone()));
+                candidate.insert(
+                    "divergence_points".to_string(),
+                    Value::List(report_divergence_points.clone()),
+                );
+                candidate.insert(
+                    "diff_summary".to_string(),
+                    Value::List(report_diff_summary.clone()),
+                );
+                candidate.insert(
+                    "cost_curve".to_string(),
+                    Value::List(report_cost_curve.clone()),
+                );
+                candidate.insert(
+                    "reason_table".to_string(),
+                    Value::List(report_reason_table.clone()),
+                );
+                candidate.insert("artifacts".to_string(), Value::Map(artifacts));
+
+                let bytes = stringify_json_value(&Value::Map(candidate.clone())).len();
+                if bytes <= max_report_bytes {
+                    let mut stable = candidate;
+                    stable.insert("report_bytes".to_string(), Value::Int(bytes as i64));
+                    break stable;
+                }
+
+                report_truncated = true;
+                report_reason_too_large = true;
+                if !report_divergence_points.is_empty() {
+                    report_divergence_points.pop();
+                    continue;
+                }
+                if !report_diff_summary.is_empty() {
+                    report_diff_summary.pop();
+                    continue;
+                }
+                if report_reason_table.len() > 1 {
+                    report_reason_table.pop();
+                    continue;
+                }
+                if report_cost_curve.len() > 1 {
+                    report_cost_curve.pop();
+                    continue;
+                }
+                if report_ranking.len() > 1 {
+                    report_ranking.pop();
+                    continue;
+                }
+
+                break BTreeMap::from([
+                    (
+                        "schema".to_string(),
+                        Value::String("shadow.report.v2".to_string()),
+                    ),
+                    ("truncated".to_string(), Value::Bool(true)),
+                    (
+                        "report_bytes".to_string(),
+                        Value::Int(max_report_bytes as i64),
+                    ),
+                ]);
+            };
+
+            let topk = selected_ranked
+                .iter()
+                .take(top_k)
+                .map(|branch| branch.branch_value.clone())
+                .collect::<Vec<_>>();
+            let mut payload = BTreeMap::new();
+            payload.insert("best".to_string(), best);
+            payload.insert("topk".to_string(), Value::List(topk));
+            payload.insert("ranking".to_string(), Value::List(report_ranking));
+            payload.insert("report".to_string(), Value::Map(report));
+            payload.insert("truncated".to_string(), Value::Bool(report_truncated));
+            payload.insert(
+                "branch_digest".to_string(),
+                Value::String(shadow_run.branch_digest),
+            );
+            payload.insert(
+                "prefix_key".to_string(),
+                Value::String(shadow_run.prefix_key),
+            );
+            payload.insert(
+                "checkpoint_every".to_string(),
+                Value::Int(shadow_run.checkpoint_every as i64),
+            );
+            payload.insert(
+                "checkpoint_cache".to_string(),
+                shadow_checkpoint_stats_value(&shadow_run.checkpoint_stats),
+            );
+            payload.insert(
+                "memo".to_string(),
+                shadow_memo_stats_value(&shadow_run.memo_stats),
+            );
+
+            if report_reason_too_large || report_truncated {
+                let reason = if report_reason_too_large {
+                    ReasonCode::ShadowReportTooLarge
+                } else {
+                    ReasonCode::ShadowCapExceeded
+                };
+                Result4::degraded(Value::Map(payload), reason)
             } else {
                 Result4::ok(Value::Map(payload))
             }
@@ -6136,6 +7441,7 @@ fn reason_code_from_str(raw: &str) -> Option<ReasonCode> {
         "RC-SHADOW-CAP-EXCEEDED" => Some(ReasonCode::ShadowCapExceeded),
         "RC-SHADOW-REPORT-TOO-LARGE" => Some(ReasonCode::ShadowReportTooLarge),
         "RC-SHADOW-EFFECT-DISALLOWED" => Some(ReasonCode::ShadowEffectDisallowed),
+        "RC-SHADOW-POLICY-DENIED" => Some(ReasonCode::ShadowPolicyDenied),
         "RC-UI-DISABLED" => Some(ReasonCode::UiDisabled),
         "RC-UI-CAP-EXCEEDED" => Some(ReasonCode::UiCapExceeded),
         "RC-QUARANTINE-REQUIRED" => Some(ReasonCode::QuarantineRequired),

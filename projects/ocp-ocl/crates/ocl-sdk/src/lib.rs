@@ -1713,6 +1713,7 @@ fn std_proc_action_from_key(key: &str) -> Option<&'static str> {
 fn std_shadow_action_from_key(key: &str) -> Option<&'static str> {
     match key {
         "std.shadow.run" => Some("run"),
+        "std.shadow.search" => Some("search"),
         "std.shadow.compare" => Some("compare"),
         _ if key.starts_with("std.shadow.") => Some("unknown"),
         _ => None,
@@ -2124,7 +2125,7 @@ fn verify_pack_permissions_for_key(
             )));
         }
 
-        if matches!(action, "run" | "compare") {
+        if matches!(action, "run" | "search" | "compare") {
             return Ok(());
         }
 
