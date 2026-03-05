@@ -30,7 +30,15 @@ pub enum KeyCapabilityKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeterminismClass {
     Deterministic,
+    CassetteBased,
     NonDeterministic,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cacheability {
+    NoCache,
+    WithinRun,
+    AcrossRuns,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,6 +79,7 @@ pub struct CapabilityRegistry {
     payload_schemas: HashMap<String, SchemaType>,
     commit_allowed: HashMap<String, bool>,
     determinism_classes: HashMap<String, DeterminismClass>,
+    cacheabilities: HashMap<String, Cacheability>,
 }
 
 impl Default for CapabilityRegistry {
@@ -244,6 +253,11 @@ impl CapabilityRegistry {
         );
         determinism_classes.insert(
             "std.shadow.compare".to_string(),
+            DeterminismClass::Deterministic,
+        );
+        determinism_classes.insert("engine.ui.run".to_string(), DeterminismClass::Deterministic);
+        determinism_classes.insert(
+            "engine.game.run".to_string(),
             DeterminismClass::Deterministic,
         );
 
@@ -1405,6 +1419,63 @@ impl CapabilityRegistry {
             },
         );
 
+        let mut cacheabilities = HashMap::new();
+        let mut std_keys = BTreeSet::<String>::new();
+        std_keys.extend(
+            ctx_required
+                .keys()
+                .filter(|key| key.starts_with("std."))
+                .cloned(),
+        );
+        std_keys.extend(
+            ctx_schemas
+                .keys()
+                .filter(|key| key.starts_with("std."))
+                .cloned(),
+        );
+        std_keys.extend(
+            payload_schemas
+                .keys()
+                .filter(|key| key.starts_with("std."))
+                .cloned(),
+        );
+        std_keys.extend(
+            commit_allowed
+                .keys()
+                .filter(|key| key.starts_with("std."))
+                .cloned(),
+        );
+
+        for key in &std_keys {
+            determinism_classes
+                .entry(key.clone())
+                .or_insert(DeterminismClass::Deterministic);
+            cacheabilities
+                .entry(key.clone())
+                .or_insert(Cacheability::NoCache);
+        }
+
+        for key in [
+            "std.net.http.request",
+            "std.proc.exec",
+            "std.time.wallclock.now",
+        ] {
+            determinism_classes.insert(key.to_string(), DeterminismClass::CassetteBased);
+        }
+
+        for key in [
+            "std.fs.read_text",
+            "std.fs.list_dir",
+            "std.fs.stat",
+            "std.kv.get",
+            "std.kv.keys",
+        ] {
+            cacheabilities.insert(key.to_string(), Cacheability::WithinRun);
+        }
+        for key in ["engine.ui.run", "engine.game.run"] {
+            cacheabilities.insert(key.to_string(), Cacheability::WithinRun);
+        }
+
         Self {
             enabled_families,
             allow_patterns: vec![KeyPattern::Any],
@@ -1414,6 +1485,7 @@ impl CapabilityRegistry {
             payload_schemas,
             commit_allowed,
             determinism_classes,
+            cacheabilities,
         }
     }
 
@@ -1475,6 +1547,14 @@ impl CapabilityRegistry {
         self.determinism_classes.insert(key_pattern.into(), class);
     }
 
+    pub fn set_cacheability_for_key(
+        &mut self,
+        key_pattern: impl Into<String>,
+        cacheability: Cacheability,
+    ) {
+        self.cacheabilities.insert(key_pattern.into(), cacheability);
+    }
+
     pub fn key_kind_for_key(&self, key: &str) -> KeyCapabilityKind {
         if self.commit_allowed_for_key(key) {
             KeyCapabilityKind::ObserveAndCommit
@@ -1489,6 +1569,12 @@ impl CapabilityRegistry {
             .unwrap_or(DeterminismClass::NonDeterministic)
     }
 
+    pub fn cacheability_for_key(&self, key: &str) -> Cacheability {
+        best_cacheability_for_key(&self.cacheabilities, key)
+            .copied()
+            .unwrap_or(Cacheability::NoCache)
+    }
+
     pub fn documented_keys(&self) -> Vec<String> {
         let mut keys = BTreeSet::<String>::new();
         keys.extend(self.ctx_required.keys().cloned());
@@ -1496,7 +1582,26 @@ impl CapabilityRegistry {
         keys.extend(self.payload_schemas.keys().cloned());
         keys.extend(self.commit_allowed.keys().cloned());
         keys.extend(self.determinism_classes.keys().cloned());
+        keys.extend(self.cacheabilities.keys().cloned());
         keys.into_iter().collect()
+    }
+
+    pub fn std_keys_missing_cache_metadata(&self) -> Vec<String> {
+        let mut missing = Vec::new();
+        for key in self
+            .documented_keys()
+            .into_iter()
+            .filter(|key| key.starts_with("std."))
+        {
+            if !self.determinism_classes.contains_key(&key)
+                || !self.cacheabilities.contains_key(&key)
+            {
+                missing.push(key);
+            }
+        }
+        missing.sort();
+        missing.dedup();
+        missing
     }
 
     pub fn ctx_required_for_key(&self, key: &str) -> Vec<String> {
@@ -1620,4 +1725,22 @@ fn best_determinism_for_key<'a>(
         }
     }
     best.map(|(class, _)| class)
+}
+
+fn best_cacheability_for_key<'a>(
+    cacheabilities: &'a HashMap<String, Cacheability>,
+    key: &str,
+) -> Option<&'a Cacheability> {
+    let mut best: Option<(&Cacheability, usize)> = None;
+    for (pattern, cacheability) in cacheabilities {
+        let kp = KeyPattern::from_pattern(pattern);
+        if kp.matches(key) {
+            let score = pattern.trim_end_matches('*').len();
+            match best {
+                Some((_, best_score)) if best_score >= score => {}
+                _ => best = Some((cacheability, score)),
+            }
+        }
+    }
+    best.map(|(cacheability, _)| cacheability)
 }

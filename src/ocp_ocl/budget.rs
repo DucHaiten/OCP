@@ -16,6 +16,7 @@ pub struct ExecConfig {
     pub step_cap: u32,
     pub commit_policy: CommitPolicyMode,
     pub guard_mode: GuardMode,
+    pub enable_exec_cache: bool,
 }
 
 impl Default for ExecConfig {
@@ -24,6 +25,7 @@ impl Default for ExecConfig {
             step_cap: 10_000,
             commit_policy: CommitPolicyMode::Normal,
             guard_mode: GuardMode::Return,
+            enable_exec_cache: true,
         }
     }
 }

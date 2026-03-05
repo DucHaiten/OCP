@@ -4,7 +4,7 @@ use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
 
 use ocl_runtime_core::{
-    pretty_schema, schema_skeleton, CapabilityRegistry, KeyCapabilityKind, RunEngine,
+    pretty_schema, schema_skeleton, CapabilityRegistry, ExecConfig, KeyCapabilityKind, RunEngine,
     RuntimeCoreError,
 };
 use ocl_sdk::{
@@ -17,15 +17,16 @@ use ocl_sdk::{
     render_profile_view, resolve_deps_v3, resolve_domain_selection_v1, resolve_universe_v1,
     resolve_view_selection_v1, run_artifact, run_conformance_v1, run_kit_doctor_v1,
     run_project_with_engine_and_lock, run_project_with_shadow_compare,
-    run_project_with_trace_engine_and_lock, run_reactor_service_with_lock,
-    run_reactor_service_with_shadow_compare, run_reactor_service_with_trace_engine_and_lock,
-    sign_oclpkg, sync_cosmos_lock_v1, sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1,
-    sync_policy_lock_v1, test_project_with_lock, trace_required_digest, verify_assembly,
-    verify_deps_lock_v3, verify_deps_signing_and_trust_v10, verify_organs_lock_v1,
-    verify_plugin_lock_v1, verify_supply_artifact, write_conformance_report_json,
-    write_profile_json, write_shadow_compare_artifacts_v1, write_trace_jsonl,
-    ConformanceRunOptionsV1, InputEnvelopeV1, ProfileViewOptions, ReactorRuntimeMode,
-    ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1,
+    run_project_with_trace_engine_and_lock, run_project_with_trace_engine_config_and_lock,
+    run_reactor_service_with_lock, run_reactor_service_with_shadow_compare,
+    run_reactor_service_with_trace_engine_and_lock, sign_oclpkg, sync_cosmos_lock_v1,
+    sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1, sync_policy_lock_v1,
+    test_project_with_lock, trace_required_digest, verify_assembly, verify_deps_lock_v3,
+    verify_deps_signing_and_trust_v10, verify_organs_lock_v1, verify_plugin_lock_v1,
+    verify_supply_artifact, write_conformance_report_json, write_profile_json,
+    write_shadow_compare_artifacts_v1, write_trace_jsonl, ConformanceRunOptionsV1, InputEnvelopeV1,
+    ProfileViewOptions, ReactorRuntimeMode, ReactorServiceOptions, SdkError, ShadowOptionsV1,
+    TraceEventV1, TraceRunSummary,
 };
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
@@ -683,6 +684,104 @@ fn run_cli(args: &[String]) -> i32 {
                 Err(err) => {
                     eprintln!("{err}");
                     1
+                }
+            }
+        }
+        "cache" => {
+            let Some(subcmd) = args.get(1).map(String::as_str) else {
+                eprintln!(
+                    "usage: ocl cache <stats|clean|bench> <project_dir> [--json]\n  stats <project_dir> [--json]\n  clean <project_dir> --yes [--json]\n  bench <project_dir> [--engine interpreter|bytecode|dual] [--locked] [--json]"
+                );
+                return 2;
+            };
+            match subcmd {
+                "stats" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!("usage: ocl cache stats <project_dir> [--json]");
+                        return 2;
+                    };
+                    let json_mode = args.iter().any(|a| a == "--json");
+                    match collect_cache_stats_report_v13(Path::new(path)) {
+                        Ok(report) => {
+                            if json_mode {
+                                println!("{}", render_cache_stats_json_v13(&report));
+                            } else {
+                                println!("{}", render_cache_stats_text_v13(&report));
+                            }
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "clean" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!("usage: ocl cache clean <project_dir> --yes [--json]");
+                        return 2;
+                    };
+                    let yes = args.iter().any(|a| a == "--yes");
+                    if !yes {
+                        eprintln!(
+                            "cache clean requires explicit --yes to avoid accidental deletion"
+                        );
+                        return 2;
+                    }
+                    let json_mode = args.iter().any(|a| a == "--json");
+                    match clean_cache_state_v13(Path::new(path)) {
+                        Ok(summary) => {
+                            if json_mode {
+                                println!("{}", render_cache_clean_json_v13(&summary));
+                            } else {
+                                println!("{}", render_cache_clean_text_v13(&summary));
+                            }
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "bench" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!(
+                            "usage: ocl cache bench <project_dir> [--engine interpreter|bytecode|dual] [--locked] [--json]"
+                        );
+                        return 2;
+                    };
+                    let locked = args.iter().any(|a| a == "--locked");
+                    let json_mode = args.iter().any(|a| a == "--json");
+                    let engine_raw = parse_string_flag(args, "--engine")
+                        .unwrap_or_else(|| "interpreter".to_string());
+                    let run_engine = match engine_raw.as_str() {
+                        "interpreter" => RunEngine::Interpreter,
+                        "bytecode" => RunEngine::Bytecode,
+                        "dual" => RunEngine::Dual,
+                        _ => {
+                            eprintln!(
+                                "invalid engine mode: `{engine_raw}` (expected interpreter|bytecode|dual)"
+                            );
+                            return 2;
+                        }
+                    };
+                    match run_cache_benchmark_v13(Path::new(path), run_engine, locked, json_mode) {
+                        Ok(rendered) => {
+                            println!("{rendered}");
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                _ => {
+                    eprintln!(
+                        "usage: ocl cache <stats|clean|bench> <project_dir> [--json]\n  stats <project_dir> [--json]\n  clean <project_dir> --yes [--json]\n  bench <project_dir> [--engine interpreter|bytecode|dual] [--locked] [--json]"
+                    );
+                    2
                 }
             }
         }
@@ -7399,6 +7498,375 @@ fn write_trace_index_v11(path: &Path, events: &[TraceEventV1]) -> Result<(), Sdk
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct CachePerfCountersV13 {
+    compile_hits: u32,
+    compile_misses: u32,
+    exec_hits: u32,
+    exec_misses: u32,
+    observe_hits: u32,
+    observe_misses: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct CacheStatsReportV13 {
+    artifact_dirs: u32,
+    perf_files: u32,
+    compile_cache_entries: u32,
+    compile_cache_bytes: u64,
+    counters: CachePerfCountersV13,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct CacheCleanSummaryV13 {
+    removed_artifacts: bool,
+    removed_local_cache: bool,
+    removed_target_cache: bool,
+}
+
+fn cache_perf_from_trace_summary_v13(summary: &TraceRunSummary) -> CachePerfCountersV13 {
+    CachePerfCountersV13 {
+        compile_hits: 0,
+        compile_misses: 0,
+        exec_hits: summary.exec_cache.hits,
+        exec_misses: summary.exec_cache.misses,
+        observe_hits: summary.observe_cache.hits,
+        observe_misses: summary.observe_cache.misses,
+    }
+}
+
+fn write_perf_cache_jsonl_v13(
+    path: &Path,
+    counters: &CachePerfCountersV13,
+) -> Result<(), SdkError> {
+    let mut out = String::new();
+    let rows = [
+        ("CacheCompileHit", counters.compile_hits),
+        ("CacheCompileMiss", counters.compile_misses),
+        ("CacheExecHit", counters.exec_hits),
+        ("CacheExecMiss", counters.exec_misses),
+        ("CacheObserveHit", counters.observe_hits),
+        ("CacheObserveMiss", counters.observe_misses),
+    ];
+    for (idx, (kind, count)) in rows.iter().enumerate() {
+        let line = json!({
+            "i": idx as u64,
+            "t": kind,
+            "seed": 0u64,
+            "tick": 0u64,
+            "call_id": null,
+            "span": null,
+            "data": {
+                "count": *count,
+            }
+        });
+        out.push_str(&line.to_string());
+        out.push('\n');
+    }
+    fs::write(path, out)?;
+    Ok(())
+}
+
+fn merge_perf_counters_v13(into: &mut CachePerfCountersV13, other: CachePerfCountersV13) {
+    into.compile_hits = into.compile_hits.saturating_add(other.compile_hits);
+    into.compile_misses = into.compile_misses.saturating_add(other.compile_misses);
+    into.exec_hits = into.exec_hits.saturating_add(other.exec_hits);
+    into.exec_misses = into.exec_misses.saturating_add(other.exec_misses);
+    into.observe_hits = into.observe_hits.saturating_add(other.observe_hits);
+    into.observe_misses = into.observe_misses.saturating_add(other.observe_misses);
+}
+
+fn parse_perf_cache_jsonl_v13(path: &Path) -> Result<CachePerfCountersV13, SdkError> {
+    let raw = fs::read_to_string(path)?;
+    let mut out = CachePerfCountersV13::default();
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let value: JsonValue = serde_json::from_str(trimmed).map_err(|e| {
+            SdkError::MissingProject(format!(
+                "invalid perf_cache.jsonl line at {}: {e}",
+                path.display()
+            ))
+        })?;
+        let Some(kind) = value.get("t").and_then(JsonValue::as_str) else {
+            continue;
+        };
+        let count = value
+            .get("data")
+            .and_then(|v| v.get("count"))
+            .and_then(JsonValue::as_u64)
+            .unwrap_or(0)
+            .min(u32::MAX as u64) as u32;
+        match kind {
+            "CacheCompileHit" => out.compile_hits = out.compile_hits.saturating_add(count),
+            "CacheCompileMiss" => out.compile_misses = out.compile_misses.saturating_add(count),
+            "CacheExecHit" => out.exec_hits = out.exec_hits.saturating_add(count),
+            "CacheExecMiss" => out.exec_misses = out.exec_misses.saturating_add(count),
+            "CacheObserveHit" => out.observe_hits = out.observe_hits.saturating_add(count),
+            "CacheObserveMiss" => out.observe_misses = out.observe_misses.saturating_add(count),
+            _ => {}
+        }
+    }
+    Ok(out)
+}
+
+fn collect_compile_cache_stats_v13(cache_root: &Path) -> Result<(u32, u64), SdkError> {
+    if !cache_root.exists() {
+        return Ok((0, 0));
+    }
+    let mut entries = 0u32;
+    let mut bytes = 0u64;
+    for entry in fs::read_dir(cache_root)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            entries = entries.saturating_add(1);
+            for child in fs::read_dir(path)? {
+                let child_path = child?.path();
+                if child_path.is_file() {
+                    let meta = fs::metadata(&child_path)?;
+                    bytes = bytes.saturating_add(meta.len());
+                }
+            }
+        }
+    }
+    Ok((entries, bytes))
+}
+
+fn collect_cache_stats_report_v13(project_root: &Path) -> Result<CacheStatsReportV13, SdkError> {
+    let mut report = CacheStatsReportV13::default();
+    let artifacts_root = project_root.join(".ocl_artifacts");
+    if artifacts_root.exists() {
+        for entry in fs::read_dir(&artifacts_root)? {
+            let artifact_dir = entry?.path();
+            if !artifact_dir.is_dir() {
+                continue;
+            }
+            report.artifact_dirs = report.artifact_dirs.saturating_add(1);
+            let perf_path = artifact_dir.join("perf_cache.jsonl");
+            if perf_path.exists() {
+                report.perf_files = report.perf_files.saturating_add(1);
+                let counters = parse_perf_cache_jsonl_v13(&perf_path)?;
+                merge_perf_counters_v13(&mut report.counters, counters);
+            }
+        }
+    }
+
+    let local_compile_root = project_root.join(".ocl_cache").join("compile");
+    let target_compile_root = project_root
+        .join("target")
+        .join("ocl")
+        .join("cache")
+        .join("compile");
+    let (local_entries, local_bytes) = collect_compile_cache_stats_v13(&local_compile_root)?;
+    let (target_entries, target_bytes) = collect_compile_cache_stats_v13(&target_compile_root)?;
+    report.compile_cache_entries = local_entries.saturating_add(target_entries);
+    report.compile_cache_bytes = local_bytes.saturating_add(target_bytes);
+
+    Ok(report)
+}
+
+fn render_cache_stats_text_v13(report: &CacheStatsReportV13) -> String {
+    format!(
+        concat!(
+            "cache stats\n",
+            "artifacts_dirs={}\n",
+            "perf_files={}\n",
+            "compile_cache_entries={}\n",
+            "compile_cache_bytes={}\n",
+            "compile_hits={}\n",
+            "compile_misses={}\n",
+            "exec_hits={}\n",
+            "exec_misses={}\n",
+            "observe_hits={}\n",
+            "observe_misses={}"
+        ),
+        report.artifact_dirs,
+        report.perf_files,
+        report.compile_cache_entries,
+        report.compile_cache_bytes,
+        report.counters.compile_hits,
+        report.counters.compile_misses,
+        report.counters.exec_hits,
+        report.counters.exec_misses,
+        report.counters.observe_hits,
+        report.counters.observe_misses
+    )
+}
+
+fn render_cache_stats_json_v13(report: &CacheStatsReportV13) -> String {
+    serde_json::to_string_pretty(&json!({
+        "artifact_dirs": report.artifact_dirs,
+        "perf_files": report.perf_files,
+        "compile_cache_entries": report.compile_cache_entries,
+        "compile_cache_bytes": report.compile_cache_bytes,
+        "counters": {
+            "compile_hits": report.counters.compile_hits,
+            "compile_misses": report.counters.compile_misses,
+            "exec_hits": report.counters.exec_hits,
+            "exec_misses": report.counters.exec_misses,
+            "observe_hits": report.counters.observe_hits,
+            "observe_misses": report.counters.observe_misses,
+        }
+    }))
+    .unwrap_or_else(|_| "{}".to_string())
+}
+
+fn clean_cache_state_v13(project_root: &Path) -> Result<CacheCleanSummaryV13, SdkError> {
+    let mut summary = CacheCleanSummaryV13::default();
+    let artifacts_dir = project_root.join(".ocl_artifacts");
+    if artifacts_dir.exists() {
+        fs::remove_dir_all(&artifacts_dir)?;
+        summary.removed_artifacts = true;
+    }
+    let local_cache_dir = project_root.join(".ocl_cache");
+    if local_cache_dir.exists() {
+        fs::remove_dir_all(&local_cache_dir)?;
+        summary.removed_local_cache = true;
+    }
+    let target_cache_dir = project_root.join("target").join("ocl").join("cache");
+    if target_cache_dir.exists() {
+        fs::remove_dir_all(&target_cache_dir)?;
+        summary.removed_target_cache = true;
+    }
+    Ok(summary)
+}
+
+fn render_cache_clean_text_v13(summary: &CacheCleanSummaryV13) -> String {
+    format!(
+        "cache clean\nremoved_artifacts={}\nremoved_local_cache={}\nremoved_target_cache={}",
+        summary.removed_artifacts, summary.removed_local_cache, summary.removed_target_cache
+    )
+}
+
+fn render_cache_clean_json_v13(summary: &CacheCleanSummaryV13) -> String {
+    serde_json::to_string_pretty(&json!({
+        "removed_artifacts": summary.removed_artifacts,
+        "removed_local_cache": summary.removed_local_cache,
+        "removed_target_cache": summary.removed_target_cache,
+    }))
+    .unwrap_or_else(|_| "{}".to_string())
+}
+
+fn run_cache_benchmark_v13(
+    project_root: &Path,
+    run_engine: RunEngine,
+    locked: bool,
+    json_mode: bool,
+) -> Result<String, SdkError> {
+    // Force deterministic "cold -> warm" benchmark sequence.
+    let _ = clean_cache_state_v13(project_root)?;
+    let cold = with_runtime_env_v08(vec![("OCL_CACHE_DISABLE", Some("0".to_string()))], || {
+        run_project_with_trace_engine_and_lock(project_root, run_engine, locked)
+    })?;
+    let warm = with_runtime_env_v08(vec![("OCL_CACHE_DISABLE", Some("0".to_string()))], || {
+        run_project_with_trace_engine_and_lock(project_root, run_engine, locked)
+    })?;
+    let no_cache =
+        with_runtime_env_v08(vec![("OCL_CACHE_DISABLE", Some("1".to_string()))], || {
+            let mut config = ExecConfig::default();
+            config.step_cap = 4096;
+            config.enable_exec_cache = false;
+            run_project_with_trace_engine_config_and_lock(project_root, run_engine, locked, config)
+        })?;
+
+    let cold_digest = trace_required_digest(&cold.events);
+    let warm_digest = trace_required_digest(&warm.events);
+    let no_cache_digest = trace_required_digest(&no_cache.events);
+    let signature_equal = warm_digest == no_cache_digest;
+    let cold_perf = cache_perf_from_trace_summary_v13(&cold);
+    let warm_perf = cache_perf_from_trace_summary_v13(&warm);
+    let no_cache_perf = cache_perf_from_trace_summary_v13(&no_cache);
+    let cold_executed = cold.exec_cache.node_evals_executed;
+    let warm_executed = warm.exec_cache.node_evals_executed;
+    let executed_reduction_bps = if cold_executed > 0 {
+        cold_executed
+            .saturating_sub(warm_executed)
+            .saturating_mul(10_000)
+            / cold_executed
+    } else {
+        0
+    };
+
+    let report_json = json!({
+        "engine": run_engine.as_str(),
+        "locked": locked,
+        "signature_equal": signature_equal,
+        "cold": {
+            "steps_total": cold.total_steps,
+            "required_digest": cold_digest,
+            "exec_cache_hits": cold_perf.exec_hits,
+            "exec_cache_misses": cold_perf.exec_misses,
+            "observe_cache_hits": cold_perf.observe_hits,
+            "observe_cache_misses": cold_perf.observe_misses,
+            "exec_node_evals_executed": cold.exec_cache.node_evals_executed,
+        },
+        "warm": {
+            "steps_total": warm.total_steps,
+            "required_digest": warm_digest,
+            "exec_cache_hits": warm_perf.exec_hits,
+            "exec_cache_misses": warm_perf.exec_misses,
+            "observe_cache_hits": warm_perf.observe_hits,
+            "observe_cache_misses": warm_perf.observe_misses,
+            "exec_node_evals_executed": warm.exec_cache.node_evals_executed,
+        },
+        "no_cache": {
+            "steps_total": no_cache.total_steps,
+            "required_digest": no_cache_digest,
+            "exec_cache_hits": no_cache_perf.exec_hits,
+            "exec_cache_misses": no_cache_perf.exec_misses,
+            "observe_cache_hits": no_cache_perf.observe_hits,
+            "observe_cache_misses": no_cache_perf.observe_misses,
+            "exec_node_evals_executed": no_cache.exec_cache.node_evals_executed,
+        },
+        "executed_reduction_bps": executed_reduction_bps,
+    });
+
+    let report_dir = project_root.join("target").join("ocl").join("v13");
+    fs::create_dir_all(&report_dir)?;
+    fs::write(
+        report_dir.join("cache_benchmark.json"),
+        serde_json::to_string_pretty(&report_json).unwrap_or_else(|_| "{}".to_string()),
+    )?;
+
+    if json_mode {
+        Ok(serde_json::to_string_pretty(&report_json).unwrap_or_else(|_| "{}".to_string()))
+    } else {
+        Ok(format!(
+            concat!(
+                "cache benchmark\n",
+                "engine={}\n",
+                "locked={}\n",
+                "signature_equal={}\n",
+                "cold_steps={}\n",
+                "warm_steps={}\n",
+                "no_cache_steps={}\n",
+                "executed_reduction_bps={}\n",
+                "cold_exec_hits={}\n",
+                "warm_exec_hits={}\n",
+                "no_cache_exec_hits={}\n",
+                "cold_observe_hits={}\n",
+                "warm_observe_hits={}\n",
+                "no_cache_observe_hits={}"
+            ),
+            run_engine.as_str(),
+            locked,
+            signature_equal,
+            cold.total_steps,
+            warm.total_steps,
+            no_cache.total_steps,
+            executed_reduction_bps,
+            cold_perf.exec_hits,
+            warm_perf.exec_hits,
+            no_cache_perf.exec_hits,
+            cold_perf.observe_hits,
+            warm_perf.observe_hits,
+            no_cache_perf.observe_hits
+        ))
+    }
+}
+
 fn build_v071_replay_toml(
     root: &Path,
     run_id: &str,
@@ -7455,6 +7923,7 @@ fn emit_v071_artifacts_for_project_run(
 
     let audit_path = artifact_dir.join("audit.jsonl");
     let trace_index_path = artifact_dir.join("trace_index.json");
+    let perf_cache_path = artifact_dir.join("perf_cache.jsonl");
     let signature_path = artifact_dir.join("signature.txt");
     let replay_path = artifact_dir.join("replay.toml");
     let (lane, entry) = read_lane_and_entry_for_v071(project_root);
@@ -7522,6 +7991,7 @@ fn emit_v071_artifacts_for_project_run(
 
     match trace_run {
         Ok(trace_summary) => {
+            let perf_counters = cache_perf_from_trace_summary_v13(&trace_summary);
             let cassette_hash = if is_quarantine {
                 Some(write_quarantine_cassette_bundle_v08(
                     &artifact_dir,
@@ -7548,6 +8018,7 @@ fn emit_v071_artifacts_for_project_run(
             }
             fs::write(&audit_path, audit_text)?;
             write_trace_index_v11(&trace_index_path, &trace_summary.events)?;
+            write_perf_cache_jsonl_v13(&perf_cache_path, &perf_counters)?;
             fs::write(&signature_path, format!("{signature}\n"))?;
             fs::write(
                 &replay_path,
@@ -7569,6 +8040,7 @@ fn emit_v071_artifacts_for_project_run(
             )?;
         }
         Err(trace_err) => {
+            write_perf_cache_jsonl_v13(&perf_cache_path, &CachePerfCountersV13::default())?;
             let cassette_hash = if is_quarantine {
                 Some(write_quarantine_cassette_bundle_v08(
                     &artifact_dir,
@@ -7942,6 +8414,11 @@ fn print_help() {
         "  run   <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen ADDR --runtime-report FILE --replay-audit FILE] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]"
     );
     eprintln!("  replay <artifact_dir>");
+    eprintln!("  cache stats <project_dir> [--json]");
+    eprintln!("  cache clean <project_dir> --yes [--json]");
+    eprintln!(
+        "  cache bench <project_dir> [--engine interpreter|bytecode|dual] [--locked] [--json]"
+    );
     eprintln!("  dbg   <artifact_dir> [--script <file>]");
     eprintln!("  doc packs [--json]");
     eprintln!(

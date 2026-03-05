@@ -251,6 +251,8 @@ name = "ocp-ocl"
 version = "0.1.0"
 dependencies = [
  "ocl-sdk",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

@@ -24,8 +24,8 @@ pub use m4::{
 use ocl_runtime_core::{
     check_file_with_compat, normalize_text, parse_program, run_file_with_engine_config_and_compat,
     run_source_with_engine, CommitPolicyMode, CompatMode, DiagPhase, Diagnostic, ErrorCode,
-    ExecConfig, Expr, GuardMode, RunEngine, RuntimeCoreError, Span, Stmt, TraceEvent,
-    TypecheckCompatConfig,
+    ExecCacheStats, ExecConfig, Expr, GuardMode, ObserveCacheStats, RunEngine, RuntimeCoreError,
+    Span, Stmt, TraceEvent, TypecheckCompatConfig,
 };
 pub use w1::{
     enforce_universe_match_v1, init_cosmos_v1, resolve_hive_caps_v1, resolve_universe_v1,
@@ -370,6 +370,8 @@ pub struct CheckSummary {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RunSummary {
     pub steps: u32,
+    pub exec_cache: ExecCacheStats,
+    pub observe_cache: ObserveCacheStats,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -564,6 +566,8 @@ pub struct TraceRunSummary {
     pub run_id: String,
     pub total_steps: u32,
     pub events: Vec<TraceEventV1>,
+    pub exec_cache: ExecCacheStats,
+    pub observe_cache: ObserveCacheStats,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -2453,6 +2457,7 @@ fn default_exec_config_for_layout(layout: &ProjectLayout) -> Result<ExecConfig, 
         step_cap: 4096,
         commit_policy: CommitPolicyMode::Normal,
         guard_mode: cfg.guard_mode,
+        enable_exec_cache: true,
     })
 }
 
@@ -4286,7 +4291,11 @@ pub fn run_project_with_engine_and_lock(
     let config = default_exec_config_for_layout(&layout)?;
     let out =
         run_file_with_engine_config_and_compat(&layout.src_main, 1, config, run_engine, compat)?;
-    Ok(RunSummary { steps: out.steps })
+    Ok(RunSummary {
+        steps: out.steps,
+        exec_cache: out.exec_cache,
+        observe_cache: out.observe_cache,
+    })
 }
 
 pub fn run_reactor_ticks(root: &Path, ticks: u32) -> Result<ReactorSummary, SdkError> {
@@ -5720,7 +5729,11 @@ pub fn run_artifact(
         .map_err(|e| SdkError::SupplyInvalid(format!("entry source is not utf8: {e}")))?;
     let out = run_source_with_engine(&source_text, 1, step_cap, run_engine)
         .map_err(RuntimeCoreError::from)?;
-    Ok(RunSummary { steps: out.steps })
+    Ok(RunSummary {
+        steps: out.steps,
+        exec_cache: out.exec_cache,
+        observe_cache: out.observe_cache,
+    })
 }
 
 pub fn build_run_id_deterministic(
@@ -5812,6 +5825,8 @@ pub fn run_project_with_trace_engine_config_and_lock(
         run_id,
         total_steps: out.steps,
         events,
+        exec_cache: out.exec_cache,
+        observe_cache: out.observe_cache,
     })
 }
 
@@ -5907,6 +5922,15 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
         )?;
     }
     let mut total_steps = 0u32;
+    let mut exec_cache_enabled = false;
+    let mut exec_cache_entries = 0u32;
+    let mut exec_cache_hits = 0u32;
+    let mut exec_cache_misses = 0u32;
+    let mut exec_cache_node_evals_charged = 0u32;
+    let mut exec_cache_node_evals_executed = 0u32;
+    let mut observe_cache_entries = 0u32;
+    let mut observe_cache_hits = 0u32;
+    let mut observe_cache_misses = 0u32;
     let io_tape_replay_entries = match &options.io_tape_replay_path {
         Some(path) => Some(read_reactor_io_tape(path)?),
         None => None,
@@ -5947,6 +5971,18 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
                         compat,
                     )?;
                     total_steps = total_steps.saturating_add(out.steps);
+                    exec_cache_enabled = exec_cache_enabled || out.exec_cache.enabled;
+                    exec_cache_entries = exec_cache_entries.max(out.exec_cache.entries);
+                    exec_cache_hits = exec_cache_hits.saturating_add(out.exec_cache.hits);
+                    exec_cache_misses = exec_cache_misses.saturating_add(out.exec_cache.misses);
+                    exec_cache_node_evals_charged = exec_cache_node_evals_charged
+                        .saturating_add(out.exec_cache.node_evals_charged);
+                    exec_cache_node_evals_executed = exec_cache_node_evals_executed
+                        .saturating_add(out.exec_cache.node_evals_executed);
+                    observe_cache_entries = observe_cache_entries.max(out.observe_cache.entries);
+                    observe_cache_hits = observe_cache_hits.saturating_add(out.observe_cache.hits);
+                    observe_cache_misses =
+                        observe_cache_misses.saturating_add(out.observe_cache.misses);
                     let payload_hash256 = fnv1a64_hex(&out.signature);
                     if payload_hash256 != tape_entry.payload_hash256 {
                         return Err(SdkError::MissingProject(format!(
@@ -5976,6 +6012,18 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
                         compat,
                     )?;
                     total_steps = total_steps.saturating_add(out.steps);
+                    exec_cache_enabled = exec_cache_enabled || out.exec_cache.enabled;
+                    exec_cache_entries = exec_cache_entries.max(out.exec_cache.entries);
+                    exec_cache_hits = exec_cache_hits.saturating_add(out.exec_cache.hits);
+                    exec_cache_misses = exec_cache_misses.saturating_add(out.exec_cache.misses);
+                    exec_cache_node_evals_charged = exec_cache_node_evals_charged
+                        .saturating_add(out.exec_cache.node_evals_charged);
+                    exec_cache_node_evals_executed = exec_cache_node_evals_executed
+                        .saturating_add(out.exec_cache.node_evals_executed);
+                    observe_cache_entries = observe_cache_entries.max(out.observe_cache.entries);
+                    observe_cache_hits = observe_cache_hits.saturating_add(out.observe_cache.hits);
+                    observe_cache_misses =
+                        observe_cache_misses.saturating_add(out.observe_cache.misses);
                     io_tape_record_entries.push(ReactorIoTapeEntry {
                         tick,
                         domain_id: domain_id.clone(),
@@ -6010,6 +6058,19 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
         run_id,
         total_steps,
         events,
+        exec_cache: ExecCacheStats {
+            enabled: exec_cache_enabled,
+            entries: exec_cache_entries,
+            hits: exec_cache_hits,
+            misses: exec_cache_misses,
+            node_evals_charged: exec_cache_node_evals_charged,
+            node_evals_executed: exec_cache_node_evals_executed,
+        },
+        observe_cache: ObserveCacheStats {
+            entries: observe_cache_entries,
+            hits: observe_cache_hits,
+            misses: observe_cache_misses,
+        },
     })
 }
 

@@ -12,7 +12,7 @@ use crate::ocp_ocl::ast::{Expr, LetPattern, MatchStmt, Program, Stmt};
 use crate::ocp_ocl::audit::{TraceEvent, TraceLog};
 use crate::ocp_ocl::budget::{BudgetMeter, CommitPolicyMode, ExecConfig, GuardMode};
 use crate::ocp_ocl::diag::{DiagPhase, Diagnostic, ErrorCode, ReasonCode};
-use crate::ocp_ocl::registry::{CapabilityRegistry, DeterminismClass};
+use crate::ocp_ocl::registry::{Cacheability, CapabilityRegistry, DeterminismClass};
 use crate::ocp_ocl::result_kind::{Result4, ResultKind};
 use crate::ocp_ocl::schema::{validate_schema_value, SchemaType};
 use crate::ocp_ocl::value::Value;
@@ -29,6 +29,25 @@ pub struct ExecOutput {
     pub commits: Vec<CommitEvent>,
     pub trace: TraceLog,
     pub signature: String,
+    pub exec_cache: ExecCacheStats,
+    pub observe_cache: ObserveCacheStats,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ExecCacheStats {
+    pub enabled: bool,
+    pub entries: u32,
+    pub hits: u32,
+    pub misses: u32,
+    pub node_evals_charged: u32,
+    pub node_evals_executed: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ObserveCacheStats {
+    pub entries: u32,
+    pub hits: u32,
+    pub misses: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -172,11 +191,34 @@ enum Flow {
     Return(Value),
 }
 
+#[derive(Debug, Clone)]
+struct ExecExprCacheEntry {
+    value: Value,
+    steps_charged: u32,
+    node_evals_charged: u32,
+}
+
+#[derive(Debug, Clone)]
+struct ObserveMemoEntry {
+    result: Result4<Value>,
+}
+
 pub struct Executor {
     env: HashMap<String, Value>,
     meter: BudgetMeter,
     commit_policy: CommitPolicyMode,
     guard_mode: GuardMode,
+    enable_exec_cache: bool,
+    exec_expr_cache: HashMap<String, ExecExprCacheEntry>,
+    exec_cache_hits: u32,
+    exec_cache_misses: u32,
+    exec_node_evals_charged: u32,
+    exec_node_evals_executed: u32,
+    observe_memo: HashMap<String, ObserveMemoEntry>,
+    observe_cache_hits: u32,
+    observe_cache_misses: u32,
+    fs_generation: u64,
+    kv_generation: u64,
     next_origin_id: u64,
     next_quarantine_call_id: u64,
     registry: CapabilityRegistry,
@@ -199,6 +241,17 @@ impl Executor {
             meter: BudgetMeter::new(config),
             commit_policy: config.commit_policy,
             guard_mode: config.guard_mode,
+            enable_exec_cache: config.enable_exec_cache,
+            exec_expr_cache: HashMap::new(),
+            exec_cache_hits: 0,
+            exec_cache_misses: 0,
+            exec_node_evals_charged: 0,
+            exec_node_evals_executed: 0,
+            observe_memo: HashMap::new(),
+            observe_cache_hits: 0,
+            observe_cache_misses: 0,
+            fs_generation: 0,
+            kv_generation: 0,
             next_origin_id: 1,
             next_quarantine_call_id: 0,
             registry: CapabilityRegistry::default(),
@@ -221,6 +274,17 @@ impl Executor {
             meter: BudgetMeter::new(config),
             commit_policy: config.commit_policy,
             guard_mode: config.guard_mode,
+            enable_exec_cache: config.enable_exec_cache,
+            exec_expr_cache: HashMap::new(),
+            exec_cache_hits: 0,
+            exec_cache_misses: 0,
+            exec_node_evals_charged: 0,
+            exec_node_evals_executed: 0,
+            observe_memo: HashMap::new(),
+            observe_cache_hits: 0,
+            observe_cache_misses: 0,
+            fs_generation: 0,
+            kv_generation: 0,
             next_origin_id: 1,
             next_quarantine_call_id: 0,
             registry,
@@ -266,12 +330,27 @@ impl Executor {
             steps: self.meter.steps(),
         });
         let signature = self.trace.signature_hex();
+        let exec_cache_stats = ExecCacheStats {
+            enabled: self.enable_exec_cache,
+            entries: self.exec_expr_cache.len() as u32,
+            hits: self.exec_cache_hits,
+            misses: self.exec_cache_misses,
+            node_evals_charged: self.exec_node_evals_charged,
+            node_evals_executed: self.exec_node_evals_executed,
+        };
+        let observe_cache_stats = ObserveCacheStats {
+            entries: self.observe_memo.len() as u32,
+            hits: self.observe_cache_hits,
+            misses: self.observe_cache_misses,
+        };
         Ok(ExecOutput {
             env: self.env,
             steps: self.meter.steps(),
             commits: self.commits,
             trace: self.trace,
             signature,
+            exec_cache: exec_cache_stats,
+            observe_cache: observe_cache_stats,
         })
     }
 
@@ -401,8 +480,7 @@ impl Executor {
                         {
                             Result4::<Value>::insufficient(reason)
                         } else {
-                            let observed = self.observe_result_for_key(&kref.raw, &ctx_lit);
-                            self.validate_runtime_payload_schema(&kref.raw, observed)
+                            self.observe_with_memo(&kref.raw, tier_lit, &ctx_lit, budget_units)
                         }
                     }
                     Err(e) => Result4::<Value>::insufficient(e.to_reason_code()),
@@ -1202,6 +1280,7 @@ impl Executor {
 
         self.applied_kv_writes
             .insert(pending.pending_write_id.clone());
+        self.kv_generation = self.kv_generation.saturating_add(1);
         Ok(())
     }
 
@@ -1299,6 +1378,7 @@ impl Executor {
 
         self.applied_fs_writes
             .insert(pending.pending_write_id.clone());
+        self.fs_generation = self.fs_generation.saturating_add(1);
         Ok(())
     }
 
@@ -1551,6 +1631,78 @@ impl Executor {
     }
 
     fn eval_expr(&mut self, expr: &Expr) -> Result<Value, Diagnostic> {
+        let cache_disabled = env::var("OCL_CACHE_DISABLE")
+            .ok()
+            .as_deref()
+            .map(|v| v == "1")
+            .unwrap_or(false);
+        if cache_disabled || !self.enable_exec_cache || !expr_is_exec_cacheable(expr) {
+            return self.eval_expr_uncached(expr);
+        }
+
+        let cache_key = self.exec_expr_cache_key(expr);
+        if let Some(entry) = self.exec_expr_cache.get(&cache_key).cloned() {
+            self.exec_cache_hits = self.exec_cache_hits.saturating_add(1);
+            self.exec_node_evals_charged = self
+                .exec_node_evals_charged
+                .saturating_add(entry.node_evals_charged);
+            self.charge_expr_steps(expr.span(), entry.steps_charged)?;
+            return Ok(entry.value);
+        }
+
+        self.exec_cache_misses = self.exec_cache_misses.saturating_add(1);
+        let steps_before = self.meter.steps();
+        let charged_before = self.exec_node_evals_charged;
+        let value = self.eval_expr_uncached(expr)?;
+        let steps_charged = self.meter.steps().saturating_sub(steps_before).max(1);
+        let node_evals_charged = self
+            .exec_node_evals_charged
+            .saturating_sub(charged_before)
+            .max(1);
+        self.exec_expr_cache.insert(
+            cache_key,
+            ExecExprCacheEntry {
+                value: value.clone(),
+                steps_charged,
+                node_evals_charged,
+            },
+        );
+        Ok(value)
+    }
+
+    fn charge_expr_steps(&mut self, span: Span, count: u32) -> Result<(), Diagnostic> {
+        for _ in 0..count {
+            self.tick(span)?;
+        }
+        Ok(())
+    }
+
+    fn exec_expr_cache_key(&self, expr: &Expr) -> String {
+        let mut refs = std::collections::BTreeSet::<String>::new();
+        collect_expr_idents(expr, &mut refs);
+
+        let mut bindings = String::new();
+        for name in refs {
+            let value_text = self
+                .env
+                .get(&name)
+                .map(stringify_json_value)
+                .unwrap_or_else(|| "<missing>".to_string());
+            bindings.push_str(&name);
+            bindings.push('=');
+            bindings.push_str(&value_text);
+            bindings.push('|');
+        }
+
+        stable_hash256_hex(&format!(
+            "exec_expr_cache|expr={}|bindings={bindings}",
+            expr_cache_fingerprint(expr)
+        ))
+    }
+
+    fn eval_expr_uncached(&mut self, expr: &Expr) -> Result<Value, Diagnostic> {
+        self.exec_node_evals_executed = self.exec_node_evals_executed.saturating_add(1);
+        self.exec_node_evals_charged = self.exec_node_evals_charged.saturating_add(1);
         self.tick(expr.span())?;
         match expr {
             Expr::Int { value, .. } => Ok(Value::Int(*value)),
@@ -1930,6 +2082,59 @@ impl Executor {
         let id = self.next_quarantine_call_id;
         self.next_quarantine_call_id = self.next_quarantine_call_id.saturating_add(1);
         id
+    }
+
+    fn observe_with_memo(
+        &mut self,
+        key: &str,
+        tier: &str,
+        ctx_lit: &str,
+        budget_units: u32,
+    ) -> Result4<Value> {
+        let cache_disabled = env::var("OCL_CACHE_DISABLE")
+            .ok()
+            .as_deref()
+            .map(|v| v == "1")
+            .unwrap_or(false);
+        let determinism_class = self.registry.determinism_class_for_key(key);
+        let cacheability = self.registry.cacheability_for_key(key);
+        let can_memoize = matches!(determinism_class, DeterminismClass::Deterministic)
+            && matches!(cacheability, Cacheability::WithinRun)
+            && !cache_disabled;
+
+        if can_memoize {
+            let memo_key = self.observe_memo_key(key, tier, ctx_lit, budget_units);
+            if let Some(entry) = self.observe_memo.get(&memo_key) {
+                self.observe_cache_hits = self.observe_cache_hits.saturating_add(1);
+                return entry.result.clone();
+            }
+            self.observe_cache_misses = self.observe_cache_misses.saturating_add(1);
+            let observed = self.observe_result_for_key(key, ctx_lit);
+            let validated = self.validate_runtime_payload_schema(key, observed);
+            let mut memoable = validated.clone();
+            memoable.origin_id = None;
+            self.observe_memo
+                .insert(memo_key, ObserveMemoEntry { result: memoable });
+            return validated;
+        }
+
+        let observed = self.observe_result_for_key(key, ctx_lit);
+        self.validate_runtime_payload_schema(key, observed)
+    }
+
+    fn observe_memo_key(&self, key: &str, tier: &str, ctx_lit: &str, budget_units: u32) -> String {
+        let mut source = format!("key={key}|tier={tier}|ctx={ctx_lit}|budget={budget_units}");
+        if let Some(engine_digest) = engine_incremental_digest(key, ctx_lit) {
+            source.push_str("|engine_incremental_digest=");
+            source.push_str(&engine_digest);
+        }
+        if key.starts_with("std.fs.") {
+            source.push_str(&format!("|fs_generation={}", self.fs_generation));
+        }
+        if key.starts_with("std.kv.") {
+            source.push_str(&format!("|kv_generation={}", self.kv_generation));
+        }
+        stable_hash256_hex(&source)
     }
 
     fn observe_result_for_key(&mut self, key: &str, ctx_lit: &str) -> Result4<Value> {
@@ -3277,6 +3482,120 @@ fn loop_cap_exceeded(span: Span, message: &'static str) -> Diagnostic {
         .with_hint("reduce loop iteration cap to fit configured loop_cap")
 }
 
+fn expr_is_exec_cacheable(expr: &Expr) -> bool {
+    match expr {
+        Expr::Call { .. } => false,
+        Expr::Int { .. } | Expr::Bool { .. } | Expr::String { .. } | Expr::Ident { .. } => true,
+        Expr::List { items, .. } => items.iter().all(expr_is_exec_cacheable),
+        Expr::Map { entries, .. } => entries
+            .iter()
+            .all(|(_, value_expr)| expr_is_exec_cacheable(value_expr)),
+        Expr::Record { fields, .. } => fields
+            .iter()
+            .all(|(_, value_expr)| expr_is_exec_cacheable(value_expr)),
+        Expr::Try { value, .. } => expr_is_exec_cacheable(value),
+        Expr::FieldAccess { base, .. } => expr_is_exec_cacheable(base),
+    }
+}
+
+fn collect_expr_idents(expr: &Expr, out: &mut std::collections::BTreeSet<String>) {
+    match expr {
+        Expr::Ident { name, .. } => {
+            out.insert(name.clone());
+        }
+        Expr::Call { args, .. } => {
+            for arg in args {
+                collect_expr_idents(arg, out);
+            }
+        }
+        Expr::List { items, .. } => {
+            for item in items {
+                collect_expr_idents(item, out);
+            }
+        }
+        Expr::Map { entries, .. } => {
+            for (_, value_expr) in entries {
+                collect_expr_idents(value_expr, out);
+            }
+        }
+        Expr::Record { fields, .. } => {
+            for (_, value_expr) in fields {
+                collect_expr_idents(value_expr, out);
+            }
+        }
+        Expr::Try { value, .. } => collect_expr_idents(value, out),
+        Expr::FieldAccess { base, .. } => collect_expr_idents(base, out),
+        Expr::Int { .. } | Expr::Bool { .. } | Expr::String { .. } => {}
+    }
+}
+
+fn expr_cache_fingerprint(expr: &Expr) -> String {
+    match expr {
+        Expr::Int { value, .. } => format!("int:{value}"),
+        Expr::Bool { value, .. } => format!("bool:{}", if *value { 1 } else { 0 }),
+        Expr::String { value, .. } => format!("str:{}", hex_encode_bytes_v08(value.as_bytes())),
+        Expr::Ident { name, .. } => format!("ident:{}", hex_encode_bytes_v08(name.as_bytes())),
+        Expr::Call { callee, args, .. } => {
+            let mut out = format!("call:{}(", hex_encode_bytes_v08(callee.as_bytes()));
+            for (idx, arg) in args.iter().enumerate() {
+                if idx > 0 {
+                    out.push(',');
+                }
+                out.push_str(&expr_cache_fingerprint(arg));
+            }
+            out.push(')');
+            out
+        }
+        Expr::List { items, .. } => {
+            let mut out = String::from("list:[");
+            for (idx, item) in items.iter().enumerate() {
+                if idx > 0 {
+                    out.push(',');
+                }
+                out.push_str(&expr_cache_fingerprint(item));
+            }
+            out.push(']');
+            out
+        }
+        Expr::Map { entries, .. } => {
+            let mut sorted = entries.iter().collect::<Vec<_>>();
+            sorted.sort_by(|(left, _), (right, _)| left.cmp(right));
+            let mut out = String::from("map:{");
+            for (idx, (key, value_expr)) in sorted.iter().enumerate() {
+                if idx > 0 {
+                    out.push(',');
+                }
+                out.push_str(&hex_encode_bytes_v08(key.as_bytes()));
+                out.push('=');
+                out.push_str(&expr_cache_fingerprint(value_expr));
+            }
+            out.push('}');
+            out
+        }
+        Expr::Record { fields, .. } => {
+            let mut sorted = fields.iter().collect::<Vec<_>>();
+            sorted.sort_by(|(left, _), (right, _)| left.cmp(right));
+            let mut out = String::from("record:{");
+            for (idx, (field, value_expr)) in sorted.iter().enumerate() {
+                if idx > 0 {
+                    out.push(',');
+                }
+                out.push_str(&hex_encode_bytes_v08(field.as_bytes()));
+                out.push('=');
+                out.push_str(&expr_cache_fingerprint(value_expr));
+            }
+            out.push('}');
+            out
+        }
+        Expr::Try { value, .. } => format!("try({})", expr_cache_fingerprint(value)),
+        Expr::FieldAccess { base, field, .. } => format!(
+            "field({}).{}",
+            expr_cache_fingerprint(base),
+            hex_encode_bytes_v08(field.as_bytes())
+        ),
+    }
+}
+
 fn condition_budget_stats(expr: &Expr) -> ConditionBudgetStats {
     fn walk(expr: &Expr) -> ConditionBudgetStats {
         match expr {
@@ -3378,6 +3697,35 @@ fn validate_ctx_literal(raw: &str) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn canonical_ctx_digest(raw: &str) -> Option<String> {
+    let mut ordered = BTreeMap::<String, String>::new();
+    for pair in raw.split(';') {
+        let (key, value) = pair.split_once('=')?;
+        ordered.insert(key.to_string(), value.to_string());
+    }
+
+    let mut canonical = String::new();
+    for (idx, (key, value)) in ordered.iter().enumerate() {
+        if idx > 0 {
+            canonical.push(';');
+        }
+        canonical.push_str(key);
+        canonical.push('=');
+        canonical.push_str(value);
+    }
+    Some(stable_hash256_hex(&canonical))
+}
+
+fn engine_incremental_digest(key: &str, ctx_lit: &str) -> Option<String> {
+    if !matches!(key, "engine.ui.run" | "engine.game.run") {
+        return None;
+    }
+    let ctx_digest = canonical_ctx_digest(ctx_lit)?;
+    Some(stable_hash256_hex(&format!(
+        "engine_incremental|{key}|ctx={ctx_digest}"
+    )))
 }
 
 fn extract_pending_sqlite_write(key: &str, result: &Result4<Value>) -> Option<PendingSqliteWrite> {
@@ -4391,6 +4739,7 @@ fn build_shadow_run(
             observe_key: memo_observe_key,
             determinism_class: match memo_determinism_class {
                 DeterminismClass::Deterministic => "deterministic".to_string(),
+                DeterminismClass::CassetteBased => "cassette_based".to_string(),
                 DeterminismClass::NonDeterministic => "non_deterministic".to_string(),
             },
             hits: memo_hits,

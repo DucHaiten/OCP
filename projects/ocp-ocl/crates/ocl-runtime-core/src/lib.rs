@@ -13,9 +13,10 @@ pub use bytecode::{assemble as assemble_bytecode, BytecodeOp, BytecodeProgram};
 pub use engine::{
     parse_program, pretty_schema, schema_skeleton, typecheck_program,
     typecheck_program_with_compat, validate_schema_value, CapabilityRegistry, CommitPolicyMode,
-    CompatMode, DiagPhase, Diagnostic, ErrorCode, ExecConfig, ExecOutput, Expr, FieldConstraints,
-    FieldSpec, GuardMode, KeyCapabilityKind, Program, ReasonCode, ResultKind, SchemaIssue,
-    SchemaIssueCode, SchemaType, Span, Stmt, TraceEvent, Type, TypecheckCompatConfig,
+    CompatMode, DiagPhase, Diagnostic, ErrorCode, ExecCacheStats, ExecConfig, ExecOutput, Expr,
+    FieldConstraints, FieldSpec, GuardMode, KeyCapabilityKind, ObserveCacheStats, Program,
+    ReasonCode, ResultKind, SchemaIssue, SchemaIssueCode, SchemaType, Span, Stmt, TraceEvent, Type,
+    TypecheckCompatConfig,
 };
 pub use ir::{lower_program as lower_to_ir, IrOp, IrOpKind, TypedIrProgram};
 pub use source_map::{build_source_map, SourceMap, SourceMapEntry};

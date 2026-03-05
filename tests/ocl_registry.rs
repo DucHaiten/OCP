@@ -1,6 +1,6 @@
 use ocp_ocl::ocp_ocl::{
-    execute_program, parse_key, parse_program, typecheck_program, CapabilityRegistry, ExecConfig,
-    Executor, KeyPattern, ReasonCode, ResultKind, Value,
+    execute_program, parse_key, parse_program, typecheck_program, Cacheability, CapabilityRegistry,
+    DeterminismClass, ExecConfig, Executor, KeyPattern, ReasonCode, ResultKind, Value,
 };
 
 #[test]
@@ -113,10 +113,31 @@ fn registry_determinism_class_defaults_to_non_deterministic() {
     let reg = CapabilityRegistry::v1_baseline();
     assert_eq!(
         reg.determinism_class_for_key("std.game.tick_info"),
-        ocp_ocl::ocp_ocl::DeterminismClass::Deterministic
+        DeterminismClass::Deterministic
     );
     assert_eq!(
         reg.determinism_class_for_key("std.time.wallclock.now"),
-        ocp_ocl::ocp_ocl::DeterminismClass::NonDeterministic
+        DeterminismClass::CassetteBased
+    );
+    assert_eq!(
+        reg.determinism_class_for_key("world.exists"),
+        DeterminismClass::NonDeterministic
+    );
+}
+
+#[test]
+fn registry_std_keys_have_explicit_determinism_and_cacheability_metadata() {
+    let reg = CapabilityRegistry::v1_baseline();
+    assert!(
+        reg.std_keys_missing_cache_metadata().is_empty(),
+        "all std keys should have explicit metadata"
+    );
+    assert_eq!(
+        reg.cacheability_for_key("std.fs.read_text"),
+        Cacheability::WithinRun
+    );
+    assert_eq!(
+        reg.cacheability_for_key("std.proc.exec"),
+        Cacheability::NoCache
     );
 }
