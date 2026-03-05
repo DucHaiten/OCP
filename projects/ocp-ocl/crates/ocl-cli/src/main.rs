@@ -8,25 +8,28 @@ use ocl_runtime_core::{
     RuntimeCoreError,
 };
 use ocl_sdk::{
-    build_oclpkg_with_lock, build_profile_from_trace, build_project_with_lock,
-    build_run_id_deterministic, check_project_with_lock, compare_shadow_traces_v1,
-    compose_phenotype, default_conformance_manifest_path, enforce_universe_match_v1,
-    fetch_artifact, fmt_project, init_cosmos_v1, init_project, install_organs_v1,
-    list_kits_from_cosmos_v1, parse_conformance_manifest_v1, parse_shadow_policy_v1,
-    publish_artifact, read_profile_json, read_trace_jsonl, render_conformance_report_json,
-    render_profile_view, resolve_deps_v3, resolve_domain_selection_v1, resolve_universe_v1,
-    resolve_view_selection_v1, run_artifact, run_conformance_v1, run_kit_doctor_v1,
-    run_project_with_engine_and_lock, run_project_with_shadow_compare,
-    run_project_with_trace_engine_and_lock, run_project_with_trace_engine_config_and_lock,
-    run_reactor_service_with_lock, run_reactor_service_with_shadow_compare,
-    run_reactor_service_with_trace_engine_and_lock, sign_oclpkg, sync_cosmos_lock_v1,
-    sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1, sync_policy_lock_v1,
-    test_project_with_lock, trace_required_digest, verify_assembly, verify_deps_lock_v3,
-    verify_deps_signing_and_trust_v10, verify_organs_lock_v1, verify_plugin_lock_v1,
-    verify_supply_artifact, write_conformance_report_json, write_profile_json,
-    write_shadow_compare_artifacts_v1, write_trace_jsonl, ConformanceManifestV1,
-    ConformanceRunOptionsV1, InputEnvelopeV1, ProfileViewOptions, ReactorRuntimeMode,
-    ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1, TraceRunSummary,
+    approve_permission_diff_v15, build_attestation_v15, build_oclpkg_with_lock,
+    build_profile_from_trace, build_project_with_lock, build_run_id_deterministic,
+    check_project_with_lock, compare_shadow_traces_v1, compose_phenotype,
+    default_conformance_manifest_path, enforce_universe_match_v1, fetch_artifact, fmt_project,
+    init_cosmos_v1, init_project, install_organs_v1, list_kits_from_cosmos_v1,
+    parse_conformance_manifest_v1, parse_shadow_policy_v1, publish_artifact, read_profile_json,
+    read_trace_jsonl, render_conformance_report_json, render_profile_view, resolve_deps_v3,
+    resolve_domain_selection_v1, resolve_universe_v1, resolve_view_selection_v1, run_artifact,
+    run_conformance_v1, run_kit_doctor_v1, run_project_with_engine_and_lock,
+    run_project_with_shadow_compare, run_project_with_trace_engine_and_lock,
+    run_project_with_trace_engine_config_and_lock, run_reactor_service_with_lock,
+    run_reactor_service_with_shadow_compare, run_reactor_service_with_trace_engine_and_lock,
+    sign_deps_lock_v3_v15, sign_oclpkg, sync_cosmos_lock_v1, sync_deps_lock_v1,
+    sync_organs_lock_v1, sync_plugin_lock_v1, sync_policy_lock_v1, test_project_with_lock,
+    trace_required_digest, verify_assembly, verify_build_attestation_v15, verify_build_repro_v15,
+    verify_deps_lock_v3, verify_deps_lock_v3_signature_v15, verify_deps_signing_and_trust_v10,
+    verify_organs_lock_v1, verify_plugin_lock_v1, verify_supply_artifact,
+    write_conformance_report_json, write_permission_diff_report_v15, write_permission_snapshot_v15,
+    write_profile_json, write_shadow_compare_artifacts_v1, write_trace_jsonl,
+    ConformanceManifestV1, ConformanceRunOptionsV1, InputEnvelopeV1, ProfileViewOptions,
+    ReactorRuntimeMode, ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1,
+    TraceRunSummary,
 };
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
@@ -1661,6 +1664,190 @@ fn run_cli(args: &[String]) -> i32 {
                 10
             }
         }
+        "lts" => {
+            let Some(scope) = args.get(1).map(String::as_str) else {
+                eprintln!(
+                    "usage: ocl lts <check|report> ...\n  check: ocl lts check <project_dir> [--manifest <file>] [--target-runtime <id>] [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--universe <id>] [--json]\n  report: ocl lts report <report_file> [--json]"
+                );
+                return 2;
+            };
+            match scope {
+                "check" => {
+                    let Some(project_dir) = args.get(2) else {
+                        eprintln!(
+                            "usage: ocl lts check <project_dir> [--manifest <file>] [--target-runtime <id>] [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--universe <id>] [--json]"
+                        );
+                        return 2;
+                    };
+                    let json_mode = args.iter().any(|a| a == "--json");
+                    let profile = parse_string_flag(args, "--profile")
+                        .unwrap_or_else(|| "strict".to_string());
+                    if profile != "strict" {
+                        eprintln!(
+                            "V-LTS-PROFILE-INVALID: unsupported profile `{profile}` (expected `strict`)"
+                        );
+                        return 2;
+                    }
+                    let manifest_path = parse_string_flag(args, "--manifest")
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| default_conformance_manifest_path(Path::new(".")));
+                    let out_path = parse_string_flag(args, "--out")
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| {
+                            PathBuf::from("target/ocl/w15/reports/lts_check_report.json")
+                        });
+                    let target_runtime = parse_string_flag(args, "--target-runtime")
+                        .unwrap_or_else(|| "current".to_string());
+                    let runtime_mode_raw = parse_string_flag(args, "--runtime")
+                        .unwrap_or_else(|| "deterministic".to_string());
+                    let runtime_mode = match runtime_mode_raw.as_str() {
+                        "deterministic" => ReactorRuntimeMode::Deterministic,
+                        "throughput" => ReactorRuntimeMode::Throughput,
+                        _ => {
+                            eprintln!(
+                                "invalid runtime mode: `{runtime_mode_raw}` (expected deterministic|throughput)"
+                            );
+                            return 2;
+                        }
+                    };
+                    let engine_raw =
+                        parse_string_flag(args, "--engine").unwrap_or_else(|| "dual".to_string());
+                    let run_engine = match engine_raw.as_str() {
+                        "interpreter" => RunEngine::Interpreter,
+                        "bytecode" => RunEngine::Bytecode,
+                        "dual" => RunEngine::Dual,
+                        _ => {
+                            eprintln!(
+                                "invalid engine mode: `{engine_raw}` (expected interpreter|bytecode|dual)"
+                            );
+                            return 2;
+                        }
+                    };
+                    let universe_id = parse_string_flag(args, "--universe");
+
+                    let report_json = match run_lts_check_report_v15(
+                        Path::new(project_dir),
+                        &manifest_path,
+                        &target_runtime,
+                        run_engine,
+                        runtime_mode,
+                        universe_id,
+                        &profile,
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            if json_mode {
+                                println!("{}", error_to_json(&err));
+                            } else {
+                                eprintln!("{err}");
+                            }
+                            return 9;
+                        }
+                    };
+
+                    if let Some(parent) = out_path.parent() {
+                        if let Err(err) = fs::create_dir_all(parent) {
+                            if json_mode {
+                                println!("{}", error_to_json(&SdkError::Io(err)));
+                            } else {
+                                eprintln!("{}", SdkError::Io(err));
+                            }
+                            return 11;
+                        }
+                    }
+                    if let Err(err) = fs::write(
+                        &out_path,
+                        serde_json::to_string_pretty(&report_json)
+                            .unwrap_or_else(|_| "{}".to_string()),
+                    ) {
+                        if json_mode {
+                            println!("{}", error_to_json(&SdkError::Io(err)));
+                        } else {
+                            eprintln!("{}", SdkError::Io(err));
+                        }
+                        return 11;
+                    }
+
+                    if json_mode {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&report_json)
+                                .unwrap_or_else(|_| "{}".to_string())
+                        );
+                    } else {
+                        println!(
+                            "lts check done (ok={}, profile={}, out={})",
+                            report_json
+                                .get("ok")
+                                .and_then(JsonValue::as_bool)
+                                .unwrap_or(false),
+                            report_json
+                                .get("profile")
+                                .and_then(JsonValue::as_str)
+                                .unwrap_or("strict"),
+                            out_path.display()
+                        );
+                        println!("{}", render_lts_report_text_v15(&report_json));
+                    }
+
+                    if report_json
+                        .get("ok")
+                        .and_then(JsonValue::as_bool)
+                        .unwrap_or(false)
+                    {
+                        0
+                    } else {
+                        10
+                    }
+                }
+                "report" => {
+                    let report_path = args.get(2).map(PathBuf::from).unwrap_or_else(|| {
+                        PathBuf::from("target/ocl/w15/reports/lts_check_report.json")
+                    });
+                    let json_mode = args.iter().any(|a| a == "--json");
+                    let raw = match fs::read_to_string(&report_path) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            if json_mode {
+                                println!("{}", error_to_json(&SdkError::Io(err)));
+                            } else {
+                                eprintln!("{}", SdkError::Io(err));
+                            }
+                            return 1;
+                        }
+                    };
+                    let report_json: JsonValue = match serde_json::from_str(&raw) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            let diag = SdkError::MissingProject(format!(
+                                "X-LTS-REPORT-INVALID: failed to parse report JSON `{}` ({err})",
+                                report_path.display()
+                            ));
+                            if json_mode {
+                                println!("{}", error_to_json(&diag));
+                            } else {
+                                eprintln!("{diag}");
+                            }
+                            return 1;
+                        }
+                    };
+                    if json_mode {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&report_json)
+                                .unwrap_or_else(|_| "{}".to_string())
+                        );
+                    } else {
+                        println!("{}", render_lts_report_text_v15(&report_json));
+                    }
+                    0
+                }
+                _ => {
+                    eprintln!("usage: ocl lts <check|report> ...");
+                    2
+                }
+            }
+        }
         "test" => {
             if args.iter().any(|a| a == "--conformance") {
                 let conformance_marker =
@@ -1960,12 +2147,14 @@ fn run_cli(args: &[String]) -> i32 {
         "build" => {
             let Some(path) = args.get(1) else {
                 eprintln!(
-                    "usage: ocl build <project_dir> [--locked] [--source-only] [--universe <id>]"
+                    "usage: ocl build <project_dir> [--locked] [--source-only] [--universe <id>] [--attest] [--attest-key <keyid>]"
                 );
                 return 2;
             };
             let locked = args.iter().any(|a| a == "--locked");
             let source_only = args.iter().any(|a| a == "--source-only");
+            let attest = args.iter().any(|a| a == "--attest");
+            let attest_key = parse_string_flag(args, "--attest-key");
             let universe_id = parse_string_flag(args, "--universe");
             if let Err(err) = resolve_universe_v1(Path::new(path), locked, universe_id.as_deref()) {
                 eprintln!("{err}");
@@ -1974,11 +2163,30 @@ fn run_cli(args: &[String]) -> i32 {
             if source_only {
                 match build_project_with_lock(Path::new(path), locked) {
                     Ok(summary) => {
-                        println!(
-                            "build source-only ok (files_bundled={})",
-                            summary.files_bundled
-                        );
-                        0
+                        if attest {
+                            match build_attestation_v15(Path::new(path), attest_key.as_deref()) {
+                                Ok(attest_summary) => {
+                                    println!(
+                                        "build source-only ok (files_bundled={}, attestation={}, sig={}, manifest_hash={})",
+                                        summary.files_bundled,
+                                        attest_summary.manifest_path.display(),
+                                        attest_summary.sig_path.display(),
+                                        attest_summary.manifest_hash_sha256
+                                    );
+                                    0
+                                }
+                                Err(err) => {
+                                    eprintln!("{err}");
+                                    1
+                                }
+                            }
+                        } else {
+                            println!(
+                                "build source-only ok (files_bundled={})",
+                                summary.files_bundled
+                            );
+                            0
+                        }
                     }
                     Err(err) => {
                         eprintln!("{err}");
@@ -1988,13 +2196,34 @@ fn run_cli(args: &[String]) -> i32 {
             } else {
                 match build_oclpkg_with_lock(Path::new(path), locked) {
                     Ok(summary) => {
-                        println!(
-                            "build ok (.oclpkg={}, files_bundled={}, payload_hash_blake3={})",
-                            summary.artifact_path.display(),
-                            summary.files_bundled,
-                            summary.payload_hash_blake3
-                        );
-                        0
+                        if attest {
+                            match build_attestation_v15(Path::new(path), attest_key.as_deref()) {
+                                Ok(attest_summary) => {
+                                    println!(
+                                        "build ok (.oclpkg={}, files_bundled={}, payload_hash_blake3={}, attestation={}, sig={}, manifest_hash={})",
+                                        summary.artifact_path.display(),
+                                        summary.files_bundled,
+                                        summary.payload_hash_blake3,
+                                        attest_summary.manifest_path.display(),
+                                        attest_summary.sig_path.display(),
+                                        attest_summary.manifest_hash_sha256
+                                    );
+                                    0
+                                }
+                                Err(err) => {
+                                    eprintln!("{err}");
+                                    1
+                                }
+                            }
+                        } else {
+                            println!(
+                                "build ok (.oclpkg={}, files_bundled={}, payload_hash_blake3={})",
+                                summary.artifact_path.display(),
+                                summary.files_bundled,
+                                summary.payload_hash_blake3
+                            );
+                            0
+                        }
                     }
                     Err(err) => {
                         eprintln!("{err}");
@@ -2263,30 +2492,224 @@ fn run_cli(args: &[String]) -> i32 {
             }
         }
         "lock" => {
-            if args.get(1).map(String::as_str) != Some("sync") {
-                eprintln!("usage: ocl lock sync <project_dir> [--write-legacy-lock]");
-                return 2;
-            }
-            let Some(path) = args.get(2) else {
-                eprintln!("usage: ocl lock sync <project_dir> [--write-legacy-lock]");
+            let Some(sub) = args.get(1).map(String::as_str) else {
+                eprintln!("usage: ocl lock <sync|sign|verify> ...");
                 return 2;
             };
-            let write_legacy = args.iter().any(|a| a == "--write-legacy-lock");
-            match resolve_deps_v3(Path::new(path), write_legacy) {
-                Ok(summary) => {
-                    println!(
-                        "lock sync ok (deps_resolved={}, lock_hash={}, lock_v3={}, ocl_lock={}, legacy_v2={})",
-                        summary.deps_resolved,
-                        summary.lock_hash,
-                        summary.lock_v3_path.display(),
-                        summary.ocl_lock_path.display(),
-                        summary.wrote_legacy_lock_v2
-                    );
-                    0
+            match sub {
+                "sync" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!("usage: ocl lock sync <project_dir> [--write-legacy-lock]");
+                        return 2;
+                    };
+                    let write_legacy = args.iter().any(|a| a == "--write-legacy-lock");
+                    match resolve_deps_v3(Path::new(path), write_legacy) {
+                        Ok(summary) => {
+                            println!(
+                                "lock sync ok (deps_resolved={}, lock_hash={}, lock_v3={}, ocl_lock={}, legacy_v2={})",
+                                summary.deps_resolved,
+                                summary.lock_hash,
+                                summary.lock_v3_path.display(),
+                                summary.ocl_lock_path.display(),
+                                summary.wrote_legacy_lock_v2
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
                 }
-                Err(err) => {
-                    eprintln!("{err}");
-                    1
+                "sign" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!("usage: ocl lock sign <project_dir> --key <keyid> [--lock deps.lock.v3]");
+                        return 2;
+                    };
+                    let Some(key_id) = parse_string_flag(args, "--key") else {
+                        eprintln!("usage: ocl lock sign <project_dir> --key <keyid> [--lock deps.lock.v3]");
+                        return 2;
+                    };
+                    if let Some(lock_value) = parse_string_flag(args, "--lock") {
+                        if lock_value.replace('\\', "/") != "deps.lock.v3" {
+                            eprintln!(
+                                "V-LOCK-PATH-INVALID: v0.15 lock sign currently supports only `--lock deps.lock.v3`"
+                            );
+                            return 2;
+                        }
+                    }
+                    match sign_deps_lock_v3_v15(Path::new(path), &key_id) {
+                        Ok(summary) => {
+                            println!(
+                                "lock sign ok (lock={}, sig={}, key_id={}, ast_hash={})",
+                                summary.lock_path.display(),
+                                summary.sig_path.display(),
+                                summary.key_id,
+                                summary.lock_ast_hash_sha256
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "verify" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!("usage: ocl lock verify <project_dir> [--lock deps.lock.v3]");
+                        return 2;
+                    };
+                    if let Some(lock_value) = parse_string_flag(args, "--lock") {
+                        if lock_value.replace('\\', "/") != "deps.lock.v3" {
+                            eprintln!(
+                                "V-LOCK-PATH-INVALID: v0.15 lock verify currently supports only `--lock deps.lock.v3`"
+                            );
+                            return 2;
+                        }
+                    }
+                    match verify_deps_lock_v3_signature_v15(Path::new(path)) {
+                        Ok(summary) => {
+                            println!(
+                                "lock verify ok (lock={}, sig={}, key_id={}, ast_hash={})",
+                                summary.lock_path.display(),
+                                summary.sig_path.display(),
+                                summary.key_id,
+                                summary.lock_ast_hash_sha256
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                _ => {
+                    eprintln!("usage: ocl lock <sync|sign|verify> ...");
+                    2
+                }
+            }
+        }
+        "perm" => {
+            let Some(sub_raw) = args.get(1).map(String::as_str) else {
+                eprintln!("usage: ocl perm <snapshot|diff|approve|review> ...");
+                return 2;
+            };
+            let sub = if sub_raw == "review" { "diff" } else { sub_raw };
+            match sub {
+                "snapshot" => {
+                    let Some(path) = args.get(2) else {
+                        eprintln!("usage: ocl perm snapshot <project_dir> [--out-dir <dir>]");
+                        return 2;
+                    };
+                    let out_dir = parse_string_flag(args, "--out-dir").map(PathBuf::from);
+                    match write_permission_snapshot_v15(Path::new(path), out_dir.as_deref()) {
+                        Ok(summary) => {
+                            println!(
+                                "perm snapshot ok (packages={}, snapshot_hash={}, snapshot={}, requested={}, granted={}, effective={})",
+                                summary.packages,
+                                summary.snapshot_hash_sha256,
+                                summary.snapshot_path.display(),
+                                summary.requested_path.display(),
+                                summary.granted_path.display(),
+                                summary.effective_path.display()
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "diff" => {
+                    let Some(old_path) = args.get(2) else {
+                        eprintln!("usage: ocl perm diff <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]");
+                        return 2;
+                    };
+                    let Some(new_path) = args.get(3) else {
+                        eprintln!("usage: ocl perm diff <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]");
+                        return 2;
+                    };
+                    let out = parse_string_flag(args, "--out")
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| PathBuf::from("permission_diff_report.json"));
+                    if let Some(parent) = out.parent() {
+                        if !parent.as_os_str().is_empty() {
+                            if let Err(err) = fs::create_dir_all(parent) {
+                                eprintln!("{err}");
+                                return 1;
+                            }
+                        }
+                    }
+                    let approval_path = parse_string_flag(args, "--approval").map(PathBuf::from);
+                    match write_permission_diff_report_v15(
+                        Path::new(old_path),
+                        Path::new(new_path),
+                        &out,
+                        approval_path.as_deref(),
+                    ) {
+                        Ok(summary) => {
+                            println!(
+                                "perm diff ok (diff_hash={}, has_changes={}, introduces_new_permissions={}, approval_checked={}, approved={}, report={})",
+                                summary.permission_diff_hash,
+                                summary.has_changes,
+                                summary.introduces_new_permissions,
+                                summary.approval_checked,
+                                summary.approved,
+                                summary.report_path.display()
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                "approve" => {
+                    let Some(diff_report) = args.get(2) else {
+                        eprintln!("usage: ocl perm approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]");
+                        return 2;
+                    };
+                    let Some(approved_by) = parse_string_flag(args, "--by") else {
+                        eprintln!("usage: ocl perm approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]");
+                        return 2;
+                    };
+                    let Some(date) = parse_string_flag(args, "--date") else {
+                        eprintln!("usage: ocl perm approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]");
+                        return 2;
+                    };
+                    let approval_path = parse_string_flag(args, "--approval")
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| PathBuf::from("permissions.approval.toml"));
+                    let note = parse_string_flag(args, "--note");
+                    match approve_permission_diff_v15(
+                        Path::new(diff_report),
+                        &approval_path,
+                        &approved_by,
+                        &date,
+                        note.as_deref(),
+                    ) {
+                        Ok(summary) => {
+                            println!(
+                                "perm approve ok (diff_hash={}, approvals_total={}, approval={})",
+                                summary.diff_hash,
+                                summary.approvals_total,
+                                summary.approval_path.display()
+                            );
+                            0
+                        }
+                        Err(err) => {
+                            eprintln!("{err}");
+                            1
+                        }
+                    }
+                }
+                _ => {
+                    eprintln!("usage: ocl perm <snapshot|diff|approve|review> ...");
+                    2
                 }
             }
         }
@@ -2769,38 +3192,88 @@ fn run_cli(args: &[String]) -> i32 {
             }
         }
         "verify" => {
-            let Some(path) = args.get(1) else {
-                eprintln!("usage: ocl verify <project_dir> --phenotype <file> [--registry <dir>] [--locked] [--universe <id>]");
-                return 2;
-            };
-            let Some(phenotype) = parse_string_flag(args, "--phenotype") else {
-                eprintln!("usage: ocl verify <project_dir> --phenotype <file> [--registry <dir>] [--locked] [--universe <id>]");
-                return 2;
-            };
-            let registry =
-                parse_string_flag(args, "--registry").unwrap_or_else(|| "registry".to_string());
-            let locked = args.iter().any(|a| a == "--locked");
-            let universe_id = parse_string_flag(args, "--universe");
-            if let Err(err) = resolve_universe_v1(Path::new(path), locked, universe_id.as_deref()) {
-                eprintln!("{err}");
-                return 1;
-            }
-            match verify_assembly(
-                Path::new(path),
-                Path::new(&phenotype),
-                Path::new(&registry),
-                locked,
-            ) {
-                Ok(summary) => {
-                    println!(
-                        "verify ok (selected_components={})",
-                        summary.selected_components
-                    );
-                    0
+            if args.get(1).map(String::as_str) == Some("--attest") {
+                let Some(artifact_dir) = args.get(2) else {
+                    eprintln!("usage: ocl verify --attest <artifact_dir>");
+                    return 2;
+                };
+                match verify_build_attestation_v15(Path::new(artifact_dir)) {
+                    Ok(summary) => {
+                        println!(
+                            "verify attest ok (manifest={}, sig={}, key_id={}, manifest_hash={})",
+                            summary.manifest_path.display(),
+                            summary.sig_path.display(),
+                            summary.key_id,
+                            summary.manifest_hash_sha256
+                        );
+                        0
+                    }
+                    Err(err) => {
+                        eprintln!("{err}");
+                        1
+                    }
                 }
-                Err(err) => {
+            } else if args.get(1).map(String::as_str) == Some("--repro") {
+                let Some(artifact_dir) = args.get(2) else {
+                    eprintln!("usage: ocl verify --repro <artifact_dir>");
+                    return 2;
+                };
+                match verify_build_repro_v15(Path::new(artifact_dir)) {
+                    Ok(summary) => {
+                        println!(
+                            "verify repro ok (artifact_dir={}, baseline_hash={}, repro_hash={}, exclusions={})",
+                            summary.artifact_dir.display(),
+                            summary.baseline_hash_sha256,
+                            summary.repro_hash_sha256,
+                            summary.exclusions.join(",")
+                        );
+                        0
+                    }
+                    Err(err) => {
+                        eprintln!("{err}");
+                        1
+                    }
+                }
+            } else {
+                let Some(path) = args.get(1) else {
+                    eprintln!("usage: ocl verify <project_dir> --phenotype <file> [--registry <dir>] [--locked] [--universe <id>]");
+                    eprintln!("       ocl verify --attest <artifact_dir>");
+                    eprintln!("       ocl verify --repro <artifact_dir>");
+                    return 2;
+                };
+                let Some(phenotype) = parse_string_flag(args, "--phenotype") else {
+                    eprintln!("usage: ocl verify <project_dir> --phenotype <file> [--registry <dir>] [--locked] [--universe <id>]");
+                    eprintln!("       ocl verify --attest <artifact_dir>");
+                    eprintln!("       ocl verify --repro <artifact_dir>");
+                    return 2;
+                };
+                let registry =
+                    parse_string_flag(args, "--registry").unwrap_or_else(|| "registry".to_string());
+                let locked = args.iter().any(|a| a == "--locked");
+                let universe_id = parse_string_flag(args, "--universe");
+                if let Err(err) =
+                    resolve_universe_v1(Path::new(path), locked, universe_id.as_deref())
+                {
                     eprintln!("{err}");
-                    1
+                    return 1;
+                }
+                match verify_assembly(
+                    Path::new(path),
+                    Path::new(&phenotype),
+                    Path::new(&registry),
+                    locked,
+                ) {
+                    Ok(summary) => {
+                        println!(
+                            "verify ok (selected_components={})",
+                            summary.selected_components
+                        );
+                        0
+                    }
+                    Err(err) => {
+                        eprintln!("{err}");
+                        1
+                    }
                 }
             }
         }
@@ -3134,6 +3607,439 @@ fn is_upgrade_scenario_relevant_v14(name: &str, features: &UpgradeCheckFeaturesV
         return features.has_dependencies;
     }
     true
+}
+
+fn extract_error_code_token_v15(message: &str, fallback: &str) -> String {
+    let token = message
+        .trim()
+        .split(|ch: char| ch == ':' || ch.is_whitespace())
+        .next()
+        .unwrap_or_default()
+        .trim();
+    if token.is_empty() {
+        return fallback.to_string();
+    }
+    if token.starts_with("X-")
+        || token.starts_with("RC-")
+        || token.starts_with("V-")
+        || token.starts_with("W9-")
+    {
+        return token.to_string();
+    }
+    fallback.to_string()
+}
+
+fn push_lts_risk_v15(
+    risks: &mut Vec<(String, String, String)>,
+    gate: &str,
+    message: &str,
+    fallback_code: &str,
+) {
+    let code = extract_error_code_token_v15(message, fallback_code);
+    risks.push((gate.to_string(), code, message.to_string()));
+}
+
+fn run_lts_check_report_v15(
+    project_root: &Path,
+    manifest_path: &Path,
+    target_runtime: &str,
+    run_engine: RunEngine,
+    runtime_mode: ReactorRuntimeMode,
+    universe_id: Option<String>,
+    profile: &str,
+) -> Result<JsonValue, SdkError> {
+    let lane = read_lane_and_entry_for_v071(project_root).0;
+    let mut risks = Vec::<(String, String, String)>::new();
+
+    let lock_gate = match verify_deps_lock_v3_signature_v15(project_root) {
+        Ok(summary) => json!({
+            "ok": true,
+            "lock_path": summary.lock_path.to_string_lossy(),
+            "sig_path": summary.sig_path.to_string_lossy(),
+            "key_id": summary.key_id,
+            "lock_ast_hash_sha256": summary.lock_ast_hash_sha256
+        }),
+        Err(err) => {
+            let msg = err.to_string();
+            push_lts_risk_v15(
+                &mut risks,
+                "lock_signature",
+                &msg,
+                "X-LOCK-SIGNATURE-INVALID",
+            );
+            json!({
+                "ok": false,
+                "error_code": extract_error_code_token_v15(&msg, "X-LOCK-SIGNATURE-INVALID"),
+                "message": msg
+            })
+        }
+    };
+
+    let trust_gate = match verify_deps_signing_and_trust_v10(project_root, true) {
+        Ok(_) => json!({ "ok": true }),
+        Err(err) => {
+            let msg = err.to_string();
+            push_lts_risk_v15(&mut risks, "trust", &msg, "X-TRUST-SIGNATURE-REQUIRED");
+            json!({
+                "ok": false,
+                "error_code": extract_error_code_token_v15(&msg, "X-TRUST-SIGNATURE-REQUIRED"),
+                "message": msg
+            })
+        }
+    };
+
+    let permission_gate = if lane == "locked_v071" {
+        let baseline = project_root.join("permissions.snapshot.json");
+        if !baseline.exists() {
+            let msg = format!(
+                "X-PERMISSION-REVIEW-REQUIRED: missing baseline snapshot `{}`; run `ocl perm snapshot {}` first",
+                baseline.display(),
+                project_root.display()
+            );
+            push_lts_risk_v15(
+                &mut risks,
+                "permission_review",
+                &msg,
+                "X-PERMISSION-REVIEW-REQUIRED",
+            );
+            json!({
+                "ok": false,
+                "error_code": "X-PERMISSION-REVIEW-REQUIRED",
+                "message": msg,
+                "baseline_present": false
+            })
+        } else {
+            let lts_tmp_root = project_root
+                .join("target")
+                .join("ocl")
+                .join("w15")
+                .join("lts");
+            fs::create_dir_all(&lts_tmp_root)?;
+            match write_permission_snapshot_v15(project_root, Some(&lts_tmp_root)) {
+                Ok(snapshot_summary) => {
+                    let approval_path = project_root.join("permissions.approval.toml");
+                    let diff_path = lts_tmp_root.join("permission_diff_report.json");
+                    match write_permission_diff_report_v15(
+                        &baseline,
+                        &snapshot_summary.snapshot_path,
+                        &diff_path,
+                        Some(&approval_path),
+                    ) {
+                        Ok(diff_summary) => json!({
+                            "ok": true,
+                            "baseline_present": true,
+                            "snapshot_hash_sha256": snapshot_summary.snapshot_hash_sha256,
+                            "permission_diff_hash": diff_summary.permission_diff_hash,
+                            "has_changes": diff_summary.has_changes,
+                            "introduces_new_permissions": diff_summary.introduces_new_permissions,
+                            "approval_checked": diff_summary.approval_checked,
+                            "approved": diff_summary.approved,
+                            "report_path": diff_summary.report_path.to_string_lossy()
+                        }),
+                        Err(err) => {
+                            let msg = err.to_string();
+                            push_lts_risk_v15(
+                                &mut risks,
+                                "permission_review",
+                                &msg,
+                                "X-PERMISSION-APPROVAL-MISSING",
+                            );
+                            json!({
+                                "ok": false,
+                                "baseline_present": true,
+                                "error_code": extract_error_code_token_v15(&msg, "X-PERMISSION-APPROVAL-MISSING"),
+                                "message": msg
+                            })
+                        }
+                    }
+                }
+                Err(err) => {
+                    let msg = err.to_string();
+                    push_lts_risk_v15(
+                        &mut risks,
+                        "permission_review",
+                        &msg,
+                        "X-PERMISSION-REVIEW-REQUIRED",
+                    );
+                    json!({
+                        "ok": false,
+                        "baseline_present": true,
+                        "error_code": extract_error_code_token_v15(&msg, "X-PERMISSION-REVIEW-REQUIRED"),
+                        "message": msg
+                    })
+                }
+            }
+        }
+    } else {
+        json!({
+            "ok": true,
+            "skipped": true,
+            "reason": format!("lane {} does not require strict permission baseline gate", lane)
+        })
+    };
+
+    let manifest = parse_conformance_manifest_v1(manifest_path)?;
+    let features = detect_upgrade_check_features_v14(project_root);
+    let selected_manifest = select_upgrade_manifest_subset_v14(&manifest, &features);
+    let selected_names: Vec<String> = selected_manifest
+        .scenarios
+        .iter()
+        .map(|s| s.name.clone())
+        .collect();
+    let locked_mode = matches!(lane.as_str(), "locked_v071" | "locked_v06");
+    let run_options = ConformanceRunOptionsV1 {
+        locked: locked_mode,
+        engine: run_engine,
+        runtime_mode,
+        universe_id,
+    };
+
+    let (upgrade_gate, conformance_gate, first_divergence) =
+        if selected_manifest.scenarios.is_empty() {
+            let msg = "X-UPGRADE-CHECK-FAILED: no conformance scenarios selected from manifest"
+                .to_string();
+            push_lts_risk_v15(&mut risks, "upgrade_check", &msg, "X-UPGRADE-CHECK-FAILED");
+            push_lts_risk_v15(&mut risks, "conformance", &msg, "X-UPGRADE-CHECK-FAILED");
+            (
+                json!({
+                    "ok": false,
+                    "error_code": "X-UPGRADE-CHECK-FAILED",
+                    "selected_scenarios": selected_names,
+                    "message": msg
+                }),
+                json!({
+                    "ok": false,
+                    "error_code": "X-UPGRADE-CHECK-FAILED",
+                    "scenarios_total": 0u64,
+                    "scenarios_passed": 0u64,
+                    "scenarios_failed": 0u64,
+                    "required_digest": JsonValue::Null,
+                    "message": msg
+                }),
+                JsonValue::Null,
+            )
+        } else {
+            let conformance = run_conformance_v1(Path::new("."), &selected_manifest, run_options);
+            let first_divergence_value = conformance
+                .results
+                .iter()
+                .enumerate()
+                .find(|(_, item)| !item.ok)
+                .map(|(idx, item)| {
+                    json!({
+                        "index": idx,
+                        "scenario": item.name,
+                        "reason": item.reason.clone().unwrap_or_default(),
+                    })
+                })
+                .unwrap_or(JsonValue::Null);
+            let ok = conformance.scenarios_failed == 0;
+            if !ok {
+                let reason = first_divergence_value
+                    .get("reason")
+                    .and_then(JsonValue::as_str)
+                    .unwrap_or("X-UPGRADE-CHECK-FAILED");
+                push_lts_risk_v15(
+                    &mut risks,
+                    "upgrade_check",
+                    reason,
+                    "X-UPGRADE-CHECK-FAILED",
+                );
+                push_lts_risk_v15(&mut risks, "conformance", reason, "X-UPGRADE-CHECK-FAILED");
+            }
+            (
+                json!({
+                    "ok": ok,
+                    "target_runtime": target_runtime,
+                    "selected_scenarios": selected_names,
+                    "scenarios_total": conformance.scenarios_total,
+                    "scenarios_failed": conformance.scenarios_failed,
+                    "required_digest": conformance.required_digest,
+                    "runner_contract": "ocl test --conformance"
+                }),
+                json!({
+                    "ok": ok,
+                    "run_id": conformance.run_id,
+                    "scenarios_total": conformance.scenarios_total,
+                    "scenarios_passed": conformance.scenarios_passed,
+                    "scenarios_failed": conformance.scenarios_failed,
+                    "required_digest": conformance.required_digest
+                }),
+                first_divergence_value,
+            )
+        };
+
+    let mut risk_values = risks
+        .into_iter()
+        .map(|(gate, code, message)| {
+            json!({
+                "gate": gate,
+                "code": code,
+                "message": message
+            })
+        })
+        .collect::<Vec<JsonValue>>();
+    risk_values.sort_by(|a, b| {
+        let ag = a
+            .get("gate")
+            .and_then(JsonValue::as_str)
+            .unwrap_or_default();
+        let bg = b
+            .get("gate")
+            .and_then(JsonValue::as_str)
+            .unwrap_or_default();
+        let ac = a
+            .get("code")
+            .and_then(JsonValue::as_str)
+            .unwrap_or_default();
+        let bc = b
+            .get("code")
+            .and_then(JsonValue::as_str)
+            .unwrap_or_default();
+        let am = a
+            .get("message")
+            .and_then(JsonValue::as_str)
+            .unwrap_or_default();
+        let bm = b
+            .get("message")
+            .and_then(JsonValue::as_str)
+            .unwrap_or_default();
+        ag.cmp(bg).then(ac.cmp(bc)).then(am.cmp(bm))
+    });
+    risk_values.dedup_by(|a, b| {
+        a.get("gate") == b.get("gate")
+            && a.get("code") == b.get("code")
+            && a.get("message") == b.get("message")
+    });
+
+    let ok = lock_gate
+        .get("ok")
+        .and_then(JsonValue::as_bool)
+        .unwrap_or(false)
+        && trust_gate
+            .get("ok")
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(false)
+        && permission_gate
+            .get("ok")
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(false)
+        && upgrade_gate
+            .get("ok")
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(false)
+        && conformance_gate
+            .get("ok")
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(false);
+
+    Ok(json!({
+        "schema": "ocl.lts_check.v1",
+        "project_dir": project_root.to_string_lossy(),
+        "project_lane": lane,
+        "profile": profile,
+        "manifest_path": manifest_path.to_string_lossy(),
+        "target_runtime": target_runtime,
+        "gates": {
+            "lock_signature": lock_gate,
+            "trust": trust_gate,
+            "permission_review": permission_gate,
+            "upgrade_check": upgrade_gate,
+            "conformance": conformance_gate
+        },
+        "first_divergence": first_divergence,
+        "risks": risk_values,
+        "ok": ok,
+        "error_code": if ok { JsonValue::Null } else { JsonValue::String("X-LTS-CHECK-FAILED".to_string()) }
+    }))
+}
+
+fn render_lts_report_text_v15(report: &JsonValue) -> String {
+    let ok = report
+        .get("ok")
+        .and_then(JsonValue::as_bool)
+        .unwrap_or(false);
+    let profile = report
+        .get("profile")
+        .and_then(JsonValue::as_str)
+        .unwrap_or("strict");
+    let lane = report
+        .get("project_lane")
+        .and_then(JsonValue::as_str)
+        .unwrap_or("unknown");
+    let mut out = String::new();
+    out.push_str("lts report\n");
+    out.push_str("  schema: ");
+    out.push_str(
+        report
+            .get("schema")
+            .and_then(JsonValue::as_str)
+            .unwrap_or("ocl.lts_check.v1"),
+    );
+    out.push('\n');
+    out.push_str("  profile: ");
+    out.push_str(profile);
+    out.push('\n');
+    out.push_str("  lane: ");
+    out.push_str(lane);
+    out.push('\n');
+    out.push_str("  ok: ");
+    out.push_str(if ok { "true" } else { "false" });
+    out.push('\n');
+
+    let gate_names = [
+        "lock_signature",
+        "trust",
+        "permission_review",
+        "upgrade_check",
+        "conformance",
+    ];
+    for gate in gate_names {
+        let gate_ok = report
+            .get("gates")
+            .and_then(|g| g.get(gate))
+            .and_then(|g| g.get("ok"))
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(false);
+        out.push_str("  gate.");
+        out.push_str(gate);
+        out.push_str(": ");
+        out.push_str(if gate_ok { "ok" } else { "fail" });
+        out.push('\n');
+    }
+
+    let risks = report
+        .get("risks")
+        .and_then(JsonValue::as_array)
+        .cloned()
+        .unwrap_or_default();
+    out.push_str("  risks: ");
+    out.push_str(&risks.len().to_string());
+    out.push('\n');
+    for item in risks {
+        let gate = item
+            .get("gate")
+            .and_then(JsonValue::as_str)
+            .unwrap_or("unknown");
+        let code = item
+            .get("code")
+            .and_then(JsonValue::as_str)
+            .unwrap_or("X-LTS-CHECK-FAILED");
+        let msg = item
+            .get("message")
+            .and_then(JsonValue::as_str)
+            .unwrap_or_default();
+        out.push_str("    - ");
+        out.push_str(gate);
+        out.push_str(": ");
+        out.push_str(code);
+        if !msg.is_empty() {
+            out.push_str(" :: ");
+            out.push_str(msg);
+        }
+        out.push('\n');
+    }
+    out
 }
 
 fn parse_path_with_flag(args: &[String], flag: &str) -> (Option<PathBuf>, bool) {
@@ -3927,6 +4833,89 @@ fn read_lane_and_entry_for_v071(root: &Path) -> (String, String) {
 }
 
 #[derive(Debug, Clone)]
+struct QuarantinePolicyV15 {
+    require_signed_cassette: bool,
+    redact_headers: Vec<String>,
+    redact_env_patterns: Vec<String>,
+}
+
+impl Default for QuarantinePolicyV15 {
+    fn default() -> Self {
+        Self {
+            require_signed_cassette: false,
+            redact_headers: vec!["authorization".to_string(), "cookie".to_string()],
+            redact_env_patterns: vec!["*_TOKEN".to_string(), "*_KEY".to_string()],
+        }
+    }
+}
+
+fn parse_bool_literal_v15(raw: &str) -> Option<bool> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
+    }
+}
+
+fn parse_quarantine_policy_v15(root: &Path) -> QuarantinePolicyV15 {
+    let manifest_path = manifest_path_for_v071(root);
+    let Ok(raw) = fs::read_to_string(manifest_path) else {
+        return QuarantinePolicyV15::default();
+    };
+
+    let mut out = QuarantinePolicyV15::default();
+    let mut section = String::new();
+    for raw_line in raw.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            section = line[1..line.len() - 1].trim().to_string();
+            continue;
+        }
+        if section != "quarantine" {
+            continue;
+        }
+        let Some((k_raw, v_raw)) = line.split_once('=') else {
+            continue;
+        };
+        let key = k_raw.trim();
+        let value_raw = v_raw.trim();
+        match key {
+            "require_signed_cassette" => {
+                if let Some(value) = parse_bool_literal_v15(value_raw.trim_matches('"')) {
+                    out.require_signed_cassette = value;
+                }
+            }
+            "redact_headers" => {
+                out.redact_headers = parse_string_array_literal_v08(value_raw)
+                    .into_iter()
+                    .map(|v| v.trim().to_ascii_lowercase())
+                    .filter(|v| !v.is_empty())
+                    .collect();
+            }
+            "redact_env_patterns" => {
+                out.redact_env_patterns = parse_string_array_literal_v08(value_raw)
+                    .into_iter()
+                    .map(|v| v.trim().to_string())
+                    .filter(|v| !v.is_empty())
+                    .collect();
+            }
+            _ => {}
+        }
+    }
+
+    if out.redact_headers.is_empty() {
+        out.redact_headers = vec!["authorization".to_string(), "cookie".to_string()];
+    }
+    if out.redact_env_patterns.is_empty() {
+        out.redact_env_patterns = vec!["*_TOKEN".to_string(), "*_KEY".to_string()];
+    }
+    out
+}
+
+#[derive(Debug, Clone)]
 struct StdFsRuntimeConfigV08 {
     read: Vec<String>,
     write: Vec<String>,
@@ -4335,12 +5324,17 @@ struct ReplaySpecV071 {
     mode: String,
     cassette_hash: Option<String>,
     hasher_version: Option<String>,
+    require_signed_cassette: bool,
 }
 
 const CASSETTE_SCHEMA_VERSION_V08: &str = "v0.8";
 const CASSETTE_HASHER_VERSION_V08: &str = "sha256-v1";
 const CASSETTE_MODE_RECORD_V08: &str = "record";
 const CASSETTE_MODE_REPLAY_V08: &str = "replay";
+const CASSETTE_SIGN_SCHEMA_VERSION_V15: &str = "v0.15";
+const CASSETTE_SIGN_HASHER_VERSION_V15: &str = "sha256-v1";
+const CASSETTE_SIGN_DEFAULT_KEY_ID_V15: &str = "project-local-v15";
+const CASSETTE_SIGN_SECRET_REL_PATH_V15: &str = ".ocl_signing/cassette_sign.key.v15";
 const TRACE_SCHEMA_VERSION_V11: u64 = 2;
 const CHECKPOINT_STATE_SCHEMA_VERSION_V11: &str = "v1";
 const CHECKPOINT_DEFAULT_EVERY_V11: u64 = 200;
@@ -4394,6 +5388,7 @@ fn parse_replay_toml_v071(path: &Path) -> Result<ReplaySpecV071, SdkError> {
     let mut mode = CASSETTE_MODE_RECORD_V08.to_string();
     let mut cassette_hash = None::<String>;
     let mut hasher_version = None::<String>;
+    let mut require_signed_cassette = false;
 
     for raw_line in raw.lines() {
         let line = raw_line.split('#').next().unwrap_or_default().trim();
@@ -4433,6 +5428,11 @@ fn parse_replay_toml_v071(path: &Path) -> Result<ReplaySpecV071, SdkError> {
             }
             "hasher_version" if !value.is_empty() => {
                 hasher_version = Some(value.to_string());
+            }
+            "require_signed_cassette" if !value.is_empty() => {
+                if let Some(parsed) = parse_bool_literal_v15(value) {
+                    require_signed_cassette = parsed;
+                }
             }
             _ => {}
         }
@@ -4479,6 +5479,7 @@ fn parse_replay_toml_v071(path: &Path) -> Result<ReplaySpecV071, SdkError> {
         mode,
         cassette_hash,
         hasher_version,
+        require_signed_cassette,
     })
 }
 
@@ -4559,6 +5560,449 @@ fn compute_cassette_hash_v08(
         cassette_index_json
     );
     sha256_hex(canonical.as_bytes())
+}
+
+fn compute_redaction_policy_hash_v15(policy: &QuarantinePolicyV15) -> String {
+    let mut headers = policy.redact_headers.clone();
+    headers.sort();
+    headers.dedup();
+    let mut env_patterns = policy.redact_env_patterns.clone();
+    env_patterns.sort();
+    env_patterns.dedup();
+    let canonical =
+        format!(
+        "version=v0.15\nrequire_signed_cassette={}\nredact_headers={}\nredact_env_patterns={}\n",
+        if policy.require_signed_cassette { "true" } else { "false" },
+        headers.join(","),
+        env_patterns.join(",")
+    );
+    sha256_hex(canonical.as_bytes())
+}
+
+fn cassette_sign_secret_path_v15(project_root: &Path) -> PathBuf {
+    project_root.join(CASSETTE_SIGN_SECRET_REL_PATH_V15)
+}
+
+fn cassette_signature_value_v15(
+    key_id: &str,
+    signer_pub: &str,
+    signer_secret: &str,
+    lane: &str,
+    mode: &str,
+    cassette_hash: &str,
+) -> String {
+    sha256_hex(
+        format!(
+            "cassette-sign-v15|key_id={key_id}|signer_pub={signer_pub}|lane={lane}|mode={mode}|cassette_hash={cassette_hash}|signer_secret={signer_secret}"
+        )
+        .as_bytes(),
+    )
+}
+
+fn load_or_create_cassette_sign_secret_v15(project_root: &Path) -> Result<String, SdkError> {
+    let key_path = cassette_sign_secret_path_v15(project_root);
+    if key_path.exists() {
+        let loaded = fs::read_to_string(&key_path)
+            .map(|v| v.trim().to_string())
+            .map_err(|err| {
+                SdkError::MissingProject(format!(
+                    "V-CASSETTE-SIGNATURE-INVALID: failed to read project signing key {}: {}",
+                    key_path.display(),
+                    err
+                ))
+            })?;
+        if !loaded.is_empty() {
+            return Ok(loaded);
+        }
+    }
+
+    if let Some(parent) = key_path.parent() {
+        fs::create_dir_all(parent).map_err(|err| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-SIGNATURE-INVALID: failed to prepare key dir {}: {}",
+                parent.display(),
+                err
+            ))
+        })?;
+    }
+
+    let seed = format!(
+        "cassette-sign-secret-v15|pid={}|unix_ms={}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    );
+    let secret = sha256_hex(seed.as_bytes());
+    fs::write(&key_path, format!("{secret}\n")).map_err(|err| {
+        SdkError::MissingProject(format!(
+            "V-CASSETTE-SIGNATURE-INVALID: failed to write project signing key {}: {}",
+            key_path.display(),
+            err
+        ))
+    })?;
+    Ok(secret)
+}
+
+fn load_cassette_sign_secret_v15(project_root: &Path) -> Result<String, SdkError> {
+    let key_path = cassette_sign_secret_path_v15(project_root);
+    if !key_path.exists() {
+        return Err(SdkError::MissingProject(format!(
+            "V-CASSETTE-SIGNATURE-INVALID: missing project signing key {}",
+            key_path.display()
+        )));
+    }
+    let secret = fs::read_to_string(&key_path)
+        .map(|v| v.trim().to_string())
+        .map_err(|err| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-SIGNATURE-INVALID: failed to read project signing key {}: {}",
+                key_path.display(),
+                err
+            ))
+        })?;
+    if secret.is_empty() {
+        return Err(SdkError::MissingProject(format!(
+            "V-CASSETTE-SIGNATURE-INVALID: empty project signing key {}",
+            key_path.display()
+        )));
+    }
+    Ok(secret)
+}
+
+fn cassette_signer_pub_v15(key_id: &str, signer_secret: &str) -> String {
+    sha256_hex(format!("cassette-signer-v15|{key_id}|{signer_secret}").as_bytes())
+}
+
+fn write_cassette_signature_v15(
+    project_root: &Path,
+    cassette_dir: &Path,
+    key_id: &str,
+    lane: &str,
+    mode: &str,
+    cassette_hash: &str,
+) -> Result<(), SdkError> {
+    let signer_secret = load_or_create_cassette_sign_secret_v15(project_root)?;
+    let signer_pub = cassette_signer_pub_v15(key_id, &signer_secret);
+    let signature = cassette_signature_value_v15(
+        key_id,
+        &signer_pub,
+        &signer_secret,
+        lane,
+        mode,
+        cassette_hash,
+    );
+    let sig_text = format!(
+        concat!(
+            "schema_version = \"{}\"\n",
+            "hasher_version = \"{}\"\n",
+            "key_id = \"{}\"\n",
+            "lane = \"{}\"\n",
+            "mode = \"{}\"\n",
+            "cassette_hash = \"{}\"\n",
+            "signer_pub = \"{}\"\n",
+            "signature = \"{}\"\n"
+        ),
+        CASSETTE_SIGN_SCHEMA_VERSION_V15,
+        CASSETTE_SIGN_HASHER_VERSION_V15,
+        key_id,
+        lane,
+        mode,
+        cassette_hash,
+        signer_pub,
+        signature
+    );
+    fs::write(cassette_dir.join("cassette.sig"), sig_text)?;
+    Ok(())
+}
+
+fn parse_cassette_signature_v15(
+    path: &Path,
+) -> Result<
+    (
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    ),
+    SdkError,
+> {
+    let raw = fs::read_to_string(path)?;
+    let mut schema_version = None::<String>;
+    let mut hasher_version = None::<String>;
+    let mut key_id = None::<String>;
+    let mut lane = None::<String>;
+    let mut mode = None::<String>;
+    let mut cassette_hash = None::<String>;
+    let mut signer_pub = None::<String>;
+    let mut signature = None::<String>;
+    for raw_line in raw.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Some((k_raw, v_raw)) = line.split_once('=') else {
+            continue;
+        };
+        let key = k_raw.trim();
+        let value = v_raw.trim().trim_matches('"').to_string();
+        match key {
+            "schema_version" => schema_version = Some(value),
+            "hasher_version" => hasher_version = Some(value),
+            "key_id" => key_id = Some(value),
+            "lane" => lane = Some(value),
+            "mode" => mode = Some(value),
+            "cassette_hash" => cassette_hash = Some(value),
+            "signer_pub" => signer_pub = Some(value),
+            "signature" => signature = Some(value),
+            _ => {}
+        }
+    }
+    let schema_version = schema_version.ok_or_else(|| {
+        SdkError::MissingProject("V-CASSETTE-SIGNATURE-INVALID: missing schema_version".to_string())
+    })?;
+    let hasher_version = hasher_version.ok_or_else(|| {
+        SdkError::MissingProject("V-CASSETTE-SIGNATURE-INVALID: missing hasher_version".to_string())
+    })?;
+    let key_id = key_id.ok_or_else(|| {
+        SdkError::MissingProject("V-CASSETTE-SIGNATURE-INVALID: missing key_id".to_string())
+    })?;
+    let lane = lane.ok_or_else(|| {
+        SdkError::MissingProject("V-CASSETTE-SIGNATURE-INVALID: missing lane".to_string())
+    })?;
+    let mode = mode.ok_or_else(|| {
+        SdkError::MissingProject("V-CASSETTE-SIGNATURE-INVALID: missing mode".to_string())
+    })?;
+    let cassette_hash = cassette_hash.ok_or_else(|| {
+        SdkError::MissingProject("V-CASSETTE-SIGNATURE-INVALID: missing cassette_hash".to_string())
+    })?;
+    let signer_pub = signer_pub.ok_or_else(|| {
+        SdkError::MissingProject("V-CASSETTE-SIGNATURE-INVALID: missing signer_pub".to_string())
+    })?;
+    let signature = signature.ok_or_else(|| {
+        SdkError::MissingProject("V-CASSETTE-SIGNATURE-INVALID: missing signature".to_string())
+    })?;
+    Ok((
+        schema_version,
+        hasher_version,
+        key_id,
+        lane,
+        mode,
+        cassette_hash,
+        signer_pub,
+        signature,
+    ))
+}
+
+fn verify_cassette_signature_v15(
+    project_root: &Path,
+    cassette_dir: &Path,
+    lane: &str,
+    mode: &str,
+    cassette_hash: &str,
+) -> Result<(), SdkError> {
+    let sig_path = cassette_dir.join("cassette.sig");
+    if !sig_path.exists() {
+        return Err(SdkError::MissingProject(
+            "V-CASSETTE-SIGNATURE-MISSING: missing cassette.sig while signed cassette is required"
+                .to_string(),
+        ));
+    }
+    let (
+        schema_version,
+        hasher_version,
+        key_id,
+        file_lane,
+        file_mode,
+        file_hash,
+        file_signer_pub,
+        file_signature,
+    ) = parse_cassette_signature_v15(&sig_path)?;
+    if schema_version != CASSETTE_SIGN_SCHEMA_VERSION_V15 {
+        return Err(SdkError::MissingProject(format!(
+            "V-CASSETTE-SIGNATURE-INVALID: unsupported schema_version `{schema_version}`"
+        )));
+    }
+    if hasher_version != CASSETTE_SIGN_HASHER_VERSION_V15 {
+        return Err(SdkError::MissingProject(format!(
+            "V-CASSETTE-SIGNATURE-INVALID: unsupported hasher_version `{hasher_version}`"
+        )));
+    }
+    if file_lane != lane || file_mode != mode || file_hash != cassette_hash {
+        return Err(SdkError::MissingProject(
+            "V-CASSETTE-SIGNATURE-INVALID: cassette signature context mismatch".to_string(),
+        ));
+    }
+    let signer_secret = load_cassette_sign_secret_v15(project_root)?;
+    let signer_pub = cassette_signer_pub_v15(&key_id, &signer_secret);
+    let expected_signature = cassette_signature_value_v15(
+        &key_id,
+        &signer_pub,
+        &signer_secret,
+        lane,
+        mode,
+        cassette_hash,
+    );
+    if signer_pub != file_signer_pub || expected_signature != file_signature {
+        return Err(SdkError::MissingProject(
+            "V-CASSETTE-SIGNATURE-INVALID: cassette signature verification failed".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn decode_headers_text_v15(raw_hex: &str) -> Option<String> {
+    let bytes = hex_decode_v08_cli(raw_hex).ok()?;
+    String::from_utf8(bytes).ok()
+}
+
+fn decode_hex_text_lossy_v15(raw_hex: &str) -> Option<String> {
+    let bytes = hex_decode_v08_cli(raw_hex).ok()?;
+    Some(String::from_utf8_lossy(&bytes).to_string())
+}
+
+fn wildcard_match_v15(pattern: &str, value: &str) -> bool {
+    let p = pattern.as_bytes();
+    let v = value.as_bytes();
+    let mut pi = 0usize;
+    let mut vi = 0usize;
+    let mut star = None::<usize>;
+    let mut vi_after_star = 0usize;
+    while vi < v.len() {
+        if pi < p.len() && (p[pi] == b'?' || p[pi] == v[vi]) {
+            pi += 1;
+            vi += 1;
+            continue;
+        }
+        if pi < p.len() && p[pi] == b'*' {
+            star = Some(pi);
+            pi += 1;
+            vi_after_star = vi;
+            continue;
+        }
+        if let Some(star_idx) = star {
+            pi = star_idx + 1;
+            vi_after_star += 1;
+            vi = vi_after_star;
+            continue;
+        }
+        return false;
+    }
+    while pi < p.len() && p[pi] == b'*' {
+        pi += 1;
+    }
+    pi == p.len()
+}
+
+fn normalize_env_patterns_v15(policy: &QuarantinePolicyV15) -> Vec<String> {
+    let mut patterns = policy
+        .redact_env_patterns
+        .iter()
+        .map(|v| v.trim().to_ascii_uppercase())
+        .filter(|v| !v.is_empty())
+        .collect::<Vec<_>>();
+    patterns.sort();
+    patterns.dedup();
+    patterns
+}
+
+fn collect_proc_env_redaction_issues_v15(
+    proc_rows: &[ProcRecordV08],
+    env_patterns: &[String],
+) -> Vec<String> {
+    if env_patterns.is_empty() {
+        return Vec::new();
+    }
+    let mut issues = Vec::new();
+    for row in proc_rows {
+        for (stream, raw_hex) in [("stdout", &row.stdout_hex), ("stderr", &row.stderr_hex)] {
+            let Some(text) = decode_hex_text_lossy_v15(raw_hex) else {
+                continue;
+            };
+            for token in
+                text.split(|ch: char| ch.is_whitespace() || [';', ',', '&', '|'].contains(&ch))
+            {
+                let trimmed = token.trim();
+                let Some((k_raw, v_raw)) = trimmed.split_once('=') else {
+                    continue;
+                };
+                let key = k_raw.trim().to_ascii_uppercase();
+                let value = v_raw.trim();
+                if key.is_empty() || value.is_empty() {
+                    continue;
+                }
+                if value.eq_ignore_ascii_case("<redacted>") {
+                    continue;
+                }
+                if env_patterns
+                    .iter()
+                    .any(|pattern| wildcard_match_v15(pattern, &key))
+                {
+                    issues.push(format!(
+                        "call_id={} env_key={} stream={}",
+                        row.call_id, key, stream
+                    ));
+                }
+            }
+        }
+    }
+    issues
+}
+
+fn detect_redaction_issues_v15(
+    net_http_rows: &[NetHttpRecordV08],
+    proc_rows: &[ProcRecordV08],
+    policy: &QuarantinePolicyV15,
+) -> Vec<String> {
+    let mut headers = policy
+        .redact_headers
+        .iter()
+        .map(|v| v.trim().to_ascii_lowercase())
+        .filter(|v| !v.is_empty())
+        .collect::<Vec<_>>();
+    headers.sort();
+    headers.dedup();
+    if headers.is_empty() {
+        return collect_proc_env_redaction_issues_v15(
+            proc_rows,
+            &normalize_env_patterns_v15(policy),
+        );
+    }
+    let mut issues = Vec::new();
+    for row in net_http_rows {
+        let Some(headers_text) = decode_headers_text_v15(&row.headers_hex) else {
+            continue;
+        };
+        for line in headers_text.lines() {
+            let Some((name_raw, value_raw)) = line.split_once(':') else {
+                continue;
+            };
+            let name = name_raw.trim().to_ascii_lowercase();
+            if !headers.iter().any(|h| h == &name) {
+                continue;
+            }
+            let value = value_raw.trim();
+            if value.is_empty() {
+                continue;
+            }
+            if value.eq_ignore_ascii_case("<redacted>") {
+                continue;
+            }
+            issues.push(format!("call_id={} header={}", row.call_id, name));
+        }
+    }
+    issues.extend(collect_proc_env_redaction_issues_v15(
+        proc_rows,
+        &normalize_env_patterns_v15(policy),
+    ));
+    issues.sort();
+    issues.dedup();
+    issues
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -4825,9 +6269,11 @@ enum CassetteRecordRowV08 {
 }
 
 fn write_quarantine_cassette_bundle_v08(
+    project_root: &Path,
     artifact_dir: &Path,
     lane: &str,
     mode: &str,
+    policy: &QuarantinePolicyV15,
     wallclock_record_path: Option<&Path>,
     proc_record_path: Option<&Path>,
     net_http_record_path: Option<&Path>,
@@ -4847,6 +6293,7 @@ fn write_quarantine_cassette_bundle_v08(
         Some(path) => load_net_http_record_source_v08(path)?,
         None => Vec::new(),
     };
+    let redaction_issues = detect_redaction_issues_v15(&net_http_rows, &proc_rows, policy);
 
     let mut rows = Vec::<(u64, CassetteRecordRowV08)>::new();
     for row in wallclock_rows {
@@ -4980,6 +6427,16 @@ fn write_quarantine_cassette_bundle_v08(
     let cassette_hash =
         compute_cassette_hash_v08(&cassette_jsonl, &cassette_index_json, lane, mode);
 
+    if !redaction_issues.is_empty()
+        && (policy.require_signed_cassette
+            || matches!(parse_lane_mode_v071(lane), Ok(LaneModeV071::LockedV071)))
+    {
+        return Err(SdkError::MissingProject(format!(
+            "V-CASSETTE-REDACTION-REQUIRED: found {} sensitive rows without redaction",
+            redaction_issues.len()
+        )));
+    }
+
     let cassette_jsonl_path = cassette_dir.join("cassette.jsonl");
     let cassette_index_path = cassette_dir.join("cassette_index.json");
     let cassette_meta_path = cassette_dir.join("cassette_meta.toml");
@@ -4992,26 +6449,59 @@ fn write_quarantine_cassette_bundle_v08(
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
+    let redaction_policy_hash = compute_redaction_policy_hash_v15(policy);
     let cassette_meta = format!(
         concat!(
             "schema_version = \"{}\"\n",
             "lane = \"{}\"\n",
             "mode = \"{}\"\n",
             "hasher_version = \"{}\"\n",
-            "created_at_unix_ms = {}\n"
+            "created_at_unix_ms = {}\n",
+            "redaction_policy_hash = \"{}\"\n",
+            "redaction_warning_count = {}\n",
+            "require_signed_cassette = {}\n"
         ),
-        CASSETTE_SCHEMA_VERSION_V08, lane, mode, CASSETTE_HASHER_VERSION_V08, created_at_unix_ms
+        CASSETTE_SCHEMA_VERSION_V08,
+        lane,
+        mode,
+        CASSETTE_HASHER_VERSION_V08,
+        created_at_unix_ms,
+        redaction_policy_hash,
+        redaction_issues.len(),
+        if policy.require_signed_cassette {
+            "true"
+        } else {
+            "false"
+        }
     );
     fs::write(&cassette_meta_path, cassette_meta)?;
     fs::write(cassette_hash_path, format!("{cassette_hash}\n"))?;
+    if !redaction_issues.is_empty() {
+        fs::write(
+            cassette_dir.join("redaction_warning.log"),
+            format!("{}\n", redaction_issues.join("\n")),
+        )?;
+    }
+    if policy.require_signed_cassette {
+        write_cassette_signature_v15(
+            project_root,
+            &cassette_dir,
+            CASSETTE_SIGN_DEFAULT_KEY_ID_V15,
+            lane,
+            mode,
+            &cassette_hash,
+        )?;
+    }
     Ok(cassette_hash)
 }
 
 fn validate_quarantine_cassette_bundle_v08(
+    project_root: &Path,
     artifact_dir: &Path,
     lane: &str,
     mode: &str,
     expected_hash: &str,
+    require_signed_cassette: bool,
 ) -> Result<(), SdkError> {
     let cassette_dir = artifact_dir.join("cassette");
     if !cassette_dir.exists() {
@@ -5053,6 +6543,9 @@ fn validate_quarantine_cassette_bundle_v08(
             expected_hash, stored_hash
         )));
     }
+    if require_signed_cassette {
+        verify_cassette_signature_v15(project_root, &cassette_dir, lane, mode, expected_hash)?;
+    }
     Ok(())
 }
 
@@ -5077,6 +6570,7 @@ fn replay_v071(artifact_dir: &Path) -> Result<String, SdkError> {
     }
 
     let spec = parse_replay_toml_v071(&replay_toml)?;
+    let replay_policy = parse_quarantine_policy_v15(&spec.root);
     parse_lane_mode_v071(&spec.lane)?;
     enforce_quarantine_lane_gate_v073(&spec.lane)?;
     if is_quarantine_lane_v08(&spec.lane) {
@@ -5094,10 +6588,12 @@ fn replay_v071(artifact_dir: &Path) -> Result<String, SdkError> {
             )
         })?;
         validate_quarantine_cassette_bundle_v08(
+            &spec.root,
             artifact_dir,
             &spec.lane,
             &spec.mode,
             expected_hash,
+            spec.require_signed_cassette || replay_policy.require_signed_cassette,
         )?;
     }
     let locked = locked_from_lane_v071(&spec.lane);
@@ -8267,6 +9763,7 @@ fn build_v071_replay_toml(
     mode: &str,
     cassette_hash: Option<&str>,
     hasher_version: Option<&str>,
+    require_signed_cassette: bool,
 ) -> String {
     let root_norm = root.to_string_lossy().replace('\\', "/");
     let mut out = format!(
@@ -8298,6 +9795,9 @@ fn build_v071_replay_toml(
         out.push_str(version);
         out.push_str("\"\n");
     }
+    if require_signed_cassette {
+        out.push_str("require_signed_cassette = true\n");
+    }
     out
 }
 
@@ -8317,6 +9817,7 @@ fn emit_v071_artifacts_for_project_run(
     let signature_path = artifact_dir.join("signature.txt");
     let replay_path = artifact_dir.join("replay.toml");
     let (lane, entry) = read_lane_and_entry_for_v071(project_root);
+    let quarantine_policy = parse_quarantine_policy_v15(project_root);
     parse_lane_mode_v071(&lane)?;
     enforce_quarantine_lane_gate_v073(&lane)?;
     let is_quarantine = is_quarantine_lane_v08(&lane);
@@ -8384,9 +9885,11 @@ fn emit_v071_artifacts_for_project_run(
             let perf_counters = cache_perf_from_trace_summary_v13(&trace_summary);
             let cassette_hash = if is_quarantine {
                 Some(write_quarantine_cassette_bundle_v08(
+                    project_root,
                     &artifact_dir,
                     &lane,
                     CASSETTE_MODE_RECORD_V08,
+                    &quarantine_policy,
                     Some(&wallclock_record_path),
                     Some(&proc_record_path),
                     Some(&net_http_record_path),
@@ -8426,6 +9929,7 @@ fn emit_v071_artifacts_for_project_run(
                     } else {
                         None
                     },
+                    is_quarantine && quarantine_policy.require_signed_cassette,
                 ),
             )?;
         }
@@ -8433,9 +9937,11 @@ fn emit_v071_artifacts_for_project_run(
             write_perf_cache_jsonl_v13(&perf_cache_path, &CachePerfCountersV13::default())?;
             let cassette_hash = if is_quarantine {
                 Some(write_quarantine_cassette_bundle_v08(
+                    project_root,
                     &artifact_dir,
                     &lane,
                     CASSETTE_MODE_RECORD_V08,
+                    &quarantine_policy,
                     Some(&wallclock_record_path),
                     Some(&proc_record_path),
                     Some(&net_http_record_path),
@@ -8479,6 +9985,7 @@ fn emit_v071_artifacts_for_project_run(
                     } else {
                         None
                     },
+                    is_quarantine && quarantine_policy.require_signed_cassette,
                 ),
             )?;
         }
@@ -8832,7 +10339,11 @@ fn print_help() {
     eprintln!("  test  --conformance [run|list] --manifest <file> [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--locked] [--universe <id>] [--trust-store <file>] [--signer-id <id>] [--sign-key <file>] [--json]");
     eprintln!("  conformance <run|list> --manifest <file> [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--locked] [--universe <id>] [--trust-store <file>] [--signer-id <id>] [--sign-key <file>] [--json]");
     eprintln!("  upgrade-check <project_dir> [--manifest <file>] [--target-runtime <id>] [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--locked] [--universe <id>] [--json]");
-    eprintln!("  build <project_dir> [--locked] [--source-only] [--universe <id>]");
+    eprintln!("  lts check <project_dir> [--manifest <file>] [--target-runtime <id>] [--out <file>] [--runtime deterministic|throughput] [--engine interpreter|bytecode|dual] [--universe <id>] [--json]");
+    eprintln!("  lts report <report_file> [--json]");
+    eprintln!(
+        "  build <project_dir> [--locked] [--source-only] [--universe <id>] [--attest] [--attest-key <keyid>]"
+    );
     eprintln!("  publish <artifact.oclpkg> [--registry <dir>]");
     eprintln!("  fetch <artifact|package> [--registry <dir>] [--out <dir>]");
     eprintln!("  verify-supply <artifact.oclpkg>");
@@ -8844,6 +10355,14 @@ fn print_help() {
     eprintln!("  pack  publish <artifact.oclpkg> [--registry <dir>]");
     eprintln!("  pack  verify <artifact.oclpkg>");
     eprintln!("  lock  sync <project_dir> [--write-legacy-lock]");
+    eprintln!("  lock  sign <project_dir> --key <keyid> [--lock deps.lock.v3]");
+    eprintln!("  lock  verify <project_dir> [--lock deps.lock.v3]");
+    eprintln!("  perm  snapshot <project_dir> [--out-dir <dir>]");
+    eprintln!(
+        "  perm  diff <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]"
+    );
+    eprintln!("  perm  approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]");
+    eprintln!("  perm  review <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]  # alias of perm diff");
     eprintln!("  policy lock sync <project_dir>");
     eprintln!("  cosmos init <project_dir> [--preset default|ci]");
     eprintln!("  cosmos lock sync <project_dir> [--locked] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>]");
@@ -8855,7 +10374,11 @@ fn print_help() {
     eprintln!("  kit list [<project_dir>] [--json]");
     eprintln!("  kit doctor <project_dir> [--locked|--json]");
     eprintln!("  compose <project_dir> --phenotype <file> [--registry <dir>] [--locked] [--universe <id>]");
-    eprintln!("  verify  <project_dir> --phenotype <file> [--registry <dir>] [--locked] [--universe <id>]");
+    eprintln!("  verify --attest <artifact_dir>");
+    eprintln!("  verify --repro <artifact_dir>");
+    eprintln!(
+        "  verify <project_dir> --phenotype <file> [--registry <dir>] [--locked] [--universe <id>]"
+    );
 }
 
 #[cfg(test)]

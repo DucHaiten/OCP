@@ -9,6 +9,9 @@ use base64::Engine as _;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use sha2::{Digest, Sha256};
 
+mod attestation_v15;
+mod perm_v15;
+
 pub mod m4;
 pub mod w1;
 pub mod w2;
@@ -17,6 +20,9 @@ pub mod w5;
 pub mod w6;
 pub mod w9;
 
+pub use attestation_v15::{
+    build_attestation_v15, verify_build_attestation_v15, verify_build_repro_v15,
+};
 pub use m4::{
     compose_phenotype, load_component_catalog, load_phenotype_spec, verify_assembly,
     AssemblyProofV1, ComponentSpecV1, ComposeSummary, PhenotypeSpecV1, VerifySummary,
@@ -26,6 +32,9 @@ use ocl_runtime_core::{
     run_source_with_engine, CommitPolicyMode, CompatMode, DiagPhase, Diagnostic, ErrorCode,
     ExecCacheStats, ExecConfig, Expr, GuardMode, ObserveCacheStats, RunEngine, RuntimeCoreError,
     Span, Stmt, TraceEvent, TypecheckCompatConfig,
+};
+pub use perm_v15::{
+    approve_permission_diff_v15, write_permission_diff_report_v15, write_permission_snapshot_v15,
 };
 pub use w1::{
     enforce_universe_match_v1, init_cosmos_v1, resolve_hive_caps_v1, resolve_universe_v1,
@@ -484,6 +493,75 @@ pub struct DepResolveSummaryV3 {
     pub lock_v3_path: PathBuf,
     pub ocl_lock_path: PathBuf,
     pub wrote_legacy_lock_v2: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LockSignSummaryV15 {
+    pub lock_path: PathBuf,
+    pub sig_path: PathBuf,
+    pub key_id: String,
+    pub lock_ast_hash_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LockVerifySummaryV15 {
+    pub lock_path: PathBuf,
+    pub sig_path: PathBuf,
+    pub key_id: String,
+    pub lock_ast_hash_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PermissionSnapshotSummaryV15 {
+    pub requested_path: PathBuf,
+    pub granted_path: PathBuf,
+    pub effective_path: PathBuf,
+    pub snapshot_path: PathBuf,
+    pub snapshot_hash_sha256: String,
+    pub packages: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PermissionDiffSummaryV15 {
+    pub report_path: PathBuf,
+    pub permission_diff_hash: String,
+    pub has_changes: bool,
+    pub introduces_new_permissions: bool,
+    pub approval_checked: bool,
+    pub approved: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PermissionApproveSummaryV15 {
+    pub approval_path: PathBuf,
+    pub diff_hash: String,
+    pub approvals_total: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BuildAttestationSummaryV15 {
+    pub artifact_dir: PathBuf,
+    pub manifest_path: PathBuf,
+    pub sig_path: PathBuf,
+    pub key_id: String,
+    pub manifest_hash_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BuildVerifyAttestationSummaryV15 {
+    pub artifact_dir: PathBuf,
+    pub manifest_path: PathBuf,
+    pub sig_path: PathBuf,
+    pub key_id: String,
+    pub manifest_hash_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BuildReproVerifySummaryV15 {
+    pub artifact_dir: PathBuf,
+    pub baseline_hash_sha256: String,
+    pub repro_hash_sha256: String,
+    pub exclusions: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -3284,8 +3362,29 @@ struct LockDepV3 {
 
 #[derive(Debug, Clone, Default)]
 struct TrustStoreV10 {
+    mode: Option<TrustPolicyModeV15>,
+    require_signed_lock: Option<bool>,
+    lane_locked_v071_requires_signed: Option<bool>,
+    lane_locked_v06_requires_signed: Option<bool>,
+    lane_quarantine_requires_signed: Option<bool>,
+    registry_allow: Vec<String>,
     global_keys: HashSet<String>,
     by_source_keys: HashMap<String, HashSet<String>>,
+    trusted_keys: Vec<TrustedKeyV15>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TrustPolicyModeV15 {
+    Strict,
+    Warn,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct TrustedKeyV15 {
+    id: String,
+    alg: String,
+    public_key: String,
+    scope: Vec<String>,
 }
 
 fn deps_lock_v3_path(layout: &ProjectLayout) -> PathBuf {
@@ -3305,11 +3404,179 @@ fn trust_store_path_v10(layout: &ProjectLayout) -> PathBuf {
 }
 
 fn normalize_trust_source_v10(raw: &str) -> String {
-    let lowered = raw.trim().to_ascii_lowercase();
-    match lowered.as_str() {
-        "builtin" | "registry" | "git" | "path" => lowered,
-        _ => lowered,
+    let lowered = raw.trim().to_ascii_lowercase().replace('\\', "/");
+    let mut out = lowered.trim_end_matches('/').to_string();
+    if out.is_empty() {
+        out = lowered;
     }
+    out
+}
+
+fn normalize_public_key_v15(raw: &str) -> String {
+    let value = raw.trim().trim_matches('"').trim().to_string();
+    if let Some(stripped) = value.strip_prefix("base64:") {
+        return stripped.trim().to_string();
+    }
+    value
+}
+
+fn wildcard_no_slash_match_v15(pattern: &str, text: &str) -> bool {
+    let p = pattern.as_bytes();
+    let t = text.as_bytes();
+    let mut pi = 0usize;
+    let mut ti = 0usize;
+    let mut star = None::<usize>;
+    let mut star_ti = 0usize;
+
+    while ti < t.len() {
+        if pi < p.len() && p[pi] == t[ti] {
+            pi += 1;
+            ti += 1;
+            continue;
+        }
+        if pi < p.len() && p[pi] == b'*' {
+            star = Some(pi);
+            pi += 1;
+            star_ti = ti;
+            continue;
+        }
+        if let Some(star_pi) = star {
+            if t[star_ti] == b'/' {
+                return false;
+            }
+            pi = star_pi + 1;
+            star_ti += 1;
+            ti = star_ti;
+            continue;
+        }
+        return false;
+    }
+
+    while pi < p.len() && p[pi] == b'*' {
+        pi += 1;
+    }
+    pi == p.len()
+}
+
+fn glob_match_no_cross_slash_v15(pattern: &str, value: &str) -> bool {
+    if pattern == value {
+        return true;
+    }
+    let p_segments: Vec<&str> = pattern.split('/').collect();
+    let v_segments: Vec<&str> = value.split('/').collect();
+    if p_segments.len() != v_segments.len() {
+        return false;
+    }
+    p_segments
+        .iter()
+        .zip(v_segments.iter())
+        .all(|(p, v)| wildcard_no_slash_match_v15(p, v))
+}
+
+fn is_known_registry_source_v15(source: &str) -> bool {
+    matches!(source, "registry" | "git" | "path")
+}
+
+fn source_matches_registry_pattern_v15(source: &str, pattern: &str) -> bool {
+    if glob_match_no_cross_slash_v15(pattern, source) {
+        return true;
+    }
+    match source {
+        "registry" => pattern.starts_with("registry:"),
+        "git" => pattern.starts_with("git:"),
+        "path" => pattern.starts_with("path:"),
+        _ => false,
+    }
+}
+
+fn is_registry_allowed_v15(store: &TrustStoreV10, source: &str) -> bool {
+    if source == "builtin" {
+        return true;
+    }
+
+    if store.registry_allow.is_empty() {
+        return is_known_registry_source_v15(source);
+    }
+
+    store
+        .registry_allow
+        .iter()
+        .any(|pattern| source_matches_registry_pattern_v15(source, pattern))
+}
+
+fn scope_pattern_matches_v15(pattern: &str, package_name: &str) -> bool {
+    let p = pattern.trim();
+    if p.is_empty() {
+        return false;
+    }
+    if let Some(prefix) = p.strip_suffix('*') {
+        return package_name.starts_with(prefix);
+    }
+    package_name == p
+}
+
+fn trusted_key_scope_allows_v15(trusted_key: &TrustedKeyV15, dep: &LockDepV3) -> bool {
+    if trusted_key.scope.is_empty() {
+        return true;
+    }
+    trusted_key
+        .scope
+        .iter()
+        .any(|scope| scope_pattern_matches_v15(scope, &dep.name))
+        || trusted_key
+            .scope
+            .iter()
+            .any(|scope| scope_pattern_matches_v15(scope, &dep.alias))
+}
+
+fn is_signer_trusted_for_dep_v15(store: &TrustStoreV10, dep: &LockDepV3, source: &str) -> bool {
+    if dep.signer_pub_b64.trim().is_empty() {
+        return false;
+    }
+
+    if is_signer_trusted_v10(store, source, &dep.signer_pub_b64) {
+        return true;
+    }
+
+    store.trusted_keys.iter().any(|trusted| {
+        trusted.public_key == dep.signer_pub_b64 && trusted_key_scope_allows_v15(trusted, dep)
+    })
+}
+
+fn parse_trust_mode_v15(raw: &str) -> Option<TrustPolicyModeV15> {
+    match raw.trim().trim_matches('"') {
+        "strict" => Some(TrustPolicyModeV15::Strict),
+        "warn" => Some(TrustPolicyModeV15::Warn),
+        _ => None,
+    }
+}
+
+fn lane_requires_signed_v15(store: &TrustStoreV10, lane: &str) -> bool {
+    match lane {
+        "locked_v071" => store.lane_locked_v071_requires_signed.unwrap_or(true),
+        "locked_v06" => store.lane_locked_v06_requires_signed.unwrap_or(false),
+        "quarantine" => store.lane_quarantine_requires_signed.unwrap_or(false),
+        _ => false,
+    }
+}
+
+fn lane_mode_v15(store: &TrustStoreV10, lane: &str) -> Result<TrustPolicyModeV15, SdkError> {
+    if lane == "locked_v071" {
+        if matches!(store.mode, Some(TrustPolicyModeV15::Warn)) {
+            return Err(SdkError::SupplyInvalid(
+                "X-TRUST-POLICY-MODE-INVALID: lane `locked_v071` requires strict mode; `mode=\"warn\"` is not allowed."
+                    .to_string(),
+            ));
+        }
+        if matches!(store.lane_locked_v071_requires_signed, Some(false)) {
+            return Err(SdkError::SupplyInvalid(
+                "X-TRUST-POLICY-INVALID: lane `locked_v071` cannot disable signed dependency enforcement."
+                    .to_string(),
+            ));
+        }
+        return Ok(TrustPolicyModeV15::Strict);
+    }
+    Ok(store.mode.unwrap_or(TrustPolicyModeV15::Warn))
 }
 
 fn insert_trusted_keys_v10(store: &mut TrustStoreV10, source: Option<&str>, mut keys: Vec<String>) {
@@ -3341,6 +3608,22 @@ fn parse_trust_store_v10(path: &Path) -> Result<TrustStoreV10, SdkError> {
     let raw = fs::read_to_string(path)?;
     let mut out = TrustStoreV10::default();
     let mut current_section = String::new();
+    let mut current_trusted_key = None::<TrustedKeyV15>;
+
+    let flush_current_trusted_key =
+        |store: &mut TrustStoreV10, current: &mut Option<TrustedKeyV15>| {
+            let Some(mut tk) = current.take() else {
+                return;
+            };
+            tk.public_key = normalize_public_key_v15(&tk.public_key);
+            normalize_string_list(&mut tk.scope);
+            if tk.alg.is_empty() {
+                tk.alg = "ed25519".to_string();
+            }
+            if !tk.public_key.is_empty() {
+                store.trusted_keys.push(tk);
+            }
+        };
 
     for raw_line in raw.lines() {
         let line = raw_line.split('#').next().unwrap_or_default().trim();
@@ -3348,7 +3631,17 @@ fn parse_trust_store_v10(path: &Path) -> Result<TrustStoreV10, SdkError> {
             continue;
         }
 
+        if line.starts_with("[[") && line.ends_with("]]") {
+            flush_current_trusted_key(&mut out, &mut current_trusted_key);
+            current_section = line[2..line.len() - 2].trim().to_string();
+            if current_section == "trusted_key" {
+                current_trusted_key = Some(TrustedKeyV15::default());
+            }
+            continue;
+        }
+
         if line.starts_with('[') && line.ends_with(']') {
+            flush_current_trusted_key(&mut out, &mut current_trusted_key);
             current_section = line[1..line.len() - 1].trim().to_string();
             continue;
         }
@@ -3359,11 +3652,11 @@ fn parse_trust_store_v10(path: &Path) -> Result<TrustStoreV10, SdkError> {
         let key = key_raw.trim();
         let value = value_raw.trim();
         let keys = parse_string_array_literal(value);
-        if keys.is_empty() {
-            continue;
-        }
 
         if current_section == "trusted_signers" {
+            if keys.is_empty() {
+                continue;
+            }
             if key == "keys" || key == "all" {
                 insert_trusted_keys_v10(&mut out, None, keys);
                 continue;
@@ -3373,11 +3666,59 @@ fn parse_trust_store_v10(path: &Path) -> Result<TrustStoreV10, SdkError> {
         }
 
         if let Some(source) = current_section.strip_prefix("trusted_signers.") {
+            if keys.is_empty() {
+                continue;
+            }
             if key == "keys" || key == "allow" || key == "trusted" {
                 insert_trusted_keys_v10(&mut out, Some(source), keys);
             }
+            continue;
+        }
+
+        if current_section == "policy" {
+            match key {
+                "mode" => out.mode = parse_trust_mode_v15(value),
+                "require_signed_lock" => out.require_signed_lock = parse_bool_literal(value),
+                "lane_locked_v071_requires_signed" => {
+                    out.lane_locked_v071_requires_signed = parse_bool_literal(value)
+                }
+                "lane_locked_v06_requires_signed" => {
+                    out.lane_locked_v06_requires_signed = parse_bool_literal(value)
+                }
+                "lane_quarantine_requires_signed" => {
+                    out.lane_quarantine_requires_signed = parse_bool_literal(value)
+                }
+                _ => {}
+            }
+            continue;
+        }
+
+        if current_section == "registries" {
+            if key == "allow" && !keys.is_empty() {
+                out.registry_allow.extend(
+                    keys.into_iter()
+                        .map(|item| normalize_trust_source_v10(&item)),
+                );
+                normalize_string_list(&mut out.registry_allow);
+            }
+            continue;
+        }
+
+        if current_section == "trusted_key" {
+            let Some(tk) = current_trusted_key.as_mut() else {
+                continue;
+            };
+            match key {
+                "id" => tk.id = strip_toml_quotes(value),
+                "alg" => tk.alg = strip_toml_quotes(value).to_ascii_lowercase(),
+                "public_key" => tk.public_key = strip_toml_quotes(value),
+                "scope" => tk.scope = keys,
+                _ => {}
+            }
         }
     }
+
+    flush_current_trusted_key(&mut out, &mut current_trusted_key);
 
     Ok(out)
 }
@@ -3404,6 +3745,7 @@ fn lock_v3_sign_message(dep: &LockDepV3) -> String {
 fn evaluate_lock_dep_trust_decision_v10(
     dep: &LockDepV3,
     trust_store: &TrustStoreV10,
+    lane: &str,
 ) -> Result<String, SdkError> {
     let source = normalize_trust_source_v10(&dep.source);
     let has_sig = !dep.signature_b64.trim().is_empty();
@@ -3411,6 +3753,11 @@ fn evaluate_lock_dep_trust_decision_v10(
 
     if source == "builtin" && !has_sig && !has_pub {
         return Ok("builtin-unsigned".to_string());
+    }
+
+    let mode = lane_mode_v15(trust_store, lane)?;
+    if mode == TrustPolicyModeV15::Strict && !is_registry_allowed_v15(trust_store, &source) {
+        return Ok("registry-denied".to_string());
     }
 
     if has_sig ^ has_pub {
@@ -3431,7 +3778,7 @@ fn evaluate_lock_dep_trust_decision_v10(
         &dep.signer_pub_b64,
     )?;
 
-    if is_signer_trusted_v10(trust_store, &source, &dep.signer_pub_b64) {
+    if is_signer_trusted_for_dep_v15(trust_store, dep, &source) {
         Ok("signed-trusted".to_string())
     } else {
         Ok("signed-untrusted".to_string())
@@ -3446,21 +3793,29 @@ fn evaluate_lock_v3_decisions_v10(
     let language_cfg = load_project_language_config_for_layout(layout)?;
     let lane = language_cfg.lane.trim().to_string();
     let trust_store = parse_trust_store_v10(&trust_store_path_v10(layout))?;
+    let mode = lane_mode_v15(&trust_store, &lane)?;
+    let requires_signed = lane_requires_signed_v15(&trust_store, &lane);
 
     let mut decisions = Vec::with_capacity(deps.len());
     for dep in deps {
-        let decision = evaluate_lock_dep_trust_decision_v10(dep, &trust_store)?;
-        if enforce_lane_policy && lane == "locked_v071" && dep.source != "builtin" {
-            if decision == "unsigned-unverified" {
+        let decision = evaluate_lock_dep_trust_decision_v10(dep, &trust_store, &lane)?;
+        if enforce_lane_policy && dep.source != "builtin" {
+            if decision == "registry-denied" && mode == TrustPolicyModeV15::Strict {
                 return Err(SdkError::SupplyInvalid(format!(
-                    "V-DEPS-SIGN-REQUIRED: non-builtin dependency `{}` is unsigned in lane `locked_v071`. Hint: sign dependency and regenerate deps.lock.v3.",
-                    dep.alias
+                    "X-TRUST-REGISTRY-DENIED: dependency `{}` has source `{}` which is not allowed by trust policy.",
+                    dep.alias, dep.source
                 )));
             }
-            if decision == "signed-untrusted" {
+            if decision == "unsigned-unverified" && requires_signed {
                 return Err(SdkError::SupplyInvalid(format!(
-                    "V-DEPS-TRUST-REQUIRED: signer for dependency `{}` is not trusted in lane `locked_v071`. Hint: add signer key to trust.toml under [trusted_signers] or [trusted_signers.{}].",
-                    dep.alias, dep.source
+                    "V-DEPS-SIGN-REQUIRED: non-builtin dependency `{}` is unsigned in lane `{}`. Hint: sign dependency and regenerate deps.lock.v3.",
+                    dep.alias, lane
+                )));
+            }
+            if decision == "signed-untrusted" && mode == TrustPolicyModeV15::Strict {
+                return Err(SdkError::SupplyInvalid(format!(
+                    "V-DEPS-TRUST-REQUIRED: signer for dependency `{}` is not trusted in lane `{}`. Hint: add signer key to trust.toml under [trusted_signers], [trusted_signers.{}], or [[trusted_key]].",
+                    dep.alias, lane, dep.source
                 )));
             }
         }
@@ -3912,6 +4267,266 @@ fn parse_lock_v3(text: &str) -> Result<Vec<LockDepV3>, SdkError> {
     Ok(deps)
 }
 
+fn lock_v3_sig_path(lock_path: &Path) -> PathBuf {
+    lock_path.with_extension("v3.sig")
+}
+
+fn append_json_escaped_v15(out: &mut String, value: &str) {
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            _ => out.push(ch),
+        }
+    }
+}
+
+fn append_json_string_field_v15(out: &mut String, key: &str, value: &str, trailing_comma: bool) {
+    out.push('"');
+    out.push_str(key);
+    out.push_str("\":\"");
+    append_json_escaped_v15(out, value);
+    out.push('"');
+    if trailing_comma {
+        out.push(',');
+    }
+}
+
+fn canonical_lock_v3_json_ast_v15(lock_deps: &[LockDepV3]) -> String {
+    let mut out = String::from("{\"deps\":[");
+    for (idx, dep) in lock_deps.iter().enumerate() {
+        if idx > 0 {
+            out.push(',');
+        }
+        out.push('{');
+        append_json_string_field_v15(&mut out, "alias", &dep.alias, true);
+        append_json_string_field_v15(
+            &mut out,
+            "content_hash_sha256",
+            &dep.content_hash_sha256,
+            true,
+        );
+        out.push_str("\"dependencies\":[");
+        for (dep_idx, dependency) in dep.dependencies.iter().enumerate() {
+            if dep_idx > 0 {
+                out.push(',');
+            }
+            out.push('"');
+            append_json_escaped_v15(&mut out, dependency);
+            out.push('"');
+        }
+        out.push_str("],");
+        append_json_string_field_v15(&mut out, "hash64", &dep.hash64, true);
+        append_json_string_field_v15(&mut out, "name", &dep.name, true);
+        append_json_string_field_v15(
+            &mut out,
+            "requested_permissions_hash",
+            &dep.requested_permissions_hash,
+            true,
+        );
+        append_json_string_field_v15(&mut out, "signature_b64", &dep.signature_b64, true);
+        append_json_string_field_v15(&mut out, "signer_pub_b64", &dep.signer_pub_b64, true);
+        append_json_string_field_v15(&mut out, "source", &dep.source, true);
+        append_json_string_field_v15(&mut out, "trust_decision", &dep.trust_decision, true);
+        append_json_string_field_v15(&mut out, "version", &dep.version, false);
+        out.push('}');
+    }
+    out.push_str("],\"hasher_version\":\"sha256-v1\",\"version\":3}");
+    out
+}
+
+fn lock_v3_ast_hash_v15(lock_deps: &[LockDepV3]) -> String {
+    let canonical = canonical_lock_v3_json_ast_v15(lock_deps);
+    sha256_hex(canonical.as_bytes())
+}
+
+fn parse_lock_v3_signature_file_v15(path: &Path) -> Result<LockVerifySummaryV15, SdkError> {
+    let raw = fs::read_to_string(path)?;
+    let mut key_id = None::<String>;
+    let mut lock_ast_hash_sha256 = None::<String>;
+    let mut signature_b64 = None::<String>;
+    let mut signer_pub_b64 = None::<String>;
+    let mut has_version = false;
+    let mut has_hasher = false;
+    let mut lock_rel = None::<String>;
+
+    for raw_line in raw.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line == "version=1" {
+            has_version = true;
+            continue;
+        }
+        if line == "hasher_version=sha256-v1" {
+            has_hasher = true;
+            continue;
+        }
+        let Some((k, v)) = line.split_once('=') else {
+            continue;
+        };
+        let key = k.trim();
+        let value = v.trim();
+        match key {
+            "lock_path" => lock_rel = Some(value.to_string()),
+            "key_id" => key_id = Some(value.to_string()),
+            "lock_ast_hash_sha256" => lock_ast_hash_sha256 = Some(value.to_string()),
+            "signature_b64" => signature_b64 = Some(value.to_string()),
+            "signer_pub_b64" => signer_pub_b64 = Some(value.to_string()),
+            _ => {}
+        }
+    }
+
+    if !has_version {
+        return Err(SdkError::SupplyInvalid(
+            "deps.lock.v3.sig missing `version=1` header".to_string(),
+        ));
+    }
+    if !has_hasher {
+        return Err(SdkError::SupplyInvalid(
+            "deps.lock.v3.sig missing `hasher_version=sha256-v1` header".to_string(),
+        ));
+    }
+
+    let Some(lock_rel) = lock_rel else {
+        return Err(SdkError::SupplyInvalid(
+            "deps.lock.v3.sig missing `lock_path`".to_string(),
+        ));
+    };
+    let Some(key_id) = key_id else {
+        return Err(SdkError::SupplyInvalid(
+            "deps.lock.v3.sig missing `key_id`".to_string(),
+        ));
+    };
+    let Some(lock_ast_hash_sha256) = lock_ast_hash_sha256 else {
+        return Err(SdkError::SupplyInvalid(
+            "deps.lock.v3.sig missing `lock_ast_hash_sha256`".to_string(),
+        ));
+    };
+    let Some(signature_b64) = signature_b64 else {
+        return Err(SdkError::SupplyInvalid(
+            "deps.lock.v3.sig missing `signature_b64`".to_string(),
+        ));
+    };
+    let Some(signer_pub_b64) = signer_pub_b64 else {
+        return Err(SdkError::SupplyInvalid(
+            "deps.lock.v3.sig missing `signer_pub_b64`".to_string(),
+        ));
+    };
+
+    let message = format!(
+        "lock-sign-v15|key_id={}|lock_path={}|lock_ast_hash_sha256={}",
+        key_id, lock_rel, lock_ast_hash_sha256
+    );
+    deterministic_verify(message.as_bytes(), &signature_b64, &signer_pub_b64)?;
+
+    Ok(LockVerifySummaryV15 {
+        lock_path: PathBuf::from(lock_rel),
+        sig_path: path.to_path_buf(),
+        key_id,
+        lock_ast_hash_sha256,
+    })
+}
+
+pub fn sign_deps_lock_v3_v15(root: &Path, key_id: &str) -> Result<LockSignSummaryV15, SdkError> {
+    let layout = project_layout(root);
+    verify_project_exists(&layout)?;
+    let lock_path = deps_lock_v3_path(&layout);
+    if !lock_path.exists() {
+        return Err(SdkError::SupplyInvalid(format!(
+            "missing deps.lock.v3: {}",
+            lock_path.display()
+        )));
+    }
+    let raw = fs::read_to_string(&lock_path)?;
+    let deps = parse_lock_v3(&raw)?;
+    let lock_ast_hash_sha256 = lock_v3_ast_hash_v15(&deps);
+    let lock_rel = lock_path
+        .strip_prefix(&layout.root)
+        .unwrap_or(lock_path.as_path())
+        .to_string_lossy()
+        .replace('\\', "/");
+    let message = format!(
+        "lock-sign-v15|key_id={}|lock_path={}|lock_ast_hash_sha256={}",
+        key_id.trim(),
+        lock_rel,
+        lock_ast_hash_sha256
+    );
+    let context = format!("lock-v3-v15|{}", key_id.trim());
+    let (signature_b64, signer_pub_b64) = deterministic_sign(&context, message.as_bytes());
+    let sig_path = lock_v3_sig_path(&lock_path);
+    let sig_raw = format!(
+        concat!(
+            "version=1\n",
+            "hasher_version=sha256-v1\n",
+            "lock_path={}\n",
+            "key_id={}\n",
+            "lock_ast_hash_sha256={}\n",
+            "signature_b64={}\n",
+            "signer_pub_b64={}\n"
+        ),
+        lock_rel,
+        key_id.trim(),
+        lock_ast_hash_sha256,
+        signature_b64,
+        signer_pub_b64
+    );
+    fs::write(&sig_path, sig_raw)?;
+    Ok(LockSignSummaryV15 {
+        lock_path,
+        sig_path,
+        key_id: key_id.trim().to_string(),
+        lock_ast_hash_sha256,
+    })
+}
+
+pub fn verify_deps_lock_v3_signature_v15(root: &Path) -> Result<LockVerifySummaryV15, SdkError> {
+    let layout = project_layout(root);
+    verify_project_exists(&layout)?;
+    let lock_path = deps_lock_v3_path(&layout);
+    if !lock_path.exists() {
+        return Err(SdkError::SupplyInvalid(format!(
+            "missing deps.lock.v3: {}",
+            lock_path.display()
+        )));
+    }
+    let sig_path = lock_v3_sig_path(&lock_path);
+    if !sig_path.exists() {
+        return Err(SdkError::SupplyInvalid(format!(
+            "missing deps.lock.v3.sig: {}",
+            sig_path.display()
+        )));
+    }
+    let mut summary = parse_lock_v3_signature_file_v15(&sig_path)?;
+    let raw = fs::read_to_string(&lock_path)?;
+    let deps = parse_lock_v3(&raw)?;
+    let actual_hash = lock_v3_ast_hash_v15(&deps);
+    if summary.lock_ast_hash_sha256 != actual_hash {
+        return Err(SdkError::SupplyInvalid(format!(
+            "X-LOCK-SIGNATURE-MISMATCH: lock AST hash mismatch (expected {}, got {}).",
+            summary.lock_ast_hash_sha256, actual_hash
+        )));
+    }
+    let expected_lock_rel = lock_path
+        .strip_prefix(&layout.root)
+        .unwrap_or(lock_path.as_path())
+        .to_string_lossy()
+        .replace('\\', "/");
+    if summary.lock_path.to_string_lossy().replace('\\', "/") != expected_lock_rel {
+        return Err(SdkError::SupplyInvalid(format!(
+            "X-LOCK-SIGNATURE-MISMATCH: lock path mismatch in deps.lock.v3.sig (expected `{}`, got `{}`).",
+            expected_lock_rel,
+            summary.lock_path.display()
+        )));
+    }
+    summary.lock_path = lock_path;
+    Ok(summary)
+}
+
 fn encode_ocl_lock_export_v3(lock_hash: &str, lock_deps: &[LockDepV3]) -> String {
     let mut out = String::from("version=1\nsource=deps.lock.v3\n");
     out.push_str("lock_hash=");
@@ -3958,7 +4573,21 @@ fn verify_lock_v3_consistency(layout: &ProjectLayout) -> Result<Vec<LockDepV3>, 
                 .to_string(),
         ));
     }
+    enforce_signed_lock_policy_v15(layout)?;
+    perm_v15::enforce_permission_review_policy_v15(&layout.root)?;
     Ok(current)
+}
+
+fn enforce_signed_lock_policy_v15(layout: &ProjectLayout) -> Result<(), SdkError> {
+    let language_cfg = load_project_language_config_for_layout(layout)?;
+    if language_cfg.lane.trim() != "locked_v071" {
+        return Ok(());
+    }
+    let trust_store = parse_trust_store_v10(&trust_store_path_v10(layout))?;
+    if trust_store.require_signed_lock.unwrap_or(false) {
+        let _ = verify_deps_lock_v3_signature_v15(&layout.root)?;
+    }
+    Ok(())
 }
 
 fn load_lock_v3_or_v2(layout: &ProjectLayout) -> Result<Vec<LockDepV3>, SdkError> {

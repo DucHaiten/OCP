@@ -1153,7 +1153,7 @@ fn render_permissions_effective_output_v14(app_root: &Path) -> Result<String, Sd
                 out.push_str(",\n");
                 out.push_str("        \"max_stderr_bytes\":");
                 out.push_str(&proc_cfg.max_stderr_bytes.to_string());
-                out.push_str("\n");
+                out.push('\n');
                 out.push_str("      }\n");
             } else {
                 out.push_str("      \"std_proc\":null\n");

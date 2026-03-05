@@ -243,6 +243,7 @@ dependencies = [
  "blake3",
  "ed25519-dalek",
  "ocl-runtime-core",
+ "serde_json",
  "sha2",
 ]
 
