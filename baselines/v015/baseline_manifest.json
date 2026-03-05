@@ -1,0 +1,15 @@
+{
+  "schema": "ocl.w16.perf.baseline_manifest.v1",
+  "hasher": "sha256-v1",
+  "baseline_id": "v0.15-line",
+  "files": [
+    {
+      "path": "baselines/v015/perf_budget_report.json",
+      "sha256": "ee52df41780301b7ac1583227892101666d3854d67747f7a91d98fd770270ae7"
+    },
+    {
+      "path": "baselines/v015/run_manifest.json",
+      "sha256": "155335361f6029068dc30a341c94fb9301a50583b8f42fc46bff14416926d802"
+    }
+  ]
+}

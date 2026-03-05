@@ -121,6 +121,60 @@ fn write_conformance_manifest(manifest_path: &Path, project_root: &Path) {
     fs::write(manifest_path, manifest).expect("write conformance manifest");
 }
 
+fn write_w16_security_reports_from_lts(report: &JsonValue) {
+    let out_dir = repo_root()
+        .join("target")
+        .join("ocl")
+        .join("w16")
+        .join("security");
+    fs::create_dir_all(&out_dir).expect("create w16 security output dir");
+
+    let lts_report = serde_json::json!({
+        "schema": "ocl.w16.security.lts_strict.v1",
+        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "source_schema": report.get("schema").cloned().unwrap_or(JsonValue::Null),
+        "ok": report.get("ok").cloned().unwrap_or(JsonValue::Bool(false)),
+        "gates": report.get("gates").cloned().unwrap_or(JsonValue::Null),
+        "risks": report.get("risks").cloned().unwrap_or(JsonValue::Null)
+    });
+    fs::write(
+        out_dir.join("lts_strict_report.json"),
+        serde_json::to_string_pretty(&lts_report).expect("serialize lts_strict_report"),
+    )
+    .expect("write lts_strict_report.json");
+
+    let security_chain = serde_json::json!({
+        "schema": "ocl.w16.security.chain.v1",
+        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "lock_signature_ok": report
+            .pointer("/gates/lock_signature/ok")
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(false),
+        "trust_ok": report
+            .pointer("/gates/trust/ok")
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(false),
+        "permission_review_ok": report
+            .pointer("/gates/permission_review/ok")
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(false),
+        "upgrade_check_ok": report
+            .pointer("/gates/upgrade_check/ok")
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(false),
+        "conformance_ok": report
+            .pointer("/gates/conformance/ok")
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(false),
+        "overall_ok": report.get("ok").and_then(JsonValue::as_bool).unwrap_or(false)
+    });
+    fs::write(
+        out_dir.join("security_chain_report.json"),
+        serde_json::to_string_pretty(&security_chain).expect("serialize security_chain_report"),
+    )
+    .expect("write security_chain_report.json");
+}
+
 fn prepare_lts_project(root: &Path, with_permission_baseline: bool) -> (PathBuf, PathBuf) {
     let project = root.join("project");
     init_project(&project).expect("init project");
@@ -214,6 +268,7 @@ fn lts_check_passes_and_report_is_actionable() {
         "lts report should not contain risks when all gates pass"
     );
     assert!(report_path.exists(), "lts report file missing");
+    write_w16_security_reports_from_lts(&report);
 
     let report_view = run_ocl_cli(&["lts", "report", &report_s, "--json"]);
     let report_stdout = assert_success(&report_view, "lts report");

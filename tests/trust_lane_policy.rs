@@ -6,6 +6,7 @@ use ocl_sdk::{
     check_project_with_lock, collect_deps_resolved_trace_events_v10, init_project, resolve_deps_v3,
     sync_deps_lock_v1,
 };
+use serde_json::json;
 
 fn temp_project_dir(tag: &str) -> PathBuf {
     let stamp = SystemTime::now()
@@ -119,4 +120,62 @@ fn v10_locked_v06_allows_untrusted_signer_for_compat() {
     prepare_project_with_non_builtin_dep(&root, "locked_v06");
 
     check_project_with_lock(&root, true).expect("locked_v06 should allow untrusted signer");
+}
+
+#[test]
+fn v16_trust_lane_policy_writes_compat_rehearsal_report() {
+    let strict_root = temp_project_dir("v16_strict_rejects");
+    prepare_project_with_non_builtin_dep(&strict_root, "locked_v071");
+    let strict_err =
+        check_project_with_lock(&strict_root, true).expect_err("locked_v071 must reject untrusted");
+    let strict_rejects = strict_err.to_string().contains("V-DEPS-TRUST-REQUIRED");
+    assert!(strict_rejects, "unexpected strict-lane error: {strict_err}");
+
+    let compat_root = temp_project_dir("v16_compat_allows");
+    prepare_project_with_non_builtin_dep(&compat_root, "locked_v06");
+    let compat_allows = check_project_with_lock(&compat_root, true).is_ok();
+    assert!(compat_allows, "locked_v06 should allow untrusted signer");
+
+    let trusted_root = temp_project_dir("v16_strict_trusted");
+    let lock_path = prepare_project_with_non_builtin_dep(&trusted_root, "locked_v071");
+    let signer_pub = read_non_builtin_signer(&lock_path);
+    let trust = format!(
+        concat!("[trusted_signers.registry]\n", "keys = [\"{}\"]\n"),
+        signer_pub
+    );
+    fs::write(trusted_root.join("trust.toml"), trust).expect("write trust.toml");
+    check_project_with_lock(&trusted_root, true).expect("locked_v071 should accept trusted signer");
+    let trace = collect_deps_resolved_trace_events_v10(&trusted_root).expect("collect deps trace");
+    let trusted_trace_ok = trace
+        .iter()
+        .any(|ev| ev.event == "deps_resolved" && ev.reason.as_deref() == Some("signed-trusted"));
+    assert!(
+        trusted_trace_ok,
+        "deps_resolved trace must include signed-trusted decision"
+    );
+
+    let out_dir = PathBuf::from("target")
+        .join("ocl")
+        .join("w16")
+        .join("compat");
+    fs::create_dir_all(&out_dir).expect("create w16 compat output dir");
+    let report = json!({
+        "schema": "ocl.w16.compat.rehearsal.v1",
+        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "baseline": "v0.15-line",
+        "lane_literals": ["locked_v071", "locked_v06", "quarantine"],
+        "results": {
+            "locked_v071_untrusted_rejected": strict_rejects,
+            "locked_v071_trusted_allowed": trusted_trace_ok,
+            "locked_v06_untrusted_allowed": compat_allows
+        },
+        "alias_policy": {
+            "locked_alias_doc_only": true
+        }
+    });
+    fs::write(
+        out_dir.join("compat_rehearsal_report.json"),
+        serde_json::to_string_pretty(&report).expect("serialize compat rehearsal report"),
+    )
+    .expect("write compat_rehearsal_report.json");
 }

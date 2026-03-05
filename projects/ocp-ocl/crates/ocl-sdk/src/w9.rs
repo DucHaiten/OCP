@@ -309,27 +309,25 @@ pub fn run_conformance_v1(
     options: ConformanceRunOptionsV1,
 ) -> ConformanceReportV1 {
     let mut results = Vec::new();
-    let copied_registry_root = copy_runtime_registry(workspace_root).ok();
+    let runtime_root = conformance_runtime_root_v16(workspace_root);
+    let copied_registry_root = copy_runtime_registry(&runtime_root, workspace_root).ok();
 
     for (idx, scenario) in manifest.scenarios.iter().enumerate() {
         let source_root = resolve_scenario_root(workspace_root, &scenario.path);
-        let copied_root = match prepare_scenario_workspace_copy(
-            workspace_root,
-            &source_root,
-            &scenario.name,
-            idx,
-        ) {
-            Ok(path) => path,
-            Err(err) => {
-                results.push(ConformanceScenarioResultV1 {
-                    name: scenario.name.clone(),
-                    path: scenario.path.clone(),
-                    ok: false,
-                    reason: Some(err.to_string()),
-                });
-                continue;
-            }
-        };
+        let copied_root =
+            match prepare_scenario_workspace_copy(&runtime_root, &source_root, &scenario.name, idx)
+            {
+                Ok(path) => path,
+                Err(err) => {
+                    results.push(ConformanceScenarioResultV1 {
+                        name: scenario.name.clone(),
+                        path: scenario.path.clone(),
+                        ok: false,
+                        reason: Some(err.to_string()),
+                    });
+                    continue;
+                }
+            };
 
         let outcome = run_scenario(
             workspace_root,
@@ -1292,7 +1290,7 @@ fn resolve_runtime_context(
 }
 
 fn prepare_scenario_workspace_copy(
-    workspace_root: &Path,
+    runtime_root: &Path,
     source_root: &Path,
     scenario_name: &str,
     scenario_index: usize,
@@ -1303,16 +1301,11 @@ fn prepare_scenario_workspace_copy(
             source_root.display()
         )));
     }
-    let target = workspace_root
-        .join("target")
-        .join("ocl")
-        .join("w9")
-        .join("fixtures")
-        .join(format!(
-            "{}-{:02}",
-            sanitize_slug(scenario_name),
-            scenario_index
-        ));
+    let target = runtime_root.join("fixtures").join(format!(
+        "{}-{:02}",
+        sanitize_slug(scenario_name),
+        scenario_index
+    ));
     if target.exists() {
         fs::remove_dir_all(&target)?;
     }
@@ -1320,13 +1313,9 @@ fn prepare_scenario_workspace_copy(
     Ok(target)
 }
 
-fn copy_runtime_registry(workspace_root: &Path) -> Result<PathBuf, SdkError> {
+fn copy_runtime_registry(runtime_root: &Path, workspace_root: &Path) -> Result<PathBuf, SdkError> {
     let src = workspace_root.join("projects/ocp-ocl/registry");
-    let dst = workspace_root
-        .join("target")
-        .join("ocl")
-        .join("w9")
-        .join("registry");
+    let dst = runtime_root.join("registry");
     if !src.exists() {
         return Ok(dst);
     }
@@ -1335,6 +1324,15 @@ fn copy_runtime_registry(workspace_root: &Path) -> Result<PathBuf, SdkError> {
     }
     copy_tree(&src, &dst)?;
     Ok(dst)
+}
+
+fn conformance_runtime_root_v16(workspace_root: &Path) -> PathBuf {
+    workspace_root
+        .join("target")
+        .join("ocl")
+        .join("w9")
+        .join("runtime")
+        .join(std::process::id().to_string())
 }
 
 fn copy_tree(src: &Path, dst: &Path) -> Result<(), SdkError> {

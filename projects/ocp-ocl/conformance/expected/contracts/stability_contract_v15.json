@@ -1,0 +1,312 @@
+{
+  "manifest_schema_version": "ocl.conformance.manifest.v5",
+  "trace_schema_version": 2,
+  "lane_literals": [
+    "locked_v06",
+    "locked_v071",
+    "quarantine"
+  ],
+  "lockfile_sot": "deps.lock.v3",
+  "pack_contracts": {
+    "engine.game.run": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "WithinRun"
+    },
+    "engine.shadow.preview": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "NonDeterministicForbidden",
+      "cacheability": "NoCache"
+    },
+    "engine.ui.run": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "WithinRun"
+    },
+    "std.args.get": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.db.exec": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.db.query_int": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.fs.list": {
+      "ctx_schema_hash": "6f6fa6bc0e73c07009a85c40622c9e8ef0e88cfb4c18ae6baa61f7dccd6bfa80",
+      "payload_schema_hash": "6ee44cf9f4c6ccb187342c59e853b3d73cac82b935225be6d6decb6b0527f53b",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.fs.list_dir": {
+      "ctx_schema_hash": "a43d750b89a9a594efdebcb0959e3770edce86abe34d826f77f810e83b6b9531",
+      "payload_schema_hash": "bcf93b1f252b0c29fc0f5d874e5bdc9a57b1b27fac2f22667597167d91ae0076",
+      "determinism_class": "Deterministic",
+      "cacheability": "WithinRun"
+    },
+    "std.fs.mkdir": {
+      "ctx_schema_hash": "65609feabe3502fad34d0f247ba0cf345ab959e88fc335500d1124cbc09f689e",
+      "payload_schema_hash": "ff79724929f4e003e2bf9a60b7981cadc2a64edce95b938ba9077fedb081dc78",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.fs.read": {
+      "ctx_schema_hash": "6f6fa6bc0e73c07009a85c40622c9e8ef0e88cfb4c18ae6baa61f7dccd6bfa80",
+      "payload_schema_hash": "51c82d1792f9418ddb05ef3d6533708a7bcb84b539e2c3a54b8c1d899defc168",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.fs.read_text": {
+      "ctx_schema_hash": "3512f34b53ff633e52c43067117938c9ad0ebf8a01f5a81d0ed5256d92552d1f",
+      "payload_schema_hash": "68df0aedc0d1a5448cb9f4debbbba32535f788d25c4e65c510f134b14e01f9db",
+      "determinism_class": "Deterministic",
+      "cacheability": "WithinRun"
+    },
+    "std.fs.remove": {
+      "ctx_schema_hash": "65609feabe3502fad34d0f247ba0cf345ab959e88fc335500d1124cbc09f689e",
+      "payload_schema_hash": "34783c1b224b33ac4e3818ee1894ef1e78e185c0c2bc67d2fc2a44d36d750198",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.fs.rename": {
+      "ctx_schema_hash": "4b1c4c45c4ab6925265c97781a33090d4e4104f7e9eec1919f38988582a06a88",
+      "payload_schema_hash": "a1b12ee12dc5cdd48408962dea1a036f21d102cfada084f6db4036e94025d2e4",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.fs.stat": {
+      "ctx_schema_hash": "6f6fa6bc0e73c07009a85c40622c9e8ef0e88cfb4c18ae6baa61f7dccd6bfa80",
+      "payload_schema_hash": "07063ef94468bcd9ace18cbf2e9e6ab0dd7300962e536ab503fee17628d123cd",
+      "determinism_class": "Deterministic",
+      "cacheability": "WithinRun"
+    },
+    "std.fs.write": {
+      "ctx_schema_hash": "51c82d1792f9418ddb05ef3d6533708a7bcb84b539e2c3a54b8c1d899defc168",
+      "payload_schema_hash": "1de7cc50a529c5d864eed12616d93ac3bec94fb81e1eeb1b9caa3f0c8e44d1f9",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.fs.write_text": {
+      "ctx_schema_hash": "15449a4bd595d4f1244b8c97586b9123e31d22ffc305cf3d151c1d169882411e",
+      "payload_schema_hash": "40f3a0e61b28b7451b5b8dcb9bd39379de9b857eea33416617f7a2db5b2c06c3",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.game.rng": {
+      "ctx_schema_hash": "13ca6bf8ec1e7ea5f176ad2f2fa105b20342719c72e40b9e28840a6ed79244cc",
+      "payload_schema_hash": "5dd04ea57cb1802f491a3ecdb00e259cced0f612ff3c817306ea6a626bbc50e8",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.game.state_delta": {
+      "ctx_schema_hash": "4af7f9d4e7c0714d29dece3f7876636160266e21d16e5db674cbb7d1c0758020",
+      "payload_schema_hash": "1fb9fc6f76f846b6fa64c9ca0ae94299950b6403aa898aa6ac551f699109bc9f",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.game.tick_info": {
+      "ctx_schema_hash": "d70e75ada929e19e6d68079ddcbafce6f97284ce19eacada0c5322a9491a6fa7",
+      "payload_schema_hash": "7f8a900a4ce84b4b1a1520c57b7870f76fe7f26815096ef83d33242da6ad987f",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.http.get": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.http.post": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.json.emit": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.json.parse": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.kv.clear": {
+      "ctx_schema_hash": "c476361e2b8a9851d7b6033bce80ac11ca443735fd6f8c25fbdba70c2bbb68af",
+      "payload_schema_hash": "2ce494e647f900aca741b2e1e7583a4c6a40d7eb596947898d9627d494014617",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.kv.del": {
+      "ctx_schema_hash": "5fb86ffbc95c0432fd2388e056ea55d67e889a644eaf8373b9da2aa258e8ae50",
+      "payload_schema_hash": "b52a0761ab5d5d170b6c40021c7e9db72611d748d064cb285afd5de6f53ef020",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.kv.get": {
+      "ctx_schema_hash": "5fb86ffbc95c0432fd2388e056ea55d67e889a644eaf8373b9da2aa258e8ae50",
+      "payload_schema_hash": "7bf35d42ad4c7c80d1bcfd3e33b5cd2b08ac790a7931ffd3b75cd666a5c3ab45",
+      "determinism_class": "Deterministic",
+      "cacheability": "WithinRun"
+    },
+    "std.kv.keys": {
+      "ctx_schema_hash": "fdd69a1719ad28a91666e525343e5460478bab6fd310b92b099564606ead4091",
+      "payload_schema_hash": "09634ec2d17468f213a500a30f5a5178f45ed0798766fd5b21148130988c67c8",
+      "determinism_class": "Deterministic",
+      "cacheability": "WithinRun"
+    },
+    "std.kv.put": {
+      "ctx_schema_hash": "30dbe5fa621ed0ba0c784451e8f0990f91e9e1679a437057c3fc0647ab700e04",
+      "payload_schema_hash": "279de18f04219b6b8590ffeb0399c618c4a2d220909dde78404d2603600679fe",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.log.info": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.net.close": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.net.http.request": {
+      "ctx_schema_hash": "55fc858651e03a263fd5fb491ae153e10d8aeae7edf51c97840096dc7c71eaff",
+      "payload_schema_hash": "cba609ae9ffe5fdd153c816f4c5dcff2ae6d7da452271c84f28424bdc4f9c76b",
+      "determinism_class": "CassetteBased",
+      "cacheability": "NoCache"
+    },
+    "std.net.listen": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.net.reply": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.proc.exec": {
+      "ctx_schema_hash": "ae32b50be3d8fbcdd9e5688ec9e2026345ec497f825cfb117cdb5f2c2669521b",
+      "payload_schema_hash": "2d5c59711ed72dc9b45ee61cbd68a9b05835bce20aec55d78d47909d85df9a5f",
+      "determinism_class": "CassetteBased",
+      "cacheability": "NoCache"
+    },
+    "std.shadow.compare": {
+      "ctx_schema_hash": "d7eb51ef351c1d7f1630f0ed7a403dd50b40a73cbf81cba606dd5de299448abd",
+      "payload_schema_hash": "cf850c9f981b0bf380ec86d59aca541512222eb9b3c0b9c410fdc9f8bbd0885d",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.shadow.run": {
+      "ctx_schema_hash": "c286f2e2cb7aa4bf5de8b711c5ba5e2397935a678dc8f5a109a1ded7843720df",
+      "payload_schema_hash": "2b55cb61fdc324b946aeb85c3612a7d31688d5d2a126a81c1b1ba9c0f26977d9",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.shadow.search": {
+      "ctx_schema_hash": "50b90f572b4e6b2ce44906e66828057a4f056eef5a3f6405fe3a9a421b98d617",
+      "payload_schema_hash": "8d3d6fe94e14c64cdca7488315b33666c69276cff2065685b1a78558ae8086b6",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.time.now": {
+      "ctx_schema_hash": "5ad437f6371e9abaee675d099542935854056b3dfbee4a7adb858e5b1442c5bf",
+      "payload_schema_hash": "39dde4c1f99d0b69d493a32c1c179609e2ee99cbcf25333656564af8c40bdc0f",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.time.now_logical": {
+      "ctx_schema_hash": "cbc4d4a062ea50fed92f5985856c9b5619cc71506ee9200961d5571821242511",
+      "payload_schema_hash": "5f9927030d370580a76e18c17dad7dd34c030be941d43160f449bc77ccf38d47",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.time.sleep": {
+      "ctx_schema_hash": "da392a101103ef3585f5243cb40d4067e14d029ed8025032172d5ec665b79cd0",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.time.tick_info": {
+      "ctx_schema_hash": "cbc4d4a062ea50fed92f5985856c9b5619cc71506ee9200961d5571821242511",
+      "payload_schema_hash": "62ba6b89e8cb098e0cf29063533ee0b952e0fd636762eec1e434735f0085fb92",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.time.wallclock.now": {
+      "ctx_schema_hash": "cb77a1ba1400aee6c161b1d15d6697a405ac4274c707c1ce2c8aa9168b778dd4",
+      "payload_schema_hash": "a24e0c006026e837c42dd40beeebf61524ec7a51be50964f138c1a1867c48743",
+      "determinism_class": "CassetteBased",
+      "cacheability": "NoCache"
+    },
+    "std.tls.connect": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.tls.handshake": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.ui.draw": {
+      "ctx_schema_hash": "6c844e30f7ac4e9feb68e51fcd9a0bfee40b2f083bc710b7b8c28cfda3d11a29",
+      "payload_schema_hash": "8500e9b3ef5ad4080e7678d9eda444086cb9d56fecb275959f378a43b0320c3b",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.ui.frame_info": {
+      "ctx_schema_hash": "a5ba6382b1360c55a449a9bf9200d44636db5de315feb76b621b03a848b6217b",
+      "payload_schema_hash": "322e81b4afb9e0e1e1fff67d15a2500239e2990c3c9089815981d0e4934e5ce5",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.ui.input": {
+      "ctx_schema_hash": "ad61f7875ec8a5980f022520a283160cc2d00c045f1dae529915e0b099bb8822",
+      "payload_schema_hash": "e6153f31fb1041afd1e7b501ed1c54b47401e718a99da3d954569ee55d324767",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.ui.present": {
+      "ctx_schema_hash": "5ad437f6371e9abaee675d099542935854056b3dfbee4a7adb858e5b1442c5bf",
+      "payload_schema_hash": "7514f1ee72f562c29875db990ff243f567b4ceceec7fd3e3c1b3a83b41706396",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.view.render_text": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    },
+    "std.view.render_tree": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "determinism_class": "Deterministic",
+      "cacheability": "NoCache"
+    }
+  }
+}
