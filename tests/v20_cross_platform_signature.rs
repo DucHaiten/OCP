@@ -19,12 +19,22 @@ fn v20_cross_platform_signature() {
     let required_path = v20b::contracts_root()
         .join("v20")
         .join("required_contracts_v20.v1.json");
-    let seed = format!(
-        "{}|{}|{}",
-        v20b::sha256_hex_file(&replay_path),
-        v20b::sha256_hex_file(&toolchain_path),
-        v20b::sha256_hex_file(&required_path)
-    );
+    let replay_hash = {
+        let value = v20b::read_json(&replay_path);
+        let canonical = v20b::canonical_json_string(&value);
+        v20b::sha256_hex_bytes(canonical.as_bytes())
+    };
+    let toolchain_hash = {
+        let value = v20b::read_json(&toolchain_path);
+        let canonical = v20b::canonical_json_string(&value);
+        v20b::sha256_hex_bytes(canonical.as_bytes())
+    };
+    let required_hash = {
+        let value = v20b::read_json(&required_path);
+        let canonical = v20b::canonical_json_string(&value);
+        v20b::sha256_hex_bytes(canonical.as_bytes())
+    };
+    let seed = format!("{}|{}|{}", replay_hash, toolchain_hash, required_hash);
     let canonical_signature = v20b::sha256_hex_bytes(seed.as_bytes());
 
     let current_profile = v20b::current_os_profile();
