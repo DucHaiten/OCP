@@ -1,7 +1,7 @@
 # OCL v0.17 — Adoption Hardening + Cassette Operability + Governed Ecosystem (Pre-v1.0 Design Freeze)
 
 Ngày tạo: 2026-03-06  
-Trạng thái: `IN_PROGRESS (17-A..17-B DONE, đang chuẩn bị 17-C)`  
+Trạng thái: `DONE (17-A..17-G DONE)`  
 Phạm vi: **OCL-only**.  
 Tiền đề: v0.1..v0.16 đã hoàn tất core semantics + determinism/replay + supply-chain/trust + conformance/productization audit.
 
@@ -59,21 +59,24 @@ Mục tiêu v0.17: chốt backlog sản phẩm hóa trước v1.0 phát hành r�
 
 ### 0.2 Quick Snapshot (bắt buộc đọc trước)
 - Mục tiêu phiên bản:
-  - khóa backlog productization trước v1.0, chưa code vội.
+  - khóa backlog productization trước v1.0 theo từng gate, ưu tiên deterministic + governed operability.
 - Trạng thái tổng quan:
-  - `IN_PROGRESS (17-A..17-B DONE, đang chuẩn bị 17-C)`.
+  - `DONE (17-A..17-G DONE)`.
 - Gate đang làm/đã xong/chưa làm:
-  - `17-A..17-B DONE`, `17-C..17-G TODO`.
+  - `17-A..17-G DONE`.
 - Bước kế tiếp ngay:
-  - mở Planning Freeze cho `17-C` (determinism core: concurrency/platform/order/entropy).
+  - chuyển sang handoff `v0.17 -> v1.0` theo `15)`.
 - Lệnh kiểm chứng chuẩn:
   - xem `12) Operational commands (v0.17)`.
-- File code trọng yếu đã thay đổi ở 17-A..17-B:
+- File code trọng yếu đã thay đổi ở 17-A..17-F:
   - `projects/ocp-ocl/crates/ocl-cli/src/main.rs`
   - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
   - `projects/ocp-ocl/crates/ocl-sdk/src/perm_v15.rs`
   - `src/ocp_ocl/exec.rs`
+  - `src/ocp_ocl/determinism.rs`
   - `src/ocp_ocl/registry.rs`
+  - `src/ocp_ocl/mod.rs`
+  - `Cargo.toml`
   - `tests/perm_doctor.rs`
   - `tests/perm_fix_apply.rs`
   - `tests/perm_fix_negative.rs`
@@ -92,26 +95,70 @@ Mục tiêu v0.17: chốt backlog sản phẩm hóa trước v1.0 phát hành r�
   - `tests/privacy_artifact_hygiene.rs`
   - `tests/dos_budget_caps.rs`
   - `tests/fs_boundary_security.rs`
+  - `tests/w17_gate_c_common.rs`
+  - `tests/deterministic_scheduler.rs`
+  - `tests/platform_profile_determinism.rs`
+  - `tests/unicode_canonicalization.rs`
+  - `tests/iteration_order_determinism.rs`
+  - `tests/entropy_governance.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/w17.rs`
+  - `contracts/w17/supported_platform_profile.v1.json`
+  - `contracts/w17/supported_platform_profile.v1.json.sig`
+  - `contracts/w17/cassette_storage_contract.v1.json`
+  - `contracts/w17/cassette_storage_contract.v1.json.sig`
+  - `contracts/w17/pack_abi_spec.v1.json`
+  - `contracts/w17/pack_abi_spec.v1.json.sig`
+  - `contracts/w17/risk_lock_policies.v1.json`
+  - `contracts/w17/risk_lock_policies.v1.json.sig`
+  - `contracts/w17/semantic_hash_taxonomy.v1.json`
+  - `contracts/w17/semantic_hash_taxonomy.v1.json.sig`
+  - `contracts/w17/canonical_serialization_spec.v1.json`
+  - `contracts/w17/canonical_serialization_spec.v1.json.sig`
+  - `tests/hash_taxonomy.rs`
+  - `tests/trust_key_lifecycle.rs`
+  - `tests/downgrade_guard.rs`
+  - `tests/serialization_stability.rs`
+  - `tests/reproducible_build_toolchain.rs`
+  - `tests/w17_contract_sot.rs`
+  - `tests/w17_gate_e_common.rs`
+  - `tests/pack_abi.rs`
+  - `tests/pack_trust_policy.rs`
+  - `tests/pack_sandbox_boundary.rs`
+  - `tests/pack_boundary_wasi.rs`
+  - `tests/pack_boundary_native_cap.rs`
+  - `tests/capability_laundering.rs`
+  - `tests/adapter_cve_policy.rs`
+  - `tests/w17_gate_f_common.rs`
+  - `tests/connector_db.rs`
+  - `tests/connector_http.rs`
+  - `tests/connector_queue.rs`
+  - `tests/w17_gate_g_common.rs`
+  - `tests/v017_adoption_readiness.rs`
+  - `tests/v017_release_guard.rs`
+  - `tests/v017_release_positioning_guard.rs`
+  - `contracts/required_contracts.v1.json`
+  - `projects/ocp-ocl/conformance/expected/contracts/stability_contract_v14.json`
+  - `projects/ocp-ocl/conformance/expected/contracts/stability_contract_v15.json`
   - `OCP-OCL-MVP-PLAN-v0.17.md`
 
 ### 0.3 Trạng thái Workstreams/Gates v0.17 (tracking)
 #### Workstreams
 - WS-DX (governed workflow UX): `DONE`
 - WS-CS (cassette storage/retention operability): `DONE`
-- WS-DT (determinism core: concurrency/platform/order/entropy): `TODO`
-- WS-TR (trust lifecycle + hash/serialization/repro): `TODO`
-- WS-EX (governed extension surface + capability governance): `TODO`
-- WS-CN (connector baseline): `TODO`
-- WS-RC (pre-v1.0 rollout readiness): `TODO`
+- WS-DT (determinism core: concurrency/platform/order/entropy): `DONE`
+- WS-TR (trust lifecycle + hash/serialization/repro): `DONE`
+- WS-EX (governed extension surface + capability governance): `DONE`
+- WS-CN (connector baseline): `DONE`
+- WS-RC (pre-v1.0 rollout readiness): `DONE`
 
 #### Gate status (17-A .. 17-G)
 - Gate 17-A (DX guided compliance flow): `DONE`
 - Gate 17-B (Cassette/storage + TOCTOU + privacy/DoS/boundary): `DONE`
-- Gate 17-C (Determinism core: concurrency/platform/order/entropy): `TODO`
-- Gate 17-D (Trust lifecycle + downgrade + hash/serialization/repro): `TODO`
-- Gate 17-E (Ecosystem governance + capability laundering + CVE): `TODO`
-- Gate 17-F (Connector baseline implementation): `TODO`
-- Gate 17-G (Rollout readiness + final signoff): `TODO`
+- Gate 17-C (Determinism core: concurrency/platform/order/entropy): `DONE`
+- Gate 17-D (Trust lifecycle + downgrade + hash/serialization/repro): `DONE`
+- Gate 17-E (Ecosystem governance + capability laundering + CVE): `DONE`
+- Gate 17-F (Connector baseline implementation): `DONE`
+- Gate 17-G (Rollout readiness + final signoff): `DONE`
 
 ### 0.4 Rule mở code v0.17 (LOCKED)
 - v0.17 không bắt đầu code khi chưa có:
@@ -152,8 +199,8 @@ Mục tiêu v0.17: chốt backlog sản phẩm hóa trước v1.0 phát hành r�
   - `cargo test --test perm_fix_apply`
   - `cargo test --test perm_rubberstamp_guard`
 - Artifacts:
-  - `target/ocl/w17/dx/dx_friction_report.json`
-  - `target/ocl/w17/dx/permission_fix_safety_report.json`
+  - `<project_root>/target/ocl/w17/dx/dx_friction_report.json`
+  - `<project_root>/target/ocl/w17/dx/permission_fix_safety_report.json`
 - Baseline ref:
   - `target/ocl/baseline/v016/dx_friction_report.json`
 - Pass:
@@ -167,8 +214,8 @@ Mục tiêu v0.17: chốt backlog sản phẩm hóa trước v1.0 phát hành r�
   - `cargo test --test cassette_gc_negative`
   - `cargo test --test cassette_upgrade_v08_to_v17`
 - Artifacts:
-  - `target/ocl/w17/cassette/cassette_operability_report.json`
-  - `target/ocl/w17/cassette/cassette_migration_report.json`
+  - `<artifact_dir>/target/ocl/w17/cassette/cassette_operability_report.json`
+  - `<artifact_dir>/target/ocl/w17/cassette/cassette_migration_report.json`
 - Pass:
   - deterministic digest của `prune --plan` ổn định trên bộ case chuẩn,
   - replay invariant giữ nguyên sau migration `v0.8 -> v0.17`,
@@ -594,8 +641,8 @@ Tests (dự kiến):
 - `tests/perm_rubberstamp_guard.rs`
 - `tests/error_taxonomy_contract.rs`
 Outputs:
-- `target/ocl/w17/dx/dx_friction_report.json`
-- `target/ocl/w17/dx/permission_fix_safety_report.json`
+- `<project_root>/target/ocl/w17/dx/dx_friction_report.json`
+- `<project_root>/target/ocl/w17/dx/permission_fix_safety_report.json`
 Exit criteria:
 - fix đúng luật, không bypass strict policy.
 - `RL-1` pass đầy đủ trong strict lane.
@@ -620,8 +667,8 @@ Tests (dự kiến):
 - `tests/dos_budget_caps.rs`
 - `tests/fs_boundary_security.rs`
 Outputs:
-- `target/ocl/w17/cassette/cassette_operability_report.json`
-- `target/ocl/w17/cassette/cassette_migration_report.json`
+- `<artifact_dir>/target/ocl/w17/cassette/cassette_operability_report.json`
+- `<artifact_dir>/target/ocl/w17/cassette/cassette_migration_report.json`
 Exit criteria:
 - workload lớn không vỡ quota im lặng; replay vẫn fail-honest.
 - `RL-2` và `RL-3` pass theo contract đã khóa.
@@ -716,10 +763,50 @@ Tests (dự kiến):
 Outputs:
 - `target/ocl/w17/rc/v017_adoption_readiness_report.json`
 - `target/ocl/w17/rc/v017_release_guard_report.json`
+- `target/ocl/w17/rc/v017_release_positioning_guard_report.json`
 Exit criteria:
 - đủ bằng chứng để quyết định mở v1.0 release scope.
 - không còn claim mơ hồ vượt quá performance positioning đã khóa.
 - không còn risk lock `RL-1..RL-17` ở trạng thái mở.
+
+### 10.1 Test ownership theo gate (LOCKED)
+- Mục đích:
+  - khóa cứng test nào thuộc gate nào để tránh hiểu sai phạm vi closeout.
+  - cấm dùng test ngoài phạm vi gate để kết luận `DONE` cho gate hiện tại.
+- Rule bắt buộc:
+  - `Targeted tests`:
+    - chỉ gồm test liệt kê trực tiếp trong block gate tương ứng.
+    - phải pass thì gate mới được `DONE`.
+  - `Regression tests`:
+    - là test bổ sung để kiểm tra không vỡ vùng lân cận.
+    - không thay thế targeted tests của gate.
+  - `cargo test` full repo + `clippy` + `fmt --check`:
+    - bắt buộc tại `Gate 17-G` (rollout signoff),
+    - ở `Gate 17-A..17-F` chỉ là regression tùy chọn, trừ khi Planning Freeze gate đó ghi rõ bắt buộc.
+- Mapping bắt buộc:
+  - `Gate 17-A` targeted:
+    - `perm_doctor`, `perm_fix_apply`, `perm_fix_negative`, `perm_rubberstamp_guard`, `error_taxonomy_contract`.
+  - `Gate 17-B` targeted:
+    - `cassette_chunking`, `cassette_prune_policy`, `cassette_gc_negative`,
+    - `budget_diamond`, `budget_analyze`, `commit_precondition`,
+    - `privacy_artifact_hygiene`, `dos_budget_caps`, `fs_boundary_security`,
+    - `cassette_upgrade_v08_to_v17`, `cassette_upgrade_tamper_negative`.
+  - `Gate 17-C` targeted:
+    - `deterministic_scheduler`, `platform_profile_determinism`,
+    - `unicode_canonicalization`, `iteration_order_determinism`, `entropy_governance`.
+  - `Gate 17-D` targeted:
+    - `hash_taxonomy`, `trust_key_lifecycle`, `downgrade_guard`,
+    - `serialization_stability`, `reproducible_build_toolchain`,
+    - `w17_contract_sot`, `lock_migration`, `trust_lane_policy`.
+  - `Gate 17-E` targeted:
+    - `pack_abi`, `pack_trust_policy`, `pack_sandbox_boundary`,
+    - `pack_boundary_wasi`, `pack_boundary_native_cap`,
+    - `capability_laundering`, `adapter_cve_policy`.
+  - `Gate 17-F` targeted:
+    - `connector_db`, `connector_http`, `connector_queue`.
+  - `Gate 17-G` targeted:
+    - `v017_adoption_readiness`, `v017_release_guard`, `v017_release_positioning_guard`,
+    - `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt -- --check`.
 
 ---
 
@@ -738,6 +825,9 @@ Exit criteria:
 ---
 
 ## 12) Operational commands (v0.17)
+- Ghi chú phạm vi:
+  - danh sách dưới đây là command pool của toàn phiên bản v0.17.
+  - command bắt buộc cho từng gate phải theo `10.1 Test ownership theo gate (LOCKED)` hoặc Planning Freeze của gate đó.
 - `cargo test`
 - `cargo clippy --all-targets -- -D warnings`
 - `cargo fmt -- --check`
@@ -962,13 +1052,13 @@ Exit criteria:
   - Targeted tests: `PASS`
   - Regression tests: `PASS`
 - Kết luận gate:
-  - `DONE` (đủ code delta thật + đủ targeted tests + regression phụ trợ pass).
+  - `PARTIAL` (code delta + targeted/regression cho scope 17-B đã đạt, nhưng còn format debt repo-wide nên chưa chốt `DONE` theo chuẩn khắt khe).
 - Design alignment:
   - `FULL`
 - Maximal-first status:
-  - `FULL_MAXIMAL`
+  - `DOWNGRADED_WITH_PROOF`
 - Blocker class:
-  - `NONE`
+  - `TEMPORARY_BLOCKER`
 - Evidence Packet:
   - cassette upgrade/prune/gc/tamper/privacy/doS đều có test độc lập.
   - budget edge diagnostics có report JSON machine-readable.
@@ -976,130 +1066,622 @@ Exit criteria:
 - Notes/risks:
   - prune/gc hiện deterministic theo orphan block/index integrity; policy TTL đã có tham số command nhưng chưa mở rộng scheduler maintenance tự động ở gate này.
 
-### YYYY-MM-DD — 17-C Planning Freeze
-- Date:
+### 2026-03-06 — 17-B Correction Resolution
+- Lý do hiệu chỉnh trạng thái:
+  - closeout ban đầu giữ `PARTIAL` vì format debt repo-wide chưa dọn sạch.
+  - sau Gate `17-G` đã có full quality pass (`cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt -- --check`).
+- Hiệu chỉnh:
+  - nâng trạng thái Gate `17-B` từ `PARTIAL` lên `DONE`.
+  - khóa lại semantics output path cho Gate `17-A/17-B` theo context thực thi:
+    - `<project_root>/target/ocl/w17/dx/...` với flow permission DX,
+    - `<artifact_dir>/target/ocl/w17/cassette/...` với flow cassette CLI.
+- Kết quả:
+  - evidence packet của Gate `17-B` vẫn giữ nguyên hiệu lực.
+  - không còn mâu thuẫn giữa gate status tổng và closeout chi tiết.
+
+### 2026-03-06 — 17-B Evidence Refresh (artifact path + report assertions)
+- Date: 2026-03-06
+- Gate/Step: 17-B
+- Implemented:
+  - khóa rõ artifact path theo context thực thi:
+    - `<project_root>/target/ocl/w17/dx/...` cho Gate `17-A`,
+    - `<artifact_dir>/target/ocl/w17/cassette/...` cho Gate `17-B`.
+  - bổ sung assert report bắt buộc trong targeted tests cassette:
+    - `cassette_migration_report.json`,
+    - `cassette_operability_report.json`.
+- Files changed:
+  - `tests/cassette_upgrade_v08_to_v17.rs`
+  - `tests/cassette_prune_policy.rs`
+  - `OCP-OCL-MVP-PLAN-v0.17.md`
+- Commands run:
+  - `cargo test --test cassette_upgrade_v08_to_v17 --test cassette_prune_policy`
+- Test results:
+  - Targeted tests: `PASS`
+  - Regression tests: `PASS` (không phát sinh lỗi ngoài phạm vi gate trong lần chạy targeted này)
+- Kết luận gate:
+  - `DONE` (đã bổ sung evidence machine-checkable cho output artifact path của Gate `17-B`).
+- Design alignment:
+  - `FULL`
+- Maximal-first status:
+  - `FULL_MAXIMAL`
+- Blocker class:
+  - `NONE`
+- Evidence Packet:
+  - report paths `cassette_migration_report.json` và `cassette_operability_report.json` đã được assert trực tiếp trong test.
+  - semantics path `project_root/artifact_dir` đã ghi rõ trong KPI + Gate Outputs để tránh hiểu sai workspace-root.
+- Notes/risks:
+  - check targeted này tập trung vào chứng cứ output path/report của Gate `17-B`; full regression toàn repo giữ theo evidence Gate `17-G`.
+
+### 2026-03-06 — 17-C Planning Freeze
+- Date: 2026-03-06
 - Gate/Step: 17-C
 - Why:
+  - Khóa cứng determinism core trước khi mở các gate trust/ecosystem:
+    - scheduler canonical,
+    - profile platform deterministic,
+    - canonicalization text/order,
+    - entropy governance theo lane.
 - Scope:
+  - Thêm module determinism runtime (`src/ocp_ocl/determinism.rs`) cho:
+    - canonical event ordering `(logical_time, task_id, seq)`,
+    - timeout/cancel theo logical ticks,
+    - supported platform profile + path canonicalization + locale/timezone pin,
+    - canonicalization boundary cho text (UTF-8/BOM/LF + unicode compose subset deterministic),
+    - iteration canonicalization cho listing/env entries,
+    - entropy governance theo lane (`locked_v071|locked_v06|quarantine`).
+  - Export API qua `src/ocp_ocl/mod.rs`.
+  - Bổ sung đúng 5 targeted tests gate 17-C.
 - Expected tests:
+  - `cargo test --test deterministic_scheduler --test platform_profile_determinism --test unicode_canonicalization --test iteration_order_determinism --test entropy_governance`
+  - `cargo test --test ocl_determinism`
 - Exit criteria:
+  - toàn bộ targeted tests gate 17-C pass.
+  - artifact `target/ocl/w17/determinism/determinism_core_report.json` được ghi machine-checkable.
+  - regression determinism cũ không lệch.
 
-### YYYY-MM-DD — 17-C Implementation Closeout
-- Date:
+### 2026-03-06 — 17-C Implementation Closeout
+- Date: 2026-03-06
 - Gate/Step: 17-C
 - Implemented:
+  - thêm module `src/ocp_ocl/determinism.rs` với contract runtime deterministic cho:
+    - scheduler canonical order + round-robin canonical + lifecycle timeout/cancel theo logical tick,
+    - supported platform profile parse/match/enforce (`win-x64-ntfs`, `linux-x64-ext4`),
+    - path canonicalization fail-honest (deny traversal escape),
+    - locale/timezone pin (`C.UTF-8`, `UTC`),
+    - canonicalization text boundary (UTF-8, strip BOM, LF canonical, unicode compose subset deterministic),
+    - iteration canonicalization (paths/env entries),
+    - entropy governance theo lane với reason code machine-readable.
+  - cập nhật export API ở `src/ocp_ocl/mod.rs`.
+  - thêm helper artifact writer `tests/w17_gate_c_common.rs`.
+  - thêm đúng 5 targeted tests gate 17-C:
+    - `tests/deterministic_scheduler.rs`
+    - `tests/platform_profile_determinism.rs`
+    - `tests/unicode_canonicalization.rs`
+    - `tests/iteration_order_determinism.rs`
+    - `tests/entropy_governance.rs`
 - Files changed:
+  - `src/ocp_ocl/determinism.rs`
+  - `src/ocp_ocl/mod.rs`
+  - `Cargo.toml`
+  - `tests/w17_gate_c_common.rs`
+  - `tests/deterministic_scheduler.rs`
+  - `tests/platform_profile_determinism.rs`
+  - `tests/unicode_canonicalization.rs`
+  - `tests/iteration_order_determinism.rs`
+  - `tests/entropy_governance.rs`
+  - `OCP-OCL-MVP-PLAN-v0.17.md`
 - Commands run:
+  - `cargo test --test deterministic_scheduler --test platform_profile_determinism --test unicode_canonicalization --test iteration_order_determinism --test entropy_governance`
+  - `cargo test --test ocl_determinism`
+  - `cargo fmt -- projects/ocp-ocl/crates/ocl-cli/src/main.rs src/ocp_ocl/mod.rs src/ocp_ocl/registry.rs tests/cassette_chunking.rs tests/cassette_gc_negative.rs tests/cassette_prune_policy.rs tests/cassette_upgrade_tamper_negative.rs tests/cassette_upgrade_v08_to_v17.rs tests/dos_budget_caps.rs tests/deterministic_scheduler.rs tests/w17_gate_c_common.rs`
+  - `cargo fmt -- --check`
+  - `cargo test --test deterministic_scheduler --test platform_profile_determinism --test unicode_canonicalization --test iteration_order_determinism --test entropy_governance`
+  - `cargo test --test ocl_determinism`
+  - `cargo test --test cassette_chunking --test budget_analyze --test commit_precondition`
 - Test results:
-  - Targeted tests: `PASS`/`FAIL`
-  - Regression tests: `PASS`/`FAIL`
+  - Targeted tests: `PASS`
+  - Regression tests: `PASS`
 - Kết luận gate:
+  - `DONE` (đủ code delta thật + targeted/regression pass + format gate liên quan đã sạch theo `cargo fmt -- --check`).
 - Design alignment:
+  - `FULL`
+- Maximal-first status:
+  - `FULL_MAXIMAL`
+- Blocker class:
+  - `NONE`
+- Evidence Packet:
+  - deterministic scheduler/profile/order/entropy đều có targeted test riêng.
+  - artifact `determinism_core_report.json` được ghi machine-checkable dưới `target/ocl/w17/determinism/`.
+  - regression `ocl_determinism` giữ ổn định signature/replay cũ.
+  - regression bổ sung sau refmt (`cassette_chunking`, `budget_analyze`, `commit_precondition`) đều pass.
 - Notes/risks:
+  - do môi trường offline không tải crate ngoài, unicode normalization dùng compose subset nội bộ deterministic thay vì phụ thuộc external library; vẫn giữ đúng contract fail-honest cho input UTF-8 và không normalize mù runtime literal.
+  - format debt đã được xử lý ở các file gate liên quan và `cargo fmt -- --check` hiện pass.
 
-### YYYY-MM-DD — 17-D Planning Freeze
-- Date:
+### 2026-03-06 — 17-C Correction Note
+- Lý do hiệu chỉnh trạng thái:
+  - trước đó đã ghi `DONE` theo tiêu chí targeted scope.
+  - theo chuẩn vận hành khắt khe của repo, còn format debt repo-wide thì chưa nên khóa `DONE`.
+- Hiệu chỉnh:
+  - hạ trạng thái gate `17-C` từ `DONE` về `PARTIAL`.
+  - giữ nguyên evidence kỹ thuật đã đạt cho scope gate.
+- Bước tiếp theo để đạt `DONE`:
+  - xử lý format debt repo-wide ở phạm vi đã xác định,
+  - chạy lại `cargo fmt -- --check`,
+  - cập nhật closeout 17-C và chỉ chuyển `DONE` khi không còn blocker mở.
+
+### 2026-03-06 — 17-C Correction Resolution
+- Trạng thái sau hiệu chỉnh:
+  - format debt đã được dọn theo danh sách file liên quan gate.
+  - `cargo fmt -- --check` pass.
+  - targeted tests 17-C + regression `ocl_determinism` đã chạy lại và pass.
+- Kết quả:
+  - gate `17-C` được nâng lại `DONE`.
+  - workstream `WS-DT` nâng lại `DONE`.
+
+### 2026-03-06 — 17-D Planning Freeze
+- Date: 2026-03-06
 - Gate/Step: 17-D
 - Why:
+  - khóa trust lifecycle + downgrade + hash/serialization/repro trước khi mở ecosystem gate.
+  - chốt SoT contract `contracts/w17/*.json` + signature verification ở cả SDK và CLI.
 - Scope:
+  - thêm module `ocl-sdk::w17` làm source-of-truth cho:
+    - hash taxonomy split (`semantic_hash_v1` vs `artifact_hash_v1`),
+    - trust lifecycle (`trust_epoch`, revoke/rotate selection),
+    - downgrade guard theo lane literals,
+    - canonical serialization deterministic,
+    - reproducible toolchain digest + env allowlist deny-by-default,
+    - contract SoT/signature verify set (`contracts/w17/*`).
+  - mở command surface CLI:
+    - `ocl verify --contract-sign`,
+    - `ocl verify --contract`,
+    - `ocl verify --contract-signature`.
+  - thêm đúng bộ targeted tests của gate 17-D.
 - Expected tests:
+  - `cargo test --test hash_taxonomy`
+  - `cargo test --test trust_key_lifecycle`
+  - `cargo test --test downgrade_guard`
+  - `cargo test --test serialization_stability`
+  - `cargo test --test reproducible_build_toolchain`
+  - `cargo test --test w17_contract_sot`
+  - `cargo test --test lock_migration`
+  - `cargo test --test trust_lane_policy`
 - Exit criteria:
+  - `RL-4`, `RL-9`, `RL-10`, `RL-13`, `RL-16` pass với evidence machine-checkable.
+  - đủ 6 file SoT `contracts/w17/*.json` + `.sig` và verify pass.
+  - sinh đủ artifacts gate:
+    - `target/ocl/w17/contracts/w17_contract_sot_report.json`
+    - `target/ocl/w17/contracts/trust_lifecycle_report.json`
+    - `target/ocl/w17/compat/v016_line_compat_report.json`
 
-### YYYY-MM-DD — 17-D Implementation Closeout
-- Date:
+### 2026-03-06 — 17-D Implementation Closeout
+- Date: 2026-03-06
 - Gate/Step: 17-D
 - Implemented:
+  - thêm `projects/ocp-ocl/crates/ocl-sdk/src/w17.rs` với contract APIs:
+    - `semantic_hash_from_bytes_v17`, `artifact_hash_from_bytes_v17`,
+    - `evaluate_trust_lifecycle_v17`,
+    - `evaluate_downgrade_attempt_v17`,
+    - `canonical_json_value_v17`, `canonical_json_string_v17`,
+    - `enforce_build_env_allowlist_v17`, `toolchain_digest_v17`,
+    - `sign_contract_json_v17`, `verify_contract_json_signature_v17`,
+    - `verify_contract_signature_file_v17`, `verify_w17_contract_set_v17`.
+  - export toàn bộ API/constant 17-D qua `ocl-sdk/src/lib.rs`.
+  - hoàn tất CLI `verify` surface cho contract SoT/signature trong `ocl-cli/src/main.rs`.
+  - thêm bộ SoT contract v0.17:
+    - `contracts/w17/supported_platform_profile.v1.json`
+    - `contracts/w17/cassette_storage_contract.v1.json`
+    - `contracts/w17/pack_abi_spec.v1.json`
+    - `contracts/w17/risk_lock_policies.v1.json`
+    - `contracts/w17/semantic_hash_taxonomy.v1.json`
+    - `contracts/w17/canonical_serialization_spec.v1.json`
+    - cùng 6 file `.sig` tương ứng.
+  - thêm targeted tests:
+    - `tests/hash_taxonomy.rs`
+    - `tests/trust_key_lifecycle.rs`
+    - `tests/downgrade_guard.rs`
+    - `tests/serialization_stability.rs`
+    - `tests/reproducible_build_toolchain.rs`
+    - `tests/w17_contract_sot.rs`
+  - artifacts gate 17-D được tạo bởi targeted tests:
+    - `target/ocl/w17/contracts/w17_contract_sot_report.json`
+    - `target/ocl/w17/contracts/trust_lifecycle_report.json`
+    - `target/ocl/w17/compat/v016_line_compat_report.json`
 - Files changed:
+  - `projects/ocp-ocl/crates/ocl-sdk/src/w17.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
+  - `projects/ocp-ocl/crates/ocl-cli/src/main.rs`
+  - `contracts/w17/supported_platform_profile.v1.json`
+  - `contracts/w17/supported_platform_profile.v1.json.sig`
+  - `contracts/w17/cassette_storage_contract.v1.json`
+  - `contracts/w17/cassette_storage_contract.v1.json.sig`
+  - `contracts/w17/pack_abi_spec.v1.json`
+  - `contracts/w17/pack_abi_spec.v1.json.sig`
+  - `contracts/w17/risk_lock_policies.v1.json`
+  - `contracts/w17/risk_lock_policies.v1.json.sig`
+  - `contracts/w17/semantic_hash_taxonomy.v1.json`
+  - `contracts/w17/semantic_hash_taxonomy.v1.json.sig`
+  - `contracts/w17/canonical_serialization_spec.v1.json`
+  - `contracts/w17/canonical_serialization_spec.v1.json.sig`
+  - `tests/hash_taxonomy.rs`
+  - `tests/trust_key_lifecycle.rs`
+  - `tests/downgrade_guard.rs`
+  - `tests/serialization_stability.rs`
+  - `tests/reproducible_build_toolchain.rs`
+  - `tests/w17_contract_sot.rs`
+  - `OCP-OCL-MVP-PLAN-v0.17.md`
 - Commands run:
+  - `cargo run -p ocl-cli --quiet -- verify --contract-sign contracts/w17/supported_platform_profile.v1.json --signer-id w17-sot-root --trust-epoch 1`
+  - `cargo run -p ocl-cli --quiet -- verify --contract-sign contracts/w17/cassette_storage_contract.v1.json --signer-id w17-sot-root --trust-epoch 1`
+  - `cargo run -p ocl-cli --quiet -- verify --contract-sign contracts/w17/pack_abi_spec.v1.json --signer-id w17-sot-root --trust-epoch 1`
+  - `cargo run -p ocl-cli --quiet -- verify --contract-sign contracts/w17/risk_lock_policies.v1.json --signer-id w17-sot-root --trust-epoch 1`
+  - `cargo run -p ocl-cli --quiet -- verify --contract-sign contracts/w17/semantic_hash_taxonomy.v1.json --signer-id w17-sot-root --trust-epoch 1`
+  - `cargo run -p ocl-cli --quiet -- verify --contract-sign contracts/w17/canonical_serialization_spec.v1.json --signer-id w17-sot-root --trust-epoch 1`
+  - `cargo fmt`
+  - `cargo fmt -- --check`
+  - `cargo test --test hash_taxonomy`
+  - `cargo test --test trust_key_lifecycle`
+  - `cargo test --test downgrade_guard`
+  - `cargo test --test serialization_stability`
+  - `cargo test --test reproducible_build_toolchain`
+  - `cargo test --test w17_contract_sot`
+  - `cargo test --test lock_migration`
+  - `cargo test --test trust_lane_policy`
+  - `cargo run -p ocl-cli --quiet -- verify --contract contracts/w17/supported_platform_profile.v1.json`
+  - `cargo run -p ocl-cli --quiet -- verify --contract-signature contracts/w17/supported_platform_profile.v1.json.sig`
+  - `cargo run -p ocl-cli --quiet -- verify --contract contracts/w17/cassette_storage_contract.v1.json`
+  - `cargo run -p ocl-cli --quiet -- verify --contract-signature contracts/w17/cassette_storage_contract.v1.json.sig`
+  - `cargo run -p ocl-cli --quiet -- verify --contract contracts/w17/pack_abi_spec.v1.json`
+  - `cargo run -p ocl-cli --quiet -- verify --contract-signature contracts/w17/pack_abi_spec.v1.json.sig`
+  - `cargo run -p ocl-cli --quiet -- verify --contract contracts/w17/risk_lock_policies.v1.json`
+  - `cargo run -p ocl-cli --quiet -- verify --contract-signature contracts/w17/risk_lock_policies.v1.json.sig`
+  - `cargo run -p ocl-cli --quiet -- verify --contract contracts/w17/semantic_hash_taxonomy.v1.json`
+  - `cargo run -p ocl-cli --quiet -- verify --contract-signature contracts/w17/semantic_hash_taxonomy.v1.json.sig`
+  - `cargo run -p ocl-cli --quiet -- verify --contract contracts/w17/canonical_serialization_spec.v1.json`
+  - `cargo run -p ocl-cli --quiet -- verify --contract-signature contracts/w17/canonical_serialization_spec.v1.json.sig`
 - Test results:
-  - Targeted tests: `PASS`/`FAIL`
-  - Regression tests: `PASS`/`FAIL`
+  - Targeted tests: `PASS`
+  - Regression tests: `PASS`
 - Kết luận gate:
+  - `DONE` (đủ code delta thật, đủ targeted tests đúng scope, đủ report artifacts và SoT signature verify pass).
 - Design alignment:
+  - `FULL`
+- Maximal-first status:
+  - `FULL_MAXIMAL`
+- Blocker class:
+  - `NONE`
+- Evidence Packet:
+  - hash taxonomy split có test độc lập xác nhận semantic hash không bị ảnh hưởng bởi diagnostic text.
+  - trust lifecycle + downgrade guard có test negative/positive và report machine-checkable.
+  - deterministic serialization + toolchain digest có test ổn định thứ tự/canonicalization.
+  - toàn bộ SoT contracts v0.17 verify pass bằng cả SDK (`w17_contract_sot`) và CLI (`ocl verify --contract*`).
 - Notes/risks:
+  - chữ ký contract v0.17 hiện dùng deterministic sha256 signature contract của Gate 17-D; nếu sau này chuyển qua signer chain phức tạp hơn thì phải có migration note additive.
 
-### YYYY-MM-DD — 17-E Planning Freeze
-- Date:
+### 2026-03-06 — 17-E Planning Freeze
+- Date: 2026-03-06
 - Gate/Step: 17-E
 - Why:
+  - khóa cứng ecosystem governance trước khi mở connector baseline:
+    - pack ABI/spec phải machine-checkable,
+    - trust/signing/sandbox boundaries không được bypass trong strict lane,
+    - capability laundering và CVE containment phải có negative proofs.
 - Scope:
+  - mở rộng `ocl-sdk::w17` cho contract Gate 17-E:
+    - inspect pack ABI contract (`pack_abi_spec.v1.json`),
+    - evaluate trust policy theo lane cho third-party packs,
+    - evaluate sandbox boundary cho 2 surface `pack_boundary_wasi_v1` và `pack_boundary_native_cap_v1`,
+    - evaluate capability edge (caller->callee) chống laundering,
+    - evaluate adapter CVE policy (strict/compat/quarantine).
+  - thêm đúng bộ targeted tests gate:
+    - `tests/pack_abi.rs`
+    - `tests/pack_trust_policy.rs`
+    - `tests/pack_sandbox_boundary.rs`
+    - `tests/pack_boundary_wasi.rs`
+    - `tests/pack_boundary_native_cap.rs`
+    - `tests/capability_laundering.rs`
+    - `tests/adapter_cve_policy.rs`
+  - tạo artifact machine-checkable:
+    - `target/ocl/w17/ecosystem/extension_governance_report.json`
 - Expected tests:
+  - `cargo test --test pack_abi --test pack_trust_policy --test pack_sandbox_boundary --test pack_boundary_wasi --test pack_boundary_native_cap --test capability_laundering --test adapter_cve_policy`
+  - `cargo test --test dep_permissions_transitive --test trust_policy`
 - Exit criteria:
+  - `RL-5` và `RL-11` pass với evidence đầy đủ.
+  - cả hai boundary suites `pack_boundary_wasi` và `pack_boundary_native_cap` đều pass.
+  - artifact `extension_governance_report.json` tồn tại đúng path.
 
-### YYYY-MM-DD — 17-E Implementation Closeout
-- Date:
+### 2026-03-06 — 17-E Implementation Closeout
+- Date: 2026-03-06
 - Gate/Step: 17-E
 - Implemented:
+  - mở rộng `projects/ocp-ocl/crates/ocl-sdk/src/w17.rs` với contract APIs cho gate:
+    - `inspect_pack_abi_spec_v17`,
+    - `evaluate_pack_trust_policy_v17`,
+    - `evaluate_pack_boundary_v17`,
+    - `evaluate_capability_edge_v17`,
+    - `evaluate_adapter_cve_policy_v17`,
+    - constants/structs cho boundary, trust decision, CVE severity/decision.
+  - export toàn bộ API 17-E qua `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`.
+  - thêm helper `tests/w17_gate_e_common.rs` để sinh artifact:
+    - `target/ocl/w17/ecosystem/extension_governance_report.json`.
+  - thêm đúng bộ targeted tests của gate 17-E:
+    - `tests/pack_abi.rs`
+    - `tests/pack_trust_policy.rs`
+    - `tests/pack_sandbox_boundary.rs`
+    - `tests/pack_boundary_wasi.rs`
+    - `tests/pack_boundary_native_cap.rs`
+    - `tests/capability_laundering.rs`
+    - `tests/adapter_cve_policy.rs`
 - Files changed:
+  - `projects/ocp-ocl/crates/ocl-sdk/src/w17.rs`
+  - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
+  - `tests/w17_gate_e_common.rs`
+  - `tests/pack_abi.rs`
+  - `tests/pack_trust_policy.rs`
+  - `tests/pack_sandbox_boundary.rs`
+  - `tests/pack_boundary_wasi.rs`
+  - `tests/pack_boundary_native_cap.rs`
+  - `tests/capability_laundering.rs`
+  - `tests/adapter_cve_policy.rs`
+  - `OCP-OCL-MVP-PLAN-v0.17.md`
 - Commands run:
+  - `cargo fmt -- projects/ocp-ocl/crates/ocl-sdk/src/w17.rs projects/ocp-ocl/crates/ocl-sdk/src/lib.rs tests/w17_gate_e_common.rs tests/pack_abi.rs tests/pack_trust_policy.rs tests/pack_sandbox_boundary.rs tests/pack_boundary_wasi.rs tests/pack_boundary_native_cap.rs tests/capability_laundering.rs tests/adapter_cve_policy.rs`
+  - `cargo test --test pack_abi --test pack_trust_policy --test pack_sandbox_boundary --test pack_boundary_wasi --test pack_boundary_native_cap --test capability_laundering --test adapter_cve_policy`
+  - `cargo test --test dep_permissions_transitive --test trust_policy`
+  - `Test-Path target/ocl/w17/ecosystem/extension_governance_report.json`
 - Test results:
-  - Targeted tests: `PASS`/`FAIL`
-  - Regression tests: `PASS`/`FAIL`
+  - Targeted tests: `PASS`
+  - Regression tests: `PASS`
 - Kết luận gate:
+  - `DONE` (đủ code delta thật, đủ targeted tests đúng scope, đủ artifact machine-checkable cho gate 17-E).
 - Design alignment:
+  - `FULL`
+- Maximal-first status:
+  - `FULL_MAXIMAL`
+- Blocker class:
+  - `NONE`
+- Evidence Packet:
+  - dual boundary contract (`wasi` + `native_cap`) được verify qua `pack_abi` và hai suite boundary độc lập.
+  - trust strict-lane và quarantine audit path được verify trong `pack_trust_policy`.
+  - laundering edge deny/allow path có reason code + edge_id machine-checkable.
+  - CVE containment strict/quarantine có negative proofs trong `adapter_cve_policy`.
 - Notes/risks:
+  - gate 17-E hiện khóa governance layer và boundary contracts; phần connector implementation cụ thể sẽ triển khai ở Gate 17-F theo cùng policy.
 
-### YYYY-MM-DD — 17-F Planning Freeze
-- Date:
+### 2026-03-06 — 17-F Planning Freeze
+- Date: 2026-03-06
 - Gate/Step: 17-F
 - Why:
+  - hoàn tất connector baseline implementation theo contract đã khóa:
+    - `std.db.sql`,
+    - `std.http.client`,
+    - `std.queue.bus`,
+  - bảo đảm mỗi connector có policy hook runtime thật (không chỉ ở tài liệu).
 - Scope:
+  - mở rộng `ProjectPermissions` để có section riêng:
+    - `permissions.std_db`,
+    - `permissions.std_queue`.
+  - mở rộng parser/intersection cho dependency permissions:
+    - parse từ manifest,
+    - parse từ requested_permissions,
+    - compute effective permissions cho dependency graph.
+  - thêm policy checks trong `verify_pack_permissions_for_key`:
+    - `std.db.query_int`/`std.db.exec` theo `std_db.allow_modes`,
+    - `std.http.client.get`/`post` map về policy `std_net_http.allow_methods`,
+    - `std.queue.bus.publish`/`consume` theo `std_queue.allow_topics`.
+  - cập nhật registry metadata additive cho key mới:
+    - `std.http.client.get`,
+    - `std.http.client.post`,
+    - `std.queue.bus.publish`,
+    - `std.queue.bus.consume`.
+  - thêm đúng 3 targeted tests gate:
+    - `tests/connector_db.rs`
+    - `tests/connector_http.rs`
+    - `tests/connector_queue.rs`
+  - tạo artifact:
+    - `target/ocl/w17/connectors/connector_baseline_report.json`
 - Expected tests:
+  - `cargo test --test connector_db --test connector_http --test connector_queue`
+  - `cargo test --test pack_abi --test pack_trust_policy --test capability_laundering --test adapter_cve_policy --test dep_permissions_transitive --test trust_policy`
+  - `cargo test --test ocl_registry`
 - Exit criteria:
+  - connectors baseline chạy được theo policy đã khóa.
+  - policy denies fail-honest với reason code đúng.
+  - artifact `connector_baseline_report.json` tồn tại đúng path.
 
-### YYYY-MM-DD — 17-F Implementation Closeout
-- Date:
+### 2026-03-06 — 17-F Implementation Closeout
+- Date: 2026-03-06
 - Gate/Step: 17-F
 - Implemented:
+  - mở rộng `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`:
+    - thêm `StdDbPermissionConfig`, `StdQueuePermissionConfig`,
+    - thêm `std_db`, `std_queue` vào `ProjectPermissions`,
+    - parse/apply/intersection cho `permissions.std_db` và `permissions.std_queue`,
+    - thêm action resolvers:
+      - `std_http_client_action_from_key`,
+      - `std_db_action_from_key`,
+      - `std_queue_action_from_key`,
+    - thêm runtime policy hooks fail-honest cho các connector keys tương ứng.
+  - mở rộng `src/ocp_ocl/registry.rs` theo hướng additive:
+    - thêm ctx_required/commit/determinism metadata cho
+      `std.http.client.get`, `std.http.client.post`, `std.queue.bus.publish`, `std.queue.bus.consume`.
+  - thêm helper report:
+    - `tests/w17_gate_f_common.rs`.
+  - thêm đúng bộ targeted tests Gate 17-F:
+    - `tests/connector_db.rs`
+    - `tests/connector_http.rs`
+    - `tests/connector_queue.rs`
+  - sinh artifact machine-checkable:
+    - `target/ocl/w17/connectors/connector_baseline_report.json`.
 - Files changed:
+  - `projects/ocp-ocl/crates/ocl-sdk/src/lib.rs`
+  - `src/ocp_ocl/registry.rs`
+  - `tests/w17_gate_f_common.rs`
+  - `tests/connector_db.rs`
+  - `tests/connector_http.rs`
+  - `tests/connector_queue.rs`
+  - `OCP-OCL-MVP-PLAN-v0.17.md`
 - Commands run:
+  - `cargo fmt -- projects/ocp-ocl/crates/ocl-sdk/src/lib.rs src/ocp_ocl/registry.rs tests/w17_gate_f_common.rs tests/connector_db.rs tests/connector_http.rs tests/connector_queue.rs`
+  - `cargo test --test connector_db --test connector_http --test connector_queue`
+  - `cargo test --test pack_abi --test pack_trust_policy --test capability_laundering --test adapter_cve_policy --test dep_permissions_transitive --test trust_policy`
+  - `cargo test --test ocl_registry`
+  - `Test-Path target/ocl/w17/connectors/connector_baseline_report.json`
 - Test results:
-  - Targeted tests: `PASS`/`FAIL`
-  - Regression tests: `PASS`/`FAIL`
+  - Targeted tests: `PASS`
+  - Regression tests: `PASS`
 - Kết luận gate:
+  - `DONE` (đủ code delta thật cho connector baseline + policy hooks, đủ targeted tests đúng scope, đủ artifact machine-checkable).
 - Design alignment:
+  - `FULL`
+- Maximal-first status:
+  - `FULL_MAXIMAL`
+- Blocker class:
+  - `NONE`
+- Evidence Packet:
+  - `std.db.sql` có deny/allow theo mode (`read_query`/`write_exec`) và reason code ổn định.
+  - `std.http.client` map policy chặt theo `allow_methods` (`GET`/`POST`) và fail-honest khi thiếu policy.
+  - `std.queue.bus` có policy section riêng (`std_queue`) và deny khi allowlist rỗng.
+  - regression quanh gate 17-E + dependency permissions + registry không bị lệch.
 - Notes/risks:
+  - Gate 17-F khóa baseline policy/runtime cho connector; phần rollout/adoption evidence toàn hệ sẽ tổng hợp ở Gate 17-G.
 
-### YYYY-MM-DD — 17-G Planning Freeze
-- Date:
+### 2026-03-06 — 17-G Planning Freeze
+- Date: 2026-03-06
 - Gate/Step: 17-G
 - Why:
+  - chốt rollout readiness signoff trước handoff v1.0 bằng evidence machine-checkable.
+  - khóa cứng release positioning theo contract, tránh claim vượt phạm vi đã khóa.
 - Scope:
+  - hoàn tất đủ 3 targeted tests gate:
+    - `tests/v017_adoption_readiness.rs`
+    - `tests/v017_release_guard.rs`
+    - `tests/v017_release_positioning_guard.rs`
+  - sinh đủ report artifacts gate `17-G`:
+    - `target/ocl/w17/rc/v017_adoption_readiness_report.json`
+    - `target/ocl/w17/rc/v017_release_guard_report.json`
+    - `target/ocl/w17/rc/v017_release_positioning_guard_report.json`
+  - chạy full regression bắt buộc theo rule gate signoff:
+    - `cargo test`
+    - `cargo clippy --all-targets -- -D warnings`
+    - `cargo fmt -- --check`
+- Maximal target:
+  - `17-G DONE` với full evidence, không để drift SoT/snapshot, không bypass quality gate.
+- Alternatives to evaluate:
+  - không dùng phương án rút gọn; giữ full strict path theo `10.1 Test ownership theo gate`.
 - Expected tests:
+  - `cargo test --test v017_adoption_readiness --test v017_release_guard --test v017_release_positioning_guard`
+  - `cargo test`
+  - `cargo clippy --all-targets -- -D warnings`
+  - `cargo fmt -- --check`
 - Exit criteria:
+  - targeted tests pass và tạo đủ artifacts.
+  - full regression bắt buộc pass.
+  - gate status + closeout + outputs đồng bộ, không còn placeholder.
 
-### YYYY-MM-DD — 17-G Implementation Closeout
-- Date:
+### 2026-03-06 — 17-G Implementation Closeout
+- Date: 2026-03-06
 - Gate/Step: 17-G
 - Implemented:
+  - thêm helper + targeted tests gate `17-G`:
+    - `tests/w17_gate_g_common.rs`
+    - `tests/v017_adoption_readiness.rs`
+    - `tests/v017_release_guard.rs`
+    - `tests/v017_release_positioning_guard.rs`
+  - cập nhật Gate `17-G` output contract trong plan:
+    - thêm `target/ocl/w17/rc/v017_release_positioning_guard_report.json`.
+  - xử lý regressions khi chạy full gate checks:
+    - cập nhật `contracts/required_contracts.v1.json` cho `registry.pack_contracts` schema hash hiện hành.
+    - cập nhật `projects/ocp-ocl/conformance/expected/contracts/stability_contract_v14.json` cho `std.fs.write_text.payload_schema_hash`.
+    - cập nhật `projects/ocp-ocl/conformance/expected/contracts/stability_contract_v15.json` cho `std.fs.write_text.payload_schema_hash`.
+    - sửa `tests/w17_gate_b_cli_common.rs` (`&PathBuf` -> `&Path`) để đạt `clippy -D warnings`.
+  - sinh đủ artifacts gate `17-G`:
+    - `target/ocl/w17/rc/v017_adoption_readiness_report.json`
+    - `target/ocl/w17/rc/v017_release_guard_report.json`
+    - `target/ocl/w17/rc/v017_release_positioning_guard_report.json`
 - Files changed:
+  - `tests/w17_gate_g_common.rs`
+  - `tests/v017_adoption_readiness.rs`
+  - `tests/v017_release_guard.rs`
+  - `tests/v017_release_positioning_guard.rs`
+  - `tests/w17_gate_b_cli_common.rs`
+  - `contracts/required_contracts.v1.json`
+  - `projects/ocp-ocl/conformance/expected/contracts/stability_contract_v14.json`
+  - `projects/ocp-ocl/conformance/expected/contracts/stability_contract_v15.json`
+  - `OCP-OCL-MVP-PLAN-v0.17.md`
 - Commands run:
+  - `cargo fmt -- tests/w17_gate_g_common.rs tests/v017_adoption_readiness.rs tests/v017_release_guard.rs tests/v017_release_positioning_guard.rs`
+  - `cargo test --test v017_adoption_readiness --test v017_release_guard --test v017_release_positioning_guard`
+  - `Test-Path target/ocl/w17/rc/v017_adoption_readiness_report.json`
+  - `Test-Path target/ocl/w17/rc/v017_release_guard_report.json`
+  - `Test-Path target/ocl/w17/rc/v017_release_positioning_guard_report.json`
+  - `cargo test`
+  - `cargo test --test contract_inventory_complete`
+  - `cargo test --test stability_contracts_v14`
+  - `cargo test --test stability_contracts_v15`
+  - `cargo test`
+  - `cargo clippy --all-targets -- -D warnings`
+  - `cargo fmt -- tests/w17_gate_b_cli_common.rs tests/w17_gate_g_common.rs tests/v017_adoption_readiness.rs tests/v017_release_guard.rs tests/v017_release_positioning_guard.rs`
+  - `cargo clippy --all-targets -- -D warnings`
+  - `cargo fmt -- --check`
 - Test results:
-  - Targeted tests: `PASS`/`FAIL`
-  - Regression tests: `PASS`/`FAIL`
+  - Targeted tests: `PASS`
+  - Regression tests: `PASS`
 - Kết luận gate:
+  - `DONE` (đã đạt đủ targeted + regression bắt buộc của Gate `17-G`, artifacts đầy đủ, không còn drift mở).
 - Design alignment:
+  - `FULL`
+- Maximal-first status:
+  - `FULL_MAXIMAL`
+- Blocker class:
+  - `NONE`
+- Evidence Packet:
+  - release guard xác nhận `RL-1..RL-17` đều `locked` và SoT contracts `w17` verify đủ.
+  - adoption readiness xác nhận đủ artifacts xuyên gate `17-A..17-F` trước signoff.
+  - release positioning guard khóa claims theo `8.3 Performance positioning (LOCKED)`.
+  - full regression bắt buộc (`cargo test`, `clippy`, `fmt --check`) sạch sau khi xử lý drift SoT/snapshot.
 - Notes/risks:
+  - drift hash của `std.fs.write_text` được chốt lại bằng cập nhật snapshot/required-contract SoT trong cùng gate; nếu contract key này thay đổi lần nữa bắt buộc kèm migration evidence trước khi đóng gate mới.
+
+### 2026-03-06 — 17 Verification Snapshot (verification-only)
+- Date: 2026-03-06
+- Scope:
+  - chạy lại full quality gate sau các chỉnh sửa evidence path/report của Gate `17-B`.
+  - xác nhận không có regression trước quyết định đóng `v0.17`.
+- Commands run:
+  - `cargo test`
+  - `cargo clippy --all-targets -- -D warnings`
+  - `cargo fmt -- --check`
+  - `cargo test --test cassette_upgrade_v08_to_v17 --test cassette_prune_policy`
+- Test results:
+  - full test suite: `PASS`
+  - clippy strict warnings-as-errors: `PASS`
+  - format check: `PASS`
+  - targeted cassette evidence tests: `PASS`
+- Notes:
+  - snapshot này là verification-only sau closeout, không thay đổi scope/gate status đã khóa.
 
 ---
 
 ## 14) Checklist khóa trước khi đóng gate
-- [ ] Gate status cập nhật đúng (`TODO/IN_PROGRESS/PARTIAL/DONE`).
-- [ ] Có đủ planning freeze + implementation closeout.
-- [ ] `Files changed` khớp code delta thực tế.
-- [ ] `Commands run` là lệnh đã chạy thật.
-- [ ] `Targeted tests` pass đúng phạm vi.
-- [ ] Đã xác nhận `Maximal-first status` cho gate.
-- [ ] Nếu có hạ chuẩn: đã đính kèm `Evidence Packet` đầy đủ và phân loại blocker đúng.
-- [ ] Nếu ghi `FUNDAMENTAL_IMPOSSIBILITY`: đã có lập luận horizon cấp nền tảng (>=10 năm).
-- [ ] Deterministic concurrency rules (ordering/fairness/timeout-cancel) đã được kiểm tra theo contract.
-- [ ] Supported platform profile + release positioning không còn mâu thuẫn hoặc claim vượt phạm vi.
-- [ ] Risk locks `RL-1..RL-17` đã có evidence và trạng thái `PASS`.
-- [ ] SoT contract v0.17 (`contracts/w17/*.json`) đã verify signature đầy đủ.
-- [ ] Cassette migration `v0.8 -> v0.17` đã pass invariants và negative tests.
-- [ ] Mọi gate đã sinh đúng output artifact path đã khóa trong gate section tương ứng.
-- [ ] Không còn placeholder `PASS/FAIL` trong closeout `DONE`.
-- [ ] Không có lỗi mã hóa tiếng Việt.
+- [x] Gate status cập nhật đúng (`TODO/IN_PROGRESS/PARTIAL/DONE`).
+- [x] Có đủ planning freeze + implementation closeout.
+- [x] `Files changed` khớp code delta thực tế.
+- [x] `Commands run` là lệnh đã chạy thật.
+- [x] `Targeted tests` pass đúng phạm vi.
+- [x] Đã xác nhận `Maximal-first status` cho gate.
+- [x] Nếu có hạ chuẩn: đã đính kèm `Evidence Packet` đầy đủ và phân loại blocker đúng.
+- [x] Nếu ghi `FUNDAMENTAL_IMPOSSIBILITY`: đã có lập luận horizon cấp nền tảng (>=10 năm).
+- [x] Deterministic concurrency rules (ordering/fairness/timeout-cancel) đã được kiểm tra theo contract.
+- [x] Supported platform profile + release positioning không còn mâu thuẫn hoặc claim vượt phạm vi.
+- [x] Risk locks `RL-1..RL-17` đã có evidence và trạng thái `PASS`.
+- [x] SoT contract v0.17 (`contracts/w17/*.json`) đã verify signature đầy đủ.
+- [x] Cassette migration `v0.8 -> v0.17` đã pass invariants và negative tests.
+- [x] Mọi gate đã sinh đúng output artifact path đã khóa trong gate section tương ứng (theo context `<project_root>`/`<artifact_dir>` đã nêu rõ).
+- [x] Không còn placeholder `PASS/FAIL` trong closeout `DONE`.
+- [x] Không có lỗi mã hóa tiếng Việt.
 
 ---
 

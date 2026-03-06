@@ -1,0 +1,32 @@
+{
+  "schema": "ocl.w17.pack_abi_spec.v1",
+  "contract_id": "w17.pack_abi_spec",
+  "version": "v1",
+  "hasher_version": "sha256-v1",
+  "boundaries": [
+    {
+      "boundary_id": "pack_boundary_native_cap_v1",
+      "status": "required"
+    },
+    {
+      "boundary_id": "pack_boundary_wasi_v1",
+      "status": "required"
+    }
+  ],
+  "adapter_interface": {
+    "hooks": [
+      "observe",
+      "commit"
+    ],
+    "result_contract": "Result4 + RC mapping",
+    "permission_schema_declaration_required": true
+  },
+  "strict_lane_policy": {
+    "locked_v071_requires_signed_attested_trusted_pack": true,
+    "untrusted_pack_behavior": "fail-honest-or-quarantine-only"
+  },
+  "laundering_defense": {
+    "enforcement_scope": "call-site-edge",
+    "proxy_bypass_forbidden": true
+  }
+}

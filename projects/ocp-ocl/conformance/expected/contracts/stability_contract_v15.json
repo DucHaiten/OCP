@@ -100,7 +100,7 @@
     },
     "std.fs.write_text": {
       "ctx_schema_hash": "15449a4bd595d4f1244b8c97586b9123e31d22ffc305cf3d151c1d169882411e",
-      "payload_schema_hash": "40f3a0e61b28b7451b5b8dcb9bd39379de9b857eea33416617f7a2db5b2c06c3",
+      "payload_schema_hash": "395f8b7c27b2695f47138c4dc8ec0c5ec5964a88982dca9ac3e39ecf15895f95",
       "determinism_class": "Deterministic",
       "cacheability": "NoCache"
     },

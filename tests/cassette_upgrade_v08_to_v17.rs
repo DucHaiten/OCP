@@ -14,10 +14,16 @@ fn seed_v08_cassette(artifact: &std::path::Path) {
         "{\"id\":\"e2\",\"type\":\"wallclock\",\"unix_ms\":2}\n"
     );
     fs::write(cassette_dir.join("cassette.jsonl"), jsonl).expect("write cassette.jsonl");
-    fs::write(cassette_dir.join("cassette_index.json"), "{\"call_id_to_entry_id\":{}}")
-        .expect("write cassette_index.json");
-    fs::write(cassette_dir.join("cassette_meta.toml"), "mode = \"record\"\n")
-        .expect("write cassette_meta.toml");
+    fs::write(
+        cassette_dir.join("cassette_index.json"),
+        "{\"call_id_to_entry_id\":{}}",
+    )
+    .expect("write cassette_index.json");
+    fs::write(
+        cassette_dir.join("cassette_meta.toml"),
+        "mode = \"record\"\n",
+    )
+    .expect("write cassette_meta.toml");
 }
 
 #[test]
@@ -27,13 +33,7 @@ fn cassette_upgrade_v08_to_v17_creates_block_store_layout() {
     seed_v08_cassette(&artifact);
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&[
-        "cassette",
-        "upgrade",
-        &artifact_s,
-        "--apply",
-        "--json",
-    ]);
+    let out = common::run_ocl_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
     let stdout = common::assert_success(&out);
     let parsed: JsonValue = serde_json::from_str(&stdout).expect("json output");
 
@@ -59,11 +59,23 @@ fn cassette_upgrade_v08_to_v17_creates_block_store_layout() {
         "missing cassette_blocks_index.json"
     );
     assert!(
-        artifact.join("cassette").join("cassette_storage_meta.toml").exists(),
+        artifact
+            .join("cassette")
+            .join("cassette_storage_meta.toml")
+            .exists(),
         "missing cassette_storage_meta.toml"
     );
     assert!(
         artifact.join("cassette").join("blocks").is_dir(),
         "missing blocks directory"
+    );
+    assert!(
+        root.join("target")
+            .join("ocl")
+            .join("w17")
+            .join("cassette")
+            .join("cassette_migration_report.json")
+            .exists(),
+        "missing cassette_migration_report.json"
     );
 }

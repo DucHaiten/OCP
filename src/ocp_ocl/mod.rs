@@ -3,6 +3,7 @@ pub mod audit;
 pub mod budget;
 pub mod compile_cache;
 pub mod ctx_contract;
+pub mod determinism;
 pub mod diag;
 pub mod exec;
 pub mod hir;
@@ -28,6 +29,15 @@ pub use compile_cache::{
 };
 pub use ctx_contract::{
     ConformanceProfile, CtxFieldType, CtxSchemaField, CORE_SEMANTIC_CTX_FIELDS,
+};
+pub use determinism::{
+    canonical_round_robin_order, canonical_task_event_order, canonicalize_env_entries,
+    canonicalize_iteration_paths, canonicalize_path_for_profile, canonicalize_text_boundary,
+    compare_bytes_lex, enforce_locale_timezone, enforce_supported_runtime_profile,
+    evaluate_entropy_policy, parse_supported_platform_profile, preserve_runtime_literal,
+    profile_matches_runtime, resolve_task_lifecycle, supported_platform_profile_ids,
+    DeterminismError, EntropyPolicyDecision, EntropySource, LogicalTaskEvent,
+    SupportedPlatformProfile, TaskLifecycleDecision,
 };
 pub use diag::{DiagPhase, Diagnostic, ErrorCode, ReasonCode};
 pub use exec::{

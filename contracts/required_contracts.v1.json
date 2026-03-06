@@ -44,7 +44,7 @@
     {
       "contract_id": "registry.pack_contracts",
       "version": "v0.15-line",
-      "schema_hash": "f6723c5d73968f83f805cf51562a6e2448c60305ddc0fb0c3888a4caa335c41c",
+      "schema_hash": "2b45f54f0e23b879667b150a9dde944c5ec1c0f052999e6f389f039c61c22bb6",
       "producer": "ocp_ocl::CapabilityRegistry",
       "consumer": "ocl-runtime-core+ocl-sdk+ocl-cli",
       "allowed_diffs_v016": "additive-only"

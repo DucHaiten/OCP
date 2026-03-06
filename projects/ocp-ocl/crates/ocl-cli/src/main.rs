@@ -12,26 +12,27 @@ use ocl_sdk::{
     build_oclpkg_with_lock, build_profile_from_trace, build_project_with_lock,
     build_run_id_deterministic, check_project_with_lock, compare_shadow_traces_v1,
     compose_phenotype, default_conformance_manifest_path, enforce_universe_match_v1,
-    fetch_artifact, fmt_project, init_cosmos_v1, init_project, install_organs_v1,
-    list_kits_from_cosmos_v1, parse_conformance_manifest_v1, parse_shadow_policy_v1,
-    publish_artifact, read_profile_json, read_trace_jsonl, render_conformance_report_json,
-    render_profile_view, resolve_deps_v3, resolve_domain_selection_v1, resolve_universe_v1,
-    resolve_view_selection_v1, run_artifact, run_conformance_v1, run_kit_doctor_v1,
-    run_project_with_engine_and_lock, run_project_with_shadow_compare,
-    run_project_with_trace_engine_and_lock, run_project_with_trace_engine_config_and_lock,
-    run_reactor_service_with_lock, run_reactor_service_with_shadow_compare,
-    run_reactor_service_with_trace_engine_and_lock, sign_deps_lock_v3_v15, sign_oclpkg,
-    sync_cosmos_lock_v1, sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1,
-    sync_policy_lock_v1, test_project_with_lock, trace_required_digest, verify_assembly,
-    verify_build_attestation_v15, verify_build_repro_v15, verify_deps_lock_v3,
-    verify_deps_lock_v3_signature_v15, verify_deps_signing_and_trust_v10, verify_organs_lock_v1,
-    verify_plugin_lock_v1, verify_supply_artifact, write_conformance_report_json,
-    write_permission_diff_report_v15, write_permission_doctor_report_v17,
-    write_permission_fix_plan_v17, write_permission_snapshot_v15, write_profile_json,
-    write_shadow_compare_artifacts_v1, write_trace_jsonl, ConformanceManifestV1,
-    ConformanceRunOptionsV1, InputEnvelopeV1, PermissionFixApplyOptionsV17, ProfileViewOptions,
-    ReactorRuntimeMode, ReactorServiceOptions, SdkError, ShadowOptionsV1, TraceEventV1,
-    TraceRunSummary,
+    fetch_artifact, fmt_project, init_cosmos_v1, init_project, inspect_contract_json_v17,
+    install_organs_v1, list_kits_from_cosmos_v1, parse_conformance_manifest_v1,
+    parse_shadow_policy_v1, publish_artifact, read_profile_json, read_trace_jsonl,
+    render_conformance_report_json, render_profile_view, resolve_deps_v3,
+    resolve_domain_selection_v1, resolve_universe_v1, resolve_view_selection_v1, run_artifact,
+    run_conformance_v1, run_kit_doctor_v1, run_project_with_engine_and_lock,
+    run_project_with_shadow_compare, run_project_with_trace_engine_and_lock,
+    run_project_with_trace_engine_config_and_lock, run_reactor_service_with_lock,
+    run_reactor_service_with_shadow_compare, run_reactor_service_with_trace_engine_and_lock,
+    sign_contract_json_v17, sign_deps_lock_v3_v15, sign_oclpkg, sync_cosmos_lock_v1,
+    sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1, sync_policy_lock_v1,
+    test_project_with_lock, trace_required_digest, verify_assembly, verify_build_attestation_v15,
+    verify_build_repro_v15, verify_contract_json_signature_v17, verify_contract_signature_file_v17,
+    verify_deps_lock_v3, verify_deps_lock_v3_signature_v15, verify_deps_signing_and_trust_v10,
+    verify_organs_lock_v1, verify_plugin_lock_v1, verify_supply_artifact,
+    write_conformance_report_json, write_permission_diff_report_v15,
+    write_permission_doctor_report_v17, write_permission_fix_plan_v17,
+    write_permission_snapshot_v15, write_profile_json, write_shadow_compare_artifacts_v1,
+    write_trace_jsonl, ConformanceManifestV1, ConformanceRunOptionsV1, InputEnvelopeV1,
+    PermissionFixApplyOptionsV17, ProfileViewOptions, ReactorRuntimeMode, ReactorServiceOptions,
+    SdkError, ShadowOptionsV1, TraceEventV1, TraceRunSummary,
 };
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
@@ -3324,7 +3325,81 @@ fn run_cli(args: &[String]) -> i32 {
             }
         }
         "verify" => {
-            if args.get(1).map(String::as_str) == Some("--attest") {
+            if args.get(1).map(String::as_str) == Some("--contract-sign") {
+                let Some(contract_path) = args.get(2) else {
+                    eprintln!("usage: ocl verify --contract-sign <contract.json> [--signer-id <id>] [--trust-epoch <u32>]");
+                    return 2;
+                };
+                let signer_id = parse_string_flag(args, "--signer-id")
+                    .unwrap_or_else(|| "w17-default".to_string());
+                let trust_epoch = parse_u32_flag(args, "--trust-epoch").unwrap_or(1) as u64;
+                match sign_contract_json_v17(Path::new(contract_path), &signer_id, trust_epoch) {
+                    Ok(sig_path) => {
+                        println!(
+                            "verify contract sign ok (contract={}, sig={}, signer_id={}, trust_epoch={})",
+                            contract_path,
+                            sig_path.display(),
+                            signer_id,
+                            trust_epoch
+                        );
+                        0
+                    }
+                    Err(err) => {
+                        eprintln!("{err}");
+                        1
+                    }
+                }
+            } else if args.get(1).map(String::as_str) == Some("--contract") {
+                let Some(contract_path) = args.get(2) else {
+                    eprintln!("usage: ocl verify --contract <contract.json>");
+                    return 2;
+                };
+                match inspect_contract_json_v17(Path::new(contract_path)) {
+                    Ok(summary) => {
+                        println!(
+                            "verify contract ok (contract_id={}, version={}, hash_sha256={}, sig={})",
+                            summary.contract_id,
+                            summary.version,
+                            summary.contract_hash_sha256,
+                            summary.signature_path.display()
+                        );
+                        0
+                    }
+                    Err(err) => {
+                        eprintln!("{err}");
+                        1
+                    }
+                }
+            } else if args.get(1).map(String::as_str) == Some("--contract-signature") {
+                let Some(sig_or_contract) = args.get(2) else {
+                    eprintln!(
+                        "usage: ocl verify --contract-signature <contract.json.sig|contract.json>"
+                    );
+                    return 2;
+                };
+                let path = Path::new(sig_or_contract);
+                let result = if sig_or_contract.ends_with(".sig") {
+                    verify_contract_signature_file_v17(path)
+                } else {
+                    verify_contract_json_signature_v17(path)
+                };
+                match result {
+                    Ok(summary) => {
+                        println!(
+                            "verify contract signature ok (contract_id={}, hash_sha256={}, signer_id={}, trust_epoch={})",
+                            summary.contract_id,
+                            summary.contract_hash_sha256,
+                            summary.signer_id.as_deref().unwrap_or("-"),
+                            summary.trust_epoch.unwrap_or(0)
+                        );
+                        0
+                    }
+                    Err(err) => {
+                        eprintln!("{err}");
+                        1
+                    }
+                }
+            } else if args.get(1).map(String::as_str) == Some("--attest") {
                 let Some(artifact_dir) = args.get(2) else {
                     eprintln!("usage: ocl verify --attest <artifact_dir>");
                     return 2;
@@ -3369,12 +3444,22 @@ fn run_cli(args: &[String]) -> i32 {
             } else {
                 let Some(path) = args.get(1) else {
                     eprintln!("usage: ocl verify <project_dir> --phenotype <file> [--registry <dir>] [--locked] [--universe <id>]");
+                    eprintln!("       ocl verify --contract-sign <contract.json> [--signer-id <id>] [--trust-epoch <u32>]");
+                    eprintln!("       ocl verify --contract <contract.json>");
+                    eprintln!(
+                        "       ocl verify --contract-signature <contract.json.sig|contract.json>"
+                    );
                     eprintln!("       ocl verify --attest <artifact_dir>");
                     eprintln!("       ocl verify --repro <artifact_dir>");
                     return 2;
                 };
                 let Some(phenotype) = parse_string_flag(args, "--phenotype") else {
                     eprintln!("usage: ocl verify <project_dir> --phenotype <file> [--registry <dir>] [--locked] [--universe <id>]");
+                    eprintln!("       ocl verify --contract-sign <contract.json> [--signer-id <id>] [--trust-epoch <u32>]");
+                    eprintln!("       ocl verify --contract <contract.json>");
+                    eprintln!(
+                        "       ocl verify --contract-signature <contract.json.sig|contract.json>"
+                    );
                     eprintln!("       ocl verify --attest <artifact_dir>");
                     eprintln!("       ocl verify --repro <artifact_dir>");
                     return 2;
@@ -4276,15 +4361,11 @@ fn run_cassette_command(args: &[String]) -> i32 {
 
 fn run_budget_command(args: &[String]) -> i32 {
     let Some(subcmd) = args.get(1).map(String::as_str) else {
-        eprintln!(
-            "usage: ocl budget <analyze|doctor> <artifact_dir|audit.jsonl> [--json]"
-        );
+        eprintln!("usage: ocl budget <analyze|doctor> <artifact_dir|audit.jsonl> [--json]");
         return 2;
     };
     let Some(path) = args.get(2) else {
-        eprintln!(
-            "usage: ocl budget <analyze|doctor> <artifact_dir|audit.jsonl> [--json]"
-        );
+        eprintln!("usage: ocl budget <analyze|doctor> <artifact_dir|audit.jsonl> [--json]");
         return 2;
     };
     let json_mode = has_flag(args, "--json");
@@ -4340,10 +4421,7 @@ fn run_budget_command(args: &[String]) -> i32 {
                             .get("caller")
                             .and_then(JsonValue::as_str)
                             .unwrap_or("-");
-                        let key = item
-                            .get("key")
-                            .and_then(JsonValue::as_str)
-                            .unwrap_or("-");
+                        let key = item.get("key").and_then(JsonValue::as_str).unwrap_or("-");
                         let pressure = item
                             .get("budget_pressure_count")
                             .and_then(JsonValue::as_u64)
@@ -4355,9 +4433,7 @@ fn run_budget_command(args: &[String]) -> i32 {
             0
         }
         _ => {
-            eprintln!(
-                "usage: ocl budget <analyze|doctor> <artifact_dir|audit.jsonl> [--json]"
-            );
+            eprintln!("usage: ocl budget <analyze|doctor> <artifact_dir|audit.jsonl> [--json]");
             2
         }
     }
@@ -4427,7 +4503,10 @@ fn run_cassette_stats_command_v17(args: &[String]) -> i32 {
                     "referenced_blocks={}",
                     json_u64_or_zero(&report, "referenced_blocks")
                 );
-                println!("orphan_blocks={}", json_u64_or_zero(&report, "orphan_blocks"));
+                println!(
+                    "orphan_blocks={}",
+                    json_u64_or_zero(&report, "orphan_blocks")
+                );
                 println!("bytes_total={}", json_u64_or_zero(&report, "bytes_total"));
                 println!("report={}", report_path.display());
             }
@@ -4442,13 +4521,17 @@ fn run_cassette_stats_command_v17(args: &[String]) -> i32 {
 
 fn run_cassette_prune_command_v17(args: &[String]) -> i32 {
     let Some(path) = args.get(2) else {
-        eprintln!("usage: ocl cassette prune <artifact_dir> --plan|--apply [--ttl-days <u32>] [--json]");
+        eprintln!(
+            "usage: ocl cassette prune <artifact_dir> --plan|--apply [--ttl-days <u32>] [--json]"
+        );
         return 2;
     };
     let plan_mode = has_flag(args, "--plan");
     let apply_mode = has_flag(args, "--apply");
     if plan_mode == apply_mode {
-        eprintln!("usage: ocl cassette prune <artifact_dir> --plan|--apply [--ttl-days <u32>] [--json]");
+        eprintln!(
+            "usage: ocl cassette prune <artifact_dir> --plan|--apply [--ttl-days <u32>] [--json]"
+        );
         return 2;
     }
     let ttl_days = parse_u32_flag(args, "--ttl-days");
@@ -4481,8 +4564,7 @@ fn run_cassette_prune_command_v17(args: &[String]) -> i32 {
                 if json_mode {
                     println!(
                         "{}",
-                        serde_json::to_string_pretty(&payload)
-                            .unwrap_or_else(|_| "{}".to_string())
+                        serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".to_string())
                     );
                 } else {
                     println!("cassette prune apply");
@@ -4724,12 +4806,13 @@ fn read_cassette_block_index_v17(
     if !index_path.exists() {
         return Ok(BTreeMap::new());
     }
-    let parsed: JsonValue = serde_json::from_str(&fs::read_to_string(&index_path)?).map_err(|err| {
-        SdkError::MissingProject(format!(
-            "V-CASSETTE-INDEX: invalid json {} ({err})",
-            index_path.display()
-        ))
-    })?;
+    let parsed: JsonValue =
+        serde_json::from_str(&fs::read_to_string(&index_path)?).map_err(|err| {
+            SdkError::MissingProject(format!(
+                "V-CASSETTE-INDEX: invalid json {} ({err})",
+                index_path.display()
+            ))
+        })?;
     let Some(entries) = parsed.get("entry_refs").and_then(JsonValue::as_array) else {
         return Err(SdkError::MissingProject(format!(
             "V-CASSETTE-INDEX: missing entry_refs in {}",
@@ -4813,7 +4896,8 @@ fn build_cassette_upgrade_plan_v17(
     max_entries: usize,
     max_block_bytes: usize,
 ) -> Result<JsonValue, SdkError> {
-    let entries = read_cassette_entries_for_upgrade_v17(artifact_dir, max_entries, max_block_bytes)?;
+    let entries =
+        read_cassette_entries_for_upgrade_v17(artifact_dir, max_entries, max_block_bytes)?;
     let mut unique_blocks = BTreeSet::<String>::new();
     let mut total_entry_bytes = 0u64;
     for entry in &entries {
@@ -4908,7 +4992,8 @@ fn apply_cassette_upgrade_v17(
     max_entries: usize,
     max_block_bytes: usize,
 ) -> Result<(JsonValue, PathBuf), SdkError> {
-    let entries = read_cassette_entries_for_upgrade_v17(artifact_dir, max_entries, max_block_bytes)?;
+    let entries =
+        read_cassette_entries_for_upgrade_v17(artifact_dir, max_entries, max_block_bytes)?;
     let blocks_dir = artifact_dir.join("cassette").join(CASSETTE_BLOCKS_DIR_V17);
     fs::create_dir_all(&blocks_dir)?;
 
@@ -4966,11 +5051,8 @@ fn apply_cassette_upgrade_v17(
         "index_path": index_path.to_string_lossy(),
         "meta_path": meta_path.to_string_lossy(),
     });
-    let report_path = write_w17_cassette_report_v17(
-        artifact_dir,
-        "cassette_migration_report.json",
-        &payload,
-    )?;
+    let report_path =
+        write_w17_cassette_report_v17(artifact_dir, "cassette_migration_report.json", &payload)?;
     Ok((payload, report_path))
 }
 
@@ -5097,10 +5179,7 @@ fn build_cassette_stats_report_v17(artifact_dir: &Path) -> Result<(JsonValue, Pa
             referenced.insert(block_id.clone());
         }
     }
-    let orphan_blocks = blocks
-        .keys()
-        .filter(|id| !referenced.contains(*id))
-        .count() as u64;
+    let orphan_blocks = blocks.keys().filter(|id| !referenced.contains(*id)).count() as u64;
     let bytes_total = {
         let mut total = 0u64;
         for path in blocks.values() {
@@ -5119,11 +5198,8 @@ fn build_cassette_stats_report_v17(artifact_dir: &Path) -> Result<(JsonValue, Pa
         "orphan_blocks": orphan_blocks,
         "bytes_total": bytes_total,
     });
-    let report_path = write_w17_cassette_report_v17(
-        artifact_dir,
-        "cassette_operability_report.json",
-        &payload,
-    )?;
+    let report_path =
+        write_w17_cassette_report_v17(artifact_dir, "cassette_operability_report.json", &payload)?;
     Ok((payload, report_path))
 }
 
@@ -5141,27 +5217,17 @@ fn build_budget_analyze_report_v17(events: &[TraceViewEventV11]) -> JsonValue {
             .callsite_package_id
             .clone()
             .unwrap_or_else(|| "root".to_string());
-        let key = event
-            .base
-            .key
-            .clone()
-            .unwrap_or_else(|| "-".to_string());
-        let kind = event
-            .base
-            .kind
-            .clone()
-            .unwrap_or_else(|| "-".to_string());
-        let reason = event
-            .base
-            .reason
-            .clone()
-            .unwrap_or_else(|| "-".to_string());
+        let key = event.base.key.clone().unwrap_or_else(|| "-".to_string());
+        let kind = event.base.kind.clone().unwrap_or_else(|| "-".to_string());
+        let reason = event.base.reason.clone().unwrap_or_else(|| "-".to_string());
         let edge_key = (caller.clone(), key.clone());
-        let entry = edge_map.entry(edge_key).or_insert_with(|| BudgetEdgeAggV17 {
-            caller: caller.clone(),
-            key: key.clone(),
-            ..BudgetEdgeAggV17::default()
-        });
+        let entry = edge_map
+            .entry(edge_key)
+            .or_insert_with(|| BudgetEdgeAggV17 {
+                caller: caller.clone(),
+                key: key.clone(),
+                ..BudgetEdgeAggV17::default()
+            });
         entry.observe_count = entry.observe_count.saturating_add(1);
         if kind == "insufficient" {
             entry.insufficient_count = entry.insufficient_count.saturating_add(1);
@@ -5224,10 +5290,7 @@ fn build_budget_doctor_report_v17(analyze: &JsonValue) -> JsonValue {
                 .get("caller")
                 .and_then(JsonValue::as_str)
                 .unwrap_or("root");
-            let key = edge
-                .get("key")
-                .and_then(JsonValue::as_str)
-                .unwrap_or("-");
+            let key = edge.get("key").and_then(JsonValue::as_str).unwrap_or("-");
             issues.push(json!({
                 "caller": caller,
                 "key": key,

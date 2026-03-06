@@ -1,0 +1,23 @@
+{
+  "schema": "ocl.w17.canonical_serialization_spec.v1",
+  "contract_id": "w17.canonical_serialization_spec",
+  "version": "v1",
+  "hasher_version": "sha256-v1",
+  "canonical_json": {
+    "key_order": "utf8-byte-lexicographic",
+    "array_order": "preserve-input-order",
+    "whitespace": "none",
+    "number_format": "serde_json_stable",
+    "encoding": "UTF-8"
+  },
+  "canonical_text": {
+    "strip_bom": true,
+    "newline": "LF",
+    "unicode_boundary_policy": "canonicalize-parser-serializer-boundary"
+  },
+  "wire_contract": {
+    "bytes_on_wire_must_be_canonical": true,
+    "schema_version_required": true,
+    "presentation_vs_semantic_split": true
+  }
+}

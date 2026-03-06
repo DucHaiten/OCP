@@ -13,19 +13,19 @@ fn seed_and_upgrade(artifact: &std::path::Path) {
         "{\"id\":\"e1\",\"type\":\"wallclock\",\"unix_ms\":1}\n",
     )
     .expect("write cassette.jsonl");
-    fs::write(cassette_dir.join("cassette_index.json"), "{\"call_id_to_entry_id\":{}}")
-        .expect("write cassette_index.json");
-    fs::write(cassette_dir.join("cassette_meta.toml"), "mode = \"record\"\n")
-        .expect("write cassette_meta.toml");
+    fs::write(
+        cassette_dir.join("cassette_index.json"),
+        "{\"call_id_to_entry_id\":{}}",
+    )
+    .expect("write cassette_index.json");
+    fs::write(
+        cassette_dir.join("cassette_meta.toml"),
+        "mode = \"record\"\n",
+    )
+    .expect("write cassette_meta.toml");
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&[
-        "cassette",
-        "upgrade",
-        &artifact_s,
-        "--apply",
-        "--json",
-    ]);
+    let out = common::run_ocl_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
     common::assert_success(&out);
 }
 

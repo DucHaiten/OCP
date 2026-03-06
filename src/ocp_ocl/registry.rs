@@ -130,6 +130,11 @@ impl CapabilityRegistry {
             "std.net.http.request".to_string(),
             vec!["method".to_string(), "url".to_string()],
         );
+        ctx_required.insert("std.http.client.get".to_string(), vec!["url".to_string()]);
+        ctx_required.insert(
+            "std.http.client.post".to_string(),
+            vec!["url".to_string(), "body".to_string()],
+        );
         ctx_required.insert("std.json.parse".to_string(), vec!["raw".to_string()]);
         ctx_required.insert("std.json.emit".to_string(), vec!["value".to_string()]);
         ctx_required.insert("std.kv.get".to_string(), vec!["key".to_string()]);
@@ -158,6 +163,14 @@ impl CapabilityRegistry {
         ctx_required.insert(
             "std.db.exec".to_string(),
             vec!["dsn".to_string(), "sql".to_string()],
+        );
+        ctx_required.insert(
+            "std.queue.bus.publish".to_string(),
+            vec!["topic".to_string(), "payload".to_string()],
+        );
+        ctx_required.insert(
+            "std.queue.bus.consume".to_string(),
+            vec!["topic".to_string()],
         );
         ctx_required.insert("std.ui.frame_info".to_string(), Vec::new());
         ctx_required.insert("std.ui.input".to_string(), vec!["cap".to_string()]);
@@ -220,6 +233,10 @@ impl CapabilityRegistry {
         commit_allowed.insert("std.time.wallclock.now".to_string(), false);
         commit_allowed.insert("std.proc.exec".to_string(), false);
         commit_allowed.insert("std.net.http.request".to_string(), false);
+        commit_allowed.insert("std.http.client.get".to_string(), false);
+        commit_allowed.insert("std.http.client.post".to_string(), false);
+        commit_allowed.insert("std.queue.bus.publish".to_string(), false);
+        commit_allowed.insert("std.queue.bus.consume".to_string(), false);
         commit_allowed.insert("std.game.state_delta".to_string(), true);
         commit_allowed.insert("std.shadow.run".to_string(), false);
         commit_allowed.insert("std.shadow.search".to_string(), false);
@@ -816,10 +833,7 @@ impl CapabilityRegistry {
                     ("path", FieldSpec::required(SchemaType::String)),
                     ("text", FieldSpec::required(SchemaType::String)),
                     ("overwrite", FieldSpec::required(SchemaType::Bool)),
-                    (
-                        "precondition_exists",
-                        FieldSpec::optional(SchemaType::Bool),
-                    ),
+                    ("precondition_exists", FieldSpec::optional(SchemaType::Bool)),
                     ("precondition_len", FieldSpec::optional(SchemaType::Int)),
                     ("pending_write_id", FieldSpec::required(SchemaType::String)),
                 ]),
@@ -1462,8 +1476,12 @@ impl CapabilityRegistry {
 
         for key in [
             "std.net.http.request",
+            "std.http.client.get",
+            "std.http.client.post",
             "std.proc.exec",
             "std.time.wallclock.now",
+            "std.queue.bus.publish",
+            "std.queue.bus.consume",
         ] {
             determinism_classes.insert(key.to_string(), DeterminismClass::CassetteBased);
         }

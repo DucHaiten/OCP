@@ -1,0 +1,120 @@
+{
+  "schema": "ocl.w17.risk_lock_policies.v1",
+  "contract_id": "w17.risk_lock_policies",
+  "version": "v1",
+  "hasher_version": "sha256-v1",
+  "lane_literals": [
+    "locked_v071",
+    "locked_v06",
+    "quarantine"
+  ],
+  "risk_locks": [
+    {
+      "id": "RL-1",
+      "title": "Permission rubber-stamping guard",
+      "gate": "17-A",
+      "status": "locked"
+    },
+    {
+      "id": "RL-2",
+      "title": "Capability diamond budget composition",
+      "gate": "17-B",
+      "status": "locked"
+    },
+    {
+      "id": "RL-3",
+      "title": "TOCTOU observe->commit precondition",
+      "gate": "17-B",
+      "status": "locked"
+    },
+    {
+      "id": "RL-4",
+      "title": "Hash taxonomy anti-brittleness",
+      "gate": "17-D",
+      "status": "locked"
+    },
+    {
+      "id": "RL-5",
+      "title": "Host adapter CVE containment",
+      "gate": "17-E",
+      "status": "locked"
+    },
+    {
+      "id": "RL-6",
+      "title": "Unicode/encoding/newline canonicalization",
+      "gate": "17-C",
+      "status": "locked"
+    },
+    {
+      "id": "RL-7",
+      "title": "Iteration-order nondeterminism",
+      "gate": "17-C",
+      "status": "locked"
+    },
+    {
+      "id": "RL-8",
+      "title": "Entropy leakage from host layer",
+      "gate": "17-C",
+      "status": "locked"
+    },
+    {
+      "id": "RL-9",
+      "title": "Key lifecycle rotation/revocation",
+      "gate": "17-D",
+      "status": "locked"
+    },
+    {
+      "id": "RL-10",
+      "title": "Downgrade/mix-and-match defense",
+      "gate": "17-D",
+      "status": "locked"
+    },
+    {
+      "id": "RL-11",
+      "title": "Capability laundering defense",
+      "gate": "17-E",
+      "status": "locked"
+    },
+    {
+      "id": "RL-12",
+      "title": "Privacy leakage via artifacts",
+      "gate": "17-B",
+      "status": "locked"
+    },
+    {
+      "id": "RL-13",
+      "title": "Deterministic serialization stability",
+      "gate": "17-D",
+      "status": "locked"
+    },
+    {
+      "id": "RL-14",
+      "title": "Error taxonomy contract stability",
+      "gate": "17-A",
+      "status": "locked"
+    },
+    {
+      "id": "RL-15",
+      "title": "DoS/resource amplification bounds",
+      "gate": "17-B",
+      "status": "locked"
+    },
+    {
+      "id": "RL-16",
+      "title": "Reproducible build toolchain drift",
+      "gate": "17-D",
+      "status": "locked"
+    },
+    {
+      "id": "RL-17",
+      "title": "Boundary correctness traversal/symlink",
+      "gate": "17-B",
+      "status": "locked"
+    }
+  ],
+  "strict_lane_defaults": {
+    "wildcard_sensitive_permissions": "deny",
+    "policy_downgrade": "deny",
+    "entropy_host_sources": "deny"
+  }
+}

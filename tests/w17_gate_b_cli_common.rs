@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -54,7 +54,7 @@ pub fn assert_failed_with(output: &Output, needle: &str) {
     );
 }
 
-pub fn ensure_artifact_layout(root: &PathBuf) -> PathBuf {
+pub fn ensure_artifact_layout(root: &Path) -> PathBuf {
     let artifact = root.join(".ocl_artifacts").join("run_demo");
     std::fs::create_dir_all(artifact.join("cassette")).expect("create cassette dir");
     artifact

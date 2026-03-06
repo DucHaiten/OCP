@@ -1,0 +1,32 @@
+{
+  "schema": "ocl.w17.semantic_hash_taxonomy.v1",
+  "contract_id": "w17.semantic_hash_taxonomy",
+  "version": "v1",
+  "hasher_version": "sha256-v1",
+  "semantic_hash_version": "semantic_hash_v1",
+  "artifact_hash_version": "artifact_hash_v1",
+  "semantic_hash_inputs": [
+    "canonical_ast_or_ir",
+    "canonical_runtime_contract_bytes",
+    "lane_profile",
+    "lock_hash",
+    "trust_hash"
+  ],
+  "semantic_hash_excludes": [
+    "diagnostic_text",
+    "local_absolute_paths",
+    "pretty_print_formatting",
+    "non_semantic_telemetry"
+  ],
+  "artifact_hash_inputs": [
+    "artifact_layout_bytes",
+    "packaging_metadata",
+    "toolchain_manifest",
+    "diagnostic_text_if_present"
+  ],
+  "signature_contract": {
+    "signature_schema_version": "1",
+    "semantic_hash_only_for_behavior_claims": true,
+    "artifact_hash_for_distribution_integrity": true
+  }
+}

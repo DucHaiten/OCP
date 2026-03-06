@@ -1,0 +1,32 @@
+{
+  "schema": "ocl.w17.cassette_storage_contract.v1",
+  "contract_id": "w17.cassette_storage_contract",
+  "version": "v1",
+  "hasher_version": "sha256-v1",
+  "cassette_schema_version": 17,
+  "block_store_version": 1,
+  "layout": {
+    "logical_entries_file": "cassette.jsonl",
+    "block_dir": "blocks/",
+    "index_file": "cassette_index.json",
+    "metadata_file": "cassette_meta.toml"
+  },
+  "bounded_controls": {
+    "max_cassette_bytes": "policy-driven",
+    "max_entries": "policy-driven",
+    "max_block_bytes": "policy-driven",
+    "max_total_blocks": "policy-driven",
+    "ttl_days": "maintenance-only"
+  },
+  "determinism_rules": {
+    "missing_block_behavior": "fail-honest",
+    "index_mismatch_behavior": "fail-honest",
+    "prune_gc_must_be_deterministic": true,
+    "ttl_affects_runtime_semantics": false
+  },
+  "migration": {
+    "from_version": "v0.8",
+    "required_command": "ocl cassette upgrade --plan|--apply",
+    "invariant": "record->replay signature equality"
+  }
+}

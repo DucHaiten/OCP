@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 
 mod attestation_v15;
 mod perm_v15;
+mod w17;
 
 pub mod m4;
 pub mod w1;
@@ -43,6 +44,22 @@ pub use w1::{
     sync_cosmos_lock_v1, sync_policy_lock_v1, CosmosHiveV1, CosmosInitSummary,
     CosmosLockSyncSummary, CosmosLockV1, CosmosSpecV1, PolicyLockSyncSummary, PolicyLockV1,
     UniverseProfileV1, UniverseSelectionV1,
+};
+pub use w17::{
+    artifact_hash_from_bytes_v17, build_contract_signature_sha256_v17, canonical_json_string_v17,
+    canonical_json_value_v17, contract_sig_path_v17, enforce_build_env_allowlist_v17,
+    evaluate_adapter_cve_policy_v17, evaluate_capability_edge_v17, evaluate_downgrade_attempt_v17,
+    evaluate_pack_boundary_v17, evaluate_pack_trust_policy_v17, evaluate_trust_lifecycle_v17,
+    inspect_contract_json_v17, inspect_pack_abi_spec_v17, semantic_hash_from_bytes_v17,
+    sign_contract_json_v17, toolchain_digest_v17, verify_contract_json_signature_v17,
+    verify_contract_signature_file_v17, verify_w17_contract_set_v17, AdapterCveDecisionV17,
+    AdapterCveSeverityV17, CapabilityEdgeDecisionV17, ContractInspectSummaryV17,
+    ContractSetSummaryV17, DowngradeDecisionV17, PackAbiBoundaryRequirementV17,
+    PackAbiSpecSummaryV17, PackBoundaryDecisionV17, PackBoundaryV17, PackTrustDecisionV17,
+    ToolchainDigestInputV17, TrustKeyRecordV17, TrustLifecycleSummaryV17,
+    W17_ARTIFACT_HASH_VERSION, W17_HASHER_VERSION, W17_PACK_ABI_SCHEMA,
+    W17_PACK_BOUNDARY_NATIVE_CAP_V1, W17_PACK_BOUNDARY_WASI_V1, W17_REQUIRED_CONTRACT_FILES,
+    W17_SEMANTIC_HASH_VERSION, W17_SIGNATURE_SCHEMA, W17_SIGNATURE_SCHEMA_VERSION,
 };
 pub use w2::{
     admit_bridge_emit_v1, poll_bridge_event_v1, resolve_bridge_runtime_plan_v1,
@@ -153,7 +170,9 @@ pub struct ProjectPermissions {
     pub modules: HashMap<String, PermissionRules>,
     pub std_fs: Option<StdFsPermissionConfig>,
     pub std_net_http: Option<StdNetHttpPermissionConfig>,
+    pub std_db: Option<StdDbPermissionConfig>,
     pub std_kv: Option<StdKvPermissionConfig>,
+    pub std_queue: Option<StdQueuePermissionConfig>,
     pub std_time: Option<StdTimePermissionConfig>,
     pub std_proc: Option<StdProcPermissionConfig>,
     pub std_game: Option<StdGamePermissionConfig>,
@@ -210,6 +229,29 @@ impl Default for StdNetHttpPermissionConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StdDbPermissionConfig {
+    pub enabled: bool,
+    pub allow_dsn: Vec<String>,
+    pub allow_modes: Vec<String>,
+    pub max_rows: u32,
+    pub max_bytes: u64,
+    pub timeout_ms: u32,
+}
+
+impl Default for StdDbPermissionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            allow_dsn: Vec::new(),
+            allow_modes: vec!["read_query".to_string(), "write_exec".to_string()],
+            max_rows: 1_000,
+            max_bytes: 1_048_576,
+            timeout_ms: 5_000,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StdKvPermissionConfig {
     pub enabled: bool,
     pub max_keys: u32,
@@ -224,6 +266,27 @@ impl Default for StdKvPermissionConfig {
             max_keys: 5_000,
             max_value_bytes: 65_536,
             key_prefix: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StdQueuePermissionConfig {
+    pub enabled: bool,
+    pub allow_topics: Vec<String>,
+    pub max_inflight: u32,
+    pub max_payload_bytes: u64,
+    pub ack_required: bool,
+}
+
+impl Default for StdQueuePermissionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            allow_topics: Vec::new(),
+            max_inflight: 256,
+            max_payload_bytes: 65_536,
+            ack_required: true,
         }
     }
 }
@@ -923,6 +986,44 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
             continue;
         }
 
+        if current_section == "permissions.std_db" {
+            let cfg = out
+                .std_db
+                .get_or_insert_with(StdDbPermissionConfig::default);
+            match key {
+                "enabled" => {
+                    if let Some(parsed) = parse_bool_literal(scalar_value) {
+                        cfg.enabled = parsed;
+                    }
+                }
+                "allow_dsn" => {
+                    cfg.allow_dsn = values;
+                }
+                "allow_modes" => {
+                    cfg.allow_modes = values.into_iter().map(|v| v.to_ascii_lowercase()).collect();
+                }
+                "max_rows" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.max_rows = parsed.max(1);
+                    }
+                }
+                "max_bytes" => {
+                    if let Ok(parsed) = scalar_value.parse::<u64>() {
+                        cfg.max_bytes = parsed.max(1);
+                    }
+                }
+                "timeout_ms" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.timeout_ms = parsed.max(1);
+                    }
+                }
+                _ => {}
+            }
+            normalize_string_list(&mut cfg.allow_dsn);
+            normalize_string_list(&mut cfg.allow_modes);
+            continue;
+        }
+
         if current_section == "permissions.std_kv" {
             let cfg = out
                 .std_kv
@@ -952,6 +1053,40 @@ fn parse_permissions_from_manifest(manifest_text: &str) -> ProjectPermissions {
                 }
                 _ => {}
             }
+            continue;
+        }
+
+        if current_section == "permissions.std_queue" {
+            let cfg = out
+                .std_queue
+                .get_or_insert_with(StdQueuePermissionConfig::default);
+            match key {
+                "enabled" => {
+                    if let Some(parsed) = parse_bool_literal(scalar_value) {
+                        cfg.enabled = parsed;
+                    }
+                }
+                "allow_topics" => {
+                    cfg.allow_topics = values;
+                }
+                "max_inflight" => {
+                    if let Ok(parsed) = scalar_value.parse::<u32>() {
+                        cfg.max_inflight = parsed.max(1);
+                    }
+                }
+                "max_payload_bytes" => {
+                    if let Ok(parsed) = scalar_value.parse::<u64>() {
+                        cfg.max_payload_bytes = parsed.max(1);
+                    }
+                }
+                "ack_required" => {
+                    if let Some(parsed) = parse_bool_literal(scalar_value) {
+                        cfg.ack_required = parsed;
+                    }
+                }
+                _ => {}
+            }
+            normalize_string_list(&mut cfg.allow_topics);
             continue;
         }
 
@@ -1315,7 +1450,9 @@ fn compute_effective_permissions_for_dependency_v10(
         modules: HashMap::new(),
         std_fs: None,
         std_net_http: None,
+        std_db: None,
         std_kv: None,
+        std_queue: None,
         std_time: None,
         std_proc: None,
         std_game: None,
@@ -1371,6 +1508,20 @@ fn compute_effective_permissions_for_dependency_v10(
     }
 
     if let (Some(g), Some(r)) = (
+        granted.std_db.as_ref(),
+        requested.permissions.std_db.as_ref(),
+    ) {
+        out.std_db = Some(StdDbPermissionConfig {
+            enabled: g.enabled && r.enabled,
+            allow_dsn: intersect_enum_list(&g.allow_dsn, &r.allow_dsn),
+            allow_modes: intersect_enum_list(&g.allow_modes, &r.allow_modes),
+            max_rows: g.max_rows.min(r.max_rows),
+            max_bytes: g.max_bytes.min(r.max_bytes),
+            timeout_ms: g.timeout_ms.min(r.timeout_ms),
+        });
+    }
+
+    if let (Some(g), Some(r)) = (
         granted.std_kv.as_ref(),
         requested.permissions.std_kv.as_ref(),
     ) {
@@ -1379,6 +1530,19 @@ fn compute_effective_permissions_for_dependency_v10(
             max_keys: g.max_keys.min(r.max_keys),
             max_value_bytes: g.max_value_bytes.min(r.max_value_bytes),
             key_prefix: intersect_prefix(g.key_prefix.as_deref(), r.key_prefix.as_deref()),
+        });
+    }
+
+    if let (Some(g), Some(r)) = (
+        granted.std_queue.as_ref(),
+        requested.permissions.std_queue.as_ref(),
+    ) {
+        out.std_queue = Some(StdQueuePermissionConfig {
+            enabled: g.enabled && r.enabled,
+            allow_topics: intersect_enum_list(&g.allow_topics, &r.allow_topics),
+            max_inflight: g.max_inflight.min(r.max_inflight),
+            max_payload_bytes: g.max_payload_bytes.min(r.max_payload_bytes),
+            ack_required: g.ack_required && r.ack_required,
         });
     }
 
@@ -1557,6 +1721,42 @@ fn apply_permission_entry(out: &mut ProjectPermissions, section: &str, key: &str
         return;
     }
 
+    if section == "std_db" {
+        let cfg = out
+            .std_db
+            .get_or_insert_with(StdDbPermissionConfig::default);
+        match key {
+            "enabled" => {
+                if let Some(parsed) = parse_bool_literal(scalar_value) {
+                    cfg.enabled = parsed;
+                }
+            }
+            "allow_dsn" => cfg.allow_dsn = values,
+            "allow_modes" => {
+                cfg.allow_modes = values.into_iter().map(|v| v.to_ascii_lowercase()).collect();
+            }
+            "max_rows" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.max_rows = parsed.max(1);
+                }
+            }
+            "max_bytes" => {
+                if let Ok(parsed) = scalar_value.parse::<u64>() {
+                    cfg.max_bytes = parsed.max(1);
+                }
+            }
+            "timeout_ms" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.timeout_ms = parsed.max(1);
+                }
+            }
+            _ => {}
+        }
+        normalize_string_list(&mut cfg.allow_dsn);
+        normalize_string_list(&mut cfg.allow_modes);
+        return;
+    }
+
     if section == "std_kv" {
         let cfg = out
             .std_kv
@@ -1586,6 +1786,38 @@ fn apply_permission_entry(out: &mut ProjectPermissions, section: &str, key: &str
             }
             _ => {}
         }
+        return;
+    }
+
+    if section == "std_queue" {
+        let cfg = out
+            .std_queue
+            .get_or_insert_with(StdQueuePermissionConfig::default);
+        match key {
+            "enabled" => {
+                if let Some(parsed) = parse_bool_literal(scalar_value) {
+                    cfg.enabled = parsed;
+                }
+            }
+            "allow_topics" => cfg.allow_topics = values,
+            "max_inflight" => {
+                if let Ok(parsed) = scalar_value.parse::<u32>() {
+                    cfg.max_inflight = parsed.max(1);
+                }
+            }
+            "max_payload_bytes" => {
+                if let Ok(parsed) = scalar_value.parse::<u64>() {
+                    cfg.max_payload_bytes = parsed.max(1);
+                }
+            }
+            "ack_required" => {
+                if let Some(parsed) = parse_bool_literal(scalar_value) {
+                    cfg.ack_required = parsed;
+                }
+            }
+            _ => {}
+        }
+        normalize_string_list(&mut cfg.allow_topics);
         return;
     }
 
@@ -1831,6 +2063,33 @@ fn std_net_http_action_from_key(key: &str) -> Option<&'static str> {
     match key {
         "std.net.http.request" => Some("request"),
         _ if key.starts_with("std.net.http.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn std_http_client_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "std.http.client.get" => Some("get"),
+        "std.http.client.post" => Some("post"),
+        _ if key.starts_with("std.http.client.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn std_db_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "std.db.query_int" => Some("read_query"),
+        "std.db.exec" => Some("write_exec"),
+        _ if key.starts_with("std.db.") => Some("unknown"),
+        _ => None,
+    }
+}
+
+fn std_queue_action_from_key(key: &str) -> Option<&'static str> {
+    match key {
+        "std.queue.bus.publish" | "std.queue.publish" => Some("publish"),
+        "std.queue.bus.consume" | "std.queue.consume" => Some("consume"),
+        _ if key.starts_with("std.queue.bus.") || key.starts_with("std.queue.") => Some("unknown"),
         _ => None,
     }
 }
@@ -2147,6 +2406,168 @@ fn verify_pack_permissions_for_key(
         }
         return Err(SdkError::PermissionDenied(format!(
             "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-NET-METHOD-DENIED`; unsupported std.net.http action `{}`.",
+            key,
+            file_path.display(),
+            module_path
+                .map(|m| format!(" (module `{m}`)"))
+                .unwrap_or_default(),
+            action,
+        )));
+    }
+
+    if let Some(action) = std_http_client_action_from_key(key) {
+        let Some(cfg) = permissions.std_net_http.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-NET-HOST-DENIED`; missing section `[permissions.std_net_http]` required by std.http.client.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-NET-HOST-DENIED`; `[permissions.std_net_http].enabled = false` while using std.http.client.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if cfg.allow_hosts.is_empty() {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-NET-HOST-DENIED`; `[permissions.std_net_http].allow_hosts` is empty for std.http.client.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        let required_method = match action {
+            "get" => Some("GET"),
+            "post" => Some("POST"),
+            _ => None,
+        };
+        if let Some(method) = required_method {
+            if !cfg.allow_methods.iter().any(|m| m == method) {
+                return Err(SdkError::PermissionDenied(format!(
+                    "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-NET-METHOD-DENIED`; missing method `{}` in `[permissions.std_net_http].allow_methods`.",
+                    key,
+                    file_path.display(),
+                    module_path
+                        .map(|m| format!(" (module `{m}`)"))
+                        .unwrap_or_default(),
+                    method,
+                )));
+            }
+            return Ok(());
+        }
+        return Err(SdkError::PermissionDenied(format!(
+            "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-NET-METHOD-DENIED`; unsupported std.http.client action `{}`.",
+            key,
+            file_path.display(),
+            module_path
+                .map(|m| format!(" (module `{m}`)"))
+                .unwrap_or_default(),
+            action,
+        )));
+    }
+
+    if let Some(action) = std_db_action_from_key(key) {
+        let Some(cfg) = permissions.std_db.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-DB-DSN-DENIED`; missing section `[permissions.std_db]`. Hint: add `[permissions.std_db]` with `enabled = true`, `allow_dsn`, and `allow_modes`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-DB-DSN-DENIED`; `[permissions.std_db].enabled = false`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if cfg.allow_dsn.is_empty() {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-DB-DSN-DENIED`; `[permissions.std_db].allow_dsn` is empty.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if !cfg.allow_modes.iter().any(|mode| mode == action) {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-DB-MODE-DENIED`; action `{}` not allowed by `[permissions.std_db].allow_modes`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+                action,
+            )));
+        }
+        if matches!(action, "read_query" | "write_exec") {
+            return Ok(());
+        }
+        return Err(SdkError::PermissionDenied(format!(
+            "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-DB-MODE-DENIED`; unsupported std.db action `{}`.",
+            key,
+            file_path.display(),
+            module_path
+                .map(|m| format!(" (module `{m}`)"))
+                .unwrap_or_default(),
+            action,
+        )));
+    }
+
+    if let Some(action) = std_queue_action_from_key(key) {
+        let Some(cfg) = permissions.std_queue.as_ref() else {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-QUEUE-TOPIC-DENIED`; missing section `[permissions.std_queue]`. Hint: add `[permissions.std_queue]` with `enabled = true` and `allow_topics`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        };
+        if !cfg.enabled {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-QUEUE-TOPIC-DENIED`; `[permissions.std_queue].enabled = false`.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if cfg.allow_topics.is_empty() {
+            return Err(SdkError::PermissionDenied(format!(
+                "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-QUEUE-TOPIC-DENIED`; `[permissions.std_queue].allow_topics` is empty.",
+                key,
+                file_path.display(),
+                module_path
+                    .map(|m| format!(" (module `{m}`)"))
+                    .unwrap_or_default(),
+            )));
+        }
+        if matches!(action, "publish" | "consume") {
+            return Ok(());
+        }
+        return Err(SdkError::PermissionDenied(format!(
+            "V-PERMISSION-DENIED: key `{}` is denied for file `{}`{}; reason=`RC-QUEUE-TOPIC-DENIED`; unsupported std.queue action `{}`.",
             key,
             file_path.display(),
             module_path
@@ -2495,7 +2916,9 @@ fn verify_permissions_for_source(
         && permissions.modules.is_empty()
         && permissions.std_fs.is_none()
         && permissions.std_net_http.is_none()
+        && permissions.std_db.is_none()
         && permissions.std_kv.is_none()
+        && permissions.std_queue.is_none()
         && permissions.std_time.is_none()
         && permissions.std_proc.is_none()
         && permissions.std_game.is_none()
