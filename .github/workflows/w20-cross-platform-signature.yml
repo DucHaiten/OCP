@@ -41,7 +41,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: w20-cross-platform-${{ matrix.profile }}
-          path: target/ocl/w20/regression/os/${{ matrix.profile }}
+          path: target/ocl/w20/regression/os
           if-no-files-found: error
 
   aggregate:
