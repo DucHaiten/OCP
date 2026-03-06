@@ -1,0 +1,7 @@
+struct User { id, name };
+enum Status { Ok, Err };
+
+fn render(user) {
+  let output = user;
+  return output;
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "ocl.editor.runtime_resilience.v1",
+  "contract_id": "editor.editor_runtime_resilience",
+  "version": "v1",
+  "crash_loop": {
+    "max_retries": 3,
+    "cooldown_ms": 1000
+  },
+  "notification_policy": {
+    "single_popup_per_failure": true,
+    "show_logs_action": true
+  },
+  "degraded_mode": true
+}

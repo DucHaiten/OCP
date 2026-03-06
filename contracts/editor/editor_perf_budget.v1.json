@@ -1,0 +1,12 @@
+{
+  "schema": "ocl.editor.perf_budget.v1",
+  "contract_id": "editor.editor_perf_budget",
+  "version": "v1",
+  "thresholds": {
+    "lsp_keystroke_work_units_p95": 1200,
+    "workspace_initial_index_work_units": 2000000,
+    "lsp_cache_bytes": 256000000,
+    "cancelled_requests_max_work_units": 200,
+    "cancelled_requests_max_poll_iterations": 50
+  }
+}

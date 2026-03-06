@@ -1,0 +1,15 @@
+{
+  "schema": "ocl.editor.diagnostics_mapping.v1",
+  "contract_id": "editor.ocl_diagnostics_mapping",
+  "version": "v1",
+  "severity_map": {
+    "X-*": "Error",
+    "RC-*": "Warning"
+  },
+  "required_fields": [
+    "code",
+    "range",
+    "severity",
+    "message"
+  ]
+}

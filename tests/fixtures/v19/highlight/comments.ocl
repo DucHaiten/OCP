@@ -1,0 +1,8 @@
+/* block comment */
+fn calc(value: i64) {
+  // inline comment
+  if value {
+    return value;
+  }
+  return 0;
+}

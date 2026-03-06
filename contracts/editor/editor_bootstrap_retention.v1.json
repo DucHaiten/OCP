@@ -1,0 +1,9 @@
+{
+  "schema": "ocl.editor.bootstrap_retention.v1",
+  "contract_id": "editor.editor_bootstrap_retention",
+  "version": "v1",
+  "max_versions_per_platform": 3,
+  "cleanup_order": "oldest_first",
+  "delete_active_version": false,
+  "readonly_storage_mode": "fail_honest_degraded"
+}

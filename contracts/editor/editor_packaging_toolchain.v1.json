@@ -1,0 +1,9 @@
+{
+  "schema": "ocl.editor.packaging_toolchain.v1",
+  "contract_id": "editor.editor_packaging_toolchain",
+  "version": "v1",
+  "node": "22.x",
+  "pnpm": "10.x",
+  "vsce": "2.x",
+  "ovsx": "0.10.x"
+}

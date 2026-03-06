@@ -1,0 +1,16 @@
+{
+  "schema": "ocl.editor.cli_bridge.v1",
+  "contract_id": "editor.editor_cli_bridge",
+  "version": "v1",
+  "commands": [
+    "ocl fmt",
+    "ocl check",
+    "ocl perm doctor",
+    "ocl perm fix --plan",
+    "ocl perm fix --apply",
+    "ocl budget analyze",
+    "ocl dbg"
+  ],
+  "output_mode": "json_only",
+  "text_fallback_allowed": false
+}

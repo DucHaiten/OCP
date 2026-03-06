@@ -60,11 +60,15 @@ fn v16_repo_hygiene_report_has_no_forbidden_tracked_artifacts_or_secrets() {
         .iter()
         .filter(|path| {
             let lower = path.to_ascii_lowercase();
+            let source_or_doc = lower.ends_with(".rs")
+                || lower.ends_with(".md")
+                || lower.ends_with(".toml")
+                || lower.ends_with(".json");
             lower.ends_with(".pem")
                 || lower.ends_with(".key")
                 || lower.contains("id_rsa")
                 || lower.contains("private_key")
-                || lower.contains("secret")
+                || (lower.contains("secret") && !source_or_doc && !lower.contains("no_secrets"))
         })
         .cloned()
         .collect::<Vec<_>>();

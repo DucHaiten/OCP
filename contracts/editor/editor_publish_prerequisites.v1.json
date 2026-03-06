@@ -1,0 +1,18 @@
+{
+  "schema": "ocl.editor.publish_prerequisites.v1",
+  "contract_id": "editor.editor_publish_prerequisites",
+  "version": "v1",
+  "required_files": [
+    "editor/vscode/ocp-ocl/package.json",
+    "editor/vscode/ocp-ocl/icons/ocp-ocl.svg",
+    "README.md",
+    "SECURITY.md"
+  ],
+  "required_metadata_fields": [
+    "name",
+    "displayName",
+    "version",
+    "publisher",
+    "engines.vscode"
+  ]
+}

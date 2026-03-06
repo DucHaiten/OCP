@@ -1,0 +1,10 @@
+fn helper(value) {
+  let local = value;
+  return local;
+}
+
+fn main() {
+  let score = 10;
+  let result = helper(score);
+  return result;
+}

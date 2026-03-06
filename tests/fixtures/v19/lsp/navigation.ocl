@@ -1,0 +1,8 @@
+fn helper(input) {
+  return input;
+}
+
+fn main() {
+  let value = helper(1);
+  return value;
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "ocl.editor.perf_protocol.v1",
+  "contract_id": "editor.editor_perf_protocol",
+  "version": "v1",
+  "dataset_id": "editor_medium_workspace_v1",
+  "dataset_path": "tests/fixtures/v19/highlight",
+  "counters": [
+    "lsp_keystroke_work_units",
+    "workspace_initial_index_work_units",
+    "lsp_cache_bytes",
+    "cancelled_requests_work_units",
+    "cancelled_requests_poll_iterations"
+  ],
+  "p95_protocol": {
+    "sample_count": 50,
+    "sort_order": "ascending",
+    "quantile_index_rule": "ceil(0.95*n)-1"
+  }
+}

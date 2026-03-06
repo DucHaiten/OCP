@@ -1,0 +1,17 @@
+{
+  "schema": "ocl.editor.versioning_policy.v1",
+  "contract_id": "editor.editor_versioning_policy",
+  "version": "v1",
+  "bump_rules": {
+    "major": "breaking_public_surface",
+    "minor": "additive_public_surface",
+    "patch": "internal_or_bugfix_only"
+  },
+  "compat_window_releases": 2,
+  "deprecation_policy": {
+    "settings_keys": "warn_then_remove",
+    "command_ids": "alias_then_remove",
+    "code_action_ids": "alias_then_remove",
+    "diagnostic_codes": "stable_in_minor"
+  }
+}

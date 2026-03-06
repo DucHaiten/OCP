@@ -1,0 +1,13 @@
+{
+  "schema": "ocl.editor.privacy_policy.v1",
+  "contract_id": "editor.editor_privacy_policy",
+  "version": "v1",
+  "forbidden_log_fields": [
+    "auth_token",
+    "cookie",
+    "secret",
+    "private_key"
+  ],
+  "path_redaction": true,
+  "env_dump_allowed": false
+}

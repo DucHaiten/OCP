@@ -1,0 +1,7 @@
+fn semantic_case() {
+  let score = 10;
+  if score {
+    return score;
+  }
+  return 0;
+}

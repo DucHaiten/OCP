@@ -1,0 +1,11 @@
+{
+  "schema": "ocl.editor.formatting_contract.v1",
+  "contract_id": "editor.ocl_formatting_contract",
+  "version": "v1",
+  "engine": "ocl_fmt_shared",
+  "idempotent": true,
+  "options": {
+    "indent_size": 2,
+    "line_width": 100
+  }
+}

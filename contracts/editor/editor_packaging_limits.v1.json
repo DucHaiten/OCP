@@ -1,0 +1,10 @@
+{
+  "schema": "ocl.editor.packaging_limits.v1",
+  "contract_id": "editor.editor_packaging_limits",
+  "version": "v1",
+  "limits_bytes": {
+    "vscode_marketplace": 262144000,
+    "open_vsx": 262144000
+  },
+  "on_exceed": "fail_honest_repackage"
+}

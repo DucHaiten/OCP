@@ -1,0 +1,34 @@
+{
+  "schema": "ocl.editor.public_surface.v1",
+  "contract_id": "editor.editor_public_surface",
+  "version": "v1",
+  "language_id": "ocp-ocl",
+  "extensions": [
+    ".ocl",
+    ".oclp",
+    ".oclt"
+  ],
+  "settings_keys": [
+    "ocpOcl.laneProfile",
+    "ocpOcl.traceLevel",
+    "ocpOcl.enableSemanticTokens",
+    "ocpOcl.serverPath"
+  ],
+  "command_ids": [
+    "ocpOcl.formatDocument",
+    "ocpOcl.checkWorkspace",
+    "ocpOcl.openDoctorReport",
+    "ocpOcl.openFixPlan",
+    "ocpOcl.openDebugTrace"
+  ],
+  "code_action_ids": [
+    "ocpOcl.codeAction.permissionFixPlan",
+    "ocpOcl.codeAction.openDiff",
+    "ocpOcl.codeAction.applyPatch",
+    "ocpOcl.codeAction.openBudgetAnalyze",
+    "ocpOcl.codeAction.openCassetteReport",
+    "ocpOcl.codeAction.openContractMismatch"
+  ],
+  "lsp_protocol_version": "3.17",
+  "dap_protocol_version": "1.70"
+}

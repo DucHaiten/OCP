@@ -1,0 +1,119 @@
+{
+  "name": "ocp-ocl",
+  "displayName": "OCP OCL",
+  "description": "Observation Collapse Language support for VSCode.",
+  "version": "0.19.0-dev",
+  "publisher": "ocp-ocl",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:ocp-ocl"
+  ],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "test:integration": "node ./scripts/test-integration.mjs"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "ocp-ocl",
+        "aliases": [
+          "OCL",
+          "ocp-ocl"
+        ],
+        "extensions": [
+          ".ocl",
+          ".oclp",
+          ".oclt"
+        ],
+        "icon": {
+          "light": "./icons/ocp-ocl.svg",
+          "dark": "./icons/ocp-ocl.svg"
+        },
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ocp-ocl",
+        "scopeName": "source.ocp-ocl",
+        "path": "./syntaxes/ocp-ocl.tmLanguage.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "ocp-ocl-icons",
+        "label": "OCP OCL Icons",
+        "path": "./icons/ocp-ocl-icon-theme.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "ocp-ocl",
+        "path": "./snippets/ocp-ocl.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "ocpOcl.formatDocument",
+        "title": "OCL: Format Document"
+      },
+      {
+        "command": "ocpOcl.checkWorkspace",
+        "title": "OCL: Check Workspace"
+      },
+      {
+        "command": "ocpOcl.openDoctorReport",
+        "title": "OCL: Open Doctor Report"
+      },
+      {
+        "command": "ocpOcl.openFixPlan",
+        "title": "OCL: Open Fix Plan"
+      },
+      {
+        "command": "ocpOcl.openDebugTrace",
+        "title": "OCL: Open Debug Trace"
+      }
+    ],
+    "configuration": {
+      "title": "OCP OCL",
+      "properties": {
+        "ocpOcl.laneProfile": {
+          "type": "string",
+          "default": "locked_v071",
+          "enum": [
+            "locked_v071",
+            "locked_v06",
+            "quarantine"
+          ],
+          "description": "Lane profile used by OCL editor workflows."
+        },
+        "ocpOcl.traceLevel": {
+          "type": "string",
+          "default": "errors",
+          "enum": [
+            "off",
+            "errors",
+            "info",
+            "debug"
+          ],
+          "description": "Trace verbosity for OCL editor features."
+        },
+        "ocpOcl.enableSemanticTokens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable semantic tokens when workspace trust allows runtime features."
+        },
+        "ocpOcl.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path override for bundled OCL language server binary."
+        }
+      }
+    }
+  }
+}

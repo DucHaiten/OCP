@@ -1,0 +1,9 @@
+{
+  "schema": "ocl.editor.code_action_apply_policy.v1",
+  "contract_id": "editor.editor_code_action_apply_policy",
+  "version": "v1",
+  "patch_format": "workspace_edit_v1",
+  "apply_mode": "workspace_edit",
+  "record_creation_point": "apply",
+  "allow_cli_apply_fallback": false
+}

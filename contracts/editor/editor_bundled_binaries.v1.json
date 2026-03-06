@@ -1,0 +1,11 @@
+{
+  "schema": "ocl.editor.bundled_binaries.v1",
+  "contract_id": "editor.editor_bundled_binaries",
+  "version": "v1",
+  "binaries": [
+    "ocl-cli",
+    "ocl-lsp",
+    "ocl-dap"
+  ],
+  "path_dependency_allowed": false
+}

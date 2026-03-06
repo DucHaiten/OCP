@@ -1,0 +1,8 @@
+// #region sample
+fn main() {
+  let n = 42;
+  let msg = "hello";
+  observe("std.fs.read_text");
+  commit(msg);
+}
+// #endregion

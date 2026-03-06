@@ -13,6 +13,7 @@ mod attestation_v15;
 mod perm_v15;
 mod w17;
 mod w18;
+mod w19;
 
 pub mod m4;
 pub mod w1;
@@ -69,6 +70,29 @@ pub use w18::{
     ContractInspectSummaryV18, ContractSetSummaryV18, SotAliasItemSummaryV18, SotAliasSummaryV18,
     W18_HASHER_VERSION, W18_REQUIRED_CONTRACT_FILES, W18_SIGNATURE_SCHEMA,
     W18_SIGNATURE_SCHEMA_VERSION,
+};
+pub use w19::{
+    bootstrap_retention_plan_v19, cli_bridge_contract_allows_v19, cli_bridge_output_policy_v19,
+    code_action_apply_policy_v19, contract_sig_path_v19, dap_breakpoint_mapping_v19,
+    dap_launch_summary_v19, dap_step_sequence_v19, dap_trace_events_from_source_v19,
+    dap_trace_path_v19, dap_variables_for_event_v19, debug_contract_profile_v19,
+    format_source_with_contract_v19, governed_code_action_ids_for_lane_v19,
+    lsp_completion_items_from_source_v19, lsp_definition_locations_v19,
+    lsp_diagnostics_from_source_v19, lsp_hover_for_symbol_v19,
+    lsp_multiroot_definition_locations_v19, lsp_reference_locations_v19, lsp_rename_preview_v19,
+    lsp_symbols_from_source_v19, multiroot_sorted_roots_v19, publish_channels_v19,
+    required_bundled_binaries_v19, required_publish_files_v19,
+    required_publish_metadata_fields_v19, runtime_resilience_profile_v19, sign_contract_json_v19,
+    strict_lane_code_action_allowed_v19, validate_code_action_apply_request_v19,
+    verify_contract_json_signature_v19, verify_w19_contract_set_v19, version_handshake_allowed_v19,
+    version_rule_matches_v19, vsix_size_limit_for_channel_v19,
+    workspace_runtime_features_allowed_v19, workspace_semantic_tokens_allowed_v19,
+    ContractInspectSummaryV19, ContractSetSummaryV19, EditorCodeActionApplyPolicyV19,
+    EditorCompletionItemV19, EditorDapBreakpointMapEntryV19, EditorDapBreakpointV19,
+    EditorDapLaunchSummaryV19, EditorDapTraceEventV19, EditorDapVariableV19, EditorDiagnosticV19,
+    EditorHoverV19, EditorLocationV19, EditorRenameEditV19, EditorRenamePreviewV19,
+    EditorSymbolV19, W19_HASHER_VERSION, W19_REQUIRED_CONTRACT_FILES, W19_SIGNATURE_SCHEMA,
+    W19_SIGNATURE_SCHEMA_VERSION,
 };
 pub use w2::{
     admit_bridge_emit_v1, poll_bridge_event_v1, resolve_bridge_runtime_plan_v1,

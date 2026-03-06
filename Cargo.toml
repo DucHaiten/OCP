@@ -13,6 +13,7 @@ sha2 = "0.10"
 [workspace]
 members = [
     ".",
+    "xtask",
     "projects/ocp-ocl/crates/ocl-runtime-core",
     "projects/ocp-ocl/crates/ocl-sdk",
     "projects/ocp-ocl/crates/ocl-cli",

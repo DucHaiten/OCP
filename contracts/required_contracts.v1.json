@@ -1,19 +1,260 @@
 {
+  "contract_id": "v1.required_contracts",
   "entries": [
     {
       "allowed_diffs_v018": "none",
-      "consumer": "tests/v18_contract_inventory_complete.rs",
-      "contract_id": "v1.contract_inventory_schema",
-      "producer": "contracts/contract_inventory_schema.v1.json",
-      "schema_hash": "d4ba951858566edef0d64a26c6e1a9d8b78ababae6e53b854d358d7d67db694b",
+      "consumer": "tests/v19_editor_assets_manifest.rs",
+      "contract_id": "editor.editor_assets_manifest",
+      "producer": "contracts/editor/editor_assets_manifest.v1.json",
+      "schema_hash": "bccab526ad4ae8c8910846072609cda49d3b3a3c626d3511fb2622cd63cd9037",
       "version": "v1"
     },
     {
       "allowed_diffs_v018": "none",
-      "consumer": "tests/v18_platform_profile_contract.rs",
-      "contract_id": "v1.supported_profile",
-      "producer": "contracts/platform/supported_profile.v1.json",
-      "schema_hash": "fb4b5ee84353dca8e2ee89b00f96588f601a0bbba704f553cecbd093aac635cf",
+      "consumer": "tests/v19_bootstrap_retention.rs",
+      "contract_id": "editor.editor_bootstrap_retention",
+      "producer": "contracts/editor/editor_bootstrap_retention.v1.json",
+      "schema_hash": "d0a056148f4d8574fade27978ca31cbe70ecbfcc2ff233836150785777d3aecd",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_bundled_tooling_presence.rs",
+      "contract_id": "editor.editor_bundled_binaries",
+      "producer": "contracts/editor/editor_bundled_binaries.v1.json",
+      "schema_hash": "6400bdd800ff7e053bf0398c52de090e1937954b17cad66719ef73b3fb1c9647",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_ci_harness_contract.rs",
+      "contract_id": "editor.editor_ci_harness",
+      "producer": "contracts/editor/editor_ci_harness.v1.json",
+      "schema_hash": "cc6cdf7e9d56e70316a0d0ebc51c2046975868d8f4ed84319ab3a2853b9516e7",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_cli_bridge_contract.rs",
+      "contract_id": "editor.editor_cli_bridge",
+      "producer": "contracts/editor/editor_cli_bridge.v1.json",
+      "schema_hash": "ad768952a4b90cfb10787b16f5b86e427799f4e1fd61264a8d337eff8b48a8a4",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_code_action_apply_contract.rs",
+      "contract_id": "editor.editor_code_action_apply_policy",
+      "producer": "contracts/editor/editor_code_action_apply_policy.v1.json",
+      "schema_hash": "acb3b6f3314964b73e8ce82658dd47d1e9f67d77b687ea7c3d75e095651dd5cb",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_multiroot_workspace.rs",
+      "contract_id": "editor.editor_multiroot_policy",
+      "producer": "contracts/editor/editor_multiroot_policy.v1.json",
+      "schema_hash": "7362d05850854e2ce8b1739bb3fb896e10b8b57ed00546421ef401461ae684ab",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_vsix_size_guard.rs",
+      "contract_id": "editor.editor_packaging_limits",
+      "producer": "contracts/editor/editor_packaging_limits.v1.json",
+      "schema_hash": "4ef841df640c4faa49e8c7f1a1a21070114bc4d6e8c2169494f4d0c9c0cd2426",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_packaging_toolchain_lock.rs",
+      "contract_id": "editor.editor_packaging_toolchain",
+      "producer": "contracts/editor/editor_packaging_toolchain.v1.json",
+      "schema_hash": "5ecb66f85254d6b2542c1fb16296fee7415a23cd5ccbd9a7b22b628d29d87c1b",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_editor_perf_budget.rs",
+      "contract_id": "editor.editor_perf_budget",
+      "producer": "contracts/editor/editor_perf_budget.v1.json",
+      "schema_hash": "e3992efd5125bc88dfca757a24ab8b311a7506947ede793a7adee2936a28f8ef",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_editor_perf_budget_protocol.rs",
+      "contract_id": "editor.editor_perf_protocol",
+      "producer": "contracts/editor/editor_perf_protocol.v1.json",
+      "schema_hash": "8e0b37e1bd8bb8a24f75ad44654fa32139226c4b454ae85623c176e04d3a992a",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_editor_privacy_hygiene.rs",
+      "contract_id": "editor.editor_privacy_policy",
+      "producer": "contracts/editor/editor_privacy_policy.v1.json",
+      "schema_hash": "a8f7af4ea5026227ccdb14b29fe0f4ef4e26a2e630224618737b0f179cb0a75d",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_editor_public_surface.rs",
+      "contract_id": "editor.editor_public_surface",
+      "producer": "contracts/editor/editor_public_surface.v1.json",
+      "schema_hash": "ccecf14b105a2ecebfd01ac7d691f409f6432347f144b82e5f9aa5c0f504225a",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_publish_channel_manifest.rs",
+      "contract_id": "editor.editor_publish_channels",
+      "producer": "contracts/editor/editor_publish_channels.v1.json",
+      "schema_hash": "e99df495f92362539b9d235e338e5fb3b18494cb89342dc8e4be7a893c4bada7",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_publish_prerequisites.rs",
+      "contract_id": "editor.editor_publish_prerequisites",
+      "producer": "contracts/editor/editor_publish_prerequisites.v1.json",
+      "schema_hash": "6c9429a8c9f018835b484e6ff60d53853bb4d2d4e0298d31c2c74c82c79363be",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_release_artifact_manifest.rs",
+      "contract_id": "editor.editor_release_manifest",
+      "producer": "contracts/editor/editor_release_manifest.v1.json",
+      "schema_hash": "e4c704bc93d182f94281c2532e98e939cf5c8b0ba57568dc8a50ff787dc52aab",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_lsp_runtime_resilience.rs",
+      "contract_id": "editor.editor_runtime_resilience",
+      "producer": "contracts/editor/editor_runtime_resilience.v1.json",
+      "schema_hash": "ffd18ab33201acabc457947f4c550a0fa501f9e9cd7375feddcd72095a5ac1ed",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_signing_trust_root_verify.rs",
+      "contract_id": "editor.editor_signing_trust_root",
+      "producer": "contracts/editor/editor_signing_trust_root.v1.json",
+      "schema_hash": "bed57ae91625cf922cc3baec928003e3a62f94fdbda7f51b3ee7db3ae754f408",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_editor_versioning_policy.rs",
+      "contract_id": "editor.editor_versioning_policy",
+      "producer": "contracts/editor/editor_versioning_policy.v1.json",
+      "schema_hash": "8809e244cb47d271826d8c0518854b60c0e1e0f512f2b94b1607d355c166e327",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_workspace_trust_guard.rs",
+      "contract_id": "editor.editor_workspace_trust_policy",
+      "producer": "contracts/editor/editor_workspace_trust_policy.v1.json",
+      "schema_hash": "fee718267ec09cdf5a86191f15890aec4f9ac1e1a69ef8385bd86f80120f1821",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_textmate_highlight_golden.rs",
+      "contract_id": "editor.golden_vectors",
+      "producer": "contracts/editor/golden_vectors.v1.json",
+      "schema_hash": "d523e1bc43f8e230ce8d1e3c4c7a83ee442f394e328e4da4078774cb16369608",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_binary_bootstrap_verify.rs",
+      "contract_id": "editor.ocl_binary_bootstrap_policy",
+      "producer": "contracts/editor/ocl_binary_bootstrap_policy.v1.json",
+      "schema_hash": "815fc1a67cb750a07732a048017171fb0289c46e599f092774d3b1974675d396",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_code_actions_governed.rs",
+      "contract_id": "editor.ocl_code_actions_contract",
+      "producer": "contracts/editor/ocl_code_actions_contract.v1.json",
+      "schema_hash": "56b4c48f60c532ab91f89512b441f16de6c9216ee975a9dcfb5c9d7910d6f534",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_dap_trace_mapping.rs",
+      "contract_id": "editor.ocl_debug_contract",
+      "producer": "contracts/editor/ocl_debug_contract.v1.json",
+      "schema_hash": "6dc738de9849c4c4b75b39663ca83afdc970cddc07ebad7bf06b1d012c8f9a5a",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_diagnostics_taxonomy_mapping.rs",
+      "contract_id": "editor.ocl_diagnostics_mapping",
+      "producer": "contracts/editor/ocl_diagnostics_mapping.v1.json",
+      "schema_hash": "07f0d465e8b0a95ced5fac20b2b7900b4bce796f01ed6fb938406e824f1736fe",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_formatting_unified.rs",
+      "contract_id": "editor.ocl_formatting_contract",
+      "producer": "contracts/editor/ocl_formatting_contract.v1.json",
+      "schema_hash": "62d05e1a9feeb3cfdd1aed346b1ef6706fcae8589a19a7bc5d7004a3a370f034",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_editor_language_profile.rs",
+      "contract_id": "editor.ocl_language_profile",
+      "producer": "contracts/editor/ocl_language_profile.v1.json",
+      "schema_hash": "f4f208b1ba2272c9235de30baa36a0de3efed002a7d3da168056b83a72249caa",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_lsp_diagnostics.rs",
+      "contract_id": "editor.ocl_lsp_capabilities",
+      "producer": "contracts/editor/ocl_lsp_capabilities.v1.json",
+      "schema_hash": "5c6d9aac672ab9e9443a33745dab17d354d2b76001d158e7ef0b21fd06ee3afa",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_semantic_tokens_golden.rs",
+      "contract_id": "editor.ocl_semantic_tokens",
+      "producer": "contracts/editor/ocl_semantic_tokens.v1.json",
+      "schema_hash": "bfabd4327444fac1331922e396263caa7ee4f7ec9eb380d641c5860cfaaabd76",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_settings_schema_contract.rs",
+      "contract_id": "editor.ocl_settings_schema",
+      "producer": "contracts/editor/ocl_settings_schema.v1.json",
+      "schema_hash": "695ceb4495a2dbf02bbbc675bed3e39f867e101cf9a306e2f2276f895ac7a6ef",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_textmate_highlight_golden.rs",
+      "contract_id": "editor.ocl_textmate_grammar",
+      "producer": "contracts/editor/ocl_textmate_grammar.v1.json",
+      "schema_hash": "bec8c081becbca8e92f5460898a1224c879ffd15541b444ed432f5fc5e9ae492",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v19_lsp_version_handshake.rs",
+      "contract_id": "editor.ocl_version_compat_matrix",
+      "producer": "contracts/editor/ocl_version_compat_matrix.v1.json",
+      "schema_hash": "3efa5ec1d126015234b9823638cd728b613fa28730f13d2e35ad6a1ba62b7740",
       "version": "v1"
     },
     {
@@ -34,14 +275,6 @@
     },
     {
       "allowed_diffs_v018": "none",
-      "consumer": "tests/v18_pack_build_sign_verify.rs",
-      "contract_id": "v1.pack_abi",
-      "producer": "contracts/packs/pack_abi.v1.json",
-      "schema_hash": "38eb28ed4786a03a15359d828186a0a718475f318ffed5e4b5c4b2095ab89b96",
-      "version": "v1"
-    },
-    {
-      "allowed_diffs_v018": "none",
       "consumer": "tests/v18_connector_http_smoke.rs+tests/v18_connector_db_smoke.rs",
       "contract_id": "v1.connector_set",
       "producer": "contracts/packs/connector_set.v1.json",
@@ -50,10 +283,10 @@
     },
     {
       "allowed_diffs_v018": "none",
-      "consumer": "tests/v18_rl_matrix_aggregate.rs",
-      "contract_id": "v1.risk_locks_rl01_rl17",
-      "producer": "contracts/policy/risk_locks_rl01_rl17.v1.json",
-      "schema_hash": "0cba204b30751ceef0046c95a36bde4a109835e20cc0f474435a86d6a3d038b9",
+      "consumer": "tests/v18_contract_inventory_complete.rs",
+      "contract_id": "v1.contract_inventory_schema",
+      "producer": "contracts/contract_inventory_schema.v1.json",
+      "schema_hash": "d4ba951858566edef0d64a26c6e1a9d8b78ababae6e53b854d358d7d67db694b",
       "version": "v1"
     },
     {
@@ -66,14 +299,37 @@
     },
     {
       "allowed_diffs_v018": "none",
+      "consumer": "tests/v18_pack_build_sign_verify.rs",
+      "contract_id": "v1.pack_abi",
+      "producer": "contracts/packs/pack_abi.v1.json",
+      "schema_hash": "38eb28ed4786a03a15359d828186a0a718475f318ffed5e4b5c4b2095ab89b96",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v18_rl_matrix_aggregate.rs",
+      "contract_id": "v1.risk_locks_rl01_rl17",
+      "producer": "contracts/policy/risk_locks_rl01_rl17.v1.json",
+      "schema_hash": "0cba204b30751ceef0046c95a36bde4a109835e20cc0f474435a86d6a3d038b9",
+      "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
       "consumer": "tests/v18_sot_alias_contract.rs",
       "contract_id": "v1.sot_aliases",
       "producer": "contracts/sot_aliases.v1.json",
       "schema_hash": "859f0752bbdbdb41d77c54ab479dd624871b56099f1597c5b22ab01bca594841",
       "version": "v1"
+    },
+    {
+      "allowed_diffs_v018": "none",
+      "consumer": "tests/v18_platform_profile_contract.rs",
+      "contract_id": "v1.supported_profile",
+      "producer": "contracts/platform/supported_profile.v1.json",
+      "schema_hash": "fb4b5ee84353dca8e2ee89b00f96588f601a0bbba704f553cecbd093aac635cf",
+      "version": "v1"
     }
   ],
   "schema": "ocl.contracts.required.v1",
-  "contract_id": "v1.required_contracts",
   "version": "v1"
 }
