@@ -1,0 +1,14 @@
+{
+  "schema": "ocl.v20.fuzz_seed_suite.v1",
+  "contract_id": "v20.fuzz_seed_suite",
+  "version": "v1",
+  "suite_id": "w20-fuzz-seeds-v1",
+  "seeds": [
+    "alpha-001",
+    "beta-002",
+    "gamma-003",
+    "delta-004",
+    "epsilon-005"
+  ],
+  "corpus_id": "w20-core-corpus-v1"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": "ocl.v20.history_toolchain_matrix.v1",
+  "contract_id": "v20.history_toolchain_matrix",
+  "version": "v1",
+  "profiles": [
+    {
+      "id": "legacy_v0x",
+      "rustc": "1.82.x",
+      "cargo": "1.82.x",
+      "node": "20.x",
+      "pnpm": "9.x"
+    },
+    {
+      "id": "stable_v1",
+      "rustc": "1.86.x",
+      "cargo": "1.86.x",
+      "node": "22.x",
+      "pnpm": "10.x"
+    }
+  ]
+}

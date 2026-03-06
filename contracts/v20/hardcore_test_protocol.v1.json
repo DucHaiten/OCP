@@ -1,0 +1,40 @@
+{
+  "schema": "ocl.v20.hardcore_test_protocol.v1",
+  "contract_id": "v20.hardcore_test_protocol",
+  "version": "v1",
+  "fuzz": {
+    "seeds_total": 5,
+    "cases_per_seed": 4000,
+    "runs_per_seed": 2,
+    "max_input_bytes": 262144
+  },
+  "property": {
+    "properties_total": 12,
+    "cases_per_property": 1200,
+    "shrinks_enabled": true
+  },
+  "mutation": {
+    "scope_modules": [
+      "ocl-runtime-core",
+      "ocl-sdk",
+      "ocl-cli"
+    ],
+    "min_score": 0.75
+  },
+  "chaos": {
+    "fault_points": [
+      "filesystem",
+      "network",
+      "process",
+      "time",
+      "cassette"
+    ],
+    "faults_per_run": 32,
+    "runs_per_seed": 3
+  },
+  "crash_triage": {
+    "minimize_required": true,
+    "save_crash_input_hash": true,
+    "save_repro_artifact": true
+  }
+}

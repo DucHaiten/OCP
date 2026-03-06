@@ -1,0 +1,17 @@
+{
+  "schema": "ocl.v20.release_gate_v1_0.v1",
+  "contract_id": "v20.release_gate_v1_0",
+  "version": "v1",
+  "required_gate_status": [
+    "20-A",
+    "20-B",
+    "20-C",
+    "20-D",
+    "20-E",
+    "20-F",
+    "20-G",
+    "20-H"
+  ],
+  "required_go_signal": "GO",
+  "required_report": "target/ocl/w20/signoff/v1_release_go_no_go.json"
+}

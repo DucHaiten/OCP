@@ -14,6 +14,7 @@ mod perm_v15;
 mod w17;
 mod w18;
 mod w19;
+mod w20;
 
 pub mod m4;
 pub mod w1;
@@ -93,6 +94,12 @@ pub use w19::{
     EditorHoverV19, EditorLocationV19, EditorRenameEditV19, EditorRenamePreviewV19,
     EditorSymbolV19, W19_HASHER_VERSION, W19_REQUIRED_CONTRACT_FILES, W19_SIGNATURE_SCHEMA,
     W19_SIGNATURE_SCHEMA_VERSION,
+};
+pub use w20::{
+    contract_sig_path_v20, sign_contract_json_v20, verify_contract_json_signature_v20,
+    verify_w20_contract_set_v20, ContractInspectSummaryV20, ContractSetSummaryV20,
+    W20_HASHER_VERSION, W20_REQUIRED_CONTRACT_FILES, W20_SIGNATURE_SCHEMA,
+    W20_SIGNATURE_SCHEMA_VERSION,
 };
 pub use w2::{
     admit_bridge_emit_v1, poll_bridge_event_v1, resolve_bridge_runtime_plan_v1,

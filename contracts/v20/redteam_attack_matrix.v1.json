@@ -1,0 +1,15 @@
+{
+  "schema": "ocl.v20.redteam_attack_matrix.v1",
+  "contract_id": "v20.redteam_attack_matrix",
+  "version": "v1",
+  "vectors": [
+    "lock_tamper",
+    "permission_wildcard_escalation",
+    "capability_laundering",
+    "cassette_tamper",
+    "release_manifest_tamper",
+    "signature_spoof",
+    "trust_epoch_downgrade",
+    "symlink_boundary_escape"
+  ]
+}

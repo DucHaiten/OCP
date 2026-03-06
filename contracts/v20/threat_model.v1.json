@@ -1,0 +1,27 @@
+{
+  "schema": "ocl.v20.threat_model.v1",
+  "contract_id": "v20.threat_model",
+  "version": "v1",
+  "threat_model_id": "w20-final-gate-threat-model-v1",
+  "scope": {
+    "assets": [
+      "contracts",
+      "run_manifest",
+      "audit_reports",
+      "release_artifacts",
+      "editor_package"
+    ],
+    "trust_boundaries": [
+      "repo_contracts",
+      "cli_runtime",
+      "editor_toolchain",
+      "supply_chain"
+    ]
+  },
+  "severity_rubric": {
+    "CRITICAL": "policy bypass or release-integrity break",
+    "HIGH": "determinism drift or practical exploit path",
+    "MEDIUM": "operability risk with mitigation available",
+    "LOW": "non-blocking quality issue"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "ocl.v20.stability_repeat_policy.v1",
+  "contract_id": "v20.stability_repeat_policy",
+  "version": "v1",
+  "repeat_suites": [
+    {
+      "suite_id": "determinism_replay",
+      "repeat_count": 3
+    },
+    {
+      "suite_id": "editor_integration",
+      "repeat_count": 2
+    },
+    {
+      "suite_id": "cross_platform_signature",
+      "repeat_count": 2
+    }
+  ]
+}

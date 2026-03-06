@@ -1,0 +1,74 @@
+name: w20-cross-platform-signature
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/w20-cross-platform-signature.yml"
+      - "tests/v20_cross_platform_signature.rs"
+      - "tests/v20_gate_b_common.rs"
+      - "tests/v20_gate_a_common.rs"
+      - "contracts/v20/history_replay_matrix.v1.json"
+      - "contracts/v20/history_toolchain_matrix.v1.json"
+      - "contracts/v20/required_contracts_v20.v1.json"
+
+jobs:
+  per_os:
+    name: per-os report (${{ matrix.profile }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            profile: win-x64
+          - os: ubuntu-latest
+            profile: linux-x64
+          - os: macos-14
+            profile: macos-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Generate per-OS report
+        env:
+          W20_CROSS_PLATFORM_MODE: per_os
+        run: cargo test --test v20_cross_platform_signature
+
+      - name: Upload per-OS report
+        uses: actions/upload-artifact@v4
+        with:
+          name: w20-cross-platform-${{ matrix.profile }}
+          path: target/ocl/w20/regression/os/${{ matrix.profile }}
+          if-no-files-found: error
+
+  aggregate:
+    name: aggregate cross-platform signature
+    needs: per_os
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Download per-OS reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: w20-cross-platform-*
+          path: target/ocl/w20/regression/os
+          merge-multiple: true
+
+      - name: Verify aggregate
+        env:
+          W20_CROSS_PLATFORM_MODE: aggregate
+        run: cargo test --test v20_cross_platform_signature
+
+      - name: Upload aggregate report
+        uses: actions/upload-artifact@v4
+        with:
+          name: w20-cross-platform-aggregate
+          path: target/ocl/w20/regression/cross_platform_signature_aggregate_report.json
+          if-no-files-found: error

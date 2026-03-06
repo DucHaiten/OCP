@@ -1,0 +1,8 @@
+{
+  "schema": "ocl.v20.dx_friction_budget.v1",
+  "contract_id": "v20.dx_friction_budget",
+  "version": "v1",
+  "max_interactions_to_unblock": 6,
+  "max_required_manual_edits": 0,
+  "max_policy_roundtrips": 3
+}

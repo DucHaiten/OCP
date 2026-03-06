@@ -1,0 +1,31 @@
+{
+  "schema": "ocl.v20.final_audit_scope.v1",
+  "contract_id": "v20.final_audit_scope",
+  "version": "v1",
+  "scope": {
+    "no_new_semantics": true,
+    "release_target": "v1.0-rc",
+    "supported_profiles": [
+      "win-x64",
+      "linux-x64",
+      "macos-arm64"
+    ],
+    "gates_required": [
+      "20-A",
+      "20-B",
+      "20-C",
+      "20-D",
+      "20-E",
+      "20-F",
+      "20-G",
+      "20-H"
+    ]
+  },
+  "claims": {
+    "deterministic_supply_chain_replay_requires_modes": [
+      "vendored",
+      "pinned_cache"
+    ],
+    "allow_network_replay_is_functional_only": true
+  }
+}

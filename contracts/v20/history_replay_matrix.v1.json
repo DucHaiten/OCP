@@ -1,0 +1,28 @@
+{
+  "schema": "ocl.v20.history_replay_matrix.v1",
+  "contract_id": "v20.history_replay_matrix",
+  "version": "v1",
+  "strategy": "checkout_and_test",
+  "entries": [
+    { "version_id": "v0.1", "commit_or_tag": "v0.1", "toolchain_profile": "legacy_v0x", "dependency_mode": "allow_network" },
+    { "version_id": "v0.2", "commit_or_tag": "v0.2", "toolchain_profile": "legacy_v0x", "dependency_mode": "allow_network" },
+    { "version_id": "v0.3", "commit_or_tag": "v0.3", "toolchain_profile": "legacy_v0x", "dependency_mode": "allow_network" },
+    { "version_id": "v0.4", "commit_or_tag": "v0.4", "toolchain_profile": "legacy_v0x", "dependency_mode": "allow_network" },
+    { "version_id": "v0.5", "commit_or_tag": "v0.5", "toolchain_profile": "legacy_v0x", "dependency_mode": "allow_network" },
+    { "version_id": "v0.6", "commit_or_tag": "v0.6", "toolchain_profile": "legacy_v0x", "dependency_mode": "allow_network" },
+    { "version_id": "v0.7.2", "commit_or_tag": "v0.7.2", "toolchain_profile": "legacy_v0x", "dependency_mode": "allow_network" },
+    { "version_id": "v0.7.3", "commit_or_tag": "v0.7.3", "toolchain_profile": "legacy_v0x", "dependency_mode": "allow_network" },
+    { "version_id": "v0.8", "commit_or_tag": "v0.8", "toolchain_profile": "legacy_v0x", "dependency_mode": "allow_network" },
+    { "version_id": "v0.9", "commit_or_tag": "v0.9", "toolchain_profile": "legacy_v0x", "dependency_mode": "allow_network" },
+    { "version_id": "v0.10", "commit_or_tag": "v0.10", "toolchain_profile": "stable_v1", "dependency_mode": "pinned_cache" },
+    { "version_id": "v0.11", "commit_or_tag": "v0.11", "toolchain_profile": "stable_v1", "dependency_mode": "pinned_cache" },
+    { "version_id": "v0.12", "commit_or_tag": "v0.12", "toolchain_profile": "stable_v1", "dependency_mode": "pinned_cache" },
+    { "version_id": "v0.13", "commit_or_tag": "v0.13", "toolchain_profile": "stable_v1", "dependency_mode": "pinned_cache" },
+    { "version_id": "v0.14", "commit_or_tag": "v0.14", "toolchain_profile": "stable_v1", "dependency_mode": "pinned_cache" },
+    { "version_id": "v0.15", "commit_or_tag": "v0.15", "toolchain_profile": "stable_v1", "dependency_mode": "pinned_cache" },
+    { "version_id": "v0.16", "commit_or_tag": "v0.16", "toolchain_profile": "stable_v1", "dependency_mode": "pinned_cache" },
+    { "version_id": "v0.17", "commit_or_tag": "v0.17", "toolchain_profile": "stable_v1", "dependency_mode": "pinned_cache" },
+    { "version_id": "v0.18", "commit_or_tag": "v0.18", "toolchain_profile": "stable_v1", "dependency_mode": "pinned_cache" },
+    { "version_id": "v0.19", "commit_or_tag": "v0.19", "toolchain_profile": "stable_v1", "dependency_mode": "pinned_cache" }
+  ]
+}

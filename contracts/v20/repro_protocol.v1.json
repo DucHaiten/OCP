@@ -1,0 +1,11 @@
+{
+  "schema": "ocl.v20.repro_protocol.v1",
+  "contract_id": "v20.repro_protocol",
+  "version": "v1",
+  "clean_build_runs": 2,
+  "compare": {
+    "manifest_byte_equal": true,
+    "artifact_sha256_equal": true
+  },
+  "allow_non_deterministic_fields": []
+}

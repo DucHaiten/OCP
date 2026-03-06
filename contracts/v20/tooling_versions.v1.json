@@ -1,0 +1,38 @@
+{
+  "schema": "ocl.v20.tooling_versions.v1",
+  "contract_id": "v20.tooling_versions",
+  "version": "v1",
+  "tooling_id": "w20-tooling-v1",
+  "required": [
+    {
+      "tool": "cargo",
+      "version_rule": "1.86.x"
+    },
+    {
+      "tool": "rustc",
+      "version_rule": "1.86.x"
+    },
+    {
+      "tool": "node",
+      "version_rule": "22.x"
+    },
+    {
+      "tool": "pnpm",
+      "version_rule": "10.x"
+    }
+  ],
+  "external": [
+    {
+      "tool": "fuzz-harness",
+      "version_rule": "v1"
+    },
+    {
+      "tool": "mutation-runner",
+      "version_rule": "v1"
+    },
+    {
+      "tool": "chaos-injector",
+      "version_rule": "v1"
+    }
+  ]
+}

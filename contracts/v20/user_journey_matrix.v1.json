@@ -1,0 +1,43 @@
+{
+  "schema": "ocl.v20.user_journey_matrix.v1",
+  "contract_id": "v20.user_journey_matrix",
+  "version": "v1",
+  "journeys": [
+    {
+      "id": "tool_cli",
+      "steps": [
+        "ocl init",
+        "ocl lock sync",
+        "ocl lock verify",
+        "ocl perm snapshot",
+        "ocl perm diff",
+        "ocl perm approve",
+        "ocl build --attest",
+        "ocl verify --attest",
+        "ocl run",
+        "ocl replay",
+        "ocl dbg"
+      ]
+    },
+    {
+      "id": "editor_lsp",
+      "steps": [
+        "open .ocl file",
+        "diagnostics realtime",
+        "format on save",
+        "go to definition",
+        "rename symbol",
+        "code action governed"
+      ]
+    },
+    {
+      "id": "connector_path",
+      "steps": [
+        "add connector pack",
+        "budget analyze",
+        "run connector flow",
+        "replay connector flow"
+      ]
+    }
+  ]
+}

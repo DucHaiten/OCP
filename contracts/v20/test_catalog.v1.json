@@ -1,0 +1,45 @@
+{
+  "schema": "ocl.v20.test_catalog.v1",
+  "contract_id": "v20.test_catalog",
+  "version": "v1",
+  "policy": {
+    "deny_ignored_tests": true,
+    "deny_test_filters": true,
+    "deny_cfg_skips": true,
+    "allow_skip_whitelist": true
+  },
+  "suites": [
+    {
+      "id": "gate20a_contract_freeze",
+      "tests": [
+        "v20_contract_chain",
+        "v20_required_contracts_complete",
+        "v20_run_manifest_policy",
+        "v20_threat_model_contract",
+        "v20_test_catalog_contract",
+        "v20_tooling_versions_contract",
+        "v20_history_toolchain_matrix_contract"
+      ]
+    },
+    {
+      "id": "gate20b_history_replay",
+      "tests": [
+        "v20_history_replay_matrix",
+        "v20_regression_snapshot_diff",
+        "v20_history_toolchain_matrix",
+        "v20_cross_platform_signature"
+      ]
+    },
+    {
+      "id": "gate20h_signoff",
+      "tests": [
+        "v20_zero_open_findings",
+        "v20_final_signoff_bundle",
+        "v20_finding_schema_contract",
+        "v20_finding_reclassification_guard",
+        "v20_signoff_required_artifacts",
+        "v20_stability_repeat_policy"
+      ]
+    }
+  ]
+}

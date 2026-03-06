@@ -1,0 +1,24 @@
+{
+  "schema": "ocl.v20.finding_schema.v1",
+  "contract_id": "v20.finding_schema",
+  "version": "v1",
+  "finding_levels": [
+    "CRITICAL",
+    "HIGH",
+    "MEDIUM",
+    "LOW"
+  ],
+  "required_fields": [
+    "finding_id",
+    "component",
+    "vector",
+    "severity",
+    "repro_steps_hash",
+    "status",
+    "evidence_packet_ref"
+  ],
+  "reclassification_required_fields": [
+    "review_record_ref",
+    "reclassification_reason_code"
+  ]
+}
