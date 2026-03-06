@@ -1,0 +1,61 @@
+{
+  "schema": "ocl.contracts.required.v1",
+  "entries": [
+    {
+      "contract_id": "history.evidence_index",
+      "version": "v1",
+      "schema_hash": "4c2a075e824e0c1301170f300470ccbe45ea09eaf41e8011edd3862aa57c5f74",
+      "producer": "contracts/history/evidence_index.v1.json",
+      "consumer": "tests/historical_evidence.rs",
+      "allowed_diffs_v016": "none"
+    },
+    {
+      "contract_id": "history.evidence_index_signature",
+      "version": "v1",
+      "schema_hash": "d23ac5575ed866bd3e2fd6cd3825dc6988975281ad85be4ca4a20698ab82f24e",
+      "producer": "contracts/history/evidence_index.v1.sig",
+      "consumer": "tests/historical_evidence_signature.rs",
+      "allowed_diffs_v016": "none"
+    },
+    {
+      "contract_id": "lane.literals",
+      "version": "v0.8+",
+      "schema_hash": "04934761cbca397924f4cbed26156471d9feb4aa05851a4b8176c8a923156b31",
+      "producer": "ocl-sdk+ocl-cli",
+      "consumer": "ocl-runtime-core+ocl-cli",
+      "allowed_diffs_v016": "none"
+    },
+    {
+      "contract_id": "lockfile.sot",
+      "version": "v0.15-line",
+      "schema_hash": "3164569a24fa1bb1cf171736dd98ef365dcb29afc80215541cc4e883744d7eed",
+      "producer": "ocl-sdk",
+      "consumer": "ocl-cli",
+      "allowed_diffs_v016": "none"
+    },
+    {
+      "contract_id": "manifest.schema",
+      "version": "v0.15-line",
+      "schema_hash": "f5579325e09353969e202d962e13948f9725aa00a13b3436168a5c0af3316620",
+      "producer": "ocl-sdk:projects/ocp-ocl/crates/ocl-sdk/src/lib.rs",
+      "consumer": "ocl-cli+ocl-runtime-core",
+      "allowed_diffs_v016": "none"
+    },
+    {
+      "contract_id": "registry.pack_contracts",
+      "version": "v0.15-line",
+      "schema_hash": "2b45f54f0e23b879667b150a9dde944c5ec1c0f052999e6f389f039c61c22bb6",
+      "producer": "ocp_ocl::CapabilityRegistry",
+      "consumer": "ocl-runtime-core+ocl-sdk+ocl-cli",
+      "allowed_diffs_v016": "additive-only"
+    },
+    {
+      "contract_id": "trace.schema",
+      "version": "v0.11-line",
+      "schema_hash": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+      "producer": "ocl-cli:projects/ocp-ocl/crates/ocl-cli/src/main.rs",
+      "consumer": "ocl-cli+ocl-sdk",
+      "allowed_diffs_v016": "none"
+    }
+  ]
+}

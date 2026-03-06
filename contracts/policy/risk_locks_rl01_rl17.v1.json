@@ -1,0 +1,29 @@
+{
+  "schema": "ocl.policy.risk_locks_rl01_rl17.v1",
+  "contract_id": "v1.risk_locks_rl01_rl17",
+  "version": "v1",
+  "hasher_version": "sha256-v1",
+  "rl_required": [
+    "RL-1",
+    "RL-2",
+    "RL-3",
+    "RL-4",
+    "RL-5",
+    "RL-6",
+    "RL-7",
+    "RL-8",
+    "RL-9",
+    "RL-10",
+    "RL-11",
+    "RL-12",
+    "RL-13",
+    "RL-14",
+    "RL-15",
+    "RL-16",
+    "RL-17"
+  ],
+  "enforcement": {
+    "missing_entry": "fail",
+    "non_pass_status": "fail"
+  }
+}

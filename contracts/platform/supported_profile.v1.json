@@ -1,0 +1,29 @@
+{
+  "schema": "ocl.platform.supported_profile.v1",
+  "contract_id": "v1.supported_profile",
+  "version": "v1",
+  "hasher_version": "sha256-v1",
+  "supported_profiles": [
+    {
+      "id": "linux-x64-ext4",
+      "os": "linux",
+      "arch": "x86_64",
+      "filesystem": "ext4",
+      "case_policy": "sensitive"
+    },
+    {
+      "id": "win-x64-ntfs",
+      "os": "windows",
+      "arch": "x86_64",
+      "filesystem": "ntfs",
+      "case_policy": "insensitive"
+    }
+  ],
+  "canonicalization": {
+    "text_encoding": "UTF-8",
+    "newline": "LF",
+    "path_separator": "/",
+    "locale": "C.UTF-8",
+    "timezone": "UTC"
+  }
+}

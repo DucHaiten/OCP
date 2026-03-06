@@ -1,0 +1,16 @@
+{
+  "schema": "ocl.packs.connector_set.v1",
+  "contract_id": "v1.connector_set",
+  "version": "v1",
+  "hasher_version": "sha256-v1",
+  "connectors": [
+    {
+      "id": "std.http.client",
+      "required": true
+    },
+    {
+      "id": "std.db.sql",
+      "required": true
+    }
+  ]
+}

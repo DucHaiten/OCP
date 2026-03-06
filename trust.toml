@@ -1,0 +1,8 @@
+[policy]
+mode = "strict"
+
+[contract_signing]
+trust_epoch = 1
+
+[trusted_signers.contracts]
+keys = ["w18-sot-root"]

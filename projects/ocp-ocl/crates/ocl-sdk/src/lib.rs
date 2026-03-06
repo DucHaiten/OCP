@@ -12,6 +12,7 @@ use sha2::{Digest, Sha256};
 mod attestation_v15;
 mod perm_v15;
 mod w17;
+mod w18;
 
 pub mod m4;
 pub mod w1;
@@ -60,6 +61,14 @@ pub use w17::{
     W17_ARTIFACT_HASH_VERSION, W17_HASHER_VERSION, W17_PACK_ABI_SCHEMA,
     W17_PACK_BOUNDARY_NATIVE_CAP_V1, W17_PACK_BOUNDARY_WASI_V1, W17_REQUIRED_CONTRACT_FILES,
     W17_SEMANTIC_HASH_VERSION, W17_SIGNATURE_SCHEMA, W17_SIGNATURE_SCHEMA_VERSION,
+};
+pub use w18::{
+    build_contract_signature_sha256_v18, canonical_json_string_v18, canonical_json_value_v18,
+    contract_sig_path_v18, inspect_contract_json_v18, sign_contract_json_v18,
+    verify_contract_json_signature_v18, verify_sot_alias_contract_v18, verify_w18_contract_set_v18,
+    ContractInspectSummaryV18, ContractSetSummaryV18, SotAliasItemSummaryV18, SotAliasSummaryV18,
+    W18_HASHER_VERSION, W18_REQUIRED_CONTRACT_FILES, W18_SIGNATURE_SCHEMA,
+    W18_SIGNATURE_SCHEMA_VERSION,
 };
 pub use w2::{
     admit_bridge_emit_v1, poll_bridge_event_v1, resolve_bridge_runtime_plan_v1,

@@ -2594,6 +2594,16 @@ fn run_cli(args: &[String]) -> i32 {
                 }
             }
         }
+        "doctor" => {
+            let mut forwarded = vec!["perm".to_string(), "doctor".to_string()];
+            forwarded.extend_from_slice(&args[1..]);
+            run_cli(&forwarded)
+        }
+        "fix" => {
+            let mut forwarded = vec!["perm".to_string(), "fix".to_string()];
+            forwarded.extend_from_slice(&args[1..]);
+            run_cli(&forwarded)
+        }
         "perm" => {
             let Some(sub_raw) = args.get(1).map(String::as_str) else {
                 eprintln!("usage: ocl perm <snapshot|diff|approve|review|doctor|fix> ...");
@@ -11598,6 +11608,8 @@ fn print_help() {
     eprintln!("  perm  doctor <project_dir> [--out <report.json>]");
     eprintln!("  perm  fix --plan <project_dir> [--out <permission_fix_plan.json>]");
     eprintln!("  perm  fix --apply <project_dir> [--plan-file <permission_fix_plan.json>] [--patch <permission_fix.patch.toml>] [--out <permission_fix_safety_report.json>] [--approval <permissions.approval.toml>] --ack-risk --justification <text> --by <id> --date <YYYY-MM-DD>");
+    eprintln!("  doctor <project_dir> [--out <report.json>]  # alias of `perm doctor`");
+    eprintln!("  fix --plan|--apply ...                        # alias of `perm fix`");
     eprintln!("  policy lock sync <project_dir>");
     eprintln!("  cosmos init <project_dir> [--preset default|ci]");
     eprintln!("  cosmos lock sync <project_dir> [--locked] [--signer-id <id>] [--sign-key <file>] [--trust-store <file>]");

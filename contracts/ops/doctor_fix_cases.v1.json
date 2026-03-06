@@ -1,0 +1,22 @@
+{
+  "schema": "ocl.ops.doctor_fix_cases.v1",
+  "contract_id": "v1.doctor_fix_cases",
+  "version": "v1",
+  "hasher_version": "sha256-v1",
+  "cases": [
+    {
+      "case_id": "perm-wildcard-risk",
+      "expected_findings": 1,
+      "expected_fix_actions": 1
+    },
+    {
+      "case_id": "missing-budget-path",
+      "expected_findings": 1,
+      "expected_fix_actions": 0
+    }
+  ],
+  "rules": {
+    "strict_lane_no_bypass": true,
+    "output_digest_stable": true
+  }
+}

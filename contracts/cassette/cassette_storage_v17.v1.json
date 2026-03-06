@@ -1,0 +1,20 @@
+{
+  "schema": "ocl.cassette.storage.v17.v1",
+  "contract_id": "v1.cassette_storage_v17",
+  "version": "v1",
+  "hasher_version": "sha256-v1",
+  "layout": {
+    "meta": "cassette_meta.toml",
+    "index": "cassette_index.json",
+    "events": "cassette.jsonl",
+    "blocks_dir": "blocks"
+  },
+  "integrity": {
+    "missing_chunk_policy": "fail-honest",
+    "hash_algorithm": "sha256-v1"
+  },
+  "retention": {
+    "ttl_scope": "maintenance-only",
+    "runtime_semantic_impact": "none"
+  }
+}

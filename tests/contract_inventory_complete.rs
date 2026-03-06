@@ -17,6 +17,7 @@ struct RequiredContractsV1 {
 fn required_path() -> PathBuf {
     v16::repo_root()
         .join("contracts")
+        .join("v16")
         .join("required_contracts.v1.json")
 }
 

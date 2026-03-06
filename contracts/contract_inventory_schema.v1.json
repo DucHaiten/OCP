@@ -1,0 +1,19 @@
+{
+  "schema": "ocl.contract.inventory.schema.v1",
+  "contract_id": "v1.contract_inventory_schema",
+  "version": "v1",
+  "hasher_version": "sha256-v1",
+  "entry_required_fields": [
+    "contract_id",
+    "version",
+    "schema_hash",
+    "producer",
+    "consumer",
+    "allowed_diffs_v018"
+  ],
+  "completeness_rules": {
+    "required_contracts_source": "contracts/required_contracts.v1.json",
+    "deny_missing_contract_id": true,
+    "deny_duplicate_contract_id": true
+  }
+}
