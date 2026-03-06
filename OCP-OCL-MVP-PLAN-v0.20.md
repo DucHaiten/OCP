@@ -49,11 +49,11 @@ Mục tiêu v0.20: **không thêm semantics mới**; đây là vòng kiểm tra 
 - Mục tiêu phiên bản:
   - vòng kiểm tra cực hạn cuối trước v1.0, săn lỗi chủ động trên toàn hệ.
 - Trạng thái tổng quan:
-  - `IN_PROGRESS (Gate 20-A đã đóng, Gate 20-B đang chạy targeted tests)`.
+  - `IN_PROGRESS (Gate 20-A, 20-B đã đóng; chuẩn bị Gate 20-C)`.
 - Gate đang làm/đã xong/chưa làm:
-  - đã xong: `20-A`; đang làm: `20-B (PARTIAL do thiếu per-OS report)`; còn lại `TODO`.
+  - đã xong: `20-A`, `20-B`; tiếp theo: `20-C`; còn lại `TODO`.
 - Bước kế tiếp ngay:
-  - bổ sung báo cáo per-OS Linux/macOS cho Gate `20-B`, sau đó chạy lại aggregate.
+  - mở Planning Freeze cho Gate `20-C` và chạy bộ hardcore bug-hunting theo protocol đã khóa.
 - Lệnh kiểm chứng chuẩn:
   - xem `10) Operational commands (v0.20)`.
 - File code trọng yếu dự kiến thay đổi:
@@ -68,7 +68,7 @@ Mục tiêu v0.20: **không thêm semantics mới**; đây là vòng kiểm tra 
 ### 0.3 Trạng thái Workstreams/Gates v0.20 (tracking)
 #### Workstreams
 - WS-BL (baseline freeze + chain-of-evidence): `IN_PROGRESS`
-- WS-RG (full regression replay v0.1..v0.19): `IN_PROGRESS`
+- WS-RG (full regression replay v0.1..v0.19): `DONE`
 - WS-HC (hardcore bug-hunt: fuzz/property/mutation/chaos): `TODO`
 - WS-US (real-user operability + DX stress): `TODO`
 - WS-SC (security red-team + supply-chain adversarial): `TODO`
@@ -77,7 +77,7 @@ Mục tiêu v0.20: **không thêm semantics mới**; đây là vòng kiểm tra 
 
 #### Gate status (20-A .. 20-H)
 - Gate 20-A — Final Contract Freeze + SoT continuity: `DONE`
-- Gate 20-B — Full Historical Regression Replay (v0.1..v0.19): `IN_PROGRESS`
+- Gate 20-B — Full Historical Regression Replay (v0.1..v0.19): `DONE`
 - Gate 20-C — Hardcore Bug Hunting (fuzz/property/mutation): `TODO`
 - Gate 20-D — Chaos/Fault Injection + Fail-honest Stress: `TODO`
 - Gate 20-E — User Operability + DX Torture Tests: `TODO`
@@ -869,6 +869,9 @@ Exit criteria:
     - `v20_history_toolchain_matrix`
     - `v20_cross_platform_signature`
   - thêm helper dùng chung cho Gate 20-B để ghi report regression/cross-platform.
+  - bổ sung workflow CI đa OS để sinh evidence per-OS và aggregate:
+    - `.github/workflows/w20-cross-platform-signature.yml`
+  - vá deterministic cross-platform signature bằng canonical JSON hash (không phụ thuộc CRLF theo OS).
 - Files changed:
   - `tests/v20_gate_b_common.rs`
   - `tests/v20_history_replay_matrix.rs`
@@ -883,18 +886,25 @@ Exit criteria:
   - `cargo test --test v20_history_toolchain_matrix`
   - `cargo test --test v20_cross_platform_signature`
   - `$env:W20_CROSS_PLATFORM_MODE='per_os'; cargo test --test v20_cross_platform_signature`
+  - `gh run list --repo DucHaiten/OCP-OCL --workflow w20-cross-platform-signature.yml --limit 3`
+  - `gh run view 22771813455 --repo DucHaiten/OCP-OCL --json ...`
+  - `gh run view 22772660078 --repo DucHaiten/OCP-OCL --job 66057928979 --log`
+  - `gh run download 22772881266 --repo DucHaiten/OCP-OCL -n w20-cross-platform-win-x64 -D target/ocl/w20/regression/os`
+  - `gh run download 22772881266 --repo DucHaiten/OCP-OCL -n w20-cross-platform-linux-x64 -D target/ocl/w20/regression/os`
+  - `gh run download 22772881266 --repo DucHaiten/OCP-OCL -n w20-cross-platform-macos-arm64 -D target/ocl/w20/regression/os`
+  - `cargo test --test v20_cross_platform_signature`
 - Test results:
   - Targeted tests (must-pass for gate):
     - `v20_history_replay_matrix`: `PASS`
     - `v20_regression_snapshot_diff`: `PASS`
     - `v20_history_toolchain_matrix`: `PASS`
-    - `v20_cross_platform_signature`: `CHƯA ĐẠT (thiếu report per-OS: linux-x64, macos-arm64)`
+    - `v20_cross_platform_signature`: `PASS` (đủ per-OS reports + aggregate).
   - Regression tests (supporting only):
     - chưa chạy `cargo test` toàn bộ ở snapshot này.
 - Kết luận gate:
-  - `IN_PROGRESS` (chưa đạt exit criteria do thiếu bằng chứng cross-platform đủ 3 OS).
+  - `DONE`.
 - Design alignment:
-  - `PARTIAL` (logic gate đúng thiết kế, còn thiếu evidence Linux/macOS do môi trường hiện tại chỉ chạy Windows).
+  - `FULL`.
 - Notes/risks:
   - artifacts đã sinh:
     - `target/ocl/w20/regression/history_replay_report.json`
@@ -903,9 +913,11 @@ Exit criteria:
     - `target/ocl/w20/regression/history_replay_strategy_report.json`
     - `target/ocl/w20/regression/history_toolchain_matrix_report.json`
     - `target/ocl/w20/regression/os/win-x64/cross_platform_signature_report.json`
+    - `target/ocl/w20/regression/os/linux-x64/cross_platform_signature_report.json`
+    - `target/ocl/w20/regression/os/macos-arm64/cross_platform_signature_report.json`
     - `target/ocl/w20/regression/cross_platform_signature_aggregate_report.json`
-  - bước tiếp theo bắt buộc để đóng 20-B:
-    - chạy workflow `.github/workflows/w20-cross-platform-signature.yml` để sinh đủ per-OS reports trên `win-x64/linux-x64/macos-arm64`, rồi verify aggregate.
+  - workflow evidence:
+    - run `22772881266` của `w20-cross-platform-signature` đã `success` trên cả `win-x64`, `linux-x64`, `macos-arm64`, aggregate pass.
 
 ### YYYY-MM-DD — 20-C Planning Freeze
 - Date:
