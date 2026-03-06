@@ -38,6 +38,7 @@ fn build_default_index_v1() -> v16::HistoryEvidenceIndexV1 {
         ("v0.13", "OCP-OCL-MVP-PLAN-v0.13.md"),
         ("v0.14", "OCP-OCL-MVP-PLAN-v0.14.md"),
         ("v0.15", "OCP-OCL-MVP-PLAN-v0.15.md"),
+        ("v0.20", "OCP-OCL-MVP-PLAN-v0.20.md"),
     ];
     let mut entries = Vec::new();
     for (version_id, file) in versions {
@@ -110,9 +111,13 @@ fn historical_evidence_chain_v01_to_v015_is_complete_and_valid() {
         .iter()
         .map(|entry| entry.version_id.clone())
         .collect::<BTreeSet<String>>();
-    assert_eq!(
-        actual_versions, expected_versions,
-        "historical evidence must cover full v0.1..v0.15 range"
+    assert!(
+        expected_versions.is_subset(&actual_versions),
+        "historical evidence must include at least full v0.1..v0.15 range"
+    );
+    assert!(
+        actual_versions.contains("v0.20"),
+        "historical evidence must include v0.20 signoff continuity entry"
     );
 
     let mut verified_entries = Vec::new();

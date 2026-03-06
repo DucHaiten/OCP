@@ -95,17 +95,17 @@ pub use w19::{
     EditorSymbolV19, W19_HASHER_VERSION, W19_REQUIRED_CONTRACT_FILES, W19_SIGNATURE_SCHEMA,
     W19_SIGNATURE_SCHEMA_VERSION,
 };
-pub use w20::{
-    contract_sig_path_v20, sign_contract_json_v20, verify_contract_json_signature_v20,
-    verify_w20_contract_set_v20, ContractInspectSummaryV20, ContractSetSummaryV20,
-    W20_HASHER_VERSION, W20_REQUIRED_CONTRACT_FILES, W20_SIGNATURE_SCHEMA,
-    W20_SIGNATURE_SCHEMA_VERSION,
-};
 pub use w2::{
     admit_bridge_emit_v1, poll_bridge_event_v1, resolve_bridge_runtime_plan_v1,
     resolve_domain_selection_v1, validate_locked_cosmos_bridge_config_v1, BridgeEnvelopeV1,
     BridgeRuntimePlanV1, BridgeRuntimeRuleV1, BridgeRuntimeStateV1, DomainProfileV1,
     DomainSelectionV1,
+};
+pub use w20::{
+    contract_sig_path_v20, sign_contract_json_v20, verify_contract_json_signature_v20,
+    verify_w20_contract_set_v20, ContractInspectSummaryV20, ContractSetSummaryV20,
+    W20_HASHER_VERSION, W20_REQUIRED_CONTRACT_FILES, W20_SIGNATURE_SCHEMA,
+    W20_SIGNATURE_SCHEMA_VERSION,
 };
 pub use w3::{
     build_commit_intent_hash256, build_shadow_required_digest, build_shadow_transcript_v1,

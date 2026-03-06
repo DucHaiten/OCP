@@ -7,6 +7,10 @@ edition = "2021"
 name = "ocp_ocl"
 path = "src/lib.rs"
 
+[features]
+default = []
+w20_chaos = []
+
 [dependencies]
 sha2 = "0.10"
 

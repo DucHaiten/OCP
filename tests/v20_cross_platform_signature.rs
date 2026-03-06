@@ -1,5 +1,5 @@
-use std::fs;
 use std::env;
+use std::fs;
 
 use serde_json::json;
 
@@ -62,8 +62,7 @@ fn v20_cross_platform_signature() {
     }
     v20b::write_json_pretty(&current_path, &current_report);
 
-    let mode = env::var("W20_CROSS_PLATFORM_MODE")
-        .unwrap_or_else(|_| "strict".to_string());
+    let mode = env::var("W20_CROSS_PLATFORM_MODE").unwrap_or_else(|_| "strict".to_string());
     assert!(
         matches!(mode.as_str(), "strict" | "per_os" | "aggregate"),
         "invalid W20_CROSS_PLATFORM_MODE: {} (expected strict|per_os|aggregate)",
@@ -133,7 +132,10 @@ fn v20_cross_platform_signature() {
         );
     }
 
-    let first = signatures.first().expect("at least one signature").to_string();
+    let first = signatures
+        .first()
+        .expect("at least one signature")
+        .to_string();
     let mismatch = signatures.iter().any(|item| item != &first);
     assert!(!mismatch, "cross-platform signatures must be identical");
 }

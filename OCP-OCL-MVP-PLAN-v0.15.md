@@ -1,7 +1,7 @@
 # OCL v0.15 — Supply-chain Hardening + LTS Rehearsal (Security-by-Design Distribution)
 
 Ngày tạo: 2026-03-03  
-Trạng thái: `DRAFT (LOCK WHEN CODING)`  
+Trạng thái: `DONE (15-A..15-F DONE)`  
 Phạm vi: **OCL-only**.  
 Tiền đề: v0.10 đã có packaging/lock/signing + permission manifests; v0.14 đã có conformance + stability sprint; v0.8 có quarantine+cassette; v0.11 có debugger/diff/minimizer.
 
@@ -51,7 +51,7 @@ Mục tiêu v0.15: đưa OCL tới mức **production readiness** ở góc độ
 - Mục tiêu phiên bản:
   - hardening supply-chain + attestation + LTS rehearsal, không mở semantics mới.
 - Trạng thái tổng quan:
-  - `DRAFT (LOCK WHEN CODING)`.
+  - `DONE (15-A..15-F DONE)`.
 - Gate đang làm/đã xong/chưa làm:
   - `15-A`, `15-B`, `15-C`, `15-D`, `15-E` đã xong; `15-F` đã xong (stretch).
 - Bước kế tiếp ngay:

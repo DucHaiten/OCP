@@ -1,7 +1,7 @@
 # OCL v0.14 — Global Conformance Suite + Stability Sprint (Behavior Contracts at Scale)
 
 Ngày tạo: 2026-03-03  
-Trạng thái: `DRAFT (LOCK WHEN CODING)`  
+Trạng thái: `DONE (14-A..14-G DONE)`  
 Phạm vi: **OCL-only**.  
 Tiền đề: v0.7–v0.13 đã hình thành core + packs + engines + quarantine+cassette + schema typing + deps/lock/signing + debugger + IR/caching.
 
@@ -50,7 +50,7 @@ Mục tiêu v0.14: đưa OCL lên mức “đủ tin cậy để người khác 
 - Mục tiêu phiên bản:
   - Thiết lập global conformance suite + stability sprint để khóa hợp đồng hành vi ở quy mô toàn hệ.
 - Trạng thái tổng quan:
-  - `DRAFT (LOCK WHEN CODING)`.
+  - `DONE (14-A..14-G DONE)`.
 - Gate đang làm/đã xong/chưa làm:
   - Gate 14-A, 14-B, 14-C, 14-D, 14-E, 14-F, 14-G đã hoàn tất theo scope.
 - Bước kế tiếp ngay:

@@ -35,6 +35,7 @@ fn build_default_index_v1() -> v16::HistoryEvidenceIndexV1 {
         ("v0.13", "OCP-OCL-MVP-PLAN-v0.13.md"),
         ("v0.14", "OCP-OCL-MVP-PLAN-v0.14.md"),
         ("v0.15", "OCP-OCL-MVP-PLAN-v0.15.md"),
+        ("v0.20", "OCP-OCL-MVP-PLAN-v0.20.md"),
     ];
     let mut entries = Vec::new();
     for (version_id, file) in versions {

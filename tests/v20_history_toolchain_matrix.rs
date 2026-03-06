@@ -32,7 +32,10 @@ fn v20_history_toolchain_matrix() {
             .expect("profile id");
         for key in ["rustc", "cargo", "node", "pnpm"] {
             assert!(
-                profile.get(key).and_then(serde_json::Value::as_str).is_some(),
+                profile
+                    .get(key)
+                    .and_then(serde_json::Value::as_str)
+                    .is_some(),
                 "profile `{id}` missing `{key}`"
             );
         }

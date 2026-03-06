@@ -7,13 +7,13 @@ mod v20;
 fn v20_test_catalog_contract() {
     v20::ensure_run_manifest();
 
-    let path = v20::contracts_root().join("v20").join("test_catalog.v1.json");
+    let path = v20::contracts_root()
+        .join("v20")
+        .join("test_catalog.v1.json");
     let value = v20::read_json(&path);
 
     assert_eq!(
-        value
-            .get("contract_id")
-            .and_then(serde_json::Value::as_str),
+        value.get("contract_id").and_then(serde_json::Value::as_str),
         Some("v20.test_catalog"),
         "test_catalog contract_id must be stable"
     );
@@ -65,12 +65,7 @@ fn v20_test_catalog_contract() {
             .and_then(serde_json::Value::as_array)
             .expect("suite.tests");
         for test_name in tests {
-            all_tests.push(
-                test_name
-                    .as_str()
-                    .expect("test name string")
-                    .to_string(),
-            );
+            all_tests.push(test_name.as_str().expect("test name string").to_string());
         }
     }
     all_tests.sort_by(|lhs, rhs| lhs.as_bytes().cmp(rhs.as_bytes()));

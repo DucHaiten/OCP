@@ -164,6 +164,17 @@
       ],
       "schema_version": "v1",
       "version_id": "v0.15"
+    },
+    {
+      "commit_or_tag": "OCL-v0.20",
+      "evidence_files": [
+        {
+          "path": "OCP-OCL-MVP-PLAN-v0.20.md",
+          "sha256": "3667fd0c19534944b10f8cc98404f828de102e7c0a5a84817f0bb0a121e7c314"
+        }
+      ],
+      "schema_version": "v1",
+      "version_id": "v0.20"
     }
   ],
   "hasher": "sha256-v1",

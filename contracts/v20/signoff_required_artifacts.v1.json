@@ -11,6 +11,8 @@
     "target/ocl/w20/hardcore/fuzz_report.json",
     "target/ocl/w20/hardcore/mutation_report.json",
     "target/ocl/w20/hardcore/chaos_report.json",
+    "target/ocl/w20/hardcore/tool_invocation_report.json",
+    "target/ocl/w20/user/editor_journey_report.json",
     "target/ocl/w20/user/golden_journeys_report.json",
     "target/ocl/w20/security/redteam_report.json",
     "target/ocl/w20/release/v1_rc_manifest.json",

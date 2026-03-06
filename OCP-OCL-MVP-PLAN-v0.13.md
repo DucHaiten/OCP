@@ -1,7 +1,7 @@
 # OCL v0.13 — Performance via IR + Reproducible Caching (Determinism-preserving)
 
 Ngày tạo: 2026-03-03  
-Trạng thái: `DRAFT (LOCK WHEN CODING)`  
+Trạng thái: `DONE (13-A..13-F DONE)`  
 Phạm vi: **OCL-only**.  
 Tiền đề: v0.11 đã có trace/index/debugger; v0.10 có deps+lock; v0.9 có schema typing; v0.7.x có core runtime; v0.12 có shadow scheduling + reuse.  
 Mục tiêu v0.13: tăng hiệu năng thực tế (app/game mượt, build nhanh) mà **không phá determinism**, bằng:

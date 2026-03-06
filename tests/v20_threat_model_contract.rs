@@ -7,13 +7,13 @@ mod v20;
 fn v20_threat_model_contract() {
     v20::ensure_run_manifest();
 
-    let path = v20::contracts_root().join("v20").join("threat_model.v1.json");
+    let path = v20::contracts_root()
+        .join("v20")
+        .join("threat_model.v1.json");
     let value = v20::read_json(&path);
 
     assert_eq!(
-        value
-            .get("contract_id")
-            .and_then(serde_json::Value::as_str),
+        value.get("contract_id").and_then(serde_json::Value::as_str),
         Some("v20.threat_model"),
         "threat_model contract_id must be stable"
     );

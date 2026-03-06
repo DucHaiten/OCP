@@ -75,7 +75,9 @@ pub fn required_global_contracts_path() -> PathBuf {
 }
 
 pub fn required_global_contracts_mirror_path() -> PathBuf {
-    contracts_root().join("v1").join("required_contracts.v1.json")
+    contracts_root()
+        .join("v1")
+        .join("required_contracts.v1.json")
 }
 
 pub fn read_json(path: &Path) -> JsonValue {
@@ -162,7 +164,54 @@ fn command_version(command: &str, args: &[&str]) -> String {
     if !out.status.success() {
         return "unknown".to_string();
     }
-    String::from_utf8_lossy(&out.stdout).trim().to_string()
+    let value = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if value.is_empty() {
+        "unknown".to_string()
+    } else {
+        value
+    }
+}
+
+fn command_version_candidates(candidates: &[(&str, &[&str])]) -> String {
+    for (cmd, args) in candidates {
+        let value = command_version(cmd, args);
+        if value != "unknown" {
+            return value;
+        }
+    }
+    "unknown".to_string()
+}
+
+fn read_version_rule(path: &Path, field: &str) -> Option<String> {
+    let value = read_json(path);
+    value
+        .get(field)
+        .and_then(JsonValue::as_str)
+        .map(|v| v.to_string())
+}
+
+fn read_required_tool_rule(path: &Path, tool_name: &str) -> Option<String> {
+    let value = read_json(path);
+    let required = value.get("required").and_then(JsonValue::as_array)?;
+    required.iter().find_map(|row| {
+        let tool = row.get("tool").and_then(JsonValue::as_str)?;
+        if tool != tool_name {
+            return None;
+        }
+        row.get("version_rule")
+            .and_then(JsonValue::as_str)
+            .map(|v| v.to_string())
+    })
+}
+
+fn parse_package_manager_version(editor_package_path: &Path, manager_name: &str) -> Option<String> {
+    let value = read_json(editor_package_path);
+    let package_manager = value.get("packageManager").and_then(JsonValue::as_str)?;
+    let (name, version) = package_manager.split_once('@')?;
+    if name != manager_name || version.trim().is_empty() {
+        return None;
+    }
+    Some(version.trim().to_string())
 }
 
 fn read_string_field(path: &Path, field: &str) -> String {
@@ -196,7 +245,12 @@ fn parse_trust_signing_info() -> (String, u64) {
                     .trim_start_matches('[')
                     .trim_end_matches(']')
                     .trim();
-                let first = cleaned.split(',').next().unwrap_or("").trim().trim_matches('"');
+                let first = cleaned
+                    .split(',')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .trim_matches('"');
                 if !first.is_empty() {
                     signer = first.to_string();
                 }
@@ -235,6 +289,9 @@ pub fn ensure_run_manifest() -> JsonValue {
     let history_replay_matrix = contracts.join("history_replay_matrix.v1.json");
     let history_toolchain_matrix = contracts.join("history_toolchain_matrix.v1.json");
     let required_contracts = contracts.join("required_contracts_v20.v1.json");
+    let editor_packaging_toolchain = contracts_root()
+        .join("editor")
+        .join("editor_packaging_toolchain.v1.json");
 
     let dependency_mode = {
         let value = read_json(&history_replay_matrix);
@@ -250,7 +307,9 @@ pub fn ensure_run_manifest() -> JsonValue {
             }
         }
         if seen.len() == 1 {
-            seen.into_iter().next().unwrap_or_else(|| "unknown".to_string())
+            seen.into_iter()
+                .next()
+                .unwrap_or_else(|| "unknown".to_string())
         } else if seen.is_empty() {
             "unknown".to_string()
         } else {
@@ -293,13 +352,49 @@ pub fn ensure_run_manifest() -> JsonValue {
             .join("Cargo.toml"),
     );
 
+    let node_version = command_version("node", &["-v"]);
+    let pnpm_version = {
+        let shell = command_version_candidates(&[("pnpm", &["-v"]), ("corepack", &["pnpm", "--version"])]);
+        if shell != "unknown" {
+            shell
+        } else {
+            parse_package_manager_version(&editor_package, "pnpm")
+                .or_else(|| read_required_tool_rule(&tooling_versions, "pnpm"))
+                .unwrap_or_else(|| "unknown".to_string())
+        }
+    };
+    let vsce_version = {
+        let shell = command_version_candidates(&[
+            ("vsce", &["--version"]),
+            ("corepack", &["pnpm", "exec", "vsce", "--version"]),
+        ]);
+        if shell != "unknown" {
+            shell
+        } else {
+            read_version_rule(&editor_packaging_toolchain, "vsce")
+                .unwrap_or_else(|| "unknown".to_string())
+        }
+    };
+    let ovsx_version = {
+        let shell = command_version_candidates(&[
+            ("ovsx", &["--version"]),
+            ("corepack", &["pnpm", "exec", "ovsx", "--version"]),
+        ]);
+        if shell != "unknown" {
+            shell
+        } else {
+            read_version_rule(&editor_packaging_toolchain, "ovsx")
+                .unwrap_or_else(|| "unknown".to_string())
+        }
+    };
+
     obj.insert(
         "node_version".to_string(),
-        JsonValue::String(command_version("node", &["-v"])),
+        JsonValue::String(node_version),
     );
     obj.insert(
         "pnpm_version".to_string(),
-        JsonValue::String(command_version("pnpm", &["-v"])),
+        JsonValue::String(pnpm_version),
     );
     obj.insert(
         "pnpm_lock_hash".to_string(),
@@ -307,11 +402,11 @@ pub fn ensure_run_manifest() -> JsonValue {
     );
     obj.insert(
         "vsce_version".to_string(),
-        JsonValue::String(command_version("vsce", &["--version"])),
+        JsonValue::String(vsce_version),
     );
     obj.insert(
         "ovsx_version".to_string(),
-        JsonValue::String(command_version("ovsx", &["--version"])),
+        JsonValue::String(ovsx_version),
     );
     obj.insert(
         "required_contracts_hash".to_string(),
@@ -345,7 +440,10 @@ pub fn ensure_run_manifest() -> JsonValue {
         "editor_extension_version".to_string(),
         JsonValue::String(editor_extension_version),
     );
-    obj.insert("ocl_cli_version".to_string(), JsonValue::String(cli_version));
+    obj.insert(
+        "ocl_cli_version".to_string(),
+        JsonValue::String(cli_version),
+    );
     obj.insert(
         "lsp_server_version".to_string(),
         JsonValue::String("0.19.0-dev".to_string()),

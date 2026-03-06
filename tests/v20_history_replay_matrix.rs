@@ -15,16 +15,16 @@ fn v20_history_replay_matrix() {
     let toolchain_path = v20b::contracts_root()
         .join("v20")
         .join("history_toolchain_matrix.v1.json");
-    let catalog_path = v20b::contracts_root().join("v20").join("test_catalog.v1.json");
+    let catalog_path = v20b::contracts_root()
+        .join("v20")
+        .join("test_catalog.v1.json");
 
     let replay = v20b::read_json(&replay_path);
     let toolchain = v20b::read_json(&toolchain_path);
     let catalog = v20b::read_json(&catalog_path);
 
     assert_eq!(
-        replay
-            .get("strategy")
-            .and_then(serde_json::Value::as_str),
+        replay.get("strategy").and_then(serde_json::Value::as_str),
         Some("checkout_and_test"),
         "history replay strategy must be checkout_and_test"
     );
@@ -67,7 +67,10 @@ fn v20_history_replay_matrix() {
             "unknown toolchain_profile `{profile}` for {version_id}"
         );
         assert!(
-            matches!(dependency_mode, "vendored" | "pinned_cache" | "allow_network"),
+            matches!(
+                dependency_mode,
+                "vendored" | "pinned_cache" | "allow_network"
+            ),
             "invalid dependency_mode `{dependency_mode}` for {version_id}"
         );
         seen_versions.insert(version_id.to_string());
@@ -135,7 +138,10 @@ fn v20_history_replay_matrix() {
         "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20b::run_manifest_sha256()
     });
-    v20b::write_report("regression/history_replay_strategy_report.json", &strategy_report);
+    v20b::write_report(
+        "regression/history_replay_strategy_report.json",
+        &strategy_report,
+    );
 
     let catalog_report = json!({
         "schema": "ocl.w20.regression_test_catalog_report.v1",
