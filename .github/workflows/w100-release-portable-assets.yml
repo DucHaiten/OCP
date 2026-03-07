@@ -33,6 +33,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p target/ocl/w100/release
           mkdir -p target/ocl/w100/ci/linux-x64
           cp target/x86_64-unknown-linux-musl/release/ocl-cli target/ocl/w100/ci/linux-x64/ocl
           cp target/x86_64-unknown-linux-musl/release/ocl-lsp target/ocl/w100/ci/linux-x64/ocl-lsp
@@ -64,6 +65,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p target/ocl/w100/release
           mkdir -p target/ocl/w100/ci/macos-arm64
           cp target/aarch64-apple-darwin/release/ocl-cli target/ocl/w100/ci/macos-arm64/ocl
           cp target/aarch64-apple-darwin/release/ocl-lsp target/ocl/w100/ci/macos-arm64/ocl-lsp
