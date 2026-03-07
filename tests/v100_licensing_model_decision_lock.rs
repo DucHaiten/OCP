@@ -11,12 +11,10 @@ fn v100_licensing_model_decision_lock() {
     let model = contract.get("model").unwrap_or(&JsonValue::Null);
     assert!(model.is_string(), "model must be a single locked string");
     assert_eq!(model.as_str().unwrap_or(""), "dual_license");
-    assert!(
-        contract
-            .get("cla_required")
-            .and_then(JsonValue::as_bool)
-            .unwrap_or(false)
-    );
+    assert!(contract
+        .get("cla_required")
+        .and_then(JsonValue::as_bool)
+        .unwrap_or(false));
     assert!(
         contract.get("model_options").is_none()
             && contract.get("allowed_models").is_none()

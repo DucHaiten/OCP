@@ -34,8 +34,14 @@ fn v100_docs_language_policy() {
     assert!(readme.contains("**English:**"));
     assert!(readme.contains("**Tiếng Việt:**"));
 
-    let vi = v100d::repo_root().join("docs").join("vi").join("USER_GUIDE.md");
-    let en = v100d::repo_root().join("docs").join("en").join("USER_GUIDE.md");
+    let vi = v100d::repo_root()
+        .join("docs")
+        .join("vi")
+        .join("USER_GUIDE.md");
+    let en = v100d::repo_root()
+        .join("docs")
+        .join("en")
+        .join("USER_GUIDE.md");
     assert!(vi.exists(), "missing {}", vi.display());
     let en_required = policy
         .get("en_translation_required_for_current_gate")
@@ -44,12 +50,10 @@ fn v100_docs_language_policy() {
     if en_required {
         assert!(en.exists(), "missing {}", en.display());
     }
-    assert!(
-        policy
-            .get("vi_is_source_of_truth")
-            .and_then(JsonValue::as_bool)
-            .unwrap_or(false)
-    );
+    assert!(policy
+        .get("vi_is_source_of_truth")
+        .and_then(JsonValue::as_bool)
+        .unwrap_or(false));
 
     let report = json!({
         "schema": "ocl.w100.docs.language_policy_report.v1",

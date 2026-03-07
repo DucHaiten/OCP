@@ -12,12 +12,19 @@ fn read_json(path: PathBuf) -> JsonValue {
 }
 
 fn write_report(rel_path: &str, value: &JsonValue) {
-    let out = repo_root().join("target").join("ocl").join("w100").join(rel_path);
+    let out = repo_root()
+        .join("target")
+        .join("ocl")
+        .join("w100")
+        .join(rel_path);
     if let Some(parent) = out.parent() {
         fs::create_dir_all(parent).expect("create report parent");
     }
-    fs::write(&out, serde_json::to_string_pretty(value).expect("serialize report"))
-        .expect("write report");
+    fs::write(
+        &out,
+        serde_json::to_string_pretty(value).expect("serialize report"),
+    )
+    .expect("write report");
 }
 
 #[test]
@@ -47,7 +54,10 @@ fn v100_installer_script_contract() {
         .join("build_win_installer.ps1");
 
     assert!(iss_path.exists(), "missing Inno Setup script");
-    assert!(build_script_path.exists(), "missing Windows installer build script");
+    assert!(
+        build_script_path.exists(),
+        "missing Windows installer build script"
+    );
 
     let iss = fs::read_to_string(&iss_path).expect("read iss");
     let build_script = fs::read_to_string(&build_script_path).expect("read build script");
@@ -91,11 +101,16 @@ fn v100_installer_script_contract() {
         .filter_map(|v| v.as_str().map(|s| s.to_string()))
         .collect::<Vec<String>>();
     assert!(
-        default_install_path.contains("OCP-OCL") && iss.contains("DefaultDirName={autopf}\\OCP-OCL"),
+        default_install_path.contains("OCP-OCL")
+            && iss.contains("DefaultDirName={autopf}\\OCP-OCL"),
         "installer script must align with default install directory contract"
     );
     let icon_path = repo_root().join(icon_asset.replace('/', "\\"));
-    assert!(icon_path.exists(), "missing installer icon asset {}", icon_path.display());
+    assert!(
+        icon_path.exists(),
+        "missing installer icon asset {}",
+        icon_path.display()
+    );
     assert!(
         iss.contains("SetupIconFile="),
         "installer script must declare SetupIconFile"

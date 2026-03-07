@@ -7,11 +7,17 @@ mod v100c;
 fn v100_win_installer_smoke() {
     let report = v100c::ensure_win_installer_smoke_report();
     assert_eq!(
-        report.get("status").and_then(JsonValue::as_str).unwrap_or(""),
+        report
+            .get("status")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "PASS"
     );
     assert!(
-        report.get("installed").and_then(JsonValue::as_bool).unwrap_or(false),
+        report
+            .get("installed")
+            .and_then(JsonValue::as_bool)
+            .unwrap_or(false),
         "installer smoke must mark installed=true"
     );
     let checks = report

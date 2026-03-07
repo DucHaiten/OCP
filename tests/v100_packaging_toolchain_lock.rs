@@ -67,10 +67,22 @@ fn v100_packaging_toolchain_lock() {
     let pnpm_ok = version_rule_matches_v19(pnpm_rule, &pnpm_actual);
     let vsce_ok = version_rule_matches_v19(vsce_rule, &vsce_actual);
     let ovsx_ok = version_rule_matches_v19(ovsx_rule, &ovsx_actual);
-    assert!(node_ok, "node version `{node_actual}` violates rule `{node_rule}`");
-    assert!(pnpm_ok, "pnpm version `{pnpm_actual}` violates rule `{pnpm_rule}`");
-    assert!(vsce_ok, "vsce version `{vsce_actual}` violates rule `{vsce_rule}`");
-    assert!(ovsx_ok, "ovsx version `{ovsx_actual}` violates rule `{ovsx_rule}`");
+    assert!(
+        node_ok,
+        "node version `{node_actual}` violates rule `{node_rule}`"
+    );
+    assert!(
+        pnpm_ok,
+        "pnpm version `{pnpm_actual}` violates rule `{pnpm_rule}`"
+    );
+    assert!(
+        vsce_ok,
+        "vsce version `{vsce_actual}` violates rule `{vsce_rule}`"
+    );
+    assert!(
+        ovsx_ok,
+        "ovsx version `{ovsx_actual}` violates rule `{ovsx_rule}`"
+    );
 
     let report = json!({
         "schema": "ocl.w100.release.packaging_toolchain_report.v1",

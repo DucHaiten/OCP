@@ -128,7 +128,9 @@ fn gate_statuses_from_plan() -> BTreeMap<String, String> {
 }
 
 fn prerequisite_gate_ids() -> Vec<&'static str> {
-    vec!["1.0-A", "1.0-B", "1.0-C", "1.0-D", "1.0-E", "1.0-F", "1.0-G"]
+    vec![
+        "1.0-A", "1.0-B", "1.0-C", "1.0-D", "1.0-E", "1.0-F", "1.0-G",
+    ]
 }
 
 fn release_asset_matrix() -> JsonValue {
@@ -174,11 +176,7 @@ fn manifest_artifact_names() -> BTreeSet<String> {
         .cloned()
         .unwrap_or_default()
         .into_iter()
-        .filter_map(|item| {
-            item.get("path")
-                .and_then(JsonValue::as_str)
-                .map(basename)
-        })
+        .filter_map(|item| item.get("path").and_then(JsonValue::as_str).map(basename))
         .collect()
 }
 
@@ -200,8 +198,8 @@ fn doc_scope_check(path: &Path) -> JsonValue {
     let manifest_sig = lower.contains("release_artifact_manifest.json.sig");
     let checksums_sig = lower.contains("sha256sums.sig");
     let no_fallback = lower.contains("fallback");
-    let source_scope = lower.contains("github auto-generated source archives")
-        && lower.contains("trust chain");
+    let source_scope =
+        lower.contains("github auto-generated source archives") && lower.contains("trust chain");
     json!({
         "path": path.to_string_lossy().replace('\\', "/"),
         "manifest_signature_mentioned": manifest_sig,
@@ -264,7 +262,8 @@ pub fn ensure_publish_signed_assets_scope_report() -> JsonValue {
             }
             continue;
         }
-        let allowed_missing = item == "SBOM-installer.spdx.json" && installer_sbom_status != "required";
+        let allowed_missing =
+            item == "SBOM-installer.spdx.json" && installer_sbom_status != "required";
         if allowed_missing {
             missing_allowed.push(item.clone());
         } else {
@@ -273,8 +272,20 @@ pub fn ensure_publish_signed_assets_scope_report() -> JsonValue {
     }
 
     let doc_checks = vec![
-        doc_scope_check(&repo_root().join("docs").join("vi").join("security").join("verify-download.md")),
-        doc_scope_check(&repo_root().join("docs").join("en").join("security").join("verify-download.md")),
+        doc_scope_check(
+            &repo_root()
+                .join("docs")
+                .join("vi")
+                .join("security")
+                .join("verify-download.md"),
+        ),
+        doc_scope_check(
+            &repo_root()
+                .join("docs")
+                .join("en")
+                .join("security")
+                .join("verify-download.md"),
+        ),
     ];
     let docs_ok = doc_checks
         .iter()
@@ -488,7 +499,11 @@ pub fn ensure_final_signoff_bundle() -> (JsonValue, JsonValue) {
     if bundle_status != "PASS" {
         blocking_reasons.push("RC-SIGNOFF-BUNDLE-NOT-CLEAN".to_string());
     }
-    let signal = if blocking_reasons.is_empty() { "GO" } else { "NO_GO" };
+    let signal = if blocking_reasons.is_empty() {
+        "GO"
+    } else {
+        "NO_GO"
+    };
 
     let go_no_go = json!({
         "schema": "ocl.w100.signoff.v1_0_release_go_no_go.v1",

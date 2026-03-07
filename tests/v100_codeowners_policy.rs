@@ -38,7 +38,9 @@ fn v100_codeowners_policy() {
     ];
     for path in required_paths {
         assert!(
-            lines.iter().any(|line| line.starts_with(&format!("{path} "))),
+            lines
+                .iter()
+                .any(|line| line.starts_with(&format!("{path} "))),
             "CODEOWNERS missing explicit ownership rule for `{path}`"
         );
     }

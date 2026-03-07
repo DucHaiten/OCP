@@ -71,7 +71,8 @@ fn v100_signing_trust_root_contract() {
         "key_rotation_policy must be non-empty"
     );
 
-    let trust_toml = fs::read_to_string(v100::repo_root().join("trust.toml")).expect("read trust.toml");
+    let trust_toml =
+        fs::read_to_string(v100::repo_root().join("trust.toml")).expect("read trust.toml");
     let signer_in_toml = key_ids.iter().any(|key_id| trust_toml.contains(key_id));
     assert!(
         signer_in_toml,

@@ -35,7 +35,12 @@ fn v100_docs_required_sections() {
         readme_ok.push(section.to_string());
     }
 
-    let vi_guide = v100d::read_text(&v100d::repo_root().join("docs").join("vi").join("USER_GUIDE.md"));
+    let vi_guide = v100d::read_text(
+        &v100d::repo_root()
+            .join("docs")
+            .join("vi")
+            .join("USER_GUIDE.md"),
+    );
     let language_policy = v100d::docs_contract_language_parity();
     let en_required = language_policy
         .get("en_translation_required_for_current_gate")
@@ -43,7 +48,10 @@ fn v100_docs_required_sections() {
         .unwrap_or(true);
     let en_guide = if en_required {
         Some(v100d::read_text(
-            &v100d::repo_root().join("docs").join("en").join("USER_GUIDE.md"),
+            &v100d::repo_root()
+                .join("docs")
+                .join("en")
+                .join("USER_GUIDE.md"),
         ))
     } else {
         None

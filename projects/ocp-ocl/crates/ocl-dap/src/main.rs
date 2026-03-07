@@ -4,8 +4,8 @@ use std::path::Path;
 
 use ocl_sdk::{
     dap_breakpoint_mapping_v19, dap_launch_summary_v19, dap_step_sequence_v19,
-    dap_trace_events_from_source_v19, dap_variables_for_event_v19,
-    EditorDapBreakpointMapEntryV19, EditorDapBreakpointV19, EditorDapTraceEventV19,
+    dap_trace_events_from_source_v19, dap_variables_for_event_v19, EditorDapBreakpointMapEntryV19,
+    EditorDapBreakpointV19, EditorDapTraceEventV19,
 };
 use serde_json::{json, Value as JsonValue};
 
@@ -41,7 +41,10 @@ struct DapWriter<W: Write> {
 
 impl<W: Write> DapWriter<W> {
     fn new(writer: W) -> Self {
-        Self { writer, next_seq: 1 }
+        Self {
+            writer,
+            next_seq: 1,
+        }
     }
 
     fn response(
@@ -124,17 +127,15 @@ fn run() -> io::Result<()> {
                     None,
                 )?;
             }
-            "launch" => {
-                match handle_launch(&mut state, &arguments) {
-                    Ok(()) => {
-                        writer.response(seq, &command, true, json!({}), None)?;
-                        writer.event("initialized", json!({}))?;
-                    }
-                    Err(message) => {
-                        writer.response(seq, &command, false, json!({}), Some(message))?;
-                    }
+            "launch" => match handle_launch(&mut state, &arguments) {
+                Ok(()) => {
+                    writer.response(seq, &command, true, json!({}), None)?;
+                    writer.event("initialized", json!({}))?;
                 }
-            }
+                Err(message) => {
+                    writer.response(seq, &command, false, json!({}), Some(message))?;
+                }
+            },
             "setBreakpoints" => {
                 let breakpoints = handle_set_breakpoints(&mut state, &arguments);
                 writer.response(
@@ -278,30 +279,39 @@ fn handle_launch(state: &mut DapState, arguments: &JsonValue) -> Result<(), Stri
         .get("workspaceFolder")
         .and_then(JsonValue::as_str)
         .map(ToOwned::to_owned)
-        .or_else(|| Path::new(&program).parent().map(|path| path.display().to_string()));
+        .or_else(|| {
+            Path::new(&program)
+                .parent()
+                .map(|path| path.display().to_string())
+        });
     let workspace_hash = arguments
         .get("workspaceHash")
         .and_then(JsonValue::as_str)
         .map(ToOwned::to_owned)
-        .unwrap_or_else(|| stable_workspace_hash(workspace_folder.as_deref().unwrap_or("workspace")));
+        .unwrap_or_else(|| {
+            stable_workspace_hash(workspace_folder.as_deref().unwrap_or("workspace"))
+        });
     let run_id = arguments
         .get("runId")
         .and_then(JsonValue::as_str)
         .map(ToOwned::to_owned)
         .unwrap_or_else(|| "editor-run".to_string());
     let file_id = stable_file_id(&program);
-    let source = std::fs::read_to_string(&program)
-        .map_err(|err| format!("read program failed: {err}"))?;
+    let source =
+        std::fs::read_to_string(&program).map_err(|err| format!("read program failed: {err}"))?;
     let contract = serde_json::from_str::<JsonValue>(DEBUG_CONTRACT_JSON)
         .map_err(|err| format!("parse debug contract failed: {err}"))?;
-    let summary =
-        dap_launch_summary_v19(&contract, &workspace_hash, &run_id, &source, file_id).map_err(
-            |err| format!("compute launch summary failed: {err}"),
-        )?;
+    let summary = dap_launch_summary_v19(&contract, &workspace_hash, &run_id, &source, file_id)
+        .map_err(|err| format!("compute launch summary failed: {err}"))?;
     let events = dap_trace_events_from_source_v19(&source, file_id)
         .map_err(|err| format!("build trace events failed: {err:?}"))?;
     let trace_path = if let Some(root) = &workspace_folder {
-        Some(write_trace_artifacts(root, &summary.trace_path, &summary, &events)?)
+        Some(write_trace_artifacts(
+            root,
+            &summary.trace_path,
+            &summary,
+            &events,
+        )?)
     } else {
         None
     };
@@ -348,8 +358,10 @@ fn handle_set_breakpoints(state: &mut DapState, arguments: &JsonValue) -> Vec<Js
             })
         })
         .collect::<Vec<EditorDapBreakpointV19>>();
-    let contract = serde_json::from_str::<JsonValue>(DEBUG_CONTRACT_JSON).unwrap_or_else(|_| json!({}));
-    let mapping = dap_breakpoint_mapping_v19(&contract, &state.events, &requested).unwrap_or_default();
+    let contract =
+        serde_json::from_str::<JsonValue>(DEBUG_CONTRACT_JSON).unwrap_or_else(|_| json!({}));
+    let mapping =
+        dap_breakpoint_mapping_v19(&contract, &state.events, &requested).unwrap_or_default();
     state.breakpoints = requested.clone();
     state.breakpoint_map = mapping;
 
@@ -404,7 +416,10 @@ fn current_variables(state: &DapState) -> Vec<JsonValue> {
 
 fn current_event(state: &DapState) -> Option<&EditorDapTraceEventV19> {
     let event_id = *state.step_ids.get(state.current_step)?;
-    state.events.iter().find(|event| event.trace_event_id == event_id)
+    state
+        .events
+        .iter()
+        .find(|event| event.trace_event_id == event_id)
 }
 
 fn advance_one_step(state: &mut DapState) -> bool {

@@ -24,7 +24,10 @@ fn v100_plan_archive_layout_policy() {
         .into_iter()
         .filter_map(|v| v.as_str().map(|s| s.to_string()))
         .collect::<Vec<String>>();
-    assert!(!allow_root_plan.is_empty(), "allow_root_plan must not be empty");
+    assert!(
+        !allow_root_plan.is_empty(),
+        "allow_root_plan must not be empty"
+    );
 
     let mut root_plans = Vec::<String>::new();
     for entry in std::fs::read_dir(&root).expect("read root") {
@@ -89,4 +92,3 @@ fn v100_plan_archive_layout_policy() {
     });
     v100d::write_report("docs/plan_archive_layout_report.json", &report);
 }
-

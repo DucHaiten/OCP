@@ -7,7 +7,10 @@ mod v100c;
 fn v100_win_uninstall_smoke() {
     let report = v100c::ensure_win_uninstall_smoke_report();
     assert_eq!(
-        report.get("status").and_then(JsonValue::as_str).unwrap_or(""),
+        report
+            .get("status")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "PASS"
     );
     assert!(

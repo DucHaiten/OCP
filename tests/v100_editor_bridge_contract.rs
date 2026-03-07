@@ -8,12 +8,19 @@ fn repo_root() -> PathBuf {
 }
 
 fn write_report(rel_path: &str, value: &serde_json::Value) {
-    let out = repo_root().join("target").join("ocl").join("w100").join(rel_path);
+    let out = repo_root()
+        .join("target")
+        .join("ocl")
+        .join("w100")
+        .join(rel_path);
     if let Some(parent) = out.parent() {
         fs::create_dir_all(parent).expect("create report parent");
     }
-    fs::write(&out, serde_json::to_string_pretty(value).expect("serialize report"))
-        .expect("write report");
+    fs::write(
+        &out,
+        serde_json::to_string_pretty(value).expect("serialize report"),
+    )
+    .expect("write report");
 }
 
 #[test]
@@ -121,8 +128,7 @@ fn v100_editor_bridge_contract() {
         "debug runtime must register a real bundled DAP adapter"
     );
     assert!(
-        package_json.contains("\"debuggers\"")
-            && package_json.contains("\"type\": \"ocp-ocl\""),
+        package_json.contains("\"debuggers\"") && package_json.contains("\"type\": \"ocp-ocl\""),
         "package.json must contribute OCL debugger metadata"
     );
 

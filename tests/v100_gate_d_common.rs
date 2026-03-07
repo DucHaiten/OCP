@@ -112,7 +112,11 @@ pub fn list_markdown_files(base: &Path) -> Vec<PathBuf> {
             }
         }
     }
-    out.sort_by(|lhs, rhs| lhs.to_string_lossy().as_bytes().cmp(rhs.to_string_lossy().as_bytes()));
+    out.sort_by(|lhs, rhs| {
+        lhs.to_string_lossy()
+            .as_bytes()
+            .cmp(rhs.to_string_lossy().as_bytes())
+    });
     out
 }
 
@@ -175,4 +179,3 @@ pub fn heading_ids(content: &str) -> Vec<String> {
     }
     ids
 }
-

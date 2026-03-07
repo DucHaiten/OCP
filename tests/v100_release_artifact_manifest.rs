@@ -46,7 +46,10 @@ fn v100_release_artifact_manifest() {
         .and_then(JsonValue::as_array)
         .cloned()
         .unwrap_or_default();
-    assert!(!artifacts.is_empty(), "manifest artifacts must not be empty");
+    assert!(
+        !artifacts.is_empty(),
+        "manifest artifacts must not be empty"
+    );
 
     for row in &artifacts {
         let rel = row

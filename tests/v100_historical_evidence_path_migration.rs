@@ -45,9 +45,17 @@ fn v100_historical_evidence_path_migration() {
                 file.path
             );
             let full = v100d::repo_root().join(&file.path);
-            assert!(full.exists(), "missing migrated evidence file `{}`", file.path);
+            assert!(
+                full.exists(),
+                "missing migrated evidence file `{}`",
+                file.path
+            );
             let actual_hash = v16::sha256_hex_file(&full);
-            assert_eq!(actual_hash, file.sha256, "hash mismatch for `{}`", file.path);
+            assert_eq!(
+                actual_hash, file.sha256,
+                "hash mismatch for `{}`",
+                file.path
+            );
             verified.push(json!({
                 "version_id": entry.version_id,
                 "path": file.path,
@@ -64,5 +72,8 @@ fn v100_historical_evidence_path_migration() {
         "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
-    v100d::write_report("docs/historical_evidence_path_migration_report.json", &report);
+    v100d::write_report(
+        "docs/historical_evidence_path_migration_report.json",
+        &report,
+    );
 }

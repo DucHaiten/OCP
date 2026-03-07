@@ -11,7 +11,11 @@ fn v100_release_portable_workflow_contract() {
         .join(".github")
         .join("workflows")
         .join("w100-release-portable-assets.yml");
-    assert!(workflow_path.exists(), "missing {}", workflow_path.display());
+    assert!(
+        workflow_path.exists(),
+        "missing {}",
+        workflow_path.display()
+    );
 
     let raw = fs::read_to_string(&workflow_path)
         .unwrap_or_else(|_| panic!("read {}", workflow_path.display()));
@@ -27,9 +31,6 @@ fn v100_release_portable_workflow_contract() {
         "w100-portable-linux-x64",
         "w100-portable-macos-arm64",
     ] {
-        assert!(
-            raw.contains(needle),
-            "workflow must contain `{needle}`"
-        );
+        assert!(raw.contains(needle), "workflow must contain `{needle}`");
     }
 }

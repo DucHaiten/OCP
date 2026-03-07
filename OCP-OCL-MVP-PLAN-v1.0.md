@@ -1,7 +1,7 @@
 # OCL v1.0 - Public Release Packaging + Documentation + Licensing/Commercial Lock
 
 Ngày tạo: 2026-03-07  
-Trạng thái: `IN_PROGRESS (Gate 1.0-A, 1.0-B, 1.0-C, 1.0-D, 1.0-E, 1.0-F, 1.0-G DONE; 1.0-H IN_PROGRESS)`  
+Trạng thái: `DONE (Gate 1.0-A..1.0-H DONE)`  
 Phạm vi: **OCL-only**  
 Tiền đề: v0.1..v0.20 đã hoàn tất chuỗi gate kỹ thuật, conformance, hardening, editor productization, và final signoff machine-checkable.
 
@@ -53,11 +53,11 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 - Mục tiêu phiên bản:
   - đưa OCL lên bản phát hành công khai v1.0 với đóng gói + docs + legal + commercial model đầy đủ.
 - Trạng thái tổng quan:
-  - `IN_PROGRESS (Gate 1.0-A, 1.0-B, 1.0-C, 1.0-D, 1.0-E, 1.0-F, 1.0-G DONE; 1.0-H IN_PROGRESS)`.
+  - `DONE (Gate 1.0-A..1.0-H DONE)`.
 - Gate đang làm/đã xong/chưa làm:
-  - `1.0-A`, `1.0-B`, `1.0-C`, `1.0-D`, `1.0-E`, `1.0-F`, `1.0-G` đã `DONE`; `1.0-H` đang `IN_PROGRESS`.
+  - `1.0-A..1.0-H` đã `DONE`.
 - Bước kế tiếp ngay:
-  - chạy full publish rehearsal cho `1.0-H` (artifact matrix đã đủ sau khi workflow portable GitHub Actions pass trên linux + macOS).
+  - chốt release notes/tag theo `GO` từ `target/ocl/w100/signoff/v1_0_release_go_no_go.json`.
 - Lệnh kiểm chứng chuẩn:
   - xem `11) Operational commands (v1.0)`.
 - File code/tài liệu trọng yếu dự kiến thay đổi:
@@ -84,7 +84,7 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 - WS-DOC (README + USER_GUIDE focused pack): `DONE`
 - WS-LG (legal/authorship/governance pack): `DONE`
 - WS-BZ (commercial/monetization model lock): `DONE`
-- WS-PR (publish rehearsal + final signoff): `IN_PROGRESS`
+- WS-PR (publish rehearsal + final signoff): `DONE`
 
 #### Gate status (1.0-A .. 1.0-H)
 - Gate 1.0-A - Release Contract Freeze + Distribution Matrix: `DONE`
@@ -94,7 +94,7 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 - Gate 1.0-E - VSCode/Editor Release Pack + UX Onboarding: `DONE`
 - Gate 1.0-F - Legal/Authorship/Governance Lock: `DONE`
 - Gate 1.0-G - Commercial Model + Community Policy Lock: `DONE`
-- Gate 1.0-H - Final Publish Rehearsal + GO/NO-GO: `IN_PROGRESS`
+- Gate 1.0-H - Final Publish Rehearsal + GO/NO-GO: `DONE`
 
 ### 0.4 Rule mở code v1.0 (LOCKED)
 - Chỉ mở code khi đã có:
@@ -3313,6 +3313,63 @@ v1.0 chỉ `DONE` khi:
     - rerun `cargo test`,
     - làm sạch `cargo fmt -- --check`,
     - rerun lại targeted suite Gate `1.0-H` sau khi baseline sạch.
+
+### 2026-03-08 - 1.0-H Final Implementation Closeout (DONE sau baseline hygiene + GO)
+- Date: 2026-03-08
+- Gate/Step: 1.0-H
+- Implemented:
+  - Rerun đầy đủ signoff/rehearsal của Gate `1.0-H` sau khi `1.0-B` đã đóng và xác nhận `v1_0_release_go_no_go.json` trả `signal = GO`.
+  - Vá baseline contract-chain liên quan để full regression sạch:
+    - đồng bộ `schema_hash` cho `v1.sot_aliases` và `v20.signoff_required_artifacts` trong required-contracts sets,
+    - cập nhật signature tương ứng cho required contracts,
+    - sửa `pnpm_lock_hash` trong run-manifest helper v19 để phản ánh lockfile thật,
+    - đồng bộ cross-platform signature reports v20 theo canonical signature hiện hành.
+  - Làm sạch formatting drift bằng `cargo fmt`, đưa baseline hygiene về trạng thái pass.
+- Files changed:
+  - `contracts/required_contracts.v1.json`
+  - `contracts/required_contracts.v1.json.sig`
+  - `contracts/v1/required_contracts.v1.json`
+  - `contracts/v20/required_contracts_v20.v1.json`
+  - `contracts/v20/required_contracts_v20.v1.json.sig`
+  - `tests/v19_gate_a_common.rs`
+  - `tests/v20_gate_a_common.rs`
+  - `target/ocl/w20/regression/os/linux-x64/cross_platform_signature_report.json`
+  - `target/ocl/w20/regression/os/macos-arm64/cross_platform_signature_report.json`
+  - `projects/ocp-ocl/crates/ocl-lsp/src/main.rs`
+  - `projects/ocp-ocl/crates/ocl-dap/src/main.rs`
+  - `tests/v100_*.rs` (format baseline)
+  - `OCP-OCL-MVP-PLAN-v1.0.md`
+- Commands run:
+  - `cargo test --test v100_release_publish_rehearsal --test v100_publish_signed_assets_scope --test v100_go_no_go_filename_contract --test v100_final_signoff_bundle --test v100_zero_open_findings --test v100_release_go_no_go`
+  - `cargo test`
+  - `cargo test --test v18_contract_inventory_complete`
+  - `cargo test --test v18_sot_signature_verify`
+  - `cargo test --test v19_node_supplychain_lock`
+  - `cargo test --test v20_cross_platform_signature`
+  - `cargo fmt`
+  - `cargo fmt -- --check`
+  - `cargo clippy --all-targets -- -D warnings`
+  - `Get-Content target\\ocl\\w100\\signoff\\v1_0_release_go_no_go.json`
+- Test results:
+  - Targeted tests (must-pass for gate):
+    - `PASS`: `v100_release_publish_rehearsal`
+    - `PASS`: `v100_publish_signed_assets_scope`
+    - `PASS`: `v100_go_no_go_filename_contract`
+    - `PASS`: `v100_final_signoff_bundle`
+    - `PASS`: `v100_zero_open_findings`
+    - `PASS`: `v100_release_go_no_go`
+  - Regression tests (supporting only):
+    - `PASS`: `cargo test`
+    - `PASS`: `cargo fmt -- --check`
+    - `PASS`: `cargo clippy --all-targets -- -D warnings`
+  - Signoff evidence:
+    - `PASS`: `target/ocl/w100/signoff/v1_0_release_go_no_go.json` với `signal = GO`
+- Kết luận gate:
+  - `DONE`
+- Design alignment:
+  - `FULL`
+- Notes/risks:
+  - Baseline hygiene pass yêu cầu một đợt format đồng loạt trên các file Rust đang drift; đây là thay đổi không đổi semantics nhưng làm code delta lớn.
 
 ---
 

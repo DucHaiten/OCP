@@ -9,19 +9,31 @@ fn v100_licensing_model_contract() {
 
     let contract = v100g::licensing_model();
     assert_eq!(
-        contract.get("contract_id").and_then(JsonValue::as_str).unwrap_or(""),
+        contract
+            .get("contract_id")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "v1.licensing_model"
     );
     assert_eq!(
-        contract.get("schema").and_then(JsonValue::as_str).unwrap_or(""),
+        contract
+            .get("schema")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "ocl.business.licensing_model.v1"
     );
     assert_eq!(
-        contract.get("version").and_then(JsonValue::as_str).unwrap_or(""),
+        contract
+            .get("version")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "v1"
     );
     assert_eq!(
-        contract.get("model").and_then(JsonValue::as_str).unwrap_or(""),
+        contract
+            .get("model")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "dual_license"
     );
     assert_eq!(
@@ -38,12 +50,10 @@ fn v100_licensing_model_contract() {
             .unwrap_or(""),
         "LICENSE"
     );
-    assert!(
-        contract
-            .get("cla_required")
-            .and_then(JsonValue::as_bool)
-            .unwrap_or(false)
-    );
+    assert!(contract
+        .get("cla_required")
+        .and_then(JsonValue::as_bool)
+        .unwrap_or(false));
     let pointer = contract
         .get("commercial_terms_pointer")
         .and_then(JsonValue::as_object)

@@ -7,7 +7,10 @@ mod v100c;
 fn v100_portable_install_smoke() {
     let report = v100c::ensure_portable_install_report();
     assert_eq!(
-        report.get("status").and_then(JsonValue::as_str).unwrap_or(""),
+        report
+            .get("status")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "PASS"
     );
     let assets = report

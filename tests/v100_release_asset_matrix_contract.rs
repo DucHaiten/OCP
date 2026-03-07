@@ -61,7 +61,10 @@ fn v100_release_asset_matrix_contract() {
             .and_then(JsonValue::as_array)
             .cloned()
             .unwrap_or_default();
-        assert!(!assets.is_empty(), "channel `{channel}` has empty required_assets");
+        assert!(
+            !assets.is_empty(),
+            "channel `{channel}` has empty required_assets"
+        );
         for asset in assets.iter().filter_map(JsonValue::as_str) {
             if asset == "ocl-v1.0.0-setup-win-x64.exe" {
                 has_installer = true;

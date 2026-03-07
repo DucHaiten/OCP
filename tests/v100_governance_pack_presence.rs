@@ -28,7 +28,10 @@ fn v100_governance_pack_presence() {
         .and_then(JsonValue::as_bool)
         .unwrap_or(false)
     {
-        assert!(v100f::repo_root().join("CODEOWNERS").exists(), "missing CODEOWNERS");
+        assert!(
+            v100f::repo_root().join("CODEOWNERS").exists(),
+            "missing CODEOWNERS"
+        );
     }
 
     let vi_doc = v100f::repo_root().join("docs/vi/legal/governance.md");

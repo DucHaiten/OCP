@@ -21,7 +21,10 @@ fn v100_oss_license_id_match() {
     assert_eq!(license_file, "LICENSE");
 
     let license_path = v100g::repo_root().join(license_file);
-    assert!(license_path.exists(), "LICENSE file declared by contract must exist");
+    assert!(
+        license_path.exists(),
+        "LICENSE file declared by contract must exist"
+    );
     let license = v100g::read_text(&license_path);
     assert!(
         license.contains("GNU AFFERO GENERAL PUBLIC LICENSE")

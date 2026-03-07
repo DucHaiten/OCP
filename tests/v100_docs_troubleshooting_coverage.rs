@@ -7,7 +7,12 @@ mod v100d;
 fn v100_docs_troubleshooting_coverage() {
     v100d::ensure_run_manifest();
 
-    let vi = v100d::read_text(&v100d::repo_root().join("docs").join("vi").join("USER_GUIDE.md"));
+    let vi = v100d::read_text(
+        &v100d::repo_root()
+            .join("docs")
+            .join("vi")
+            .join("USER_GUIDE.md"),
+    );
     let policy = v100d::docs_contract_language_parity();
     let en_required = policy
         .get("en_translation_required_for_current_gate")
@@ -15,7 +20,10 @@ fn v100_docs_troubleshooting_coverage() {
         .unwrap_or(true);
     let en = if en_required {
         Some(v100d::read_text(
-            &v100d::repo_root().join("docs").join("en").join("USER_GUIDE.md"),
+            &v100d::repo_root()
+                .join("docs")
+                .join("en")
+                .join("USER_GUIDE.md"),
         ))
     } else {
         None

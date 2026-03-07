@@ -10,7 +10,8 @@ fn v100_release_required_contracts() {
     let required_path = v100::release_required_contracts_path();
     let mut required = v100::parse_release_required_contracts(&required_path);
     let mut expected_producers = v100::canonical_contract_producers_v100();
-    expected_producers.retain(|item| item != "contracts/release/v1.0/release_required_contracts.v1.json");
+    expected_producers
+        .retain(|item| item != "contracts/release/v1.0/release_required_contracts.v1.json");
     expected_producers.push("contracts/sot_aliases.v1.json".to_string());
     expected_producers.sort();
 

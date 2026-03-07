@@ -20,16 +20,19 @@ fn v100_release_checksums() {
         };
         entries.push((sha.to_string(), rel.to_string()));
     }
-    assert!(!entries.is_empty(), "SHA256SUMS must have at least one entry");
+    assert!(
+        !entries.is_empty(),
+        "SHA256SUMS must have at least one entry"
+    );
 
     for (expected_sha, rel) in &entries {
         let path = v100b::repo_root().join(rel);
-        assert!(path.exists(), "checksum entry points to missing file `{rel}`");
-        let actual_sha = v100b::sha256_hex_file(&path);
-        assert_eq!(
-            actual_sha, *expected_sha,
-            "checksum mismatch for `{rel}`"
+        assert!(
+            path.exists(),
+            "checksum entry points to missing file `{rel}`"
         );
+        let actual_sha = v100b::sha256_hex_file(&path);
+        assert_eq!(actual_sha, *expected_sha, "checksum mismatch for `{rel}`");
     }
 
     let report = json!({

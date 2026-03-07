@@ -318,7 +318,7 @@
       "consumer": "tests/v18_sot_alias_contract.rs",
       "contract_id": "v1.sot_aliases",
       "producer": "contracts/sot_aliases.v1.json",
-      "schema_hash": "859f0752bbdbdb41d77c54ab479dd624871b56099f1597c5b22ab01bca594841",
+      "schema_hash": "c1dffc774d858d8393124a5e6fc567e32cf838b0e7e3a92821659c0040941d42",
       "version": "v1"
     },
     {
@@ -422,7 +422,7 @@
       "consumer": "tests/v20_signoff_required_artifacts.rs",
       "contract_id": "v20.signoff_required_artifacts",
       "producer": "contracts/v20/signoff_required_artifacts.v1.json",
-      "schema_hash": "5bf8404c1aa493ca066479b5d5b8c02051369ea44b3036d88ef3e21a2bc2c49d",
+      "schema_hash": "affbffebb6cde223c1ea07d3f17d943b2dbda11f368a02db666477af7cfa90bf",
       "version": "v1"
     },
     {

@@ -189,7 +189,12 @@ fn trust_key_epoch() -> (String, u64, u64, u64) {
     (key, min, max, current)
 }
 
-fn file_signature_payload(file_path: &str, hash: &str, pubkey_id: &str, trust_epoch: u64) -> String {
+fn file_signature_payload(
+    file_path: &str,
+    hash: &str,
+    pubkey_id: &str,
+    trust_epoch: u64,
+) -> String {
     format!(
         "ocl-v100-file-sign-v1|file_path={}|file_hash_sha256={}|pubkey_id={}|trust_epoch={}",
         file_path, hash, pubkey_id, trust_epoch
@@ -378,8 +383,12 @@ pub fn ensure_release_fixture_v100() -> ReleaseFixtureV100 {
         .map(|(path, sha)| format!("{sha}  {path}"))
         .collect::<Vec<String>>();
     checksum_lines.sort_by(|lhs, rhs| lhs.as_bytes().cmp(rhs.as_bytes()));
-    fs::write(&checksums_path, format!("{}\n", checksum_lines.join("\n"))).expect("write SHA256SUMS");
-    artifact_hashes.insert(release_rel(&checksums_path), sha256_hex_file(&checksums_path));
+    fs::write(&checksums_path, format!("{}\n", checksum_lines.join("\n")))
+        .expect("write SHA256SUMS");
+    artifact_hashes.insert(
+        release_rel(&checksums_path),
+        sha256_hex_file(&checksums_path),
+    );
 
     let (key_id, _, _, trust_epoch) = trust_key_epoch();
     let checksums_sig = sign_file(&checksums_path, &key_id, trust_epoch);

@@ -69,20 +69,43 @@ fn v100_docs_bilingual_structure_parity() {
             "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
             "run_manifest_sha256": v100d::run_manifest_sha256()
         });
-        v100d::write_report("docs/docs_bilingual_manual_review_record.json", &manual_review);
+        v100d::write_report(
+            "docs/docs_bilingual_manual_review_record.json",
+            &manual_review,
+        );
         return;
     }
 
-    let vi = v100d::read_text(&v100d::repo_root().join("docs").join("vi").join("USER_GUIDE.md"));
-    let en = v100d::read_text(&v100d::repo_root().join("docs").join("en").join("USER_GUIDE.md"));
+    let vi = v100d::read_text(
+        &v100d::repo_root()
+            .join("docs")
+            .join("vi")
+            .join("USER_GUIDE.md"),
+    );
+    let en = v100d::read_text(
+        &v100d::repo_root()
+            .join("docs")
+            .join("en")
+            .join("USER_GUIDE.md"),
+    );
 
     let vi_ids = v100d::heading_ids(&vi);
     let en_ids = v100d::heading_ids(&en);
-    assert_eq!(vi_ids, en_ids, "heading ids mismatch between vi/en user guides");
+    assert_eq!(
+        vi_ids, en_ids,
+        "heading ids mismatch between vi/en user guides"
+    );
 
-    let vi_blocks = extract_code_blocks(&vi).into_iter().collect::<BTreeSet<String>>();
-    let en_blocks = extract_code_blocks(&en).into_iter().collect::<BTreeSet<String>>();
-    assert_eq!(vi_blocks, en_blocks, "command blocks mismatch between vi/en");
+    let vi_blocks = extract_code_blocks(&vi)
+        .into_iter()
+        .collect::<BTreeSet<String>>();
+    let en_blocks = extract_code_blocks(&en)
+        .into_iter()
+        .collect::<BTreeSet<String>>();
+    assert_eq!(
+        vi_blocks, en_blocks,
+        "command blocks mismatch between vi/en"
+    );
 
     let vi_links = v100d::markdown_links(&vi)
         .into_iter()
@@ -92,7 +115,10 @@ fn v100_docs_bilingual_structure_parity() {
         .into_iter()
         .map(|v| normalize_link_target(&v))
         .collect::<BTreeSet<String>>();
-    assert_eq!(vi_links, en_links, "link target parity mismatch between vi/en");
+    assert_eq!(
+        vi_links, en_links,
+        "link target parity mismatch between vi/en"
+    );
 
     let parity = json!({
         "schema": "ocl.w100.docs.bilingual_structure_parity_report.v1",
@@ -117,5 +143,8 @@ fn v100_docs_bilingual_structure_parity() {
         "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
-    v100d::write_report("docs/docs_bilingual_manual_review_record.json", &manual_review);
+    v100d::write_report(
+        "docs/docs_bilingual_manual_review_record.json",
+        &manual_review,
+    );
 }

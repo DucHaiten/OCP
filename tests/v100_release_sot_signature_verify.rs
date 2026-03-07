@@ -30,7 +30,10 @@ fn v100_release_sot_signature_verify() {
             continue;
         }
         if !sig_path.exists() {
-            invalid.push(format!("missing signature: {}", sig_path.to_string_lossy().replace('\\', "/")));
+            invalid.push(format!(
+                "missing signature: {}",
+                sig_path.to_string_lossy().replace('\\', "/")
+            ));
             continue;
         }
     }

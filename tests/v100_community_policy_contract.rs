@@ -9,19 +9,31 @@ fn v100_community_policy_contract() {
 
     let contract = v100g::community_policy();
     assert_eq!(
-        contract.get("contract_id").and_then(JsonValue::as_str).unwrap_or(""),
+        contract
+            .get("contract_id")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "v1.community_contribution_policy"
     );
     assert_eq!(
-        contract.get("schema").and_then(JsonValue::as_str).unwrap_or(""),
+        contract
+            .get("schema")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "ocl.business.community_contribution_policy.v1"
     );
     assert_eq!(
-        contract.get("version").and_then(JsonValue::as_str).unwrap_or(""),
+        contract
+            .get("version")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "v1"
     );
     assert_eq!(
-        contract.get("cla_type").and_then(JsonValue::as_str).unwrap_or(""),
+        contract
+            .get("cla_type")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "license_grant"
     );
     let required_for = contract
@@ -34,22 +46,30 @@ fn v100_community_policy_contract() {
         .collect::<Vec<String>>();
     assert_eq!(
         required_for,
-        vec!["code".to_string(), "docs".to_string(), "contracts".to_string()]
+        vec![
+            "code".to_string(),
+            "docs".to_string(),
+            "contracts".to_string()
+        ]
     );
     assert_eq!(
-        contract.get("inbound").and_then(JsonValue::as_str).unwrap_or(""),
+        contract
+            .get("inbound")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "cla"
     );
     assert_eq!(
-        contract.get("outbound").and_then(JsonValue::as_str).unwrap_or(""),
+        contract
+            .get("outbound")
+            .and_then(JsonValue::as_str)
+            .unwrap_or(""),
         "AGPL-3.0-only+commercial"
     );
-    assert!(
-        contract
-            .get("reject_contribution_without_cla")
-            .and_then(JsonValue::as_bool)
-            .unwrap_or(false)
-    );
+    assert!(contract
+        .get("reject_contribution_without_cla")
+        .and_then(JsonValue::as_bool)
+        .unwrap_or(false));
 
     let report = json!({
         "schema": "ocl.w100.business.community_policy_report.v1",

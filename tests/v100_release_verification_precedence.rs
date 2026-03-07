@@ -48,5 +48,8 @@ fn v100_release_verification_precedence() {
         "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100b::run_manifest_sha256()
     });
-    v100b::write_report("release/release_verification_precedence_report.json", &report);
+    v100b::write_report(
+        "release/release_verification_precedence_report.json",
+        &report,
+    );
 }

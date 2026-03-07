@@ -98,4 +98,3 @@ fn v100_docs_link_redirect_policy() {
     });
     v100d::write_report("docs/docs_link_redirect_policy_report.json", &report);
 }
-

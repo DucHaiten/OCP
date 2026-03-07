@@ -26,9 +26,18 @@ fn v100_trademark_official_build_policy() {
         .and_then(JsonValue::as_str)
         .unwrap_or("");
 
-    assert!(v100f::repo_root().join(signer_ref).exists(), "missing signer ref");
-    assert!(v100f::repo_root().join(manifest_ref).exists(), "missing release manifest ref");
-    assert!(v100f::repo_root().join(signature_ref).exists(), "missing release signature ref");
+    assert!(
+        v100f::repo_root().join(signer_ref).exists(),
+        "missing signer ref"
+    );
+    assert!(
+        v100f::repo_root().join(manifest_ref).exists(),
+        "missing release manifest ref"
+    );
+    assert!(
+        v100f::repo_root().join(signature_ref).exists(),
+        "missing release signature ref"
+    );
 
     let root = v100f::read_text(&v100f::repo_root().join("TRADEMARK.md"));
     let vi = v100f::read_text(&v100f::repo_root().join("docs/vi/legal/trademark.md"));

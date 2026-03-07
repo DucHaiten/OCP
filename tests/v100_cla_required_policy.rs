@@ -11,18 +11,14 @@ fn v100_cla_required_policy() {
     let community_policy = v100g::community_policy();
     let contributing = v100g::read_text(&v100g::repo_root().join("CONTRIBUTING.md"));
 
-    assert!(
-        licensing_model
-            .get("cla_required")
-            .and_then(JsonValue::as_bool)
-            .unwrap_or(false)
-    );
-    assert!(
-        community_policy
-            .get("reject_contribution_without_cla")
-            .and_then(JsonValue::as_bool)
-            .unwrap_or(false)
-    );
+    assert!(licensing_model
+        .get("cla_required")
+        .and_then(JsonValue::as_bool)
+        .unwrap_or(false));
+    assert!(community_policy
+        .get("reject_contribution_without_cla")
+        .and_then(JsonValue::as_bool)
+        .unwrap_or(false));
     assert!(
         contributing.contains("CLA")
             && contributing.contains("license_grant")

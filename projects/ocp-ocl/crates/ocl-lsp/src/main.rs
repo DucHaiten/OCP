@@ -212,8 +212,9 @@ fn hover_result(state: &LspState, params: &JsonValue) -> JsonValue {
     let Some(symbol) = identifier_at_position(&source, line, column) else {
         return JsonValue::Null;
     };
-    let Some(hover) =
-        lsp_hover_for_symbol_v19(&source, file_id_from_uri(&uri), &symbol).ok().flatten()
+    let Some(hover) = lsp_hover_for_symbol_v19(&source, file_id_from_uri(&uri), &symbol)
+        .ok()
+        .flatten()
     else {
         return JsonValue::Null;
     };
@@ -351,7 +352,8 @@ fn workspace_symbol_result(state: &LspState, params: &JsonValue) -> JsonValue {
         .to_ascii_lowercase();
     let mut out = Vec::<JsonValue>::new();
     for (uri, source) in &state.docs {
-        let symbols = lsp_symbols_from_source_v19(source, file_id_from_uri(uri)).unwrap_or_default();
+        let symbols =
+            lsp_symbols_from_source_v19(source, file_id_from_uri(uri)).unwrap_or_default();
         for symbol in symbols {
             if !query.is_empty() && !symbol.name.to_ascii_lowercase().contains(&query) {
                 continue;
@@ -373,7 +375,8 @@ fn formatting_result(state: &LspState, params: &JsonValue) -> JsonValue {
     let Some(source) = load_source(state, &uri) else {
         return JsonValue::Array(Vec::new());
     };
-    let contract = serde_json::from_str::<JsonValue>(FORMATTING_CONTRACT_JSON).unwrap_or_else(|_| json!({}));
+    let contract =
+        serde_json::from_str::<JsonValue>(FORMATTING_CONTRACT_JSON).unwrap_or_else(|_| json!({}));
     let Ok(formatted) = format_source_with_contract_v19(&source, &contract) else {
         return JsonValue::Array(Vec::new());
     };
@@ -498,14 +501,22 @@ fn open_doc_params(params: &JsonValue) -> Option<(String, String)> {
 }
 
 fn change_doc_params(params: &JsonValue) -> Option<(String, String)> {
-    let uri = params.get("textDocument")?.get("uri")?.as_str()?.to_string();
+    let uri = params
+        .get("textDocument")?
+        .get("uri")?
+        .as_str()?
+        .to_string();
     let changes = params.get("contentChanges")?.as_array()?;
     let text = changes.last()?.get("text")?.as_str()?.to_string();
     Some((uri, text))
 }
 
 fn save_doc_uri(params: &JsonValue) -> Option<String> {
-    params.get("textDocument")?.get("uri")?.as_str().map(ToOwned::to_owned)
+    params
+        .get("textDocument")?
+        .get("uri")?
+        .as_str()
+        .map(ToOwned::to_owned)
 }
 
 fn text_doc_uri(params: &JsonValue) -> Option<String> {

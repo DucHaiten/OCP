@@ -8,7 +8,10 @@ fn v100_readme_licensing_consistency() {
     v100g::ensure_run_manifest();
 
     let readme = v100g::read_text(&v100g::repo_root().join("README.md"));
-    assert!(readme.contains("## License"), "README must contain License section");
+    assert!(
+        readme.contains("## License"),
+        "README must contain License section"
+    );
     assert!(
         readme.contains("AGPL-3.0-only"),
         "README must state OSS license id explicitly"

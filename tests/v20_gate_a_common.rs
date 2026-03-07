@@ -354,7 +354,8 @@ pub fn ensure_run_manifest() -> JsonValue {
 
     let node_version = command_version("node", &["-v"]);
     let pnpm_version = {
-        let shell = command_version_candidates(&[("pnpm", &["-v"]), ("corepack", &["pnpm", "--version"])]);
+        let shell =
+            command_version_candidates(&[("pnpm", &["-v"]), ("corepack", &["pnpm", "--version"])]);
         if shell != "unknown" {
             shell
         } else {
@@ -388,26 +389,14 @@ pub fn ensure_run_manifest() -> JsonValue {
         }
     };
 
-    obj.insert(
-        "node_version".to_string(),
-        JsonValue::String(node_version),
-    );
-    obj.insert(
-        "pnpm_version".to_string(),
-        JsonValue::String(pnpm_version),
-    );
+    obj.insert("node_version".to_string(), JsonValue::String(node_version));
+    obj.insert("pnpm_version".to_string(), JsonValue::String(pnpm_version));
     obj.insert(
         "pnpm_lock_hash".to_string(),
         JsonValue::String(pnpm_lock_hash),
     );
-    obj.insert(
-        "vsce_version".to_string(),
-        JsonValue::String(vsce_version),
-    );
-    obj.insert(
-        "ovsx_version".to_string(),
-        JsonValue::String(ovsx_version),
-    );
+    obj.insert("vsce_version".to_string(), JsonValue::String(vsce_version));
+    obj.insert("ovsx_version".to_string(), JsonValue::String(ovsx_version));
     obj.insert(
         "required_contracts_hash".to_string(),
         JsonValue::String(sha256_hex_file(&required_contracts)),

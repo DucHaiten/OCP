@@ -39,7 +39,11 @@ fn v100_cla_inbound_outbound_policy() {
         .collect::<Vec<String>>();
     assert_eq!(
         required_for,
-        vec!["code".to_string(), "docs".to_string(), "contracts".to_string()]
+        vec![
+            "code".to_string(),
+            "docs".to_string(),
+            "contracts".to_string()
+        ]
     );
 
     let contributing = v100g::read_text(&v100g::repo_root().join("CONTRIBUTING.md"));

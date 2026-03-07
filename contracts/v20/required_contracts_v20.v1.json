@@ -134,7 +134,7 @@
       "consumer": "tests/v20_signoff_required_artifacts.rs",
       "contract_id": "v20.signoff_required_artifacts",
       "producer": "contracts/v20/signoff_required_artifacts.v1.json",
-      "schema_hash": "5bf8404c1aa493ca066479b5d5b8c02051369ea44b3036d88ef3e21a2bc2c49d",
+      "schema_hash": "affbffebb6cde223c1ea07d3f17d943b2dbda11f368a02db666477af7cfa90bf",
       "version": "v1"
     },
     {

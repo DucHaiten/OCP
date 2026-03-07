@@ -204,9 +204,21 @@ pub fn ensure_run_manifest() -> JsonValue {
         "pnpm_version".to_string(),
         JsonValue::String(command_version("pnpm", &["-v"])),
     );
+    let pnpm_lock_path = repo
+        .join("editor")
+        .join("vscode")
+        .join("ocp-ocl")
+        .join("pnpm-lock.yaml");
+    let pnpm_lock_hash = if pnpm_lock_path.exists() {
+        let bytes = fs::read(&pnpm_lock_path)
+            .unwrap_or_else(|_| panic!("read {}", pnpm_lock_path.display()));
+        sha256_hex_bytes(&bytes)
+    } else {
+        "missing".to_string()
+    };
     obj.insert(
         "pnpm_lock_hash".to_string(),
-        JsonValue::String("missing".to_string()),
+        JsonValue::String(pnpm_lock_hash),
     );
     obj.insert(
         "vsce_version".to_string(),

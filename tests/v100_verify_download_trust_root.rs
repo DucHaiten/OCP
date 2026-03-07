@@ -45,11 +45,23 @@ fn v100_verify_download_trust_root() {
             .join("verify-download.md"),
     )
     .expect("read docs/en/security/verify-download.md");
-    assert!(vi_doc.contains(trust_path), "vi verify guide must reference trust root path");
-    assert!(en_doc.contains(trust_path), "en verify guide must reference trust root path");
+    assert!(
+        vi_doc.contains(trust_path),
+        "vi verify guide must reference trust root path"
+    );
+    assert!(
+        en_doc.contains(trust_path),
+        "en verify guide must reference trust root path"
+    );
     for key in &key_ids {
-        assert!(vi_doc.contains(key), "vi verify guide missing key_id `{key}`");
-        assert!(en_doc.contains(key), "en verify guide missing key_id `{key}`");
+        assert!(
+            vi_doc.contains(key),
+            "vi verify guide missing key_id `{key}`"
+        );
+        assert!(
+            en_doc.contains(key),
+            "en verify guide missing key_id `{key}`"
+        );
     }
 
     let report = json!({
