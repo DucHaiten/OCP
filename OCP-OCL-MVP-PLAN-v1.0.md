@@ -1,7 +1,7 @@
 # OCL v1.0 - Public Release Packaging + Documentation + Licensing/Commercial Lock
 
 Ngày tạo: 2026-03-07  
-Trạng thái: `IN_PROGRESS (Gate 1.0-A, 1.0-C, 1.0-D, 1.0-E, 1.0-F, 1.0-G DONE; 1.0-B IN_PROGRESS; 1.0-H IN_PROGRESS)`  
+Trạng thái: `IN_PROGRESS (Gate 1.0-A, 1.0-B, 1.0-C, 1.0-D, 1.0-E, 1.0-F, 1.0-G DONE; 1.0-H IN_PROGRESS)`  
 Phạm vi: **OCL-only**  
 Tiền đề: v0.1..v0.20 đã hoàn tất chuỗi gate kỹ thuật, conformance, hardening, editor productization, và final signoff machine-checkable.
 
@@ -53,11 +53,11 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 - Mục tiêu phiên bản:
   - đưa OCL lên bản phát hành công khai v1.0 với đóng gói + docs + legal + commercial model đầy đủ.
 - Trạng thái tổng quan:
-  - `IN_PROGRESS (Gate 1.0-A, 1.0-C, 1.0-D, 1.0-E, 1.0-F, 1.0-G DONE; 1.0-B IN_PROGRESS; 1.0-H IN_PROGRESS)`.
+  - `IN_PROGRESS (Gate 1.0-A, 1.0-B, 1.0-C, 1.0-D, 1.0-E, 1.0-F, 1.0-G DONE; 1.0-H IN_PROGRESS)`.
 - Gate đang làm/đã xong/chưa làm:
-  - `1.0-A`, `1.0-C`, `1.0-D`, `1.0-E`, `1.0-F`, `1.0-G` đã `DONE`; `1.0-B` đang `IN_PROGRESS`; `1.0-H` đang `IN_PROGRESS`.
+  - `1.0-A`, `1.0-B`, `1.0-C`, `1.0-D`, `1.0-E`, `1.0-F`, `1.0-G` đã `DONE`; `1.0-H` đang `IN_PROGRESS`.
 - Bước kế tiếp ngay:
-  - giữ `1.0-B` mở vì blocker macOS arm64 ngoài môi trường hiện tại; `1.0-H` chỉ được đóng sau khi giải quyết blocker này và chạy full publish rehearsal.
+  - chạy full publish rehearsal cho `1.0-H` (artifact matrix đã đủ sau khi workflow portable GitHub Actions pass trên linux + macOS).
 - Lệnh kiểm chứng chuẩn:
   - xem `11) Operational commands (v1.0)`.
 - File code/tài liệu trọng yếu dự kiến thay đổi:
@@ -79,7 +79,7 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 ### 0.3 Trạng thái Workstreams/Gates v1.0 (tracking)
 #### Workstreams
 - WS-RC (release contract freeze + inventory): `DONE`
-- WS-DP (distribution packaging + installers): `IN_PROGRESS`
+- WS-DP (distribution packaging + installers): `DONE`
 - WS-ED (editor/VSIX release readiness): `DONE`
 - WS-DOC (README + USER_GUIDE focused pack): `DONE`
 - WS-LG (legal/authorship/governance pack): `DONE`
@@ -88,7 +88,7 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 
 #### Gate status (1.0-A .. 1.0-H)
 - Gate 1.0-A - Release Contract Freeze + Distribution Matrix: `DONE`
-- Gate 1.0-B - GitHub Release Assets + Integrity Bundle: `IN_PROGRESS`
+- Gate 1.0-B - GitHub Release Assets + Integrity Bundle: `DONE`
 - Gate 1.0-C - Windows EXE Installer + Portable Install Paths: `DONE`
 - Gate 1.0-D - User Docs Complete (Read Once, Use Immediately): `DONE`
 - Gate 1.0-E - VSCode/Editor Release Pack + UX Onboarding: `DONE`
@@ -1422,6 +1422,49 @@ v1.0 chỉ `DONE` khi:
 - Notes/risks:
   - `gh auth status` cho thấy máy hiện tại chưa đăng nhập GitHub, nên chưa thể tự dispatch workflow hoặc tải artifact trong phiên này.
   - Khi workflow này chạy trên GitHub Actions và trả về `ocl-v1.0.0-macos-arm64.tar.gz` thật, Gate `1.0-B` có thể được rerun để chốt lại.
+
+### 2026-03-08 - 1.0-B Final Implementation Closeout (DONE sau GitHub Actions portable artifacts)
+- Date: 2026-03-08
+- Gate/Step: 1.0-B
+- Implemented:
+  - dispatch workflow build portable assets trên GitHub Actions và nhận đủ artifacts thật cho `linux-x64` + `macos-arm64`.
+  - sửa workflow portable để tạo sẵn thư mục `target/ocl/w100/release` trước khi đóng gói tarball.
+  - tải artifacts từ run thành công về `target/ocl/w100/release/*` và rerun toàn bộ targeted tests của Gate `1.0-B`.
+- Files changed:
+  - `.github/workflows/w100-release-portable-assets.yml`
+  - `target/ocl/w100/release/ocl-v1.0.0-linux-x64.tar.gz`
+  - `target/ocl/w100/release/ocl-v1.0.0-macos-arm64.tar.gz`
+  - `OCP-OCL-MVP-PLAN-v1.0.md`
+- Commands run:
+  - `gh workflow run w100-release-portable-assets.yml --ref main`
+  - `gh run view 22808190239 --log-failed`
+  - `gh workflow run w100-release-portable-assets.yml --ref main`
+  - `gh run watch 22808244378 --interval 10 --exit-status`
+  - `gh run download 22808244378 -n w100-portable-linux-x64 -D target/ocl/w100/release`
+  - `gh run download 22808244378 -n w100-portable-macos-arm64 -D target/ocl/w100/release`
+  - `cargo test --test v100_release_artifact_manifest --test v100_release_artifact_signature --test v100_release_checksums --test v100_release_sbom --test v100_release_sbom_status_policy --test v100_release_publish_scope_contract --test v100_verify_download_trust_root --test v100_packaging_toolchain_lock --test v100_release_dependency_policy --test v100_release_verification_precedence`
+  - `cargo test --test v100_install_next_steps_output`
+- Test results:
+  - Targeted tests (must-pass for gate):
+    - `PASS`: `v100_release_artifact_manifest`
+    - `PASS`: `v100_release_artifact_signature`
+    - `PASS`: `v100_release_checksums`
+    - `PASS`: `v100_release_sbom`
+    - `PASS`: `v100_release_sbom_status_policy`
+    - `PASS`: `v100_release_publish_scope_contract`
+    - `PASS`: `v100_verify_download_trust_root`
+    - `PASS`: `v100_packaging_toolchain_lock`
+    - `PASS`: `v100_release_dependency_policy`
+    - `PASS`: `v100_release_verification_precedence`
+  - Regression tests (supporting only):
+    - `PASS`: `v100_install_next_steps_output`
+- Kết luận gate:
+  - `DONE`
+- Design alignment:
+  - `FULL`
+- Notes/risks:
+  - Run đầu tiên của workflow bị lỗi đóng gói do thiếu thư mục release; đã sửa ngay trong workflow và xác nhận run kế tiếp pass.
+  - Portable artifact matrix của Gate `1.0-B` đã đủ `windows-x64`, `linux-x64`, `macos-arm64` theo release contracts hiện hành.
 
 ### 2026-03-07 - 1.0-C Planning Freeze
 - Date: 2026-03-07
