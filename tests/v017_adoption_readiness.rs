@@ -34,7 +34,7 @@ fn v017_adoption_readiness_collects_cross_gate_evidence() {
         ),
     ]);
 
-    let plan_path = PathBuf::from("OCP-OCL-MVP-PLAN-v0.17.md");
+    let plan_path = PathBuf::from("docs/plans/history/OCP-OCL-MVP-PLAN-v0.17.md");
     let plan_text = w17::read_utf8(&plan_path);
 
     let gate_statuses = ["17-A", "17-B", "17-C", "17-D", "17-E", "17-F"]

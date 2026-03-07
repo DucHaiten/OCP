@@ -1,0 +1,24 @@
+{
+  "schema": "ocl.docs.required_sections.v1",
+  "contract_id": "v1.docs_required_sections",
+  "version": "v1",
+  "readme_required_sections": [
+    "What is OCL",
+    "Install",
+    "Quickstart",
+    "Editor",
+    "Security",
+    "License",
+    "Commercial Use",
+    "Contributing"
+  ],
+  "user_guide_required_sections": [
+    "Install",
+    "Quickstart",
+    "Permissions",
+    "Lock Trust Attest",
+    "Run Replay",
+    "Debug",
+    "Troubleshooting"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "ocl.release.dependency_policy.v1",
+  "contract_id": "v1.release_dependency_policy",
+  "version": "v1",
+  "release_build_dependency_mode_allowed": [
+    "vendored",
+    "pinned_cache"
+  ],
+  "release_build_dependency_mode_default": "pinned_cache",
+  "deny_allow_network_channels": [
+    "github_release",
+    "staging_rehearsal"
+  ]
+}

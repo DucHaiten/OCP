@@ -2,6 +2,8 @@
 name = "ocp-ocl"
 version = "0.1.0"
 edition = "2021"
+authors = ["DucHaiten"]
+license = "AGPL-3.0-only"
 
 [lib]
 name = "ocp_ocl"
@@ -21,6 +23,8 @@ members = [
     "projects/ocp-ocl/crates/ocl-runtime-core",
     "projects/ocp-ocl/crates/ocl-sdk",
     "projects/ocp-ocl/crates/ocl-cli",
+    "projects/ocp-ocl/crates/ocl-lsp",
+    "projects/ocp-ocl/crates/ocl-dap",
 ]
 resolver = "2"
 

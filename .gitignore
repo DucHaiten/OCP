@@ -7,3 +7,8 @@ Rules/guard/__pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Local smoke artifacts
+--help/
+--project/
+debug.log

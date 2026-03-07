@@ -1,0 +1,14 @@
+{
+  "schema": "ocl.release.positioning_guard.v1",
+  "contract_id": "v1.release_positioning_guard",
+  "version": "v1",
+  "supported_profile_claim": "supported_profile_only",
+  "deterministic_supply_chain_replay_claim": false,
+  "performance_positioning": "governed_runtime_not_compute_kernel_replacement",
+  "forbidden_claims": [
+    "deterministic_supply_chain_replay_full",
+    "compute_heavy_native_speed_guarantee",
+    "unsupported_platform_equivalence",
+    "zero_friction_permissions_without_review"
+  ]
+}

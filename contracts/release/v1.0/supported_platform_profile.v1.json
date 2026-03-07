@@ -1,0 +1,16 @@
+{
+  "schema": "ocl.release.supported_platform_profile.v1",
+  "contract_id": "v1.supported_platform_profile",
+  "version": "v1",
+  "runtime_support": [
+    "win-x64",
+    "linux-x64",
+    "macos-arm64"
+  ],
+  "editor_support": [
+    "win-x64",
+    "linux-x64",
+    "macos-arm64"
+  ],
+  "fallback_policy": "fail_honest_when_outside_profile"
+}

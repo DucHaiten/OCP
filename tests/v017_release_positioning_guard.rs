@@ -26,7 +26,7 @@ fn has_unqualified_phrase(section: &str, phrase: &str) -> bool {
 
 #[test]
 fn v017_release_positioning_guard_enforces_locked_claims() {
-    let plan_path = PathBuf::from("OCP-OCL-MVP-PLAN-v0.17.md");
+    let plan_path = PathBuf::from("docs/plans/history/OCP-OCL-MVP-PLAN-v0.17.md");
     let plan_text = w17::read_utf8(&plan_path);
     let positioning =
         extract_markdown_section(&plan_text, "### 8.3 Performance positioning (LOCKED)");

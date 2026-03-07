@@ -1,0 +1,18 @@
+{
+  "schema": "ocl.docs.language_parity_policy.v1",
+  "contract_id": "v1.docs_language_parity_policy",
+  "version": "v1",
+  "readme_mode": "bilingual_single_file",
+  "docs_mode": "split_vi_en",
+  "vi_is_source_of_truth": true,
+  "current_translation_stage": "vi_en_translation_open",
+  "en_translation_required_for_current_gate": true,
+  "structural_parity_required_for_current_gate": true,
+  "manual_review_record_required": true,
+  "structural_parity_fields": [
+    "heading_ids",
+    "command_blocks",
+    "version_strings",
+    "link_targets"
+  ]
+}

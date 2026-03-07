@@ -1,0 +1,35 @@
+# Installer Layout
+
+Thư mục `installer/` là gốc source cho hệ đóng gói/cài đặt của OCL.
+
+Quy ước hiện hành:
+- Source installer Windows nằm ở `installer/windows/`.
+- Script build/release hỗ trợ nằm ở `tools/release/`.
+- Build artifacts không được lưu trong repo source này.
+
+Artifacts chuẩn sau khi build:
+- Windows installer: `target/ocl/w100/release/ocl-v1.0.0-setup-win-x64.exe`
+- VSIX: `target/ocl/w100/release/ocp-ocl-vscode-v1.0.0.vsix`
+
+Các file nguồn chính:
+- `installer/windows/ocl-win-x64.iss`
+- `installer/windows/ocl-installer.ico`
+- `tools/release/build_win_installer.ps1`
+- `tools/release/build_vsix.ps1`
+
+Trạng thái thực tế hiện tại:
+- Installer Windows đã được kiểm chứng cài thật ngoài repo.
+- Payload cài đặt chuẩn hiện gồm:
+  - `ocl.exe`
+  - `ocl-lsp.exe`
+  - `ocl-dap.exe`
+  - `ocp-ocl-vscode-v1.0.0.vsix`
+- Installer có:
+  - icon OCL,
+  - chọn thư mục cài,
+  - opt-in `PATH`,
+  - auto-install VSCode extension khi phát hiện VSCode.
+
+Lưu ý:
+- Không copy `.exe` hay file build vào `installer/`.
+- `installer/` chỉ chứa source đóng gói, không chứa output phát hành.

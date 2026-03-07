@@ -1,0 +1,19 @@
+# OCP-OCL NOTICE
+
+Copyright (c) 2026 DucHaiten and contributors to OCP-OCL.
+
+This repository contains the OCP-OCL project and related materials, including:
+- source code,
+- documentation,
+- contracts,
+- release tooling,
+- editor integration.
+
+Unless a specific file or dependency states otherwise, the project-owned material in this repository is distributed under the licensing model documented by the project:
+- OSS side: `AGPL-3.0-only`
+- Commercial side: separate approved agreement when applicable
+
+Important:
+- This file is informational.
+- This file does not replace `LICENSE`.
+- This file does not replace third-party notices that may be required by dependencies or bundled tools.

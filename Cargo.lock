@@ -229,6 +229,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ocl-dap"
+version = "0.1.0"
+dependencies = [
+ "ocl-sdk",
+ "serde_json",
+]
+
+[[package]]
+name = "ocl-lsp"
+version = "0.1.0"
+dependencies = [
+ "ocl-sdk",
+ "serde_json",
+]
+
+[[package]]
 name = "ocl-runtime-core"
 version = "0.1.0"
 dependencies = [

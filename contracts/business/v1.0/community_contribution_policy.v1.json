@@ -1,0 +1,14 @@
+{
+  "schema": "ocl.business.community_contribution_policy.v1",
+  "contract_id": "v1.community_contribution_policy",
+  "version": "v1",
+  "cla_type": "license_grant",
+  "cla_required_for": [
+    "code",
+    "docs",
+    "contracts"
+  ],
+  "inbound": "cla",
+  "outbound": "AGPL-3.0-only+commercial",
+  "reject_contribution_without_cla": true
+}

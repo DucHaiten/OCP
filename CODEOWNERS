@@ -1,0 +1,16 @@
+# OCP-OCL is currently maintained as an owner-led project.
+# Default owner for all paths:
+* @DucHaiten
+
+# Keep critical surfaces explicitly pinned for readability.
+/README.md @DucHaiten
+/LICENSE @DucHaiten
+/NOTICE @DucHaiten
+/AUTHORS @DucHaiten
+/GOVERNANCE.md @DucHaiten
+/TRADEMARK.md @DucHaiten
+/docs/ @DucHaiten
+/contracts/ @DucHaiten
+/projects/ @DucHaiten
+/editor/ @DucHaiten
+/.github/ @DucHaiten

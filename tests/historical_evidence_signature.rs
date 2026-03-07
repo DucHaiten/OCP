@@ -20,22 +20,22 @@ fn sig_path() -> std::path::PathBuf {
 
 fn build_default_index_v1() -> v16::HistoryEvidenceIndexV1 {
     let versions = [
-        ("v0.1", "OCP-OCL-MVP-PLAN-v0.1.md"),
-        ("v0.2", "OCP-OCL-MVP-PLAN-v0.2.md"),
-        ("v0.3", "OCP-OCL-MVP-PLAN-v0.3.md"),
-        ("v0.4", "OCP-OCL-MVP-PLAN-v0.4.md"),
-        ("v0.5", "OCP-OCL-MVP-PLAN-v0.5.md"),
-        ("v0.6", "OCP-OCL-MVP-PLAN-v0.6.md"),
-        ("v0.7", "OCP-OCL-MVP-PLAN-v0.7.1.md"),
-        ("v0.8", "OCP-OCL-MVP-PLAN-v0.8.md"),
-        ("v0.9", "OCP-OCL-MVP-PLAN-v0.9.md"),
-        ("v0.10", "OCP-OCL-MVP-PLAN-v0.10.md"),
-        ("v0.11", "OCP-OCL-MVP-PLAN-v0.11.md"),
-        ("v0.12", "OCP-OCL-MVP-PLAN-v0.12.md"),
-        ("v0.13", "OCP-OCL-MVP-PLAN-v0.13.md"),
-        ("v0.14", "OCP-OCL-MVP-PLAN-v0.14.md"),
-        ("v0.15", "OCP-OCL-MVP-PLAN-v0.15.md"),
-        ("v0.20", "OCP-OCL-MVP-PLAN-v0.20.md"),
+        ("v0.1", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.1.md"),
+        ("v0.2", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.2.md"),
+        ("v0.3", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.3.md"),
+        ("v0.4", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.4.md"),
+        ("v0.5", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.5.md"),
+        ("v0.6", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.6.md"),
+        ("v0.7", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.7.1.md"),
+        ("v0.8", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.8.md"),
+        ("v0.9", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.9.md"),
+        ("v0.10", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.10.md"),
+        ("v0.11", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.11.md"),
+        ("v0.12", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.12.md"),
+        ("v0.13", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.13.md"),
+        ("v0.14", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.14.md"),
+        ("v0.15", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.15.md"),
+        ("v0.20", "docs/plans/history/OCP-OCL-MVP-PLAN-v0.20.md"),
     ];
     let mut entries = Vec::new();
     for (version_id, file) in versions {

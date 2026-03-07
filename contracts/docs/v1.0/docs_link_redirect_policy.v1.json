@@ -1,0 +1,12 @@
+{
+  "schema": "ocl.docs.link_redirect_policy.v1",
+  "contract_id": "v1.docs_link_redirect_policy",
+  "version": "v1",
+  "docs_root": "docs/",
+  "plans_index": "docs/plans/INDEX.md",
+  "historical_plans_root": "docs/plans/history/",
+  "allow_root_plan": [
+    "OCP-OCL-MVP-PLAN-v1.0.md"
+  ],
+  "broken_links_policy": "fail_if_any_broken_link"
+}

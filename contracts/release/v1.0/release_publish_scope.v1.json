@@ -1,0 +1,23 @@
+{
+  "schema": "ocl.release.publish_scope.v1",
+  "contract_id": "v1.release_publish_scope",
+  "version": "v1",
+  "signed_assets_scope": [
+    "release_artifact_manifest.json",
+    "release_artifact_manifest.sig",
+    "SHA256SUMS",
+    "SHA256SUMS.sig",
+    "SBOM-rust.spdx.json",
+    "SBOM-vscode.spdx.json",
+    "SBOM-installer.spdx.json"
+  ],
+  "source_trust_scope": {
+    "github_auto_generated_source_archives_trusted": false,
+    "source_archive_policy": "out_of_trust_chain_unless_explicitly_signed_asset"
+  },
+  "verification_precedence": {
+    "primary": "release_artifact_manifest.json.sig",
+    "secondary": "SHA256SUMS.sig",
+    "on_mismatch": "fail_no_fallback"
+  }
+}

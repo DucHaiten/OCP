@@ -1,0 +1,18 @@
+{
+  "schema": "ocl.security.signing_trust_root.v1",
+  "contract_id": "v1.signing_trust_root",
+  "version": "v1",
+  "trust_root_public_keys": [
+    {
+      "key_id": "w18-sot-root",
+      "fingerprint": "w18-sot-root",
+      "purpose": "contracts_and_release_signing"
+    }
+  ],
+  "trust_epoch_policy": {
+    "min": 1,
+    "max": 1,
+    "current": 1
+  },
+  "key_rotation_policy": "rotation_requires_sot_update_release_note_and_signature_reverify"
+}

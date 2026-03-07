@@ -1,0 +1,53 @@
+{
+  "schema": "ocl.release.asset_matrix.v1",
+  "contract_id": "v1.release_asset_matrix",
+  "version": "v1",
+  "distribution_model": "bundle",
+  "bundled_binaries": [
+    "ocl",
+    "ocl-lsp",
+    "ocl-dap"
+  ],
+  "release_channels": [
+    {
+      "channel": "github_release",
+      "required_assets": [
+        "ocl-v1.0.0-win-x64.zip",
+        "ocl-v1.0.0-linux-x64.tar.gz",
+        "ocl-v1.0.0-macos-arm64.tar.gz",
+        "ocl-v1.0.0-setup-win-x64.exe",
+        "ocp-ocl-vscode-v1.0.0.vsix",
+        "release_artifact_manifest.json",
+        "release_artifact_manifest.sig",
+        "SHA256SUMS",
+        "SHA256SUMS.sig",
+        "SBOM-rust.spdx.json",
+        "SBOM-vscode.spdx.json"
+      ]
+    },
+    {
+      "channel": "staging_rehearsal",
+      "required_assets": [
+        "release_artifact_manifest.json",
+        "release_artifact_manifest.sig",
+        "SHA256SUMS",
+        "SHA256SUMS.sig"
+      ]
+    },
+    {
+      "channel": "local_rehearsal",
+      "required_assets": [
+        "release_artifact_manifest.json",
+        "release_artifact_manifest.sig"
+      ]
+    }
+  ],
+  "installer_sbom": {
+    "status": "optional",
+    "unavailable_reason_code": ""
+  },
+  "vsix_size_limits_bytes": {
+    "marketplace": 268435456,
+    "open_vsx": 268435456
+  }
+}

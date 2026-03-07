@@ -1,0 +1,25 @@
+{
+  "schema": "ocl.legal.pack_required.v1",
+  "contract_id": "v1.legal_pack_required",
+  "version": "v1",
+  "required_root_files": [
+    "LICENSE",
+    "NOTICE",
+    "AUTHORS",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "GOVERNANCE.md",
+    "CODEOWNERS",
+    "TRADEMARK.md"
+  ],
+  "required_docs_files": [
+    "docs/vi/legal/licensing.md",
+    "docs/en/legal/licensing.md",
+    "docs/vi/legal/commercial.md",
+    "docs/en/legal/commercial.md",
+    "docs/vi/legal/governance.md",
+    "docs/en/legal/governance.md",
+    "docs/vi/legal/trademark.md",
+    "docs/en/legal/trademark.md"
+  ]
+}

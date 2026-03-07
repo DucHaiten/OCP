@@ -37,6 +37,8 @@ use ocl_sdk::{
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
 
+const OCL_PUBLIC_VERSION: &str = "v1.0.0";
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let code = run_cli(&args);
@@ -47,6 +49,11 @@ fn run_cli(args: &[String]) -> i32 {
     if args.is_empty() {
         print_help();
         return 2;
+    }
+
+    if args.len() == 1 && matches!(args[0].as_str(), "--version" | "-V" | "version") {
+        print_version();
+        return 0;
     }
 
     match args[0].as_str() {
@@ -3509,6 +3516,10 @@ fn run_cli(args: &[String]) -> i32 {
             2
         }
     }
+}
+
+fn print_version() {
+    println!("ocl {}", OCL_PUBLIC_VERSION);
 }
 
 fn render_doc_packs_text_v09() -> String {

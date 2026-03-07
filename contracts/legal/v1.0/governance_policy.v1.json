@@ -1,0 +1,11 @@
+{
+  "schema": "ocl.legal.governance_policy.v1",
+  "contract_id": "v1.governance_policy",
+  "version": "v1",
+  "release_authority": [
+    "maintainer_owner"
+  ],
+  "codeowners_required": true,
+  "security_disclosure_file": "SECURITY.md",
+  "governance_file": "GOVERNANCE.md"
+}

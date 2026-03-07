@@ -1,0 +1,10 @@
+[package]
+name = "ocl-lsp"
+version = "0.1.0"
+edition = "2021"
+authors = ["DucHaiten"]
+license = "AGPL-3.0-only"
+
+[dependencies]
+ocl-sdk = { path = "../ocl-sdk" }
+serde_json = "1"

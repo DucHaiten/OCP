@@ -16,7 +16,7 @@ fn contains_unqualified_claim(section: &str, phrase: &str) -> bool {
 fn v18_release_positioning_guard_keeps_supported_profile_claims_bounded() {
     common::ensure_run_manifest();
 
-    let plan_path = PathBuf::from("OCP-OCL-MVP-PLAN-v0.18.md");
+    let plan_path = PathBuf::from("docs/plans/history/OCP-OCL-MVP-PLAN-v0.18.md");
     let plan_text = std::fs::read_to_string(&plan_path).expect("read v0.18 plan");
     let plan_lower = plan_text.to_lowercase();
 

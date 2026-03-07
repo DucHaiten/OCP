@@ -3,6 +3,8 @@
   "displayName": "OCP OCL",
   "description": "Observation Collapse Language support for VSCode.",
   "version": "0.19.0-dev",
+  "author": "DucHaiten",
+  "license": "AGPL-3.0-only",
   "publisher": "ocp-ocl",
   "engines": {
     "vscode": "^1.90.0"
@@ -11,7 +13,8 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage:ocp-ocl"
+    "onLanguage:ocp-ocl",
+    "onDebugResolve:ocp-ocl"
   ],
   "main": "./dist/extension.js",
   "scripts": {
@@ -77,6 +80,50 @@
       {
         "command": "ocpOcl.openDebugTrace",
         "title": "OCL: Open Debug Trace"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "ocp-ocl",
+        "label": "OCL Replay Debug",
+        "languages": [
+          "ocp-ocl"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to the .ocl entry file to debug."
+              },
+              "workspaceFolder": {
+                "type": "string",
+                "description": "Workspace root used for replay-backed trace artifacts."
+              },
+              "workspaceHash": {
+                "type": "string",
+                "description": "Deterministic workspace hash used by the replay-backed debug adapter."
+              },
+              "runId": {
+                "type": "string",
+                "description": "Deterministic run identifier used for editor debug traces."
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "ocp-ocl",
+            "request": "launch",
+            "name": "OCL Replay Debug",
+            "program": "${file}",
+            "workspaceFolder": "${workspaceFolder}",
+            "runId": "editor-debug"
+          }
+        ]
       }
     ],
     "configuration": {

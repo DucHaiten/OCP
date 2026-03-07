@@ -1,0 +1,13 @@
+{
+  "schema": "ocl.business.licensing_model.v1",
+  "contract_id": "v1.licensing_model",
+  "version": "v1",
+  "model": "dual_license",
+  "oss_license_id": "AGPL-3.0-only",
+  "oss_license_file": "LICENSE",
+  "cla_required": true,
+  "commercial_terms_pointer": {
+    "vi": "docs/vi/legal/commercial.md",
+    "en": "docs/en/legal/commercial.md"
+  }
+}

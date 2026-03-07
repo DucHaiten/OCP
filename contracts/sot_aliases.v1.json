@@ -11,6 +11,10 @@
     {
       "canonical": "contracts/contract_inventory_schema.v1.json",
       "mirror": "contracts/v1/contract_inventory_schema.v1.json"
+    },
+    {
+      "canonical": "contracts/release/v1.0/release_required_contracts.v1.json",
+      "mirror": "contracts/v1/release_required_contracts.v1.json"
     }
   ]
 }

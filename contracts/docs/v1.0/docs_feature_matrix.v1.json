@@ -1,0 +1,8 @@
+{
+  "schema": "ocl.docs.feature_matrix.v1",
+  "contract_id": "v1.docs_feature_matrix",
+  "version": "v1",
+  "source_contract": "contracts/release/v1.0/release_required_contracts.v1.json",
+  "required_matrix_file": "docs/vi/USER_GUIDE.md",
+  "sync_policy": "canonical_commands_must_exist_in_user_guide"
+}
