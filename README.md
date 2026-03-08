@@ -65,8 +65,9 @@ Official install and verification:
 - EN verify download: [docs/en/security/verify-download.md](docs/en/security/verify-download.md)
 - VI verify download: [docs/vi/security/verify-download.md](docs/vi/security/verify-download.md)
 
-Windows setup package in v1.0 guide:
-- `ocp-v1.0.0-setup-win-x64.exe`
+Windows setup package:
+- [Download `ocp-v1.0.0-setup-win-x64.exe`](https://github.com/DucHaiten/OCP-OCL/releases/latest/download/ocp-v1.0.0-setup-win-x64.exe)
+- [All releases](https://github.com/DucHaiten/OCP-OCL/releases)
 
 ## Quickstart
 60-second demo (real I/O, replayable):
@@ -98,11 +99,6 @@ Run flow:
 ocp init hello --template tool-cli
 cd hello
 ocp lock sync .
-ocp lock sign . --key <keyid>
-ocp lock verify . --lock deps.lock.v3
-ocp perm snapshot . --out-dir ./.ocp_perm/current
-ocp build . --attest
-ocp verify --attest target/ocp/attestation
 ocp run .
 ocp replay ./.ocp_artifacts/<run_id>/
 ```
@@ -111,6 +107,7 @@ Expected result:
 - `./out/out.json` is created.
 - Run artifacts are created under `.ocp_artifacts/<run_id>/`.
 - Replay reproduces the run behavior deterministically.
+- Full production flow (`lock sign/verify`, `perm`, `attest`) is in USER_GUIDE.
 
 Full guides:
 - EN: [docs/en/USER_GUIDE.md#quickstart](docs/en/USER_GUIDE.md#quickstart)
