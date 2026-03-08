@@ -175,6 +175,28 @@ If you use VSCode:
 3. Install the VSIX in VSCode.
 4. Open a `.ocp` file and check syntax highlighting.
 
+### 6) Get source by git (build locally)
+Use this path if you want to install from source instead of prebuilt assets.
+
+1. Clone repository:
+
+```bash
+git clone https://github.com/DucHaiten/OCP.git
+cd OCP
+```
+
+2. Build and verify CLI:
+
+```bash
+cargo run --bin ocp-cli -- --version
+```
+
+3. Optional release build:
+
+```bash
+cargo build --release --bin ocp-cli
+```
+
 ---
 
 <a id="quickstart"></a>

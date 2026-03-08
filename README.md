@@ -69,6 +69,13 @@ Windows setup package:
 - [Download `ocp-v1.0.0-setup-win-x64.exe`](https://github.com/DucHaiten/OCP/blob/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe?raw=1)
 - [All releases](https://github.com/DucHaiten/OCP/releases)
 
+Install from source (git):
+```bash
+git clone https://github.com/DucHaiten/OCP.git
+cd OCP
+cargo run --bin ocp-cli -- --version
+```
+
 ## Quickstart
 60-second demo (real I/O, replayable):
 

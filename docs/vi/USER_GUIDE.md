@@ -172,6 +172,28 @@ Nếu bạn dùng VSCode:
 3. Cài VSIX trong VSCode.
 4. Mở file `.ocp` để kiểm syntax highlight; workflow editor nâng cao xem ở mục `Editor workflow (VSCode/LSP/DAP)`.
 
+### 6) Tải source bằng git (build local)
+Dùng cách này nếu bạn muốn cài từ source thay vì dùng binary đã build sẵn.
+
+1. Clone repository:
+
+```bash
+git clone https://github.com/DucHaiten/OCP.git
+cd OCP
+```
+
+2. Build và kiểm tra CLI:
+
+```bash
+cargo run --bin ocp-cli -- --version
+```
+
+3. Nâng cao (build release):
+
+```bash
+cargo build --release --bin ocp-cli
+```
+
 ---
 
 <a id="quickstart"></a>
