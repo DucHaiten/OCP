@@ -66,8 +66,8 @@ Official install and verification:
 - VI verify download: [docs/vi/security/verify-download.md](docs/vi/security/verify-download.md)
 
 Windows setup package:
-- [Download `ocp-v1.0.0-setup-win-x64.exe`](https://github.com/DucHaiten/OCP-OCL/releases/latest/download/ocp-v1.0.0-setup-win-x64.exe)
-- [All releases](https://github.com/DucHaiten/OCP-OCL/releases)
+- [Download `ocp-v1.0.0-setup-win-x64.exe`](https://github.com/DucHaiten/OCP/blob/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe?raw=1)
+- [All releases](https://github.com/DucHaiten/OCP/releases)
 
 ## Quickstart
 60-second demo (real I/O, replayable):

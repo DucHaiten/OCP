@@ -98,7 +98,8 @@ ocp replay <artifact_dir>
 - Nếu dùng VSCode: cần VSCode để cài VSIX editor extension.
 
 ### 2) Cài đặt trên Windows (installer)
-1. Tải file `ocp-v1.0.0-setup-win-x64.exe` từ GitHub Release chính thức.
+1. Tải trực tiếp file `ocp-v1.0.0-setup-win-x64.exe` tại:
+   - `https://github.com/DucHaiten/OCP/blob/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe?raw=1`
 2. Chạy installer và chọn:
    - Thư mục cài đặt trên ổ bạn muốn dùng.
    - Tùy chọn thêm `ocp` vào `PATH` (installer hỏi rõ, khuyến nghị bật).

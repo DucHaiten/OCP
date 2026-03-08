@@ -98,7 +98,8 @@ Read in this order:
 - VSCode only matters if you want the VSIX extension.
 
 ### 2) Install on Windows (installer)
-1. Download `ocp-v1.0.0-setup-win-x64.exe` from the official GitHub Release.
+1. Download `ocp-v1.0.0-setup-win-x64.exe` directly from:
+   - `https://github.com/DucHaiten/OCP/blob/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe?raw=1`
 2. Run the installer and choose:
    - the install directory on the drive you want;
    - whether to add `ocp` to `PATH`;
