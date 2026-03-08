@@ -33,7 +33,7 @@ fn v100_release_asset_matrix_contract() {
         .filter_map(JsonValue::as_str)
         .map(|v| v.to_string())
         .collect::<Vec<String>>();
-    for required in ["ocl", "ocl-lsp", "ocl-dap"] {
+    for required in ["ocp", "ocp-lsp", "ocp-dap"] {
         assert!(
             bundled_names.iter().any(|item| item == required),
             "missing bundled binary `{required}`"
@@ -66,7 +66,7 @@ fn v100_release_asset_matrix_contract() {
             "channel `{channel}` has empty required_assets"
         );
         for asset in assets.iter().filter_map(JsonValue::as_str) {
-            if asset == "ocl-v1.0.0-setup-win-x64.exe" {
+            if asset == "ocp-v1.0.0-setup-win-x64.exe" {
                 has_installer = true;
             }
         }
@@ -105,13 +105,13 @@ fn v100_release_asset_matrix_contract() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.release_asset_matrix_report.v1",
+        "schema": "ocp.w100.release_asset_matrix_report.v1",
         "status": "PASS",
         "distribution_model": "bundle",
         "channel_count": channels.len(),
         "channels": channel_names,
         "installer_sbom_status": status,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100::run_manifest_sha256()
     });
     v100::write_report("contracts/release_asset_matrix_report.json", &report);

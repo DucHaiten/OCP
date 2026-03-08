@@ -15,7 +15,7 @@ fn v100_docs_repo_layout_policy() {
         "CONTRIBUTING.md".to_string(),
         "SECURITY.md".to_string(),
         "GOVERNANCE.md".to_string(),
-        "OCP-OCL-MVP-PLAN-v1.0.md".to_string(),
+        "OCP-MVP-PLAN-v1.0.md".to_string(),
         "TRADEMARK.md".to_string(),
     ]);
 
@@ -72,11 +72,11 @@ fn v100_docs_repo_layout_policy() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.docs.repo_layout_report.v1",
+        "schema": "ocp.w100.docs.repo_layout_report.v1",
         "status": "PASS",
         "allowed_root_markdown": allowed_root_md,
         "root_markdown_detected": root_md,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
     v100d::write_report("docs/docs_repo_layout_report.json", &report);

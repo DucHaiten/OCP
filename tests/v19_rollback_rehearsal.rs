@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::{sign_contract_json_v19, verify_contract_json_signature_v19};
+use ocp_sdk::{sign_contract_json_v19, verify_contract_json_signature_v19};
 use serde_json::json;
 
 #[path = "v19_gate_f_common.rs"]
@@ -43,14 +43,14 @@ fn v19_rollback_rehearsal_restores_previous_manifest() {
     assert!(verify.signature_verified, "restored signature must verify");
 
     let report = json!({
-        "schema": "ocl.w19.release.rollback_rehearsal_report.v1",
+        "schema": "ocp.w19.release.rollback_rehearsal_report.v1",
         "status": "PASS",
         "backup_manifest": backup_manifest.to_string_lossy().replace('\\', "/"),
         "backup_sig": backup_sig.to_string_lossy().replace('\\', "/"),
         "restored_hash": restored_hash,
         "original_hash": original_manifest_hash,
         "signature_verified": verify.signature_verified,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/rollback_rehearsal_report.json", &report);

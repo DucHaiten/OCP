@@ -1,4 +1,4 @@
-use ocl_sdk::{enforce_build_env_allowlist_v17, toolchain_digest_v17, ToolchainDigestInputV17};
+use ocp_sdk::{enforce_build_env_allowlist_v17, toolchain_digest_v17, ToolchainDigestInputV17};
 
 #[test]
 fn v17_toolchain_digest_is_deterministic_under_reordered_inputs() {

@@ -1,11 +1,11 @@
-# OCL v1.0 User Guide (EN)
+# OCP v1.0 User Guide (EN)
 
-This is the main entry point for OCL v1.0 users.  
+This is the main entry point for OCP v1.0 users.  
 Goal: read once, then work from A to Z without hunting through many other files.
 
 Scope:
 - Install and verify release integrity.
-- Learn enough OCL to write a basic program from scratch.
+- Learn enough OCP to write a basic program from scratch.
 - Use the canonical CLI flow: `init -> lock -> perm -> build/verify attest -> run/replay -> debug`.
 - Handle routine operations such as `doctor`, `fix`, and `budget analyze`.
 - Diagnose the first real failures you will meet.
@@ -26,15 +26,15 @@ Example labels used in this file:
 - [One-file reading path (A->Z)](#learning-path)
 - [Install](#install)
 - [Quickstart](#quickstart)
-- [Learn OCL](#learn-ocl)
+- [Learn OCP](#learn-ocp)
 - [5 code patterns you will copy often](#copy-patterns)
 - [Template manifests](#template-manifests)
 - [Capability starter pack](#capability-starter-pack)
 - [Short language reference (runnable examples)](#language-reference-short)
 - [Complete mini-game sample project](#mini-game-project)
 - [Complete tool-http sample project](#tool-http-project)
-- [Language Quickstart (write your first OCL code)](#language-quickstart)
-- [Foundations you should know to use OCL](#concepts)
+- [Language Quickstart (write your first OCP code)](#language-quickstart)
+- [Foundations you should know to use OCP](#concepts)
 - [Permissions](#permissions)
 - [Lock Trust Attest](#lock-trust-attest)
 - [Run Replay](#run-replay)
@@ -58,21 +58,21 @@ Example labels used in this file:
 
 If you need to start immediately, follow this order:
 1. Install and verify the release (`Install`).
-2. Write and run your first program (`Learn OCL` + `Language Quickstart`).
+2. Write and run your first program (`Learn OCP` + `Language Quickstart`).
 3. Run the canonical flow (`Quickstart` -> `Permissions` -> `Lock Trust Attest` -> `Run Replay` -> `Debug`).
 4. If you get stuck, go to `Troubleshooting`.
 
 Minimum command chain for a project:
 
 ```bash
-ocl init <project_dir> --template tool-cli
-ocl lock sync <project_dir>
-ocl lock sign <project_dir> --key <keyid>
-ocl lock verify <project_dir> --lock deps.lock.v3
-ocl perm snapshot <project_dir>
-ocl build <project_dir> --attest
-ocl run <project_dir>
-ocl replay <artifact_dir>
+ocp init <project_dir> --template tool-cli
+ocp lock sync <project_dir>
+ocp lock sign <project_dir> --key <keyid>
+ocp lock verify <project_dir> --lock deps.lock.v3
+ocp perm snapshot <project_dir>
+ocp build <project_dir> --attest
+ocp run <project_dir>
+ocp replay <artifact_dir>
 ```
 
 <a id="learning-path"></a>
@@ -81,7 +81,7 @@ ocl replay <artifact_dir>
 Read in this order:
 1. `Install`
 2. `Quickstart`
-3. `Learn OCL` + `Language Quickstart`
+3. `Learn OCP` + `Language Quickstart`
 4. `Foundations you should know` (sections 1..6)
 5. `Permissions` -> `Lock Trust Attest` -> `Run Replay` -> `Debug`
 6. `Troubleshooting`
@@ -98,15 +98,15 @@ Read in this order:
 - VSCode only matters if you want the VSIX extension.
 
 ### 2) Install on Windows (installer)
-1. Download `ocl-v1.0.0-setup-win-x64.exe` from the official GitHub Release.
+1. Download `ocp-v1.0.0-setup-win-x64.exe` from the official GitHub Release.
 2. Run the installer and choose:
    - the install directory on the drive you want;
-   - whether to add `ocl` to `PATH`;
+   - whether to add `ocp` to `PATH`;
    - whether to install the VSCode extension immediately if VSCode is detected.
 3. Open a new terminal and run:
 
 ```bash
-ocl --version
+ocp --version
 ```
 
 If the command is not recognized:
@@ -114,20 +114,20 @@ If the command is not recognized:
 - recheck `PATH`.
 
 Installer scope:
-- OCL icon
+- OCP icon
 - install-directory picker
 - explicit `PATH` confirmation
-- `ocl.exe`, `ocl-lsp.exe`, `ocl-dap.exe`
-- bundled `ocp-ocl-vscode-v1.0.0.vsix`
+- `ocp.exe`, `ocp-lsp.exe`, `ocp-dap.exe`
+- bundled `ocp-vscode-v1.0.0.vsix`
 
 ### 3) Portable install (Windows/Linux/macOS)
 1. Download the correct portable package.
 2. Extract it to a stable directory.
-3. Add the directory containing `ocl` to `PATH`.
+3. Add the directory containing `ocp` to `PATH`.
 4. Verify:
 
 ```bash
-ocl --version
+ocp --version
 ```
 
 ### 4) Verify release integrity (required before production)
@@ -143,14 +143,14 @@ Quick flow:
 3. Verify the trust root first:
 
 ```bash
-ocl verify --contract-signature contracts/security/v1.0/signing_trust_root.v1.json.sig
+ocp verify --contract-signature contracts/security/v1.0/signing_trust_root.v1.json.sig
 ```
 
 Expected output example:
 - `verify contract signature ok (...)`
 
 4. Verify the release signatures:
-   - `schema = ocl.release.file.sig.v1`
+   - `schema = ocp.release.file.sig.v1`
    - `pubkey_id` and `trust_epoch` must belong to the trust root
    - `file_hash_sha256` must match the referenced file
 5. Only install when hash and signature both verify.
@@ -170,9 +170,9 @@ Deep-dive companion note:
 ### 5) Install the VSCode extension
 If you use VSCode:
 1. If the installer already installed the extension, reopen VSCode.
-2. Otherwise use `ocp-ocl-vscode-v1.0.0.vsix`.
+2. Otherwise use `ocp-vscode-v1.0.0.vsix`.
 3. Install the VSIX in VSCode.
-4. Open a `.ocl` file and check syntax highlighting.
+4. Open a `.ocp` file and check syntax highlighting.
 
 ---
 
@@ -182,20 +182,20 @@ If you use VSCode:
 ### 1) Initialize a project
 
 ```bash
-ocl init hello --template tool-cli
+ocp init hello --template tool-cli
 cd hello
 ```
 
 Purpose:
-- create a standard OCL project skeleton;
+- create a standard OCP project skeleton;
 - make Quickstart stable by pinning `--template tool-cli`.
 
 ### 2) Sync the lock before running
 
 ```bash
-ocl lock sync <project_dir>
-ocl lock sign <project_dir> --key <keyid>
-ocl lock verify <project_dir> --lock deps.lock.v3
+ocp lock sync <project_dir>
+ocp lock sign <project_dir> --key <keyid>
+ocp lock verify <project_dir> --lock deps.lock.v3
 ```
 
 Purpose:
@@ -206,81 +206,81 @@ Purpose:
 ### 3) Snapshot and review permissions
 
 ```bash
-ocl perm snapshot <project_dir> --out-dir <perm_dir>
-ocl perm diff <old_snapshot> <new_snapshot> --out <diff_report.json> --approval <permissions.approval.toml>
-ocl perm approve <diff_report.json> --approval <permissions.approval.toml> --by <id> --date <YYYY-MM-DD>
+ocp perm snapshot <project_dir> --out-dir <perm_dir>
+ocp perm diff <old_snapshot> <new_snapshot> --out <diff_report.json> --approval <permissions.approval.toml>
+ocp perm approve <diff_report.json> --approval <permissions.approval.toml> --by <id> --date <YYYY-MM-DD>
 ```
 
 Recommended baseline/current example:
 
 ```bash
-ocl perm snapshot . --out-dir ./.ocl_perm/baseline
-ocl perm snapshot . --out-dir ./.ocl_perm/current
-ocl perm diff ./.ocl_perm/baseline/permissions.snapshot.json ./.ocl_perm/current/permissions.snapshot.json --out ./.ocl_perm/permission_diff_report.json --approval permissions.approval.toml
-ocl perm approve ./.ocl_perm/permission_diff_report.json --approval permissions.approval.toml --by dev.local --date 2026-03-07
+ocp perm snapshot . --out-dir ./.ocp_perm/baseline
+ocp perm snapshot . --out-dir ./.ocp_perm/current
+ocp perm diff ./.ocp_perm/baseline/permissions.snapshot.json ./.ocp_perm/current/permissions.snapshot.json --out ./.ocp_perm/permission_diff_report.json --approval permissions.approval.toml
+ocp perm approve ./.ocp_perm/permission_diff_report.json --approval permissions.approval.toml --by dev.local --date 2026-03-07
 ```
 
 ### 4) Build + verify attest
 
 ```bash
-ocl build <project_dir> --attest
-ocl verify --attest <artifact_dir>
+ocp build <project_dir> --attest
+ocp verify --attest <artifact_dir>
 ```
 
 ### 5) Run and replay
 
 ```bash
-ocl run <project_dir>
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp run <project_dir>
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 ### 6) Debug a failure
 
 ```bash
-ocl dbg <artifact_dir>
+ocp dbg <artifact_dir>
 ```
 
 ### 7) Fast path for file/state tools (v0.7.2)
 
 ```bash
-ocl init my-tool --template tool-cli
+ocp init my-tool --template tool-cli
 cd my-tool
-ocl test . --golden fixtures/expected --clean
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp test . --golden fixtures/expected --clean
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 ### 8) Fast path for mini-game / shadow-preview (v0.7.3)
 
 ```bash
-ocl init demo-game --template mini-game
-ocl run demo-game
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp init demo-game --template mini-game
+ocp run demo-game
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Or:
 
 ```bash
-ocl init demo-shadow --template shadow-preview
-ocl run demo-shadow --shadow branch-a --shadow-policy forbid_commit
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp init demo-shadow --template shadow-preview
+ocp run demo-shadow --shadow branch-a --shadow-policy forbid_commit
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 ---
 
-<a id="learn-ocl"></a>
-## Learn OCL
+<a id="learn-ocp"></a>
+## Learn OCP
 
-Goal: understand the language model well enough to write a basic OCL program instead of only editing a template by trial and error.
+Goal: understand the language model well enough to write a basic OCP program instead of only editing a template by trial and error.
 
-### OCL in 90 seconds
+### OCP in 90 seconds
 - `observe(...)`: get data or an effect handle from an authorized capability.
 - `match` on `Result4`: decide what to do with the outcome.
 - `commit(...)`: accept a side effect only when the contract and policy allow it.
-- OCL does not assume IO always succeeds.
+- OCP does not assume IO always succeeds.
 - `replay` is reproducibility evidence, not a bonus feature.
 
-### 5 rules that let you write OCL
+### 5 rules that let you write OCP
 1. If you need external data, use `observe`.
 2. After `observe`, always handle the `Result4` outcome.
 3. Only `commit` on branches that the capability and lane allow.
@@ -309,8 +309,8 @@ Real v1.0 code may also use:
 - reactor tick integration
 
 Rule:
-1. when you open new syntax surface, run `ocl check <project_dir> --locked`;
-2. rerun `ocl run` + `ocl replay` after refactoring.
+1. when you open new syntax surface, run `ocp check <project_dir> --locked`;
+2. rerun `ocp run` + `ocp replay` after refactoring.
 
 ### Minimum syntax you can use to start independently
 - statements end with `;`
@@ -343,16 +343,16 @@ Stable fields:
 | `std.kv.put` | store small deterministic state | yes |
 | `std.time.tick_info` | get deterministic logical time | no |
 
-### Smallest possible OCL program
+### Smallest possible OCP program
 
-```ocl
+```ocp
 module app.hello;
 condition(true);
 ```
 
 ### Example 1: one observe + one match (no commit)
 
-```ocl
+```ocp
 module app.read_only;
 
 let rd_req = { path: "./fixtures/in/sample.json" };
@@ -368,7 +368,7 @@ match rd {
 
 ### Example 2: two chained steps (mkdir -> write_text)
 
-```ocl
+```ocp
 module app.pipeline;
 
 let mk_req = { path: "./out", recursive: true };
@@ -394,7 +394,7 @@ condition(true);
 
 ### Example 3: read input -> write report
 
-```ocl
+```ocp
 module app.report;
 
 let rd_req = { path: "./fixtures/in/sample.txt" };
@@ -426,7 +426,7 @@ In this section:
 
 Shortest syntax survey:
 
-```ocl
+```ocp
 // comment 1 dòng
 module app.demo;
 
@@ -459,9 +459,9 @@ match wr {
 4. `observe`.
 5. `match` the 4 kinds.
 6. Decide which branch may `commit`.
-7. `ocl run <project_dir>`.
-8. `ocl replay <artifact_dir>`.
-9. If it fails, run `ocl dbg <artifact_dir>`.
+7. `ocp run <project_dir>`.
+8. `ocp replay <artifact_dir>`.
+9. If it fails, run `ocp dbg <artifact_dir>`.
 
 ### 3 common beginner errors
 1. `RC-CTX-INVALID`
@@ -469,7 +469,7 @@ match wr {
 - Fix: use a correctly shaped typed record.
 
 2. `RC-*-PERMISSION-DENIED`
-- Cause: missing permission in `Ocl.toml`.
+- Cause: missing permission in `Ocp.toml`.
 - Fix: follow snapshot/diff/approve.
 
 3. `INSUFFICIENT`
@@ -478,7 +478,7 @@ match wr {
 
 ### Beginner FAQ
 #### Why not write directly? Why observe then commit?
-Because OCL separates “seeing the effect” from “accepting the effect”, so policy and audit can control side effects explicitly.
+Because OCP separates “seeing the effect” from “accepting the effect”, so policy and audit can control side effects explicitly.
 
 #### Can `DEGRADED` be committed?
 Possibly, but only when the capability contract and lane policy allow it. For onboarding, default to committing only on `OK`.
@@ -491,7 +491,7 @@ Only for compatibility with older scripts or currently shipped templates.
 
 ### Result4 sugar and field access (from beginner to practical)
 
-```ocl
+```ocp
 observe("std.json.parse", "tier2", { text: "{\"ok\":true}" }, budget(5)) -> rs;
 let parsed = try rs else { 0 };
 let reason = try rs else { r.reason_code };
@@ -505,16 +505,16 @@ condition(true);
 
 Rules:
 - Sugar must preserve canonical `match` semantics.
-- `std.json.parse` here is only a sugar example key; inspect `ocl doc packs --json` for exact schema.
+- `std.json.parse` here is only a sugar example key; inspect `ocp doc packs --json` for exact schema.
 - Inside `try r else { ... }`, the implicit `r` refers to the original `Result4`; it is valid syntax, not a typo.
 - The `r` inside `else` is a local implicit binding, not the outer-scope `r`.
-- After refactoring to sugar, rerun `ocl check --locked` and `ocl replay`.
+- After refactoring to sugar, rerun `ocp check --locked` and `ocp replay`.
 
 ### 15-minute practice path
-1. `ocl init hello-ocl --template tool-cli`
-2. Replace `src/main.ocl` with Example 2.
-3. `ocl run .`
-4. `ocl replay ./.ocl_artifacts/<run_id>/`
+1. `ocp init hello-ocp --template tool-cli`
+2. Replace `src/main.ocp` with Example 2.
+3. `ocp run .`
+4. `ocp replay ./.ocp_artifacts/<run_id>/`
 5. Lower one `budget(5)` to `budget(1)`, observe `INSUFFICIENT`, then fix it.
 
 ### 3 progressive exercises to gain confidence
@@ -529,8 +529,8 @@ Requirements:
 3. On `OK`, only do `condition(true);`.
 
 Done when:
-- `ocl run .` passes.
-- `ocl replay <artifact_dir>` passes.
+- `ocp run .` passes.
+- `ocp replay <artifact_dir>` passes.
 
 #### Exercise 2: read input then write a report
 Goal:
@@ -552,9 +552,9 @@ Goal:
 
 Requirements:
 1. Lower one `budget(5)` to `budget(1)`.
-2. Run `ocl run .` and observe `INSUFFICIENT` or its reason code.
+2. Run `ocp run .` and observe `INSUFFICIENT` or its reason code.
 3. Raise the budget again or reduce request scope.
-4. Rerun `ocl run .` and `ocl replay <artifact_dir>`.
+4. Rerun `ocp run .` and `ocp replay <artifact_dir>`.
 
 Done when:
 - you can identify the `reason_code`;
@@ -568,9 +568,9 @@ Example label:
 
 ```text
 hello-guide/
-  Ocl.toml
+  Ocp.toml
   src/
-    main.ocl
+    main.ocp
   fixtures/
     in/
       sample.json
@@ -578,7 +578,7 @@ hello-guide/
       out.json
 ```
 
-Sample `Ocl.toml`:
+Sample `Ocp.toml`:
 
 ```toml
 [package]
@@ -587,7 +587,7 @@ version = "0.1.0"
 
 [project]
 lane = "locked_v071"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [targets]
 default = "main"
@@ -629,9 +629,9 @@ Notes:
 - It intentionally grants enough permissions for the guide examples. It is not the tightest production configuration.
 - For real projects, narrow `permissions.*` to the exact keys you use.
 
-Sample `src/main.ocl`:
+Sample `src/main.ocp`:
 
-```ocl
+```ocp
 module app.tool_cli;
 
 let rd_req = { path: "./fixtures/in/sample.json" };
@@ -686,13 +686,13 @@ Minimum `fixtures/expected/out.json`:
 ```
 
 Run it:
-1. `ocl check . --locked`
-2. `ocl test . --golden fixtures/expected --clean`
-3. `ocl run .`
-4. `ocl replay ./.ocl_artifacts/<run_id>/`
+1. `ocp check . --locked`
+2. `ocp test . --golden fixtures/expected --clean`
+3. `ocp run .`
+4. `ocp replay ./.ocp_artifacts/<run_id>/`
 
 Important note:
-- `ocl init --template tool-cli` currently generates `src/main.ocl` in compatibility style using `ctx("...")`.
+- `ocp init --template tool-cli` currently generates `src/main.ocp` in compatibility style using `ctx("...")`.
 - This guide immediately switches to typed records to teach the canonical v1.0-facing style.
 
 <a id="copy-patterns"></a>
@@ -701,7 +701,7 @@ These are the five most practical patterns to start from when you do not remembe
 
 #### Pattern 1: read a file, no commit
 
-```ocl
+```ocp
 let rd_req = { path: "./fixtures/in/sample.json" };
 observe("std.fs.read_text", "tier2", rd_req, budget(5)) -> rd;
 match rd {
@@ -714,7 +714,7 @@ match rd {
 
 #### Pattern 2: create a directory then write a file
 
-```ocl
+```ocp
 let mk_req = { path: "./out", recursive: true };
 observe("std.fs.mkdir", "tier2", mk_req, budget(5)) -> mk;
 match mk {
@@ -736,7 +736,7 @@ match wr {
 
 #### Pattern 3: read input then write a report
 
-```ocl
+```ocp
 let rd_req = { path: "./fixtures/in/sample.txt" };
 observe("std.fs.read_text", "tier2", rd_req, budget(5)) -> rd;
 match rd {
@@ -758,7 +758,7 @@ match rd {
 
 #### Pattern 4: write local state via KV
 
-```ocl
+```ocp
 let kv_req = { key: "tool.last_run", value: "ok", overwrite: true };
 observe("std.kv.put", "tier2", kv_req, budget(5)) -> kvp;
 match kvp {
@@ -771,7 +771,7 @@ match kvp {
 
 #### Pattern 5: `guard` and `try ... else`
 
-```ocl
+```ocp
 observe("std.fs.read_text", "tier2", { path: "./fixtures/in/sample.json" }, budget(5)) -> r;
 guard r;
 
@@ -792,15 +792,15 @@ This section explains which template to start from and what runtime shape it ass
 Minimum flow:
 
 ```bash
-ocl init hello-ocl --template tool-cli
-cd hello-ocl
+ocp init hello-ocp --template tool-cli
+cd hello-ocp
 ```
 
 #### When should you use `tool-http`?
 - when the project needs real HTTP calls and cassette-based replay;
 - this means `quarantine`, not the locked deterministic lane.
 
-Example `Ocl.toml`:
+Example `Ocp.toml`:
 
 ```toml
 [package]
@@ -809,7 +809,7 @@ version = "0.1.0"
 
 [project]
 lane = "quarantine"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [quarantine]
 mode = "record"
@@ -854,41 +854,41 @@ max_list_entries = 500
 Minimum flow:
 
 ```bash
-ocl init my-http --template tool-http
+ocp init my-http --template tool-http
 cd my-http
-export OCL_QUARANTINE=1
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+export OCP_QUARANTINE=1
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 ```powershell
-$env:OCL_QUARANTINE="1"
-ocl check .
-ocl run .
+$env:OCP_QUARANTINE="1"
+ocp check .
+ocp run .
 ```
 
 ```bash
-export OCL_QUARANTINE=1
-ocl check .
-ocl run .
+export OCP_QUARANTINE=1
+ocp check .
+ocp run .
 ```
 
 Important note:
 - this sample mainly teaches `quarantine` + cassette record/replay;
-- when you need to read HTTP response payloads such as `status` or `body`, inspect the schema through `ocl doc packs --json` and a replay artifact from a real run.
+- when you need to read HTTP response payloads such as `status` or `body`, inspect the schema through `ocp doc packs --json` and a replay artifact from a real run.
 
 ```powershell
-ocl init my-http --template tool-http
+ocp init my-http --template tool-http
 cd my-http
-$env:OCL_QUARANTINE="1"
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+$env:OCP_QUARANTINE="1"
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 #### When should you use `mini-game`?
-- when you want to try OCL as an app/game runtime instead of a file-oriented tool.
+- when you want to try OCP as an app/game runtime instead of a file-oriented tool.
 
-Example `Ocl.toml`:
+Example `Ocp.toml`:
 
 ```toml
 [package]
@@ -897,7 +897,7 @@ version = "0.1.0"
 
 [project]
 lane = "locked_v071"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [targets]
 default = "main"
@@ -923,15 +923,15 @@ state_delta_max_bytes = 65536
 Minimum flow:
 
 ```bash
-ocl init demo-game --template mini-game
+ocp init demo-game --template mini-game
 cd demo-game
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Keep in mind:
 - the current `mini-game` template still ships compatibility-style source using `ctx("...")` for `engine.game.run`;
-- that accurately reflects the shipped template, but you can keep the manifest and rewrite `src/main.ocl` in a more canonical style after init.
+- that accurately reflects the shipped template, but you can keep the manifest and rewrite `src/main.ocp` in a more canonical style after init.
 
 <a id="capability-starter-pack"></a>
 ### 12) Capability starter pack
@@ -943,8 +943,8 @@ How to read it:
 - the most precise schema source is still:
 
 ```bash
-ocl doc packs
-ocl doc packs --json
+ocp doc packs
+ocp doc packs --json
 ```
 
 #### File system group (`permissions.std_fs`)
@@ -953,13 +953,13 @@ ocl doc packs --json
 - use case: read text/JSON input files;
 - minimum request:
 
-```ocl
+```ocp
 { path: "./fixtures/in/sample.json" }
 ```
 
 - common extended request:
 
-```ocl
+```ocp
 { path: "./README.md", max_bytes: 128 }
 ```
 
@@ -981,7 +981,7 @@ OK/DEGRADED => { text, truncated, bytes }
 - use case: create output or work directories;
 - minimum request:
 
-```ocl
+```ocp
 { path: "./out", recursive: true }
 ```
 
@@ -992,7 +992,7 @@ OK/DEGRADED => { text, truncated, bytes }
 - use case: write text/JSON/report output;
 - minimum request:
 
-```ocl
+```ocp
 { path: "./out/out.json", text: "{\"status\":\"OK\"}", overwrite: true }
 ```
 
@@ -1005,7 +1005,7 @@ OK/DEGRADED => { text, truncated, bytes }
 - use case: read local deterministic state;
 - minimum request:
 
-```ocl
+```ocp
 { key: "app.flag" }
 ```
 
@@ -1015,13 +1015,13 @@ OK/DEGRADED => { text, truncated, bytes }
 - use case: write checkpoints, markers, or small local state;
 - minimum request:
 
-```ocl
+```ocp
 { key: "tool.last_run", value: "ok", overwrite: true }
 ```
 
 - tested variant:
 
-```ocl
+```ocp
 { key: "app.answer", value_json: 42, overwrite: true }
 ```
 
@@ -1034,13 +1034,13 @@ OK/DEGRADED => { text, truncated, bytes }
 - use case: deterministic logical time in locked lanes;
 - minimum request:
 
-```ocl
+```ocp
 { scope: "tool" }
 ```
 
 - tested variant:
 
-```ocl
+```ocp
 { tick: 7, dt_ms: 20 }
 ```
 
@@ -1057,7 +1057,7 @@ OK => { tick, dt_ms }
 - use case: real wallclock time in `quarantine`;
 - minimum request:
 
-```ocl
+```ocp
 { scope: "tool" }
 ```
 
@@ -1070,7 +1070,7 @@ OK => { tick, dt_ms }
 - use case: real HTTP calls with cassette record/replay;
 - minimum request:
 
-```ocl
+```ocp
 { method: "GET", url: "http://mock.local/demo", timeout_ms: 3000, max_body_bytes: 16 }
 ```
 
@@ -1092,13 +1092,13 @@ truncated
 req_hash
 ```
 
-- if you need the full payload map for actual business logic, inspect `ocl doc packs --json` and a replay artifact from a real run first.
+- if you need the full payload map for actual business logic, inspect `ocp doc packs --json` and a replay artifact from a real run first.
 
 `std.proc.exec`
 - use case: run a real process in `quarantine`;
 - minimum request from the shipped template:
 
-```ocl
+```ocp
 { bin: "mock.proc", args: "--template", timeout_ms: 3000, max_stdout_bytes: 32 }
 ```
 
@@ -1110,7 +1110,7 @@ req_hash
 - use case: deterministic app/game loop under the runtime pack;
 - starter request currently used by shipped templates:
 
-```ocl
+```ocp
 ctx("entry_module=app.mini_game;phase=frame;tick=1;stream=main;count=4;input_cap=8;events=key:Space|text:start;draw_cap=8;draw_list=text:1,1,mini-game,12;state_json={\"score\":0}")
 ```
 
@@ -1121,7 +1121,7 @@ ctx("entry_module=app.mini_game;phase=frame;tick=1;stream=main;count=4;input_cap
 - use case: bounded shadow branch search and compare;
 - starter request currently present in fixtures/templates:
 
-```ocl
+```ocp
 ctx("policy=round_robin;variants_json=[{\"x\":1},{\"x\":2},{\"x\":3}];max_branches=3;per_branch_step_cap=80;per_branch_budget_cap=2000;global_step_cap=240;global_budget_cap=12000;top_k=3;rounds=2")
 ```
 
@@ -1129,10 +1129,10 @@ ctx("policy=round_robin;variants_json=[{\"x\":1},{\"x\":2},{\"x\":3}];max_branch
 
 Checklist for a new capability:
 1. Find the closest key in this starter pack.
-2. Run `ocl doc packs` to inspect `permission_class`, `ctx_schema`, `payload_schema`, and `example`.
+2. Run `ocp doc packs` to inspect `permission_class`, `ctx_schema`, `payload_schema`, and `example`.
 3. Write the request as a record or `ctx("...")` exactly for that key.
-4. Run `ocl check . --locked` or the corresponding lane.
-5. Run `ocl run .` and `ocl replay <artifact_dir>`.
+4. Run `ocp check . --locked` or the corresponding lane.
+5. Run `ocp run .` and `ocp replay <artifact_dir>`.
 
 #### How to read `result/payload` by capability
 The most stable layer is always the `Result4` wrapper:
@@ -1168,8 +1168,8 @@ Some payload shapes already backed by tests:
 For keys such as `std.fs.read_text`, `std.time.tick_info`, `std.net.http.request`, and `std.shadow.search`:
 - this guide pins the starter request shape;
 - when you need real payload details for logic, inspect:
-  1. `ocl doc packs`
-  2. `ocl doc packs --json`
+  1. `ocp doc packs`
+  2. `ocp doc packs --json`
   3. the replay/audit artifact from that exact run
 
 <a id="language-reference-short"></a>
@@ -1181,7 +1181,7 @@ Note:
 
 #### `module`, `import`, `fn`, `return`
 
-```ocl
+```ocp
 module app.demo;
 import toolkit.api.math;
 
@@ -1195,7 +1195,7 @@ condition(ok);
 
 #### `repeat` and `for ... cap`
 
-```ocl
+```ocp
 module app.loops;
 
 let xs = [1, 2, 3];
@@ -1206,7 +1206,7 @@ condition(true);
 
 #### `guard` and `try ... else`
 
-```ocl
+```ocp
 module app.sugar;
 
 observe("std.fs.read_text", "tier2", { path: "./fixtures/in/sample.json" }, budget(5)) -> r;
@@ -1221,11 +1221,11 @@ condition(true);
 Rule:
 - write the flow with `match` first;
 - only then refactor to sugar;
-- after each sugar refactor, run `ocl check . --locked` and `ocl replay <artifact_dir>`.
+- after each sugar refactor, run `ocp check . --locked` and `ocp replay <artifact_dir>`.
 
 <a id="mini-game-project"></a>
 ### 14) Complete mini-game sample project
-This is the minimal sample for users who want to try OCL as an app/game runtime instead of a file tool.
+This is the minimal sample for users who want to try OCP as an app/game runtime instead of a file tool.
 
 Example label:
 - `Canonical pattern` for new users: the code below adds `match frame` so it stays consistent with the onboarding rules.
@@ -1235,12 +1235,12 @@ Project tree:
 
 ```text
 demo-game/
-  Ocl.toml
+  Ocp.toml
   src/
-    main.ocl
+    main.ocp
 ```
 
-`Ocl.toml`:
+`Ocp.toml`:
 
 ```toml
 [package]
@@ -1249,7 +1249,7 @@ version = "0.1.0"
 
 [project]
 lane = "locked_v071"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [targets]
 default = "main"
@@ -1272,9 +1272,9 @@ rng_max_count = 32
 state_delta_max_bytes = 65536
 ```
 
-`src/main.ocl`:
+`src/main.ocp`:
 
-```ocl
+```ocp
 module app.mini_game;
 
 observe("engine.game.run", "tier2", ctx("entry_module=app.mini_game;phase=frame;tick=1;stream=main;count=4;input_cap=8;events=key:Space|text:start;draw_cap=8;draw_list=text:1,1,mini-game,12;state_json={\"score\":0}"), budget(10)) -> frame;
@@ -1289,15 +1289,15 @@ match frame {
 Run:
 
 ```bash
-ocl check . --locked
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp check . --locked
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Expected outcome:
-- `.ocl_artifacts/<run_id>/audit.jsonl`
-- `.ocl_artifacts/<run_id>/signature.txt`
-- `.ocl_artifacts/<run_id>/replay.toml`
+- `.ocp_artifacts/<run_id>/audit.jsonl`
+- `.ocp_artifacts/<run_id>/signature.txt`
+- `.ocp_artifacts/<run_id>/replay.toml`
 - stable replay
 
 Notes:
@@ -1317,12 +1317,12 @@ Project tree:
 
 ```text
 my-http/
-  Ocl.toml
+  Ocp.toml
   src/
-    main.ocl
+    main.ocp
 ```
 
-`Ocl.toml`:
+`Ocp.toml`:
 
 ```toml
 [package]
@@ -1331,7 +1331,7 @@ version = "0.1.0"
 
 [project]
 lane = "quarantine"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [quarantine]
 mode = "record"
@@ -1373,9 +1373,9 @@ max_write_bytes = 1048576
 max_list_entries = 500
 ```
 
-`src/main.ocl`:
+`src/main.ocp`:
 
-```ocl
+```ocp
 module app.tool_http;
 
 observe("std.net.http.request", "tier2", { method: "GET", url: "http://mock.local/template-http", timeout_ms: 3000, max_body_bytes: 32 }, budget(8)) -> net;
@@ -1406,48 +1406,48 @@ match wr {
 Run in record mode:
 
 ```powershell
-$env:OCL_QUARANTINE="1"
-ocl check .
-ocl run .
+$env:OCP_QUARANTINE="1"
+ocp check .
+ocp run .
 ```
 
 ```bash
-export OCL_QUARANTINE=1
-ocl check .
-ocl run .
+export OCP_QUARANTINE=1
+ocp check .
+ocp run .
 ```
 
 Replay:
 
 ```powershell
-$env:OCL_QUARANTINE="1"
-ocl replay ./.ocl_artifacts/<run_id>/
+$env:OCP_QUARANTINE="1"
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 ```bash
-export OCL_QUARANTINE=1
-ocl replay ./.ocl_artifacts/<run_id>/
+export OCP_QUARANTINE=1
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Expected outcome:
 - `./out/http.txt`
-- `.ocl_artifacts/<run_id>/cassette/cassette.jsonl`
+- `.ocp_artifacts/<run_id>/cassette/cassette.jsonl`
 - cassette entry with `cap = "std.net.http.request"`
 - replay passes while the env gate remains enabled
 
 Fail-honest rules:
-- if `OCL_QUARANTINE="1"` is not enabled, both `run` and `replay` for the `quarantine` lane must fail;
+- if `OCP_QUARANTINE="1"` is not enabled, both `run` and `replay` for the `quarantine` lane must fail;
 - if host or method is outside the allowlist, the runtime must return `INSUFFICIENT`, not silently weaken policy.
 
 Notes:
 - unlike `tool-cli`, the shipped `tool-http` template already uses typed record requests for HTTP/fs;
 - this sample is the `canonical pattern` version for new users; it handles `net`, `mk`, and `wr` with `match`;
 - the shipped `tool-http` template is shorter and acceptable as a smoke scaffold, but it is not the cleanest pattern for new logic;
-- this sample mainly teaches `quarantine` + cassette + controlled side effects; when you need real `status`/`body` response logic, inspect `ocl doc packs --json` and the replay artifact from a real run.
+- this sample mainly teaches `quarantine` + cassette + controlled side effects; when you need real `status`/`body` response logic, inspect `ocp doc packs --json` and the replay artifact from a real run.
 
 <a id="language-quickstart"></a>
-### 16) Write your first OCL code (Language Quickstart)
-Goal: edit `src/main.ocl` and make it run immediately.
+### 16) Write your first OCP code (Language Quickstart)
+Goal: edit `src/main.ocp` and make it run immediately.
 
 Example label:
 - `Canonical pattern`: this is the primary learning path for new users, using typed records and full `match`.
@@ -1459,22 +1459,22 @@ Guide convention for v1.0:
 Step 1 - create a project from a template with real IO:
 
 ```bash
-ocl init hello-ocl --template tool-cli
-cd hello-ocl
+ocp init hello-ocp --template tool-cli
+cd hello-ocp
 ```
 
 Step 2 - minimum project structure to know:
-- `Ocl.toml`: lane, permissions, entrypoint;
-- `src/main.ocl`: main code;
+- `Ocp.toml`: lane, permissions, entrypoint;
+- `src/main.ocp`: main code;
 - `fixtures/`: sample test data.
 
 Notes:
 - the current `tool-cli` template still generates compatibility-style source with `ctx("k=v;...")`;
 - in this guide you replace it immediately with typed records to learn the canonical v1.0-facing style.
 
-Step 3 - replace `src/main.ocl` with this runnable sample:
+Step 3 - replace `src/main.ocp` with this runnable sample:
 
-```ocl
+```ocp
 module app.tool_cli;
 
 let mk_req = { path: "./out", recursive: true };
@@ -1513,13 +1513,13 @@ condition(true);
 Step 4 - run:
 
 ```bash
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Step 5 - read the result:
 - output file: `./out/out.json`
-- replay artifact: `.ocl_artifacts/<run_id>/`
+- replay artifact: `.ocp_artifacts/<run_id>/`
 
 Minimum syntax cheat sheet:
 - variable declaration: `let x = 1;`
@@ -1530,7 +1530,7 @@ Minimum syntax cheat sheet:
   2. `match r { OK => commit(r); ... }`
 - canonical `Result4` pattern:
 
-```ocl
+```ocp
 match r {
   OK => { /* nhánh thành công */ }
   DEGRADED => { /* nhánh giảm cấp */ }
@@ -1541,7 +1541,7 @@ match r {
 
 Fail-honest file-read sample:
 
-```ocl
+```ocp
 let rd_req = { path: "./fixtures/in/sample.json" };
 observe("std.fs.read_text", "tier2", rd_req, budget(5)) -> rd;
 match rd {
@@ -1555,7 +1555,7 @@ match rd {
 ---
 
 <a id="concepts"></a>
-## [concepts] Foundations you should know to use OCL
+## [concepts] Foundations you should know to use OCP
 
 This section covers practical operating knowledge.  
 Detailed version-by-version history lives in `docs/plans/history/*`.
@@ -1606,12 +1606,12 @@ Before calling a build valid, at minimum do:
 3. verify attest/supply
 
 ### 6) Minimum manifest for the locked lane
-A minimal `Ocl.toml` should include:
+A minimal `Ocp.toml` should include:
 
 ```toml
 [project]
 lane = "locked_v071"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [language]
 guard_mode = "return"
@@ -1630,15 +1630,15 @@ Meaning:
 ## [permissions] Permissions
 
 ### 1) Why permissions are mandatory
-OCL does not allow side effects to float freely.  
+OCP does not allow side effects to float freely.  
 All IO permissions must be explicit, reviewable, and traceable.
 
 ### 2) Meaning of each permission command
-- `ocl perm snapshot <project_dir> [--out-dir <dir>]`
+- `ocp perm snapshot <project_dir> [--out-dir <dir>]`
   - capture the permission baseline.
-- `ocl perm diff <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]`
+- `ocp perm diff <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]`
   - compare new permissions against baseline.
-- `ocl perm approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]`
+- `ocp perm approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]`
   - approve a valid diff under the lane policy.
 
 ### 3) Safe approval rules
@@ -1648,9 +1648,9 @@ All IO permissions must be explicit, reviewable, and traceable.
 
 ### 4) Standard workflow
 1. change the code;
-2. run `ocl perm snapshot <project_dir> --out-dir ./.ocl_perm`;
-3. run `ocl perm diff <old_snapshot> <new_snapshot> --out permission_diff_report.json --approval permissions.approval.toml`;
-4. if valid and justified: `ocl perm approve permission_diff_report.json --approval permissions.approval.toml --by <id> --date <YYYY-MM-DD>`;
+2. run `ocp perm snapshot <project_dir> --out-dir ./.ocp_perm`;
+3. run `ocp perm diff <old_snapshot> <new_snapshot> --out permission_diff_report.json --approval permissions.approval.toml`;
+4. if valid and justified: `ocp perm approve permission_diff_report.json --approval permissions.approval.toml --by <id> --date <YYYY-MM-DD>`;
 5. keep the diff report and approval file as evidence.
 
 ---
@@ -1658,22 +1658,22 @@ All IO permissions must be explicit, reviewable, and traceable.
 <a id="lock-trust-attest"></a>
 ## [lock-trust-attest] Lock Trust Attest
 
-### 1) `ocl lock sync <project_dir>`
+### 1) `ocp lock sync <project_dir>`
 - synchronize the lockfile with current dependency state;
 - prepare stable inputs for verify/build.
 
-### 2) `ocl lock sign <project_dir> --key <keyid> [--lock deps.lock.v3]`
+### 2) `ocp lock sign <project_dir> --key <keyid> [--lock deps.lock.v3]`
 - sign `deps.lock.v3` and produce `deps.lock.v3.sig`;
 - needed before `lock verify` in strict signed flows.
 
-### 3) `ocl lock verify <project_dir> [--lock deps.lock.v3]`
+### 3) `ocp lock verify <project_dir> [--lock deps.lock.v3]`
 - check lock/trust policy;
 - catch mismatches early.
 
-### 4) `ocl build <project_dir> --attest`
+### 4) `ocp build <project_dir> --attest`
 - build with attestation evidence.
 
-### 5) `ocl verify --attest <artifact_dir>`
+### 5) `ocp verify --attest <artifact_dir>`
 - verify the attestation just produced.
 
 ### 6) When to run the full lock/trust/attest flow
@@ -1686,23 +1686,23 @@ All IO permissions must be explicit, reviewable, and traceable.
 <a id="run-replay"></a>
 ## [run-replay] Run Replay
 
-### 1) `ocl run <project_dir>`
+### 1) `ocp run <project_dir>`
 - run the program under the current policy/lane;
 - generate trace/artifacts for audit and debug.
 
-### 2) `ocl replay <artifact_dir>`
+### 2) `ocp replay <artifact_dir>`
 - replay behavior from recorded data;
 - prove reproducibility.
 
 Minimum artifact bundle:
-- `.ocl_artifacts/<run_id>/audit.jsonl`
-- `.ocl_artifacts/<run_id>/signature.txt`
-- `.ocl_artifacts/<run_id>/replay.toml`
+- `.ocp_artifacts/<run_id>/audit.jsonl`
+- `.ocp_artifacts/<run_id>/signature.txt`
+- `.ocp_artifacts/<run_id>/replay.toml`
 
 Example:
 
 ```bash
-ocl replay ./.ocl_artifacts/000123/
+ocp replay ./.ocp_artifacts/000123/
 ```
 
 ### 3) Fail-honest principle
@@ -1714,24 +1714,24 @@ Replay must fail clearly when:
 ### 4) Quick replay-failure checklist
 1. verify lock/trust
 2. verify cassette/chunk completeness
-3. run `ocl dbg`
+3. run `ocp dbg`
 
 ---
 
 <a id="debug"></a>
 ## [debug] Debug
 
-### 1) When to use `ocl dbg <artifact_dir>`
+### 1) When to use `ocp dbg <artifact_dir>`
 - run failed and the reason is unclear;
 - replay mismatch;
 - you need the exact state transition that caused the problem.
 
-### 2) Goal of debug in OCL
+### 2) Goal of debug in OCP
 - not just “see an error”;
 - trace the real cause through structured evidence.
 
 ### 3) Short debug procedure
-1. run `ocl dbg <artifact_dir>`;
+1. run `ocp dbg <artifact_dir>`;
 2. identify the failing stage (observe/match/commit);
 3. cross-check permission/lock/attest if relevant;
 4. fix, then rerun the minimum flow.
@@ -1742,84 +1742,84 @@ Replay must fail clearly when:
 ## Full command catalog
 
 ### A) Canonical command set (main v1.0 workflow)
-- `ocl init <project_dir> [--template tool-cli|tool-http|tool-proc|tool-wallclock|mini-game|shadow-preview|dep-permission] [--preset workflow_basic|agent_swarm_basic]`
-- `ocl lock sync <project_dir>`
-- `ocl lock sign <project_dir> --key <keyid> [--lock deps.lock.v3]`
-- `ocl lock verify <project_dir> [--lock deps.lock.v3]`
-- `ocl perm snapshot <project_dir> [--out-dir <dir>]`
-- `ocl perm diff <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]`
-- `ocl perm approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]`
-- `ocl build <project_dir> --attest`
-- `ocl verify --attest <artifact_dir>`
-- `ocl run <project_dir>`
-- `ocl replay <artifact_dir>`
-- `ocl dbg <artifact_dir> [--script <file>]`
-- `ocl doctor <project_dir> [--out <report.json>]`
-- `ocl fix --plan <project_dir> [--out <permission_fix_plan.json>]`
-- `ocl fix --apply <project_dir> [--plan-file <permission_fix_plan.json>] [--patch <permission_fix.patch.toml>] [--out <permission_fix_safety_report.json>] [--approval <permissions.approval.toml>] --ack-risk --justification <text> --by <id> --date <YYYY-MM-DD>`
-- `ocl budget analyze <artifact_dir|audit.jsonl> [--json]`
+- `ocp init <project_dir> [--template tool-cli|tool-http|tool-proc|tool-wallclock|mini-game|shadow-preview|dep-permission] [--preset workflow_basic|agent_swarm_basic]`
+- `ocp lock sync <project_dir>`
+- `ocp lock sign <project_dir> --key <keyid> [--lock deps.lock.v3]`
+- `ocp lock verify <project_dir> [--lock deps.lock.v3]`
+- `ocp perm snapshot <project_dir> [--out-dir <dir>]`
+- `ocp perm diff <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]`
+- `ocp perm approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]`
+- `ocp build <project_dir> --attest`
+- `ocp verify --attest <artifact_dir>`
+- `ocp run <project_dir>`
+- `ocp replay <artifact_dir>`
+- `ocp dbg <artifact_dir> [--script <file>]`
+- `ocp doctor <project_dir> [--out <report.json>]`
+- `ocp fix --plan <project_dir> [--out <permission_fix_plan.json>]`
+- `ocp fix --apply <project_dir> [--plan-file <permission_fix_plan.json>] [--patch <permission_fix.patch.toml>] [--out <permission_fix_safety_report.json>] [--approval <permissions.approval.toml>] --ack-risk --justification <text> --by <id> --date <YYYY-MM-DD>`
+- `ocp budget analyze <artifact_dir|audit.jsonl> [--json]`
 
 ### B) Advanced commands (available in the CLI, use as needed)
 
 #### 1) Advanced execution, checking, and profiling
-- `ocl check <project_dir> [--json] [--locked] [--universe <id>]`
-- `ocl run <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
-- `ocl fmt <project_dir> [--check]`
-- `ocl test <project_dir> [--locked] [--universe <id>] [--domain <id>] [...]`
-- `ocl cache stats <project_dir> [--json]`
-- `ocl cache clean <project_dir> --yes [--json]`
-- `ocl cache bench <project_dir> [--engine ...] [--locked] [--json]`
-- `ocl trace run <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
-- `ocl trace view <artifact_dir|audit.jsonl|legacy.trace> [...]`
-- `ocl trace diff <artifactA|auditA> <artifactB|auditB> [...]`
-- `ocl minimize <artifact_dir> --goal <...> [...]`
-- `ocl profile run <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
-- `ocl profile view <profile_file> [--top N] [--json]`
-- `ocl budget doctor <artifact_dir|audit.jsonl> [--json]`
-- `ocl doc packs [--json]`
+- `ocp check <project_dir> [--json] [--locked] [--universe <id>]`
+- `ocp run <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
+- `ocp fmt <project_dir> [--check]`
+- `ocp test <project_dir> [--locked] [--universe <id>] [--domain <id>] [...]`
+- `ocp cache stats <project_dir> [--json]`
+- `ocp cache clean <project_dir> --yes [--json]`
+- `ocp cache bench <project_dir> [--engine ...] [--locked] [--json]`
+- `ocp trace run <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
+- `ocp trace view <artifact_dir|audit.jsonl|legacy.trace> [...]`
+- `ocp trace diff <artifactA|auditA> <artifactB|auditB> [...]`
+- `ocp minimize <artifact_dir> --goal <...> [...]`
+- `ocp profile run <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
+- `ocp profile view <profile_file> [--top N] [--json]`
+- `ocp budget doctor <artifact_dir|audit.jsonl> [--json]`
+- `ocp doc packs [--json]`
 
 #### 2) Supply-chain, package, and dependency
-- `ocl publish <artifact.oclpkg> [--registry <dir>]`
-- `ocl fetch <artifact|package> [--registry <dir>] [--out <dir>]`
-- `ocl verify-supply <artifact.oclpkg>`
-- `ocl deps resolve <project_dir> [--write-legacy-lock]`
-- `ocl deps update <project_dir> [pkg] [--write-legacy-lock]`
-- `ocl deps verify <project_dir> [--no-lane-policy]`
-- `ocl pack build <project_dir> [--locked]`
-- `ocl pack sign <artifact.oclpkg>`
-- `ocl pack publish <artifact.oclpkg> [--registry <dir>]`
-- `ocl pack verify <artifact.oclpkg>`
+- `ocp publish <artifact.ocppkg> [--registry <dir>]`
+- `ocp fetch <artifact|package> [--registry <dir>] [--out <dir>]`
+- `ocp verify-supply <artifact.ocppkg>`
+- `ocp deps resolve <project_dir> [--write-legacy-lock]`
+- `ocp deps update <project_dir> [pkg] [--write-legacy-lock]`
+- `ocp deps verify <project_dir> [--no-lane-policy]`
+- `ocp pack build <project_dir> [--locked]`
+- `ocp pack sign <artifact.ocppkg>`
+- `ocp pack publish <artifact.ocppkg> [--registry <dir>]`
+- `ocp pack verify <artifact.ocppkg>`
 
 #### 3) Policy / cosmos / plugin / organ / kit
-- `ocl init <project_dir> --preset workflow_basic|agent_swarm_basic`
-- `ocl policy lock sync <project_dir>`
-- `ocl cosmos init <project_dir> [--preset default|ci]`
-- `ocl cosmos lock sync <project_dir> [--locked] [...]`
-- `ocl plugin lock sync <project_dir>`
-- `ocl plugin verify <project_dir>`
-- `ocl organ lock sync <project_dir> [--registry <index.toml>] [--json]`
-- `ocl organ verify <project_dir> [--locked|--unlocked] [--json]`
-- `ocl organ install <name> <version> [--project <dir>] [...]`
-- `ocl kit list [<project_dir>] [--json]`
-- `ocl kit doctor <project_dir> [--locked|--json]`
-- `ocl compose <project_dir> --phenotype <file> [...]`
+- `ocp init <project_dir> --preset workflow_basic|agent_swarm_basic`
+- `ocp policy lock sync <project_dir>`
+- `ocp cosmos init <project_dir> [--preset default|ci]`
+- `ocp cosmos lock sync <project_dir> [--locked] [...]`
+- `ocp plugin lock sync <project_dir>`
+- `ocp plugin verify <project_dir>`
+- `ocp organ lock sync <project_dir> [--registry <index.toml>] [--json]`
+- `ocp organ verify <project_dir> [--locked|--unlocked] [--json]`
+- `ocp organ install <name> <version> [--project <dir>] [...]`
+- `ocp kit list [<project_dir>] [--json]`
+- `ocp kit doctor <project_dir> [--locked|--json]`
+- `ocp compose <project_dir> --phenotype <file> [...]`
 
 Quick distinction:
-- `ocl init --preset workflow_basic|agent_swarm_basic`: public project-level onboarding preset
-- `ocl cosmos init --preset default|ci`: deeper cosmos configuration preset
+- `ocp init --preset workflow_basic|agent_swarm_basic`: public project-level onboarding preset
+- `ocp cosmos init --preset default|ci`: deeper cosmos configuration preset
 
 #### 4) Advanced verify
-- `ocl verify --attest <artifact_dir>`
-- `ocl verify --repro <artifact_dir>`
-- `ocl verify <project_dir> --phenotype <file> [...]`
+- `ocp verify --attest <artifact_dir>`
+- `ocp verify --repro <artifact_dir>`
+- `ocp verify <project_dir> --phenotype <file> [...]`
 
 ### C) Useful aliases
-- `ocl doctor ...` is an alias of `ocl perm doctor ...`
-- `ocl fix --plan|--apply ...` is an alias of `ocl perm fix ...`
-- `ocl perm review ...` is an alias of `ocl perm diff ...`
+- `ocp doctor ...` is an alias of `ocp perm doctor ...`
+- `ocp fix --plan|--apply ...` is an alias of `ocp perm fix ...`
+- `ocp perm review ...` is an alias of `ocp perm diff ...`
 
 ### D) Safe usage recommendations
-- always run `ocl --help` or `ocl <group> --help` before advanced commands;
+- always run `ocp --help` or `ocp <group> --help` before advanced commands;
 - for commands that change locks/permissions/artifacts, prefer a separate branch first.
 
 Quick lookup:
@@ -1844,18 +1844,18 @@ Short workflow:
 2. run compose:
 
 ```bash
-ocl compose <project_dir> --phenotype <phenotype_file>
+ocp compose <project_dir> --phenotype <phenotype_file>
 ```
 
 3. verify phenotype/build consistency:
 
 ```bash
-ocl verify <project_dir> --phenotype <phenotype_file>
+ocp verify <project_dir> --phenotype <phenotype_file>
 ```
 
 Common artifacts after compose:
-- `src/generated/*.ocl`
-- `src/generated/mod.ocl`
+- `src/generated/*.ocp`
+- `src/generated/mod.ocp`
 - `assembly_proof.toml`
 
 <a id="organ-kit-preset"></a>
@@ -1867,28 +1867,28 @@ Short workflow:
 1. initialize from a public workflow preset:
 
 ```bash
-ocl init <project_dir> --preset workflow_basic
+ocp init <project_dir> --preset workflow_basic
 # hoặc
-ocl init <project_dir> --preset agent_swarm_basic
+ocp init <project_dir> --preset agent_swarm_basic
 ```
 
 2. the preset pulls the required lock chain, then sync the organ graph:
 
 ```bash
-ocl organ lock sync <project_dir>
+ocp organ lock sync <project_dir>
 ```
 
 3. verify organ under the target lane:
 
 ```bash
-ocl organ verify <project_dir> --locked
+ocp organ verify <project_dir> --locked
 ```
 
 4. install more organs and check the kit:
 
 ```bash
-ocl organ install <name> <version> --project <project_dir>
-ocl kit doctor <project_dir> --locked
+ocp organ install <name> <version> --project <project_dir>
+ocp kit doctor <project_dir> --locked
 ```
 
 Preset guidance:
@@ -1899,7 +1899,7 @@ Preset guidance:
 ## Editor workflow (VSCode/LSP/DAP)
 
 Recommended editor workflow:
-1. install the VSIX and open a `.ocl` file;
+1. install the VSIX and open a `.ocp` file;
 2. by default you get TextMate highlighting + snippets; bridge commands use bundled CLI in trusted workspaces;
 3. trust behavior:
    - untrusted workspace: static shell only, no runtime command bridge;
@@ -1907,20 +1907,20 @@ Recommended editor workflow:
 4. the editor bridge uses bundled CLI binaries from the extension package, not host `PATH`;
 5. current editor runtime status in the repo:
    - bridge commands use bundled CLI for `fmt`, `check`, `doctor`, `fix --plan`, and opening trace artifacts;
-   - editor runtimes are bundled as `ocl-lsp` / `ocl-dap` in the release pack;
+   - editor runtimes are bundled as `ocp-lsp` / `ocp-dap` in the release pack;
 6. before commit, run:
 
 ```bash
-ocl fmt <project_dir> --check
-ocl check <project_dir> --locked
-ocl doctor <project_dir>
-ocl fix --plan <project_dir>
+ocp fmt <project_dir> --check
+ocp check <project_dir> --locked
+ocp doctor <project_dir>
+ocp fix --plan <project_dir>
 ```
 
 7. if you already have a failing artifact or replay mismatch:
 
 ```bash
-ocl dbg <artifact_dir>
+ocp dbg <artifact_dir>
 ```
 
 <a id="reactor-workflow"></a>
@@ -1931,21 +1931,21 @@ Use reactor when you need bounded tick loops or separate runtime report/audit fi
 Basic reactor run:
 
 ```bash
-ocl run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --universe dev --domain main --view default
+ocp run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --universe dev --domain main --view default
 ```
 
 Reactor trace:
 
 ```bash
-ocl trace run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --out target/ocl/trace/reactor.audit.jsonl
-ocl trace view target/ocl/trace/reactor.audit.jsonl --tail 50
+ocp trace run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --out target/ocp/trace/reactor.audit.jsonl
+ocp trace view target/ocp/trace/reactor.audit.jsonl --tail 50
 ```
 
 Reactor profile:
 
 ```bash
-ocl profile run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --out target/ocl/profile/reactor.profile.json
-ocl profile view target/ocl/profile/reactor.profile.json --top 20
+ocp profile run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --out target/ocp/profile/reactor.profile.json
+ocp profile view target/ocp/profile/reactor.profile.json --top 20
 ```
 
 Notes:
@@ -1958,13 +1958,13 @@ Notes:
 ## Recommended workflow
 
 Default team flow:
-1. `ocl init <project_dir>` (or enter an existing project)
-2. `ocl lock sync <project_dir>` + `ocl lock sign <project_dir> --key <keyid>` + `ocl lock verify <project_dir> --lock deps.lock.v3`
-3. `ocl perm snapshot <project_dir>` + `ocl perm diff <old> <new>` + `ocl perm approve <diff_report.json> --by <id> --date <YYYY-MM-DD>`
-4. `ocl build <project_dir> --attest` + `ocl verify --attest <artifact_dir>`
-5. `ocl run <project_dir>` + `ocl replay <artifact_dir>`
-6. If something breaks: `ocl doctor <project_dir>` -> `ocl fix --plan <project_dir>` -> `ocl fix --apply <project_dir> ...` -> `ocl dbg <artifact_dir>`
-7. If you suspect budget issues: `ocl budget analyze <artifact_dir|audit.jsonl>`
+1. `ocp init <project_dir>` (or enter an existing project)
+2. `ocp lock sync <project_dir>` + `ocp lock sign <project_dir> --key <keyid>` + `ocp lock verify <project_dir> --lock deps.lock.v3`
+3. `ocp perm snapshot <project_dir>` + `ocp perm diff <old> <new>` + `ocp perm approve <diff_report.json> --by <id> --date <YYYY-MM-DD>`
+4. `ocp build <project_dir> --attest` + `ocp verify --attest <artifact_dir>`
+5. `ocp run <project_dir>` + `ocp replay <artifact_dir>`
+6. If something breaks: `ocp doctor <project_dir>` -> `ocp fix --plan <project_dir>` -> `ocp fix --apply <project_dir> ...` -> `ocp dbg <artifact_dir>`
+7. If you suspect budget issues: `ocp budget analyze <artifact_dir|audit.jsonl>`
 
 ---
 
@@ -1973,12 +1973,12 @@ Default team flow:
 
 ### 1) Command not recognized after installation
 Symptom:
-- `ocl` is not recognized.
+- `ocp` is not recognized.
 
 Fix:
 1. open a new terminal
 2. check `PATH`
-3. run `ocl --version` again
+3. run `ocp --version` again
 
 ### 2) `perm diff` shows suspicious permission growth
 Symptom:
@@ -1994,8 +1994,8 @@ Symptom:
 - lock/trust mismatch.
 
 Fix:
-1. rerun `ocl lock sync`
-2. if `deps.lock.v3.sig` is missing, run `ocl lock sign <project_dir> --key <keyid>`
+1. rerun `ocp lock sync`
+2. if `deps.lock.v3.sig` is missing, run `ocp lock sign <project_dir> --key <keyid>`
 3. verify again
 4. if it still fails, inspect trust policy/metadata
 
@@ -2004,7 +2004,7 @@ Symptom:
 - attestation mismatch.
 
 Fix:
-1. rebuild with `ocl build --attest`
+1. rebuild with `ocp build --attest`
 2. verify immediately after build
 3. inspect environment and artifact paths if it still diverges
 
@@ -2015,7 +2015,7 @@ Symptom:
 Fix:
 1. record data again with the correct flow
 2. do not use real IO fallback
-3. use `ocl dbg`
+3. use `ocp dbg`
 
 ### 6) Tool IO is blocked (`RC-*-PERMISSION-DENIED`)
 Symptom:
@@ -2027,8 +2027,8 @@ Fix:
    - `[permissions.std_kv]`
    - `[permissions.std_time]`
 2. compare the actual key with allow/deny rules
-3. rerun `ocl check . --locked`
-4. rerun `ocl test . --golden fixtures/expected --clean`
+3. rerun `ocp check . --locked`
+4. rerun `ocp test . --golden fixtures/expected --clean`
 
 ### 7) `quarantine` lane blocked during run/replay
 Symptom:
@@ -2037,10 +2037,10 @@ Symptom:
 Fix:
 1. confirm which lane the project/artifact uses
 2. if it is `quarantine`, enable the env gate:
-   - PowerShell: `$env:OCL_QUARANTINE="1"`
-   - bash/zsh: `export OCL_QUARANTINE=1`
+   - PowerShell: `$env:OCP_QUARANTINE="1"`
+   - bash/zsh: `export OCP_QUARANTINE=1`
 3. do not replay `quarantine` artifacts like locked-lane artifacts
-4. rerun `ocl run ...` then `ocl replay <artifact_dir>`
+4. rerun `ocp run ...` then `ocp replay <artifact_dir>`
 
 ### 8) Need deeper help
 - `docs/en/troubleshooting/common-errors.md`
@@ -2053,7 +2053,7 @@ Fix:
 ## [advanced-appendix] Advanced appendix (read after onboarding)
 
 Everything below is advanced material.  
-If this is your first time learning OCL, reading through `Troubleshooting` is enough for daily work.
+If this is your first time learning OCP, reading through `Troubleshooting` is enough for daily work.
 
 ### 7) Tool-grade IO packs you should know about (advanced)
 Locked-lane tool work commonly uses:
@@ -2063,11 +2063,11 @@ Locked-lane tool work commonly uses:
 
 When building an IO tool:
 1. initialize from the template:
-   - `ocl init <project_dir> --template tool-cli`
+   - `ocp init <project_dir> --template tool-cli`
 2. test with golden output:
-   - `ocl test <project_dir> --golden fixtures/expected --clean`
+   - `ocp test <project_dir> --golden fixtures/expected --clean`
 3. replay from the artifact:
-   - `ocl replay ./.ocl_artifacts/<run_id>/`
+   - `ocp replay ./.ocp_artifacts/<run_id>/`
 
 Important IO metadata artifacts:
 - `io/fixtures_manifest.json`
@@ -2075,53 +2075,53 @@ Important IO metadata artifacts:
 - `replay.toml`
 
 ### 8) Consumer packs for app/game (advanced)
-OCL also provides consumer-style capability families:
+OCP also provides consumer-style capability families:
 - `std.ui.*`
 - `engine.game.*`
 - `std.shadow.*`
 
 Fast start:
-1. `ocl init <project_dir> --template mini-game`
-2. `ocl run <project_dir>`
-3. `ocl replay ./.ocl_artifacts/<run_id>/`
+1. `ocp init <project_dir> --template mini-game`
+2. `ocp run <project_dir>`
+3. `ocp replay ./.ocp_artifacts/<run_id>/`
 
 Or:
-1. `ocl init <project_dir> --template shadow-preview`
-2. `ocl run <project_dir> --shadow <id> --shadow-policy forbid_commit`
-3. `ocl replay ./.ocl_artifacts/<run_id>/`
+1. `ocp init <project_dir> --template shadow-preview`
+2. `ocp run <project_dir> --shadow <id> --shadow-policy forbid_commit`
+3. `ocp replay ./.ocp_artifacts/<run_id>/`
 
 Lane note:
 - `quarantine` is separate for nondeterministic capabilities;
-- when using that lane, enable `OCL_QUARANTINE=1`;
+- when using that lane, enable `OCP_QUARANTINE=1`;
 - `quarantine` artifacts/signatures must not be mixed with locked-lane artifacts.
 
 ### 9) Quarantine + cassette record/replay (advanced)
 When your tool needs nondeterministic capabilities such as HTTP/proc/wallclock, use `quarantine`.
 
 Correct operating checklist:
-1. in `Ocl.toml`, set lane `quarantine` and declare the corresponding permissions
+1. in `Ocp.toml`, set lane `quarantine` and declare the corresponding permissions
 2. enable the env gate before running:
 
 ```powershell
-$env:OCL_QUARANTINE="1"
+$env:OCP_QUARANTINE="1"
 ```
 
 ```bash
-export OCL_QUARANTINE=1
+export OCP_QUARANTINE=1
 ```
 
-3. run the project with `ocl run <project_dir>`
+3. run the project with `ocp run <project_dir>`
 4. replay from the run artifact:
 
 ```bash
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 5. for longer cassette operations, use:
-   - `ocl cassette stats`
-   - `ocl cassette prune`
-   - `ocl cassette gc`
-   - `ocl cassette upgrade`
+   - `ocp cassette stats`
+   - `ocp cassette prune`
+   - `ocp cassette gc`
+   - `ocp cassette upgrade`
 
 Shipped example projects:
 - `tool-http`
@@ -2134,14 +2134,14 @@ Important rules:
 - use `quarantine` only when you really need nondeterministic capabilities
 
 ### 10) Schema + typing for ctx/payload/effects (advanced)
-OCL pushes contract checks earlier:
+OCP pushes contract checks earlier:
 - `ctx` should be written as typed records where possible
 - `match`/`try`/`guard` expect proper `Result4`
 - `commit(...)` is only legal for observe keys whose contract allows commit
 
 Recommended sample:
 
-```ocl
+```ocp
 let req = { path: "./out/result.json", overwrite: true };
 observe("std.fs.write_text", "tier2", req, budget(5)) -> wr;
 match wr {
@@ -2152,7 +2152,7 @@ match wr {
 }
 ```
 
-If you are migrating an older script that still uses `ctx("...")`, you may temporarily enable compatibility in `Ocl.toml`:
+If you are migrating an older script that still uses `ctx("...")`, you may temporarily enable compatibility in `Ocp.toml`:
 
 ```toml
 [compat]
@@ -2166,8 +2166,8 @@ Safe migration path:
 3. switch back to `deny`
 
 Useful schema-pack commands:
-- `ocl doc packs`
-- `ocl doc packs --json`
+- `ocp doc packs`
+- `ocp doc packs --json`
 
 Common errors:
 - `RC-CTX-INVALID`
@@ -2175,7 +2175,7 @@ Common errors:
 - compile-time commit denial for observe-only keys
 
 ### 11) Packaging + lockfile + trust (advanced)
-OCL provides a full dependency/package flow so modules can be reused across projects while keeping supply-chain control.
+OCP provides a full dependency/package flow so modules can be reused across projects while keeping supply-chain control.
 
 What to remember:
 - the lockfile SoT is `deps.lock.v3`
@@ -2186,13 +2186,13 @@ Standard flow when adding/updating dependencies:
 1. resolve the graph:
 
 ```bash
-ocl deps resolve <project_dir>
+ocp deps resolve <project_dir>
 ```
 
 2. verify lock + trust:
 
 ```bash
-ocl deps verify <project_dir>
+ocp deps verify <project_dir>
 ```
 
 3. only then continue with build/run.
@@ -2200,9 +2200,9 @@ ocl deps verify <project_dir>
 If you package a reusable artifact:
 
 ```bash
-ocl pack build <project_dir>
-ocl pack sign <artifact.oclpkg>
-ocl pack verify <artifact.oclpkg>
+ocp pack build <project_dir>
+ocp pack sign <artifact.ocppkg>
+ocp pack verify <artifact.ocppkg>
 ```
 
 Artifacts worth tracking:
@@ -2211,32 +2211,32 @@ Artifacts worth tracking:
 - audit event `DepsResolved`
 
 ### 12) Replay-native debugging: trace, diff, dbg, minimize (advanced)
-OCL gives you artifact-based debugging instead of relying on hand-written logging.
+OCP gives you artifact-based debugging instead of relying on hand-written logging.
 
 Recommended incident flow:
 1. run and capture the artifact
 2. inspect trace for the first failure point:
 
 ```bash
-ocl trace view <artifact_dir|audit.jsonl> --tail 50
+ocp trace view <artifact_dir|audit.jsonl> --tail 50
 ```
 
 3. if you need a baseline comparison:
 
 ```bash
-ocl trace diff <artifactA|auditA> <artifactB|auditB> --mode align --out <out_dir>
+ocp trace diff <artifactA|auditA> <artifactB|auditB> --mode align --out <out_dir>
 ```
 
 4. open the replay debugger:
 
 ```bash
-ocl dbg <artifact_dir>
+ocp dbg <artifact_dir>
 ```
 
 5. if the case is too large, minimize the repro:
 
 ```bash
-ocl minimize <artifact_dir> --goal <error_code:X|divergence|kind:KIND> --out <out_dir>
+ocp minimize <artifact_dir> --goal <error_code:X|divergence|kind:KIND> --out <out_dir>
 ```
 
 ### 13) Shadow scheduling + incremental reuse (advanced)
@@ -2249,27 +2249,27 @@ Fast path:
 1. initialize the template:
 
 ```bash
-ocl init <project_dir> --template shadow-preview
+ocp init <project_dir> --template shadow-preview
 ```
 
 2. run and produce an artifact:
 
 ```bash
-ocl run <project_dir>
+ocp run <project_dir>
 ```
 
 3. replay to confirm stability:
 
 ```bash
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 4. when comparing branches/builds:
-   - `ocl trace view <artifact_dir>`
-   - `ocl trace diff <artifactA> <artifactB> --mode align`
+   - `ocp trace view <artifact_dir>`
+   - `ocp trace diff <artifactA> <artifactB> --mode align`
 
 ### 14) IR + reproducible cache (advanced)
-OCL adds performance layers while keeping the principle “determinism first, speed second”:
+OCP adds performance layers while keeping the principle “determinism first, speed second”:
 - compile cache
 - execution cache for pure branches
 - observe cache under safe policy
@@ -2277,44 +2277,44 @@ OCL adds performance layers while keeping the principle “determinism first, sp
 Cache commands:
 
 ```bash
-ocl cache stats <project_dir> [--json]
-ocl cache bench <project_dir> [--engine interpreter|bytecode|dual] [--locked] [--json]
-ocl cache clean <project_dir> --yes [--json]
+ocp cache stats <project_dir> [--json]
+ocp cache bench <project_dir> [--engine interpreter|bytecode|dual] [--locked] [--json]
+ocp cache clean <project_dir> --yes [--json]
 ```
 
 Practical use:
-1. `ocl cache stats` to inspect compile/exec/observe hit/miss
-2. `ocl cache bench` to compare cold/warm/no-cache and verify `signature_equal`
-3. `ocl cache clean --yes` only when you truly need a reset
+1. `ocp cache stats` to inspect compile/exec/observe hit/miss
+2. `ocp cache bench` to compare cold/warm/no-cache and verify `signature_equal`
+3. `ocp cache clean --yes` only when you truly need a reset
 
 ### 15) Conformance suite + upgrade-check (advanced)
-OCL provides system-level contract verification, not only isolated unit tests.
+OCP provides system-level contract verification, not only isolated unit tests.
 
 Main command set:
 
 ```bash
-ocl test --conformance list --manifest <manifest_file>
-ocl test --conformance run --manifest <manifest_file> --out <report_file> [--locked]
+ocp test --conformance list --manifest <manifest_file>
+ocp test --conformance run --manifest <manifest_file> --out <report_file> [--locked]
 ```
 
 Equivalent aliases:
 
 ```bash
-ocl conformance list --manifest <manifest_file>
-ocl conformance run --manifest <manifest_file> --out <report_file> [--locked]
+ocp conformance list --manifest <manifest_file>
+ocp conformance run --manifest <manifest_file> --out <report_file> [--locked]
 ```
 
 Practical example:
 
 ```bash
-ocl test --conformance list --manifest projects/ocp-ocl/conformance/conformance.v5.toml
-ocl test --conformance run --manifest projects/ocp-ocl/conformance/conformance.v5.toml --out target/ocl/w14/reports/conformance_report.json
+ocp test --conformance list --manifest projects/ocp/conformance/conformance.v5.toml
+ocp test --conformance run --manifest projects/ocp/conformance/conformance.v5.toml --out target/ocp/w14/reports/conformance_report.json
 ```
 
 Upgrade check before changing runtime:
 
 ```bash
-ocl upgrade-check <project_dir> --manifest <manifest_file> --out <report_file> [--locked]
+ocp upgrade-check <project_dir> --manifest <manifest_file> --out <report_file> [--locked]
 ```
 
 ### 16) Advanced maintainer/release flow
@@ -2336,7 +2336,7 @@ See:
 Prefer looking up directly inside this file:
 - [Quick reference](#quick-reference)
 - [Language Quickstart](#language-quickstart)
-- [Foundations you should know to use OCL](#concepts)
+- [Foundations you should know to use OCP](#concepts)
 - [Permissions](#permissions)
 - [Full command catalog](#commands)
 - [Troubleshooting](#troubleshooting)
@@ -2353,5 +2353,5 @@ External companion files:
 <a id="maintainer-guide"></a>
 ## Maintainer Guide
 
-Release/gate material is separated so `USER_GUIDE` can stay focused on writing and running OCL:
+Release/gate material is separated so `USER_GUIDE` can stay focused on writing and running OCP:
 - [docs/vi/MAINTAINER_GUIDE.md](/docs/vi/MAINTAINER_GUIDE.md)

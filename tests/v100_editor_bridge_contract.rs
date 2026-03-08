@@ -10,7 +10,7 @@ fn repo_root() -> PathBuf {
 fn write_report(rel_path: &str, value: &serde_json::Value) {
     let out = repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w100")
         .join(rel_path);
     if let Some(parent) = out.parent() {
@@ -29,7 +29,7 @@ fn v100_editor_bridge_contract() {
         repo_root()
             .join("editor")
             .join("vscode")
-            .join("ocp-ocl")
+            .join("ocp")
             .join("src")
             .join("commands.ts"),
     )
@@ -38,7 +38,7 @@ fn v100_editor_bridge_contract() {
         repo_root()
             .join("editor")
             .join("vscode")
-            .join("ocp-ocl")
+            .join("ocp")
             .join("dist")
             .join("commands.js"),
     )
@@ -47,7 +47,7 @@ fn v100_editor_bridge_contract() {
         repo_root()
             .join("editor")
             .join("vscode")
-            .join("ocp-ocl")
+            .join("ocp")
             .join("src")
             .join("lspClient.ts"),
     )
@@ -56,7 +56,7 @@ fn v100_editor_bridge_contract() {
         repo_root()
             .join("editor")
             .join("vscode")
-            .join("ocp-ocl")
+            .join("ocp")
             .join("src")
             .join("runtimePaths.ts"),
     )
@@ -65,7 +65,7 @@ fn v100_editor_bridge_contract() {
         repo_root()
             .join("editor")
             .join("vscode")
-            .join("ocp-ocl")
+            .join("ocp")
             .join("src")
             .join("dapRuntime.ts"),
     )
@@ -74,7 +74,7 @@ fn v100_editor_bridge_contract() {
         repo_root()
             .join("editor")
             .join("vscode")
-            .join("ocp-ocl")
+            .join("ocp")
             .join("package.json"),
     )
     .expect("read package.json");
@@ -92,11 +92,11 @@ fn v100_editor_bridge_contract() {
             "editor command bridge must execute CLI commands"
         );
         assert!(
-            source.contains("ocpOcl.formatDocument")
-                && source.contains("ocpOcl.checkWorkspace")
-                && source.contains("ocpOcl.openDoctorReport")
-                && source.contains("ocpOcl.openFixPlan")
-                && source.contains("ocpOcl.openDebugTrace"),
+            source.contains("ocp.formatDocument")
+                && source.contains("ocp.checkWorkspace")
+                && source.contains("ocp.openDoctorReport")
+                && source.contains("ocp.openFixPlan")
+                && source.contains("ocp.openDebugTrace"),
             "editor command bridge must register all public command ids"
         );
         assert!(
@@ -107,15 +107,15 @@ fn v100_editor_bridge_contract() {
     assert!(
         runtime_paths.contains("bin")
             && runtime_paths.contains("win-x64")
-            && commands_ts.contains("\"ocl.exe\"")
-            && lsp_client.contains("\"ocl-lsp.exe\"")
-            && dap_runtime.contains("\"ocl-dap.exe\""),
+            && commands_ts.contains("\"ocp.exe\"")
+            && lsp_client.contains("\"ocp-lsp.exe\"")
+            && dap_runtime.contains("\"ocp-dap.exe\""),
         "runtime path resolver and callers must know bundled CLI/LSP/DAP names"
     );
 
     assert!(
         lsp_client.contains("workspace is untrusted")
-            && lsp_client.contains("ocl-lsp.exe")
+            && lsp_client.contains("ocp-lsp.exe")
             && lsp_client.contains("registerHoverProvider")
             && lsp_client.contains("registerDocumentSemanticTokensProvider")
             && lsp_client.contains("spawn("),
@@ -124,34 +124,34 @@ fn v100_editor_bridge_contract() {
     assert!(
         dap_runtime.contains("registerDebugAdapterDescriptorFactory")
             && dap_runtime.contains("registerDebugConfigurationProvider")
-            && dap_runtime.contains("ocl-dap.exe"),
+            && dap_runtime.contains("ocp-dap.exe"),
         "debug runtime must register a real bundled DAP adapter"
     );
     assert!(
-        package_json.contains("\"debuggers\"") && package_json.contains("\"type\": \"ocp-ocl\""),
-        "package.json must contribute OCL debugger metadata"
+        package_json.contains("\"debuggers\"") && package_json.contains("\"type\": \"ocp\""),
+        "package.json must contribute OCP debugger metadata"
     );
 
     assert!(
         build_vsix.contains("Resolve-BinarySource")
             && build_vsix.contains("bin\\win-x64")
-            && build_vsix.contains("ocl.exe")
-            && build_vsix.contains("ocl-lsp.exe")
-            && build_vsix.contains("ocl-dap.exe"),
+            && build_vsix.contains("ocp.exe")
+            && build_vsix.contains("ocp-lsp.exe")
+            && build_vsix.contains("ocp-dap.exe"),
         "VSIX build script must bundle CLI/LSP/DAP into extension/bin/win-x64"
     );
 
     let report = json!({
-        "schema": "ocl.w100.editor.bridge_contract_report.v1",
+        "schema": "ocp.w100.editor.bridge_contract_report.v1",
         "status": "PASS",
-        "commands_source": "editor/vscode/ocp-ocl/src/commands.ts",
-        "lsp_client_source": "editor/vscode/ocp-ocl/src/lspClient.ts",
-        "dap_runtime_source": "editor/vscode/ocp-ocl/src/dapRuntime.ts",
+        "commands_source": "editor/vscode/ocp/src/commands.ts",
+        "lsp_client_source": "editor/vscode/ocp/src/lspClient.ts",
+        "dap_runtime_source": "editor/vscode/ocp/src/dapRuntime.ts",
         "vsix_build_script": "tools/release/build_vsix.ps1",
         "bundled_binaries_rel": [
-            "extension/bin/win-x64/ocl.exe",
-            "extension/bin/win-x64/ocl-lsp.exe",
-            "extension/bin/win-x64/ocl-dap.exe"
+            "extension/bin/win-x64/ocp.exe",
+            "extension/bin/win-x64/ocp-lsp.exe",
+            "extension/bin/win-x64/ocp-dap.exe"
         ]
     });
     write_report("editor/editor_bridge_contract_report.json", &report);

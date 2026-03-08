@@ -20,7 +20,7 @@ fn v100_community_policy_contract() {
             .get("schema")
             .and_then(JsonValue::as_str)
             .unwrap_or(""),
-        "ocl.business.community_contribution_policy.v1"
+        "ocp.business.community_contribution_policy.v1"
     );
     assert_eq!(
         contract
@@ -72,14 +72,14 @@ fn v100_community_policy_contract() {
         .unwrap_or(false));
 
     let report = json!({
-        "schema": "ocl.w100.business.community_policy_report.v1",
+        "schema": "ocp.w100.business.community_policy_report.v1",
         "status": "PASS",
         "cla_type": "license_grant",
         "cla_required_for": required_for,
         "inbound": "cla",
         "outbound": "AGPL-3.0-only+commercial",
         "reject_contribution_without_cla": true,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100g::run_manifest_sha256()
     });
     v100g::write_report("business/community_policy_report.json", &report);

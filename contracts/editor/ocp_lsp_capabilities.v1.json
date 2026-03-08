@@ -1,0 +1,23 @@
+{
+  "schema": "ocp.editor.lsp_capabilities.v1",
+  "contract_id": "editor.ocp_lsp_capabilities",
+  "version": "v1",
+  "capabilities": [
+    "textDocument/didOpen",
+    "textDocument/didChange",
+    "textDocument/didSave",
+    "textDocument/publishDiagnostics",
+    "textDocument/hover",
+    "textDocument/completion",
+    "textDocument/definition",
+    "textDocument/references",
+    "textDocument/rename",
+    "textDocument/documentSymbol",
+    "workspace/symbol",
+    "textDocument/formatting",
+    "textDocument/codeAction",
+    "textDocument/semanticTokens/full",
+    "workspace/didChangeConfiguration",
+    "$/cancelRequest"
+  ]
+}

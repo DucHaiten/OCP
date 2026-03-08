@@ -219,56 +219,56 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
-name = "ocl-cli"
+name = "ocp"
 version = "0.1.0"
 dependencies = [
- "ocl-runtime-core",
- "ocl-sdk",
- "serde_json",
- "sha2",
-]
-
-[[package]]
-name = "ocl-dap"
-version = "0.1.0"
-dependencies = [
- "ocl-sdk",
- "serde_json",
-]
-
-[[package]]
-name = "ocl-lsp"
-version = "0.1.0"
-dependencies = [
- "ocl-sdk",
- "serde_json",
-]
-
-[[package]]
-name = "ocl-runtime-core"
-version = "0.1.0"
-dependencies = [
- "ocp-ocl",
-]
-
-[[package]]
-name = "ocl-sdk"
-version = "0.1.0"
-dependencies = [
- "base64",
- "blake3",
- "ed25519-dalek",
- "ocl-runtime-core",
+ "ocp-sdk",
  "serde",
  "serde_json",
  "sha2",
 ]
 
 [[package]]
-name = "ocp-ocl"
+name = "ocp-cli"
 version = "0.1.0"
 dependencies = [
- "ocl-sdk",
+ "ocp-runtime-core",
+ "ocp-sdk",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "ocp-dap"
+version = "0.1.0"
+dependencies = [
+ "ocp-sdk",
+ "serde_json",
+]
+
+[[package]]
+name = "ocp-lsp"
+version = "0.1.0"
+dependencies = [
+ "ocp-sdk",
+ "serde_json",
+]
+
+[[package]]
+name = "ocp-runtime-core"
+version = "0.1.0"
+dependencies = [
+ "ocp",
+]
+
+[[package]]
+name = "ocp-sdk"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "blake3",
+ "ed25519-dalek",
+ "ocp-runtime-core",
  "serde",
  "serde_json",
  "sha2",

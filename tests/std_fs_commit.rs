@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, Diagnostic, ExecConfig, ExecOutput, Executor, ReasonCode,
     ResultKind, Value,
 };
@@ -44,7 +44,7 @@ fn temp_fs_root(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    std::env::temp_dir().join(format!("ocl_std_fs_commit_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_std_fs_commit_{tag}_{stamp}"))
 }
 
 fn write_text(path: &PathBuf, content: &str) {
@@ -70,9 +70,9 @@ fn std_fs_write_text_commit_roundtrip_and_overwrite_policy() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let root = temp_fs_root("roundtrip");
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_read_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_READ", "./out/**");
-    let _allow_write_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_WRITE", "./out/**");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_read_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_READ", "./out/**");
+    let _allow_write_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_WRITE", "./out/**");
 
     let src = r#"
 observe("std.fs.write_text", "tier2", ctx("path=./out/result.txt;text=hello;overwrite=true"), budget(5)) -> w1;
@@ -111,11 +111,11 @@ fn std_fs_mkdir_rename_remove_commit_flow() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let root = temp_fs_root("mkdir_rename_remove");
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_read_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_READ", "./work/**");
-    let _allow_write_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_WRITE", "./work/**");
-    let _allow_remove_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_REMOVE", "./work/**");
-    let _allow_rename_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_RENAME", "./work/**");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_read_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_READ", "./work/**");
+    let _allow_write_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_WRITE", "./work/**");
+    let _allow_remove_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_REMOVE", "./work/**");
+    let _allow_rename_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_RENAME", "./work/**");
 
     let src = r#"
 observe("std.fs.mkdir", "tier2", ctx("path=./work;recursive=true"), budget(5)) -> mk;
@@ -166,9 +166,9 @@ fn std_fs_write_text_deferred_when_exceeds_max_write_bytes() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let root = temp_fs_root("deferred_cap");
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_write_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_WRITE", "./out/**");
-    let _max_write_guard = EnvVarGuard::set("OCL_STD_FS_MAX_WRITE_BYTES", "4");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_write_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_WRITE", "./out/**");
+    let _max_write_guard = EnvVarGuard::set("OCP_STD_FS_MAX_WRITE_BYTES", "4");
 
     let src = r#"
 observe("std.fs.write_text", "tier2", ctx("path=./out/large.txt;text=abcdef"), budget(5)) -> w;
@@ -187,8 +187,8 @@ fn std_fs_write_text_denied_when_outside_allowlist() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let root = temp_fs_root("deny_allowlist");
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_write_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_WRITE", "./allowed/**");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_write_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_WRITE", "./allowed/**");
 
     let src = r#"
 observe("std.fs.write_text", "tier2", ctx("path=./blocked/file.txt;text=x"), budget(5)) -> w;
@@ -212,8 +212,8 @@ fn std_fs_rename_commit_denied_when_destination_exists_and_overwrite_false() {
     write_text(&src_file, "src");
     write_text(&dst_file, "dst");
 
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_rename_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_RENAME", "./work/**");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_rename_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_RENAME", "./work/**");
 
     let src = r#"
 observe("std.fs.rename", "tier2", ctx("from=./work/src.txt;to=./work/dst.txt;overwrite=false"), budget(5)) -> rn;

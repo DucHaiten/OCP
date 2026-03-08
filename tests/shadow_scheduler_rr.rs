@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, Value,
 };
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {
@@ -63,11 +63,11 @@ fn shadow_search_round_robin_is_deterministic() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_branches = EnvVarGuard::set("OCL_STD_SHADOW_MAX_BRANCHES", "8");
-    let _step_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_STEP_CAP", "80");
-    let _budget_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
-    let _policy_allow = EnvVarGuard::set("OCL_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "round_robin");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_branches = EnvVarGuard::set("OCP_STD_SHADOW_MAX_BRANCHES", "8");
+    let _step_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_STEP_CAP", "80");
+    let _budget_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
+    let _policy_allow = EnvVarGuard::set("OCP_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "round_robin");
 
     let src = r#"
 observe("std.shadow.search", "tier2", ctx("policy=round_robin;variants_json=[{\"x\":1},{\"x\":2},{\"x\":3}];max_branches=3;per_branch_step_cap=80;per_branch_budget_cap=2000;global_step_cap=240;global_budget_cap=12000;top_k=3;rounds=2"), budget(5)) -> s;
@@ -108,11 +108,11 @@ fn shadow_search_round_robin_respects_global_step_cap() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_branches = EnvVarGuard::set("OCL_STD_SHADOW_MAX_BRANCHES", "8");
-    let _step_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_STEP_CAP", "80");
-    let _budget_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
-    let _policy_allow = EnvVarGuard::set("OCL_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "round_robin");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_branches = EnvVarGuard::set("OCP_STD_SHADOW_MAX_BRANCHES", "8");
+    let _step_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_STEP_CAP", "80");
+    let _budget_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
+    let _policy_allow = EnvVarGuard::set("OCP_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "round_robin");
 
     let src = r#"
 observe("std.shadow.search", "tier2", ctx("policy=round_robin;variants_json=[{\"x\":1},{\"x\":2},{\"x\":3}];max_branches=3;per_branch_step_cap=80;per_branch_budget_cap=2000;global_step_cap=80;global_budget_cap=12000;top_k=3"), budget(5)) -> s;
@@ -139,8 +139,8 @@ fn shadow_search_policy_denied_when_not_in_allowlist() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _policy_allow = EnvVarGuard::set("OCL_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "beam,portfolio");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _policy_allow = EnvVarGuard::set("OCP_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "beam,portfolio");
 
     let src = r#"
 observe("std.shadow.search", "tier2", ctx("policy=round_robin;variants_json=[{\"x\":1}]"), budget(5)) -> s;

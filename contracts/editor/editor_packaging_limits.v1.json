@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.editor.packaging_limits.v1",
+  "schema": "ocp.editor.packaging_limits.v1",
   "contract_id": "editor.editor_packaging_limits",
   "version": "v1",
   "limits_bytes": {

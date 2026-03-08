@@ -10,11 +10,11 @@ Date: 2026-03-03
 
 ## Evidence
 - `cargo test`
-- `cargo test --test ocl_parser`
-- `cargo test --test ocl_typecheck`
-- `cargo test --test ocl_exec`
-- `cargo test --test ocl_toy_programs`
-- `cargo test --test ocl_pilot`
+- `cargo test --test ocp_parser`
+- `cargo test --test ocp_typecheck`
+- `cargo test --test ocp_exec`
+- `cargo test --test ocp_toy_programs`
+- `cargo test --test ocp_pilot`
 - `cargo test --bin soak_compare`
 - `cargo clippy --all-targets -- -D warnings`
 - `cargo fmt -- --check`

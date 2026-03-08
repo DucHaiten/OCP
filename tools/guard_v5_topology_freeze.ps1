@@ -1,7 +1,7 @@
 param(
     [ValidateSet("Before", "After")]
     [string]$Phase = "Before",
-    [string]$ReportRoot = "target/ocl/v5/w0/reports"
+    [string]$ReportRoot = "target/ocp/v5/w0/reports"
 )
 
 Set-StrictMode -Version Latest
@@ -37,7 +37,7 @@ function Get-WorkspaceMembers {
 }
 
 function Get-ConformanceScenarioOrder {
-    $manifest = "projects/ocp-ocl/conformance/conformance.v1.toml"
+    $manifest = "projects/ocp/conformance/conformance.v1.toml"
     if (-not (Test-Path -LiteralPath $manifest)) {
         return @()
     }
@@ -51,7 +51,7 @@ function Get-ConformanceScenarioOrder {
 }
 
 function Get-PluginPlatformPins {
-    $path = "projects/ocp-ocl/apps/plugin-demo/plugins.lock.v1"
+    $path = "projects/ocp/apps/plugin-demo/plugins.lock.v1"
     if (-not (Test-Path -LiteralPath $path)) {
         return @()
     }
@@ -72,8 +72,8 @@ function Get-PluginPlatformPins {
 
 function Get-LanePins {
     $paths = @(
-        "tools/ci_ocl_lane.ps1",
-        "tools/ci_ocl_quarantine.ps1"
+        "tools/ci_ocp_lane.ps1",
+        "tools/ci_ocp_quarantine.ps1"
     )
     $pins = New-Object System.Collections.Generic.List[string]
     foreach ($path in $paths) {

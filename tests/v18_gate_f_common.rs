@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{contract_sig_path_v18, sign_contract_json_v18};
+use ocp_sdk::{contract_sig_path_v18, sign_contract_json_v18};
 use serde_json::{json, Value as JsonValue};
 use sha2::{Digest, Sha256};
 
@@ -20,7 +20,7 @@ pub fn repo_root() -> PathBuf {
 pub fn w18_rc_dir() -> PathBuf {
     repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w18")
         .join("rc")
 }
@@ -43,20 +43,20 @@ pub fn temp_project_dir(tag: &str) -> PathBuf {
     dir
 }
 
-pub fn run_ocl_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
+pub fn run_ocp_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args);
     for (k, v) in envs {
         cmd.env(k, v);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 pub fn assert_ok(output: &Output, step: &str) -> String {
@@ -93,8 +93,8 @@ pub fn list_dirs(path: &Path) -> Vec<PathBuf> {
 }
 
 pub fn latest_artifact_dir(project_root: &Path) -> PathBuf {
-    let mut dirs = list_dirs(&project_root.join(".ocl_artifacts"));
-    assert!(!dirs.is_empty(), "missing .ocl_artifacts run dirs");
+    let mut dirs = list_dirs(&project_root.join(".ocp_artifacts"));
+    assert!(!dirs.is_empty(), "missing .ocp_artifacts run dirs");
     dirs.pop().expect("latest artifact dir")
 }
 
@@ -120,24 +120,24 @@ pub fn sha256_hex_file(path: &Path) -> String {
 
 pub fn release_required_artifacts() -> Vec<&'static str> {
     vec![
-        "target/ocl/w18/meta/run_manifest.json",
-        "target/ocl/w18/contracts/contract_inventory.json",
-        "target/ocl/w18/contracts/contract_inventory_completeness_report.json",
-        "target/ocl/w18/contracts/sot_signature_report.json",
-        "target/ocl/w18/migration/cassette_upgrade_report.json",
-        "target/ocl/w18/migration/manifest_upgrade_report.json",
-        "target/ocl/w18/migration/pack_abi_upgrade_report.json",
-        "target/ocl/w18/migration/migration_noop_report.json",
-        "target/ocl/w18/ops/doctor_report.json",
-        "target/ocl/w18/ops/fix_plan_report.json",
-        "target/ocl/w18/ops/budget_analyze_report.json",
-        "target/ocl/w18/ops/doctor_fix_cases_report.json",
-        "target/ocl/w18/cassette/cassette_operability_report.json",
-        "target/ocl/w18/security/privacy_hygiene_report.json",
-        "target/ocl/w18/security/dos_caps_report.json",
-        "target/ocl/w18/security/fs_boundary_report.json",
-        "target/ocl/w18/packs/pack_shipproof_report.json",
-        "target/ocl/w18/packs/connector_baseline_report.json",
+        "target/ocp/w18/meta/run_manifest.json",
+        "target/ocp/w18/contracts/contract_inventory.json",
+        "target/ocp/w18/contracts/contract_inventory_completeness_report.json",
+        "target/ocp/w18/contracts/sot_signature_report.json",
+        "target/ocp/w18/migration/cassette_upgrade_report.json",
+        "target/ocp/w18/migration/manifest_upgrade_report.json",
+        "target/ocp/w18/migration/pack_abi_upgrade_report.json",
+        "target/ocp/w18/migration/migration_noop_report.json",
+        "target/ocp/w18/ops/doctor_report.json",
+        "target/ocp/w18/ops/fix_plan_report.json",
+        "target/ocp/w18/ops/budget_analyze_report.json",
+        "target/ocp/w18/ops/doctor_fix_cases_report.json",
+        "target/ocp/w18/cassette/cassette_operability_report.json",
+        "target/ocp/w18/security/privacy_hygiene_report.json",
+        "target/ocp/w18/security/dos_caps_report.json",
+        "target/ocp/w18/security/fs_boundary_report.json",
+        "target/ocp/w18/packs/pack_shipproof_report.json",
+        "target/ocp/w18/packs/connector_baseline_report.json",
     ]
 }
 
@@ -165,12 +165,12 @@ pub fn ensure_release_artifact_manifest_signed() -> (PathBuf, PathBuf) {
     }
 
     let manifest = json!({
-        "schema": "ocl.w18.rc.release_artifact_manifest.v1",
+        "schema": "ocp.w18.rc.release_artifact_manifest.v1",
         "contract_id": "v1.release_artifact_manifest",
         "version": "v1",
         "hasher_version": "sha256-v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
-        "toolchain_digest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
+        "toolchain_digest_ref": "target/ocp/w18/meta/run_manifest.json",
         "artifacts": artifacts
     });
     let manifest_path = rc_dir.join("release_artifact_manifest.json");
@@ -185,8 +185,8 @@ pub fn ensure_release_artifact_manifest_signed() -> (PathBuf, PathBuf) {
 }
 
 pub fn patch_manifest_for_permission_delta(project_root: &Path) {
-    let manifest_path = project_root.join("Ocl.toml");
-    let raw = fs::read_to_string(&manifest_path).expect("read Ocl.toml");
+    let manifest_path = project_root.join("Ocp.toml");
+    let raw = fs::read_to_string(&manifest_path).expect("read Ocp.toml");
     let from = "allow = [\"std.fs.*\", \"std.kv.*\", \"std.time.*\"]";
     let to = "allow = [\"std.fs.*\", \"std.kv.*\", \"std.time.*\", \"std.proc.*\"]";
     let patched = raw.replace(from, to);
@@ -194,5 +194,5 @@ pub fn patch_manifest_for_permission_delta(project_root: &Path) {
         raw, patched,
         "permission delta patch must update [permissions.package].allow"
     );
-    fs::write(manifest_path, patched).expect("write patched Ocl.toml");
+    fs::write(manifest_path, patched).expect("write patched Ocp.toml");
 }

@@ -51,12 +51,12 @@ fn v100_release_publish_scope_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.release.release_publish_scope_report.v1",
+        "schema": "ocp.w100.release.release_publish_scope_report.v1",
         "status": "PASS",
         "signed_assets_scope": signed_assets_scope,
         "source_trust_scope": source_scope,
         "release_manifest_ref": fixture.manifest_path.to_string_lossy().replace('\\', "/"),
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100b::run_manifest_sha256()
     });
     v100b::write_report("release/release_publish_scope_report.json", &report);

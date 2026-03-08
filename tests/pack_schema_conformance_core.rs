@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, validate_schema_value, CapabilityRegistry, ExecConfig,
     Executor, ReasonCode, ResultKind, Value,
 };

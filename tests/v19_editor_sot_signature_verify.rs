@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::{
+use ocp_sdk::{
     sign_contract_json_v19, verify_contract_json_signature_v19, verify_w19_contract_set_v19,
     W19_REQUIRED_CONTRACT_FILES,
 };
@@ -13,12 +13,12 @@ mod v19;
 fn v19_editor_sot_signature_verify() {
     v19::ensure_run_manifest();
 
-    let update = std::env::var("OCL_UPDATE_V19_SOT_SIG").ok().as_deref() == Some("1");
+    let update = std::env::var("OCP_UPDATE_V19_SOT_SIG").ok().as_deref() == Some("1");
     let mut generated = Vec::<String>::new();
     let mut resigned = Vec::<String>::new();
     for rel in W19_REQUIRED_CONTRACT_FILES {
         let contract_path = v19::contracts_root().join(rel);
-        let sig_path = ocl_sdk::contract_sig_path_v19(&contract_path);
+        let sig_path = ocp_sdk::contract_sig_path_v19(&contract_path);
         if update || !sig_path.exists() {
             sign_contract_json_v19(&contract_path, "w18-sot-root", 1)
                 .unwrap_or_else(|_| panic!("sign {}", contract_path.display()));
@@ -47,7 +47,7 @@ fn v19_editor_sot_signature_verify() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.editor_sot_signature_report.v1",
+        "schema": "ocp.w19.editor_sot_signature_report.v1",
         "status": "PASS",
         "required_count": summary.required_count,
         "verified_count": summary.verified_count,
@@ -62,7 +62,7 @@ fn v19_editor_sot_signature_verify() {
             "signer_id": item.signer_id,
             "trust_epoch": item.trust_epoch
         })).collect::<Vec<_>>(),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     let out_dir = v19::w19_target_root().join("contracts");

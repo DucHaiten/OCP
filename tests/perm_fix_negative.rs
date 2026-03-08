@@ -9,7 +9,7 @@ fn v17_perm_fix_apply_requires_ack_and_justification() {
     w17_perm_common::write_manifest_with_fs_rule(&root, "locked_v071", "./**");
 
     let root_s = root.to_string_lossy().to_string();
-    let output = w17_perm_common::run_ocl_cli(
+    let output = w17_perm_common::run_ocp_cli(
         &[
             "perm",
             "fix",

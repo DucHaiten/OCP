@@ -1,4 +1,4 @@
-use ocl_sdk::publish_channels_v19;
+use ocp_sdk::publish_channels_v19;
 use serde_json::json;
 
 #[path = "v19_gate_f_common.rs"]
@@ -38,13 +38,13 @@ fn v19_publish_channel_manifest_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.release.publish_channel_report.v1",
+        "schema": "ocp.w19.release.publish_channel_report.v1",
         "status": "PASS",
         "channels_contract_path": channels_path.to_string_lossy().replace('\\', "/"),
         "channels": channels,
         "manifest_channel": channel,
         "rollback_required": rollback_required,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/publish_channel_report.json", &report);

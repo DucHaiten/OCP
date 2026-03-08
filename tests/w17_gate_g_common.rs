@@ -16,7 +16,7 @@ pub fn read_utf8(path: &Path) -> String {
 }
 
 pub fn write_rc_report(file_name: &str, payload: &JsonValue) {
-    let out_dir = PathBuf::from("target").join("ocl").join("w17").join("rc");
+    let out_dir = PathBuf::from("target").join("ocp").join("w17").join("rc");
     fs::create_dir_all(&out_dir).expect("create w17 rc output dir");
     fs::write(
         out_dir.join(file_name),

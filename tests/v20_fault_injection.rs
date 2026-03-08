@@ -44,7 +44,7 @@ fn v20_fault_injection() {
         .collect::<Vec<serde_json::Value>>();
 
     let report = json!({
-        "schema": "ocl.w20.chaos_report.v1",
+        "schema": "ocp.w20.chaos_report.v1",
         "status": "PASS",
         "feature_gate": "w20_chaos",
         "fault_points": fault_points,
@@ -53,7 +53,7 @@ fn v20_fault_injection() {
         "total_faults_injected": total_faults,
         "injection_results": injected,
         "undefined_behavior_count": 0,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20d::run_manifest_sha256()
     });
 

@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use ocl_sdk::{sign_contract_json_v20, verify_contract_json_signature_v20};
+use ocp_sdk::{sign_contract_json_v20, verify_contract_json_signature_v20};
 use serde_json::json;
 
 #[path = "v100_gate_a_common.rs"]
@@ -17,12 +17,12 @@ fn v100_release_sot_signature_verify() {
         files.insert(entry.producer);
     }
 
-    let update = std::env::var("OCL_UPDATE_V100_SOT_SIG").ok().as_deref() == Some("1");
+    let update = std::env::var("OCP_UPDATE_V100_SOT_SIG").ok().as_deref() == Some("1");
     let mut generated = Vec::<String>::new();
     let mut invalid = Vec::<String>::new();
     for rel in &files {
         let contract_path = v100::repo_root().join(rel);
-        let sig_path = ocl_sdk::contract_sig_path_v20(&contract_path);
+        let sig_path = ocp_sdk::contract_sig_path_v20(&contract_path);
         if update {
             sign_contract_json_v20(&contract_path, "w18-sot-root", 1)
                 .unwrap_or_else(|_| panic!("sign {}", contract_path.display()));
@@ -84,12 +84,12 @@ fn v100_release_sot_signature_verify() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.release_sot_signature_report.v1",
+        "schema": "ocp.w100.release_sot_signature_report.v1",
         "status": "PASS",
         "required_count": files.len(),
         "verified_count": items.len(),
         "items": items,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100::run_manifest_sha256()
     });
     v100::write_report("contracts/release_sot_signature_report.json", &report);

@@ -3,25 +3,25 @@ use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::init_project;
+use ocp_sdk::init_project;
 use serde_json::Value as JsonValue;
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 fn assert_success(output: &Output) -> String {
@@ -49,11 +49,11 @@ fn temp_dir_for_test(tag: &str) -> PathBuf {
 
 #[test]
 fn upgrade_check_core_fixture_passes_with_json_report() {
-    let out = run_ocl_cli(&[
+    let out = run_ocp_cli(&[
         "upgrade-check",
-        "projects/ocp-ocl/conformance/fixtures/core-exec-pass",
+        "projects/ocp/conformance/fixtures/core-exec-pass",
         "--manifest",
-        "projects/ocp-ocl/conformance/conformance.v5.toml",
+        "projects/ocp/conformance/conformance.v5.toml",
         "--json",
     ]);
     let stdout = assert_success(&out);
@@ -61,7 +61,7 @@ fn upgrade_check_core_fixture_passes_with_json_report() {
 
     assert_eq!(
         report.get("schema").and_then(JsonValue::as_str),
-        Some("ocl.upgrade_check.v1")
+        Some("ocp.upgrade_check.v1")
     );
     assert_eq!(report.get("ok").and_then(JsonValue::as_bool), Some(true));
     assert_eq!(
@@ -90,12 +90,12 @@ fn upgrade_check_reports_divergence_for_signature_mismatch() {
     let root = temp_dir_for_test("signature-mismatch");
     let project = root.join("project");
     init_project(&project).expect("init project");
-    let manifest_toml = project.join("Ocl.toml");
-    let mut manifest_text = fs::read_to_string(&manifest_toml).expect("read Ocl.toml");
+    let manifest_toml = project.join("Ocp.toml");
+    let mut manifest_text = fs::read_to_string(&manifest_toml).expect("read Ocp.toml");
     manifest_text.push_str(
         "\n[permissions.package]\nallow = [\"std.log.info\", \"std.fs.read_text\"]\ndeny = []\n",
     );
-    fs::write(&manifest_toml, manifest_text).expect("patch Ocl.toml permissions");
+    fs::write(&manifest_toml, manifest_text).expect("patch Ocp.toml permissions");
 
     let expected_dir = root.join("expected");
     fs::create_dir_all(&expected_dir).expect("create expected dir");
@@ -122,7 +122,7 @@ fn upgrade_check_reports_divergence_for_signature_mismatch() {
     );
     fs::write(&manifest_path, manifest).expect("write conformance manifest");
 
-    let out = run_ocl_cli(&[
+    let out = run_ocp_cli(&[
         "upgrade-check",
         project.to_string_lossy().as_ref(),
         "--manifest",

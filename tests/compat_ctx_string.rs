@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{
+use ocp_sdk::{
     check_project_with_lock, init_project, parse_project_language_config_v071, SdkError,
 };
 
@@ -11,15 +11,15 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_compat_ctx_string_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_compat_ctx_string_{tag}_{stamp}"))
 }
 
 fn write_manifest(root: &Path, body: &str) {
-    fs::write(root.join("Ocl.toml"), body).expect("write manifest");
+    fs::write(root.join("Ocp.toml"), body).expect("write manifest");
 }
 
 fn write_main(root: &Path, body: &str) {
-    fs::write(root.join("src").join("main.ocl"), body).expect("write main");
+    fs::write(root.join("src").join("main.ocp"), body).expect("write main");
 }
 
 fn base_manifest_with_compat(compat_block: &str) -> String {

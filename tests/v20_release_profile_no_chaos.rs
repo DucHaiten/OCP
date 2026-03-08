@@ -30,12 +30,12 @@ fn v20_release_profile_no_chaos() {
     );
 
     let report = json!({
-        "schema": "ocl.w20.release.release_profile_no_chaos_report.v1",
+        "schema": "ocp.w20.release.release_profile_no_chaos_report.v1",
         "status": "PASS",
         "w20_chaos_enabled_at_compile_time": false,
         "cargo_feature_env_present": false,
-        "release_manifest_ref": "target/ocl/w20/release/v1_rc_manifest.json",
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "release_manifest_ref": "target/ocp/w20/release/v1_rc_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20g::run_manifest_sha256()
     });
     v20g::write_report("release/release_profile_no_chaos_report.json", &report);

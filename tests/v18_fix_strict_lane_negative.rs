@@ -12,7 +12,7 @@ fn v18_fix_strict_lane_negative_requires_ack_and_justification() {
     common::write_manifest_with_fs_rule(&root, "locked_v071", "./**");
     let root_s = root.to_string_lossy().to_string();
 
-    let out = common::run_ocl_cli(
+    let out = common::run_ocp_cli(
         &[
             "perm",
             "fix",

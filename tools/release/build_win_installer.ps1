@@ -3,8 +3,8 @@ param(
     [string]$LspSource = "",
     [string]$DapSource = "",
     [string]$VsixSource = "",
-    [string]$StageRoot = "target/ocl/w100/stage/win-x64",
-    [string]$ReleaseRoot = "target/ocl/w100/release",
+    [string]$StageRoot = "target/ocp/w100/stage/win-x64",
+    [string]$ReleaseRoot = "target/ocp/w100/release",
     [string]$IsccPath = ""
 )
 
@@ -13,8 +13,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $stageRootPath = Join-Path $repoRoot $StageRoot
 $releaseRootPath = Join-Path $repoRoot $ReleaseRoot
-$installerScript = Join-Path $repoRoot "installer\windows\ocl-win-x64.iss"
-$installerIconPath = Join-Path $repoRoot "installer\windows\ocl-installer.ico"
+$installerScript = Join-Path $repoRoot "installer\windows\ocp-win-x64.iss"
+$installerIconPath = Join-Path $repoRoot "installer\windows\ocp-installer.ico"
 $installerIconScript = Join-Path $repoRoot "tools\release\render_installer_icon.py"
 $vsixBuildScript = Join-Path $repoRoot "tools\release\build_vsix.ps1"
 
@@ -92,7 +92,7 @@ function Resolve-VsixSource {
         throw "VSIX build script failed with exit code $LASTEXITCODE"
     }
 
-    $built = Join-Path $ReleaseRootPath "ocp-ocl-vscode-v1.0.0.vsix"
+    $built = Join-Path $ReleaseRootPath "ocp-vscode-v1.0.0.vsix"
     if (-not (Test-Path $built)) {
         throw "VSIX not found after build: $built"
     }
@@ -120,17 +120,17 @@ function Ensure-InstallerIcon {
     }
 }
 
-$cliBinaryPath = Resolve-BinarySource -InputPath $BinarySource -RepoRoot $repoRoot -FriendlyName "ocl.exe" -Fallbacks @(
-    "target\release\ocl-cli.exe",
-    "projects\ocp-ocl\crates\ocl-cli\target\release\ocl-cli.exe"
+$cliBinaryPath = Resolve-BinarySource -InputPath $BinarySource -RepoRoot $repoRoot -FriendlyName "ocp.exe" -Fallbacks @(
+    "target\release\ocp-cli.exe",
+    "projects\ocp\crates\ocp-cli\target\release\ocp-cli.exe"
 )
-$lspBinaryPath = Resolve-BinarySource -InputPath $LspSource -RepoRoot $repoRoot -FriendlyName "ocl-lsp.exe" -Fallbacks @(
-    "target\release\ocl-lsp.exe",
-    "projects\ocp-ocl\crates\ocl-lsp\target\release\ocl-lsp.exe"
+$lspBinaryPath = Resolve-BinarySource -InputPath $LspSource -RepoRoot $repoRoot -FriendlyName "ocp-lsp.exe" -Fallbacks @(
+    "target\release\ocp-lsp.exe",
+    "projects\ocp\crates\ocp-lsp\target\release\ocp-lsp.exe"
 )
-$dapBinaryPath = Resolve-BinarySource -InputPath $DapSource -RepoRoot $repoRoot -FriendlyName "ocl-dap.exe" -Fallbacks @(
-    "target\release\ocl-dap.exe",
-    "projects\ocp-ocl\crates\ocl-dap\target\release\ocl-dap.exe"
+$dapBinaryPath = Resolve-BinarySource -InputPath $DapSource -RepoRoot $repoRoot -FriendlyName "ocp-dap.exe" -Fallbacks @(
+    "target\release\ocp-dap.exe",
+    "projects\ocp\crates\ocp-dap\target\release\ocp-dap.exe"
 )
 $iscc = Resolve-IsccPath -InputPath $IsccPath
 $vsixPath = Resolve-VsixSource -InputPath $VsixSource -RepoRoot $repoRoot -ReleaseRootPath $releaseRootPath -VsixBuildScriptPath $vsixBuildScript
@@ -139,22 +139,22 @@ Ensure-InstallerIcon -IconPath $installerIconPath -ScriptPath $installerIconScri
 New-Item -ItemType Directory -Force -Path $stageRootPath | Out-Null
 New-Item -ItemType Directory -Force -Path $releaseRootPath | Out-Null
 
-Copy-Item $cliBinaryPath (Join-Path $stageRootPath "ocl.exe") -Force
-Copy-Item $lspBinaryPath (Join-Path $stageRootPath "ocl-lsp.exe") -Force
-Copy-Item $dapBinaryPath (Join-Path $stageRootPath "ocl-dap.exe") -Force
-Copy-Item $vsixPath (Join-Path $stageRootPath "ocp-ocl-vscode-v1.0.0.vsix") -Force
+Copy-Item $cliBinaryPath (Join-Path $stageRootPath "ocp.exe") -Force
+Copy-Item $lspBinaryPath (Join-Path $stageRootPath "ocp-lsp.exe") -Force
+Copy-Item $dapBinaryPath (Join-Path $stageRootPath "ocp-dap.exe") -Force
+Copy-Item $vsixPath (Join-Path $stageRootPath "ocp-vscode-v1.0.0.vsix") -Force
 
 $nextSteps = @(
-    "OCP-OCL v1.0 - Windows install next steps",
+    "OCP v1.0 - Windows install next steps",
     "",
     "Fast start:",
-    "- If VSCode extension was auto-installed, you can open VSCode and start coding in .ocl files immediately.",
+    "- If VSCode extension was auto-installed, you can open VSCode and start coding in .ocp files immediately.",
     "- If the extension was not auto-installed, install the bundled VSIX and then start coding.",
     "",
     "Recommended quick checks:",
     "1. Open a new terminal.",
-    "2. Run: ocl --version",
-    "3. Run: ocl init hello --template tool-cli",
+    "2. Run: ocp --version",
+    "3. Run: ocp init hello --template tool-cli",
     "",
     "Required before production use:",
     "- Verify release integrity:",
@@ -162,13 +162,13 @@ $nextSteps = @(
     "",
     "Installer behavior:",
     "- choose the install directory you want during setup",
-    "- opt in to Add OCP-OCL CLI to PATH if you want terminal access everywhere",
+    "- opt in to Add OCP CLI to PATH if you want terminal access everywhere",
     "",
     "VSCode extension:",
-    "- installer will auto-install ocp-ocl-vscode-v1.0.0.vsix if VSCode is detected",
+    "- installer will auto-install ocp-vscode-v1.0.0.vsix if VSCode is detected",
     '- supported detection paths: Program Files, LocalAppData, or any absolute code.cmd path returned by `where code.cmd`',
     "- install log after setup: <install-dir>\\vscode-extension-install.log",
-    "- manual fallback: code --install-extension ocp-ocl-vscode-v1.0.0.vsix --force"
+    "- manual fallback: code --install-extension ocp-vscode-v1.0.0.vsix --force"
 ) -join [Environment]::NewLine
 
 [System.IO.File]::WriteAllText(
@@ -182,4 +182,4 @@ if ($LASTEXITCODE -ne 0) {
     throw "ISCC.exe failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "Installer built at $releaseRootPath\ocl-v1.0.0-setup-win-x64.exe"
+Write-Host "Installer built at $releaseRootPath\ocp-v1.0.0-setup-win-x64.exe"

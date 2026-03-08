@@ -7,12 +7,12 @@ fn v100_cli_version_flag() {
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .arg("--version")
         .output()
-        .expect("run ocl-cli --version");
+        .expect("run ocp-cli --version");
 
     assert!(
         output.status.success(),
@@ -23,7 +23,7 @@ fn v100_cli_version_flag() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("ocl v1.0.0"),
+        stdout.contains("ocp v1.0.0"),
         "--version output must contain public version: {stdout}"
     );
 }

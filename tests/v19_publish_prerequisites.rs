@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ocl_sdk::{required_publish_files_v19, required_publish_metadata_fields_v19};
+use ocp_sdk::{required_publish_files_v19, required_publish_metadata_fields_v19};
 use serde_json::json;
 
 #[path = "v19_gate_f_common.rs"]
@@ -46,7 +46,7 @@ fn v19_publish_prerequisites_are_present() {
     let package_path = f19::repo_root()
         .join("editor")
         .join("vscode")
-        .join("ocp-ocl")
+        .join("ocp")
         .join("package.json");
     let package = f19::read_json(&package_path);
     let mut missing_fields = Vec::<String>::new();
@@ -58,12 +58,12 @@ fn v19_publish_prerequisites_are_present() {
     assert!(missing_fields.is_empty(), "missing package metadata fields");
 
     let report = json!({
-        "schema": "ocl.w19.release.publish_prerequisites_report.v1",
+        "schema": "ocp.w19.release.publish_prerequisites_report.v1",
         "status": "PASS",
         "prereq_contract_path": prereq_path.to_string_lossy().replace('\\', "/"),
         "checked_files_count": required_files.len(),
         "checked_metadata_fields_count": required_fields.len(),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/publish_prerequisites_report.json", &report);

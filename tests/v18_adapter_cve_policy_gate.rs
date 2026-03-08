@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use ocl_sdk::{evaluate_adapter_cve_policy_v17, AdapterCveSeverityV17};
+use ocp_sdk::{evaluate_adapter_cve_policy_v17, AdapterCveSeverityV17};
 
 #[path = "v18_gate_e_common.rs"]
 mod common;

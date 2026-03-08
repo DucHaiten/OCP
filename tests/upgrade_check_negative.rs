@@ -5,27 +5,27 @@ fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 #[test]
 fn upgrade_check_negative_invalid_runtime_mode_fails_with_hint() {
-    let output = run_ocl_cli(&[
+    let output = run_ocp_cli(&[
         "upgrade-check",
-        "projects/ocp-ocl/conformance/fixtures/core-exec-pass",
+        "projects/ocp/conformance/fixtures/core-exec-pass",
         "--manifest",
-        "projects/ocp-ocl/conformance/conformance.v5.toml",
+        "projects/ocp/conformance/conformance.v5.toml",
         "--runtime",
         "invalid-runtime",
         "--json",
@@ -45,11 +45,11 @@ fn upgrade_check_negative_invalid_runtime_mode_fails_with_hint() {
 
 #[test]
 fn upgrade_check_negative_invalid_engine_mode_fails_with_hint() {
-    let output = run_ocl_cli(&[
+    let output = run_ocp_cli(&[
         "upgrade-check",
-        "projects/ocp-ocl/conformance/fixtures/core-exec-pass",
+        "projects/ocp/conformance/fixtures/core-exec-pass",
         "--manifest",
-        "projects/ocp-ocl/conformance/conformance.v5.toml",
+        "projects/ocp/conformance/conformance.v5.toml",
         "--engine",
         "invalid-engine",
         "--json",

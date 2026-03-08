@@ -40,16 +40,16 @@ fn v19_platform_matrix_aggregate() {
         .iter()
         .map(|profile| {
             let per_os = json!({
-                "schema": "ocl.w19.rc.vscode_integration_report.v1",
+                "schema": "ocp.w19.rc.vscode_integration_report.v1",
                 "status": "PASS",
                 "profile": profile,
                 "integration_command": commands.clone(),
                 "required_reports": [
-                    "target/ocl/w19/rc/golden_user_journey_editor_report.json",
-                    "target/ocl/w19/perf/editor_perf_budget_report.json",
-                    "target/ocl/w19/perf/editor_perf_protocol_report.json"
+                    "target/ocp/w19/rc/golden_user_journey_editor_report.json",
+                    "target/ocp/w19/perf/editor_perf_budget_report.json",
+                    "target/ocp/w19/perf/editor_perf_protocol_report.json"
                 ],
-                "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+                "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
                 "run_manifest_sha256": v19g::run_manifest_sha256()
             });
             v19g::write_report(
@@ -62,20 +62,20 @@ fn v19_platform_matrix_aggregate() {
                 "status": "PASS",
                 "integration_command": commands.clone(),
                 "required_reports": [
-                    "target/ocl/w19/rc/golden_user_journey_editor_report.json",
-                    "target/ocl/w19/perf/editor_perf_budget_report.json",
-                    "target/ocl/w19/perf/editor_perf_protocol_report.json"
+                    "target/ocp/w19/rc/golden_user_journey_editor_report.json",
+                    "target/ocp/w19/perf/editor_perf_budget_report.json",
+                    "target/ocp/w19/perf/editor_perf_protocol_report.json"
                 ]
             })
         })
         .collect::<Vec<serde_json::Value>>();
 
     let report = json!({
-        "schema": "ocl.w19.rc.platform_matrix_report.v1",
+        "schema": "ocp.w19.rc.platform_matrix_report.v1",
         "status": "PASS",
         "platform_count": entries.len(),
         "platforms": entries,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19g::run_manifest_sha256()
     });
     v19g::write_report("rc/platform_matrix_report.json", &report);

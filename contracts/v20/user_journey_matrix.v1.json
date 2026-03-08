@@ -1,28 +1,28 @@
 {
-  "schema": "ocl.v20.user_journey_matrix.v1",
+  "schema": "ocp.v20.user_journey_matrix.v1",
   "contract_id": "v20.user_journey_matrix",
   "version": "v1",
   "journeys": [
     {
       "id": "tool_cli",
       "steps": [
-        "ocl init",
-        "ocl lock sync",
-        "ocl lock verify",
-        "ocl perm snapshot",
-        "ocl perm diff",
-        "ocl perm approve",
-        "ocl build --attest",
-        "ocl verify --attest",
-        "ocl run",
-        "ocl replay",
-        "ocl dbg"
+        "ocp init",
+        "ocp lock sync",
+        "ocp lock verify",
+        "ocp perm snapshot",
+        "ocp perm diff",
+        "ocp perm approve",
+        "ocp build --attest",
+        "ocp verify --attest",
+        "ocp run",
+        "ocp replay",
+        "ocp dbg"
       ]
     },
     {
       "id": "editor_lsp",
       "steps": [
-        "open .ocl file",
+        "open .ocp file",
         "diagnostics realtime",
         "format on save",
         "go to definition",

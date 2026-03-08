@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.release.dependency_policy.v1",
+  "schema": "ocp.release.dependency_policy.v1",
   "contract_id": "v1.release_dependency_policy",
   "version": "v1",
   "release_build_dependency_mode_allowed": [

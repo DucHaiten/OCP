@@ -16,6 +16,6 @@ fn cassette_stats_fails_when_sensitive_markers_are_present() {
     .expect("write cassette");
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&["cassette", "stats", &artifact_s]);
+    let out = common::run_ocp_cli(&["cassette", "stats", &artifact_s]);
     common::assert_failed_with(&out, "X-CASSETTE-PRIVACY-LEAK");
 }

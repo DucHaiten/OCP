@@ -80,11 +80,11 @@ fn v20_test_catalog_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w20.test_catalog_report.v1",
+        "schema": "ocp.w20.test_catalog_report.v1",
         "status": "PASS",
         "suite_count": suites.len(),
         "test_count_unique": all_tests.len(),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20::run_manifest_sha256()
     });
     v20::write_report("contracts/test_catalog_report.json", &report);

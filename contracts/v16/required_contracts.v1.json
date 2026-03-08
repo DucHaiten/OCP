@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.contracts.required.v1",
+  "schema": "ocp.contracts.required.v1",
   "entries": [
     {
       "contract_id": "history.evidence_index",
@@ -21,40 +21,40 @@
       "contract_id": "lane.literals",
       "version": "v0.8+",
       "schema_hash": "04934761cbca397924f4cbed26156471d9feb4aa05851a4b8176c8a923156b31",
-      "producer": "ocl-sdk+ocl-cli",
-      "consumer": "ocl-runtime-core+ocl-cli",
+      "producer": "ocp-sdk+ocp-cli",
+      "consumer": "ocp-runtime-core+ocp-cli",
       "allowed_diffs_v016": "none"
     },
     {
       "contract_id": "lockfile.sot",
       "version": "v0.15-line",
       "schema_hash": "3164569a24fa1bb1cf171736dd98ef365dcb29afc80215541cc4e883744d7eed",
-      "producer": "ocl-sdk",
-      "consumer": "ocl-cli",
+      "producer": "ocp-sdk",
+      "consumer": "ocp-cli",
       "allowed_diffs_v016": "none"
     },
     {
       "contract_id": "manifest.schema",
       "version": "v0.15-line",
       "schema_hash": "f5579325e09353969e202d962e13948f9725aa00a13b3436168a5c0af3316620",
-      "producer": "ocl-sdk:projects/ocp-ocl/crates/ocl-sdk/src/lib.rs",
-      "consumer": "ocl-cli+ocl-runtime-core",
+      "producer": "ocp-sdk:projects/ocp/crates/ocp-sdk/src/lib.rs",
+      "consumer": "ocp-cli+ocp-runtime-core",
       "allowed_diffs_v016": "none"
     },
     {
       "contract_id": "registry.pack_contracts",
       "version": "v0.15-line",
       "schema_hash": "2b45f54f0e23b879667b150a9dde944c5ec1c0f052999e6f389f039c61c22bb6",
-      "producer": "ocp_ocl::CapabilityRegistry",
-      "consumer": "ocl-runtime-core+ocl-sdk+ocl-cli",
+      "producer": "ocp::CapabilityRegistry",
+      "consumer": "ocp-runtime-core+ocp-sdk+ocp-cli",
       "allowed_diffs_v016": "additive-only"
     },
     {
       "contract_id": "trace.schema",
       "version": "v0.11-line",
       "schema_hash": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
-      "producer": "ocl-cli:projects/ocp-ocl/crates/ocl-cli/src/main.rs",
-      "consumer": "ocl-cli+ocl-sdk",
+      "producer": "ocp-cli:projects/ocp/crates/ocp-cli/src/main.rs",
+      "consumer": "ocp-cli+ocp-sdk",
       "allowed_diffs_v016": "none"
     }
   ]

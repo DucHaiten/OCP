@@ -170,6 +170,6 @@
       "version": "v1"
     }
   ],
-  "schema": "ocl.contracts.release_required.v1",
+  "schema": "ocp.contracts.release_required.v1",
   "version": "v1"
 }

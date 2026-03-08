@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.finding_schema.v1",
+  "schema": "ocp.v20.finding_schema.v1",
   "contract_id": "v20.finding_schema",
   "version": "v1",
   "finding_levels": [

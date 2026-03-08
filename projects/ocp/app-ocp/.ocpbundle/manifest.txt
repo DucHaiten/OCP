@@ -1,0 +1,3 @@
+version=1
+file=src/main.ocp
+file=tests/smoke.ocp

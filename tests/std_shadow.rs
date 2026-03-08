@@ -1,11 +1,11 @@
 use std::sync::{Mutex, OnceLock};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, TraceEvent,
     Value,
 };
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {
@@ -49,10 +49,10 @@ fn std_shadow_run_is_deterministic_and_emits_trace() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_branches = EnvVarGuard::set("OCL_STD_SHADOW_MAX_BRANCHES", "8");
-    let _step_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_STEP_CAP", "5000");
-    let _budget_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_branches = EnvVarGuard::set("OCP_STD_SHADOW_MAX_BRANCHES", "8");
+    let _step_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_STEP_CAP", "5000");
+    let _budget_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
 
     let src = r#"
 observe("std.shadow.run", "tier2", ctx("variants_json=[{\"x\":1},{\"x\":2},{\"x\":3}]"), budget(5)) -> s;
@@ -102,8 +102,8 @@ fn std_shadow_run_truncates_when_branch_cap_exceeded() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_branches = EnvVarGuard::set("OCL_STD_SHADOW_MAX_BRANCHES", "2");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_branches = EnvVarGuard::set("OCP_STD_SHADOW_MAX_BRANCHES", "2");
 
     let src = r#"
 observe("std.shadow.run", "tier2", ctx("variants_json=[{\"x\":1},{\"x\":2},{\"x\":3}]"), budget(5)) -> s;
@@ -131,7 +131,7 @@ fn std_shadow_run_blocks_disallowed_effect_keys() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
 
     let src = r#"
 observe("std.shadow.run", "tier2", ctx("variants_json=[{\"x\":1}];effect_keys=std.fs.write_text|std.ui.present"), budget(5)) -> s;
@@ -149,9 +149,9 @@ fn std_shadow_compare_is_bounded_and_deterministic() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_diff = EnvVarGuard::set("OCL_STD_SHADOW_MAX_DIFF_KEYS", "1");
-    let _max_report = EnvVarGuard::set("OCL_STD_SHADOW_MAX_REPORT_BYTES", "256");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_diff = EnvVarGuard::set("OCP_STD_SHADOW_MAX_DIFF_KEYS", "1");
+    let _max_report = EnvVarGuard::set("OCP_STD_SHADOW_MAX_REPORT_BYTES", "256");
 
     let src = r#"
 observe("std.shadow.compare", "tier2", ctx("branches_json=[{\"id\":0,\"outcome\":\"OK\",\"signature\":\"a\",\"cost\":{\"steps\":1,\"budget\":2},\"state_summary\":{\"a\":1,\"b\":1,\"c\":1}},{\"id\":1,\"outcome\":\"OK\",\"signature\":\"b\",\"cost\":{\"steps\":2,\"budget\":3},\"state_summary\":{\"a\":1,\"b\":2,\"c\":3}}];baseline_id=0;max_diff_keys=1"), budget(5)) -> c;
@@ -198,9 +198,9 @@ fn std_shadow_compare_degraded_when_report_too_large() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_diff = EnvVarGuard::set("OCL_STD_SHADOW_MAX_DIFF_KEYS", "10");
-    let _max_report = EnvVarGuard::set("OCL_STD_SHADOW_MAX_REPORT_BYTES", "120");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_diff = EnvVarGuard::set("OCP_STD_SHADOW_MAX_DIFF_KEYS", "10");
+    let _max_report = EnvVarGuard::set("OCP_STD_SHADOW_MAX_REPORT_BYTES", "120");
 
     let src = r#"
 observe("std.shadow.compare", "tier2", ctx("branches_json=[{\"id\":0,\"outcome\":\"OK\",\"signature\":\"aaaaaaaaaaaaaaaa\",\"cost\":{\"steps\":1,\"budget\":2},\"state_summary\":{\"k1\":1,\"k2\":2,\"k3\":3}},{\"id\":1,\"outcome\":\"OK\",\"signature\":\"bbbbbbbbbbbbbbbb\",\"cost\":{\"steps\":20,\"budget\":300},\"state_summary\":{\"k1\":9,\"k2\":8,\"k3\":7}}];baseline_id=0"), budget(5)) -> c;

@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 
-use ocp_ocl::ocp_ocl::{parse_program, typecheck_program, ExecConfig, Executor, ResultKind, Value};
+use ocp::ocp::{parse_program, typecheck_program, ExecConfig, Executor, ResultKind, Value};
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {
@@ -61,15 +61,15 @@ fn shadow_memo_reuses_deterministic_observe_without_changing_outcome() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_branches = EnvVarGuard::set("OCL_STD_SHADOW_MAX_BRANCHES", "8");
-    let _step_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_STEP_CAP", "5000");
-    let _budget_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
-    let _checkpoint_every = EnvVarGuard::set("OCL_STD_SHADOW_CHECKPOINT_EVERY", "5000");
-    let _checkpoint_reuse = EnvVarGuard::set("OCL_STD_SHADOW_CHECKPOINT_REUSE", "0");
-    let _memo_enabled = EnvVarGuard::set("OCL_STD_SHADOW_MEMOIZE_DETERMINISTIC_OBSERVE", "1");
-    let _memo_key = EnvVarGuard::set("OCL_STD_SHADOW_MEMO_OBSERVE_KEY", "std.game.tick_info");
-    let _memo_cost = EnvVarGuard::set("OCL_STD_SHADOW_MEMO_OBSERVE_COST_STEPS", "64");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_branches = EnvVarGuard::set("OCP_STD_SHADOW_MAX_BRANCHES", "8");
+    let _step_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_STEP_CAP", "5000");
+    let _budget_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
+    let _checkpoint_every = EnvVarGuard::set("OCP_STD_SHADOW_CHECKPOINT_EVERY", "5000");
+    let _checkpoint_reuse = EnvVarGuard::set("OCP_STD_SHADOW_CHECKPOINT_REUSE", "0");
+    let _memo_enabled = EnvVarGuard::set("OCP_STD_SHADOW_MEMOIZE_DETERMINISTIC_OBSERVE", "1");
+    let _memo_key = EnvVarGuard::set("OCP_STD_SHADOW_MEMO_OBSERVE_KEY", "std.game.tick_info");
+    let _memo_cost = EnvVarGuard::set("OCP_STD_SHADOW_MEMO_OBSERVE_COST_STEPS", "64");
 
     let src = r#"
 observe("std.shadow.run", "tier2", ctx("variants_json=[{\"x\":1},{\"x\":1},{\"x\":2}];checkpoint_every=5000"), budget(5)) -> s;
@@ -139,15 +139,15 @@ fn shadow_memo_disabled_keeps_executed_and_charged_observe_calls_equal() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_branches = EnvVarGuard::set("OCL_STD_SHADOW_MAX_BRANCHES", "8");
-    let _step_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_STEP_CAP", "5000");
-    let _budget_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
-    let _checkpoint_every = EnvVarGuard::set("OCL_STD_SHADOW_CHECKPOINT_EVERY", "5000");
-    let _checkpoint_reuse = EnvVarGuard::set("OCL_STD_SHADOW_CHECKPOINT_REUSE", "0");
-    let _memo_enabled = EnvVarGuard::set("OCL_STD_SHADOW_MEMOIZE_DETERMINISTIC_OBSERVE", "0");
-    let _memo_key = EnvVarGuard::set("OCL_STD_SHADOW_MEMO_OBSERVE_KEY", "std.game.tick_info");
-    let _memo_cost = EnvVarGuard::set("OCL_STD_SHADOW_MEMO_OBSERVE_COST_STEPS", "64");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_branches = EnvVarGuard::set("OCP_STD_SHADOW_MAX_BRANCHES", "8");
+    let _step_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_STEP_CAP", "5000");
+    let _budget_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
+    let _checkpoint_every = EnvVarGuard::set("OCP_STD_SHADOW_CHECKPOINT_EVERY", "5000");
+    let _checkpoint_reuse = EnvVarGuard::set("OCP_STD_SHADOW_CHECKPOINT_REUSE", "0");
+    let _memo_enabled = EnvVarGuard::set("OCP_STD_SHADOW_MEMOIZE_DETERMINISTIC_OBSERVE", "0");
+    let _memo_key = EnvVarGuard::set("OCP_STD_SHADOW_MEMO_OBSERVE_KEY", "std.game.tick_info");
+    let _memo_cost = EnvVarGuard::set("OCP_STD_SHADOW_MEMO_OBSERVE_COST_STEPS", "64");
 
     let src = r#"
 observe("std.shadow.run", "tier2", ctx("variants_json=[{\"x\":1},{\"x\":1},{\"x\":2}]"), budget(5)) -> s;

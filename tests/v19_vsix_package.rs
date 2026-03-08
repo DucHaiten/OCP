@@ -32,13 +32,13 @@ fn v19_vsix_package_builds_release_manifest_fixture() {
     assert_eq!(manifest_vsix_hash, fixture.vsix_sha256);
 
     let report = json!({
-        "schema": "ocl.w19.release.editor_release_manifest.v1",
+        "schema": "ocp.w19.release.editor_release_manifest.v1",
         "status": "PASS",
         "manifest_path": fixture.manifest_path.to_string_lossy().replace('\\', "/"),
         "manifest_sig_path": fixture.manifest_sig_path.to_string_lossy().replace('\\', "/"),
         "vsix_path": fixture.vsix_path.to_string_lossy().replace('\\', "/"),
         "vsix_size_bytes": fs::metadata(&fixture.vsix_path).map(|m| m.len()).unwrap_or(0),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/editor_release_manifest.json", &manifest);

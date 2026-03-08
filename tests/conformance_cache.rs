@@ -3,14 +3,14 @@ use std::process::{Command, Output};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{
+use ocp_sdk::{
     parse_conformance_manifest_v1, run_conformance_v1, ConformanceManifestV1,
     ConformanceRunOptionsV1,
 };
 use serde_json::Value as JsonValue;
 
 fn conformance_v5_path() -> &'static Path {
-    Path::new("projects/ocp-ocl/conformance/conformance.v5.toml")
+    Path::new("projects/ocp/conformance/conformance.v5.toml")
 }
 
 fn cache_manifest_subset() -> ConformanceManifestV1 {
@@ -67,18 +67,18 @@ fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 fn assert_success(output: &Output) -> String {
@@ -96,7 +96,7 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_conformance_cache_v14_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_conformance_cache_v14_{tag}_{stamp}"))
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn conformance_cache_subset_preserves_signature_with_and_without_cache() {
 
     let manifest = cache_manifest_subset();
     let with_cache = {
-        let _cache_guard = EnvVarGuard::set("OCL_CACHE_DISABLE", "0");
+        let _cache_guard = EnvVarGuard::set("OCP_CACHE_DISABLE", "0");
         run_conformance_v1(
             Path::new("."),
             &manifest,
@@ -132,7 +132,7 @@ fn conformance_cache_subset_preserves_signature_with_and_without_cache() {
     );
 
     let without_cache = {
-        let _cache_guard = EnvVarGuard::set("OCL_CACHE_DISABLE", "1");
+        let _cache_guard = EnvVarGuard::set("OCP_CACHE_DISABLE", "1");
         run_conformance_v1(
             Path::new("."),
             &manifest,
@@ -155,10 +155,10 @@ fn conformance_cache_bench_reports_non_semantic_cache_telemetry() {
     let root = temp_project_dir("bench");
     let root_s = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_s, "--template", "mini-game"]);
+    let init = run_ocp_cli(&["init", &root_s, "--template", "mini-game"]);
     assert_success(&init);
 
-    let bench = run_ocl_cli(&["cache", "bench", &root_s, "--json"]);
+    let bench = run_ocp_cli(&["cache", "bench", &root_s, "--json"]);
     let bench_json = assert_success(&bench);
     let parsed: JsonValue = serde_json::from_str(&bench_json).expect("bench json");
 
@@ -202,7 +202,7 @@ fn conformance_cache_bench_reports_non_semantic_cache_telemetry() {
 
     let report_path = root
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("v13")
         .join("cache_benchmark.json");
     assert!(

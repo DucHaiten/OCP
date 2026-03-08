@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, Value,
 };
 
@@ -43,10 +43,10 @@ fn temp_kv_path(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    std::env::temp_dir().join(format!("ocl_std_kv_{tag}_{stamp}.json"))
+    std::env::temp_dir().join(format!("ocp_std_kv_{tag}_{stamp}.json"))
 }
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {
@@ -64,7 +64,7 @@ fn std_kv_put_commit_then_get_roundtrip() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let kv_path = temp_kv_path("roundtrip");
     let kv_path_str = kv_path.to_string_lossy().to_string();
-    let _kv_path_guard = EnvVarGuard::set("OCL_STD_KV_PATH", &kv_path_str);
+    let _kv_path_guard = EnvVarGuard::set("OCP_STD_KV_PATH", &kv_path_str);
 
     let src = r#"
 observe("std.kv.put", "tier2", ctx("key=app.answer;value_json=42;overwrite=true"), budget(5)) -> put_r;
@@ -97,7 +97,7 @@ fn std_kv_keys_returns_sorted_and_degraded_when_truncated() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let kv_path = temp_kv_path("keys");
     let kv_path_str = kv_path.to_string_lossy().to_string();
-    let _kv_path_guard = EnvVarGuard::set("OCL_STD_KV_PATH", &kv_path_str);
+    let _kv_path_guard = EnvVarGuard::set("OCP_STD_KV_PATH", &kv_path_str);
 
     let src = r#"
 observe("std.kv.put", "tier2", ctx("key=app.c;value=3;overwrite=true"), budget(5)) -> p1;
@@ -140,8 +140,8 @@ fn std_kv_put_deferred_when_value_exceeds_cap() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let kv_path = temp_kv_path("cap");
     let kv_path_str = kv_path.to_string_lossy().to_string();
-    let _kv_path_guard = EnvVarGuard::set("OCL_STD_KV_PATH", &kv_path_str);
-    let _kv_max_guard = EnvVarGuard::set("OCL_STD_KV_MAX_VALUE_BYTES", "8");
+    let _kv_path_guard = EnvVarGuard::set("OCP_STD_KV_PATH", &kv_path_str);
+    let _kv_max_guard = EnvVarGuard::set("OCP_STD_KV_MAX_VALUE_BYTES", "8");
 
     let src = r#"
 observe("std.kv.put", "tier2", ctx("key=app.long;value=0123456789"), budget(5)) -> put_r;
@@ -161,7 +161,7 @@ fn std_kv_signature_is_stable_with_same_program_and_state() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let kv_path = temp_kv_path("determinism");
     let kv_path_str = kv_path.to_string_lossy().to_string();
-    let _kv_path_guard = EnvVarGuard::set("OCL_STD_KV_PATH", &kv_path_str);
+    let _kv_path_guard = EnvVarGuard::set("OCP_STD_KV_PATH", &kv_path_str);
 
     let src = r#"
 observe("std.kv.put", "tier2", ctx("key=app.flag;value=ok;overwrite=true"), budget(5)) -> p;

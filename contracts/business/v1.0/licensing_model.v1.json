@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.business.licensing_model.v1",
+  "schema": "ocp.business.licensing_model.v1",
   "contract_id": "v1.licensing_model",
   "version": "v1",
   "model": "dual_license",

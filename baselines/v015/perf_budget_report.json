@@ -1,8 +1,8 @@
 {
-  "schema": "ocl.w15.perf.budget.v1",
+  "schema": "ocp.w15.perf.budget.v1",
   "baseline_id": "v0.15-line",
   "measurement_source": {
-    "project": "projects/ocp-ocl/apps/hello-cli",
+    "project": "projects/ocp/apps/hello-cli",
     "engine": "interpreter",
     "lane": "locked_v071"
   },

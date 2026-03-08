@@ -40,7 +40,7 @@ Mục tiêu: giảm tối đa rủi ro mất dữ liệu khi trợ lý làm vi�
 - Có thể làm chậm, nhưng không được làm liều.
 
 ## 7) Chuẩn viết tài liệu triển khai (bắt buộc)
-- Tất cả file `OCP-OCL-MVP-PLAN-v*.md` phải đồng bộ cùng một cấu trúc chuẩn:
+- Tất cả file `OCP-MVP-PLAN-v*.md` phải đồng bộ cùng một cấu trúc chuẩn:
   - Header + mục tiêu.
   - Quy ước cập nhật + templates.
   - Trạng thái gate.
@@ -74,7 +74,7 @@ Mục tiêu: giảm tối đa rủi ro mất dữ liệu khi trợ lý làm vi�
 - [ ] Không còn lỗi tiếng Việt/mã hóa.
 
 ## 9) Tiêu chí "Nhìn Là Hiểu" cho tài liệu triển khai
-- Mỗi file plan `OCP-OCL-MVP-PLAN-v*.md` phải có một khối tóm tắt ở đầu file, đủ để đọc trong 30-60 giây:
+- Mỗi file plan `OCP-MVP-PLAN-v*.md` phải có một khối tóm tắt ở đầu file, đủ để đọc trong 30-60 giây:
   - Mục tiêu phiên bản.
   - Trạng thái tổng quan.
   - Gate đang làm/đã xong/chưa làm.
@@ -88,7 +88,7 @@ Mục tiêu: giảm tối đa rủi ro mất dữ liệu khi trợ lý làm vi�
 - Nhật ký chi tiết vẫn giữ bên dưới, nhưng phần đầu phải là bản đồ điều hướng nhanh.
 
 ## 10) Mặc định khi viết/cập nhật tài liệu plan
-- Mặc định `FULL_LOG_MODE` cho mọi file `OCP-OCL-MVP-PLAN-v*.md`.
+- Mặc định `FULL_LOG_MODE` cho mọi file `OCP-MVP-PLAN-v*.md`.
 - `FULL_LOG_MODE` nghĩa là:
   - Không tự ý tóm gọn so với các bản trước.
   - Giữ mức chi tiết tương đương giữa các phiên bản (v0.1, v0.2, v0.3, ...).
@@ -193,7 +193,7 @@ Mục tiêu: giảm tối đa rủi ro mất dữ liệu khi trợ lý làm vi�
 - Chỉ sửa bằng `apply_patch` theo từng hunk nhỏ, có kiểm soát.
 - Mỗi lần chỉ sửa một cụm lỗi ngắn, rồi dừng để kiểm tra.
 - Không sửa cả file trong một lần nếu mục tiêu chỉ là vá lỗi tiếng Việt/mã hóa.
-- Với file plan lớn (`OCP-OCL-MVP-PLAN-v*.md`), phải ưu tiên vá từng đoạn thủ công, không dùng biến đổi tự động.
+- Với file plan lớn (`OCP-MVP-PLAN-v*.md`), phải ưu tiên vá từng đoạn thủ công, không dùng biến đổi tự động.
 
 ### Checkpoint bắt buộc khi sửa text
 - Sau mỗi cụm sửa, phải báo checkpoint:

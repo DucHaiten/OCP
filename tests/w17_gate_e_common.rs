@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use ocl_sdk::{
+use ocp_sdk::{
     evaluate_adapter_cve_policy_v17, evaluate_capability_edge_v17, evaluate_pack_boundary_v17,
     evaluate_pack_trust_policy_v17, inspect_pack_abi_spec_v17, AdapterCveSeverityV17,
     W17_PACK_BOUNDARY_NATIVE_CAP_V1, W17_PACK_BOUNDARY_WASI_V1,
@@ -70,8 +70,8 @@ pub fn write_gate_e_report() {
     );
 
     let report = json!({
-        "schema": "ocl.w17.extension_governance_report.v1",
-        "run_manifest_ref": "target/ocl/w17/meta/run_manifest.json",
+        "schema": "ocp.w17.extension_governance_report.v1",
+        "run_manifest_ref": "target/ocp/w17/meta/run_manifest.json",
         "pack_abi": {
             "contract_id": pack_abi.contract_id,
             "version": pack_abi.version,
@@ -140,7 +140,7 @@ pub fn write_gate_e_report() {
     });
 
     let out_dir = PathBuf::from("target")
-        .join("ocl")
+        .join("ocp")
         .join("w17")
         .join("ecosystem");
     fs::create_dir_all(&out_dir).expect("create ecosystem output dir");

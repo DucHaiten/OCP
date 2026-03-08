@@ -9,12 +9,12 @@ fn v19_language_configuration_matches_language_profile_contract() {
 
     let profile_path = v19::contracts_root()
         .join("editor")
-        .join("ocl_language_profile.v1.json");
+        .join("ocp_language_profile.v1.json");
     let profile = v19::read_json(&profile_path);
     let config_path = v19::repo_root()
         .join("editor")
         .join("vscode")
-        .join("ocp-ocl")
+        .join("ocp")
         .join("language-configuration.json");
     let config = v19::read_json(&config_path);
 
@@ -70,11 +70,11 @@ fn v19_language_configuration_matches_language_profile_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.editor.language_configuration_report.v1",
+        "schema": "ocp.w19.editor.language_configuration_report.v1",
         "status": "PASS",
         "config_path": config_path.to_string_lossy().replace('\\', "/"),
         "profile_path": profile_path.to_string_lossy().replace('\\', "/"),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("editor/language_configuration_report.json", &report);

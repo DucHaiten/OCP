@@ -9,7 +9,7 @@ fn v17_error_taxonomy_contract_for_perm_guard_is_stable() {
     w17_perm_common::write_manifest_with_fs_rule(&root, "locked_v071", "./**");
 
     let root_s = root.to_string_lossy().to_string();
-    let output = w17_perm_common::run_ocl_cli(&["perm", "doctor", &root_s], &BTreeMap::new());
+    let output = w17_perm_common::run_ocp_cli(&["perm", "doctor", &root_s], &BTreeMap::new());
     assert!(!output.status.success(), "doctor must fail in strict lane");
     let stderr = String::from_utf8_lossy(&output.stderr);
 

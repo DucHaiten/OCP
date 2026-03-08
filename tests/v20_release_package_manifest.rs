@@ -23,7 +23,7 @@ fn v20_release_package_manifest() {
             .get("schema")
             .and_then(JsonValue::as_str)
             .unwrap_or(""),
-        "ocl.w20.release.v1_rc_manifest.v1"
+        "ocp.w20.release.v1_rc_manifest.v1"
     );
     assert_eq!(
         manifest

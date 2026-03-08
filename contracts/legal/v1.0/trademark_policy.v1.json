@@ -1,12 +1,12 @@
 {
-  "schema": "ocl.legal.trademark_policy.v1",
+  "schema": "ocp.legal.trademark_policy.v1",
   "contract_id": "v1.trademark_policy",
   "version": "v1",
   "official_build_definition": {
     "required_signer_ref": "contracts/security/v1.0/signing_trust_root.v1.json",
-    "required_release_manifest": "target/ocl/w100/release/release_artifact_manifest.json",
-    "required_release_signature": "target/ocl/w100/release/release_artifact_manifest.json.sig"
+    "required_release_manifest": "target/ocp/w100/release/release_artifact_manifest.json",
+    "required_release_signature": "target/ocp/w100/release/release_artifact_manifest.json.sig"
   },
-  "fork_branding_rule": "allow_based_on_ocl_disallow_official_branding",
-  "official_vscode_publisher": "ocp-ocl"
+  "fork_branding_rule": "allow_based_on_ocp_disallow_official_branding",
+  "official_vscode_publisher": "ocp"
 }

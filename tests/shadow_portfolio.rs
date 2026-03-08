@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, Value,
 };
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {
@@ -63,11 +63,11 @@ fn shadow_portfolio_is_deterministic_and_emits_strategy_sequence() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_branches = EnvVarGuard::set("OCL_STD_SHADOW_MAX_BRANCHES", "8");
-    let _step_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_STEP_CAP", "80");
-    let _budget_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
-    let _policy_allow = EnvVarGuard::set("OCL_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "portfolio");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_branches = EnvVarGuard::set("OCP_STD_SHADOW_MAX_BRANCHES", "8");
+    let _step_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_STEP_CAP", "80");
+    let _budget_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
+    let _policy_allow = EnvVarGuard::set("OCP_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "portfolio");
 
     let src = r#"
 observe("std.shadow.search", "tier2", ctx("policy=portfolio;variants_json=[{\"score\":30},{\"score\":10},{\"score\":60},{\"score\":40}];max_branches=4;rounds=4;top_k=3;per_branch_step_cap=80;per_branch_budget_cap=5000;global_step_cap=320;global_budget_cap=20000;outcome_weight=0;cost_budget_weight=0;cost_steps_weight=0;reason_penalty_weight=0;state_score_weight=1"), budget(5)) -> s;
@@ -117,12 +117,12 @@ fn shadow_portfolio_respects_max_rounds_cap() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_branches = EnvVarGuard::set("OCL_STD_SHADOW_MAX_BRANCHES", "8");
-    let _step_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_STEP_CAP", "80");
-    let _budget_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
-    let _max_rounds = EnvVarGuard::set("OCL_STD_SHADOW_MAX_ROUNDS", "2");
-    let _policy_allow = EnvVarGuard::set("OCL_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "portfolio");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_branches = EnvVarGuard::set("OCP_STD_SHADOW_MAX_BRANCHES", "8");
+    let _step_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_STEP_CAP", "80");
+    let _budget_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
+    let _max_rounds = EnvVarGuard::set("OCP_STD_SHADOW_MAX_ROUNDS", "2");
+    let _policy_allow = EnvVarGuard::set("OCP_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "portfolio");
 
     let src = r#"
 observe("std.shadow.search", "tier2", ctx("policy=portfolio;variants_json=[{\"score\":20},{\"score\":30},{\"score\":40}];max_branches=3;rounds=10;top_k=3;per_branch_step_cap=80;per_branch_budget_cap=5000;global_step_cap=240;global_budget_cap=12000"), budget(5)) -> s;
@@ -148,9 +148,9 @@ fn shadow_portfolio_policy_denied_when_not_in_allowlist() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
     let _policy_allow =
-        EnvVarGuard::set("OCL_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "round_robin,beam");
+        EnvVarGuard::set("OCP_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "round_robin,beam");
 
     let src = r#"
 observe("std.shadow.search", "tier2", ctx("policy=portfolio;variants_json=[{\"score\":1}]"), budget(5)) -> s;

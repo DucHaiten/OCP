@@ -13,21 +13,21 @@ pub fn temp_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v17_gate_b_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v17_gate_b_{tag}_{stamp}"))
 }
 
-pub fn run_ocl_cli(args: &[&str]) -> Output {
+pub fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 pub fn assert_success(output: &Output) -> String {
@@ -55,7 +55,7 @@ pub fn assert_failed_with(output: &Output, needle: &str) {
 }
 
 pub fn ensure_artifact_layout(root: &Path) -> PathBuf {
-    let artifact = root.join(".ocl_artifacts").join("run_demo");
+    let artifact = root.join(".ocp_artifacts").join("run_demo");
     std::fs::create_dir_all(artifact.join("cassette")).expect("create cassette dir");
     artifact
 }

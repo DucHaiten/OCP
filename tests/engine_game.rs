@@ -1,10 +1,10 @@
 use std::sync::{Mutex, OnceLock};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, Value,
 };
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {
@@ -48,10 +48,10 @@ fn engine_game_run_is_deterministic_and_returns_rng_state_payload() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_GAME_ENABLED", "1");
-    let _seed = EnvVarGuard::set("OCL_STD_GAME_BASE_SEED", "123");
-    let _streams = EnvVarGuard::set("OCL_STD_GAME_RNG_STREAMS", "main,loot");
-    let _count_cap = EnvVarGuard::set("OCL_STD_GAME_RNG_MAX_COUNT", "8");
+    let _enabled = EnvVarGuard::set("OCP_STD_GAME_ENABLED", "1");
+    let _seed = EnvVarGuard::set("OCP_STD_GAME_BASE_SEED", "123");
+    let _streams = EnvVarGuard::set("OCP_STD_GAME_RNG_STREAMS", "main,loot");
+    let _count_cap = EnvVarGuard::set("OCP_STD_GAME_RNG_MAX_COUNT", "8");
 
     let src = r#"
 observe("engine.game.run", "tier2", ctx("entry_module=game.main;tick=4;stream=main;count=3;state_json={\"score\":2};draw_list=text:1,1,score,12"), budget(5)) -> r;
@@ -93,9 +93,9 @@ fn engine_shadow_preview_wraps_run_and_compare_deterministically() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_branches = EnvVarGuard::set("OCL_STD_SHADOW_MAX_BRANCHES", "8");
-    let _max_diff = EnvVarGuard::set("OCL_STD_SHADOW_MAX_DIFF_KEYS", "8");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_branches = EnvVarGuard::set("OCP_STD_SHADOW_MAX_BRANCHES", "8");
+    let _max_diff = EnvVarGuard::set("OCP_STD_SHADOW_MAX_DIFF_KEYS", "8");
 
     let src = r#"
 observe("engine.shadow.preview", "tier2", ctx("entry_module=game.main;variants_json=[{\"x\":1},{\"x\":2}];baseline_id=0;max_diff_keys=4"), budget(5)) -> p;
@@ -136,7 +136,7 @@ fn engine_shadow_preview_blocks_disallowed_effect_keys() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
 
     let src = r#"
 observe("engine.shadow.preview", "tier2", ctx("entry_module=game.main;variants_json=[{\"x\":1}];effect_keys=std.fs.write_text"), budget(5)) -> p;

@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.w16.perf.baseline_manifest.v1",
+  "schema": "ocp.w16.perf.baseline_manifest.v1",
   "hasher": "sha256-v1",
   "baseline_id": "v0.15-line",
   "files": [

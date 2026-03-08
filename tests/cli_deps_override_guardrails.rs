@@ -13,23 +13,23 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v10_override_guardrails_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v10_override_guardrails_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
+fn run_ocp_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args);
     for (k, v) in envs {
         cmd.env(k, v);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 fn assert_ok(output: &Output, step: &str) {
@@ -62,7 +62,7 @@ fn write_manifest_with_override(root: &Path, allow_overrides: bool) {
     if allow_overrides {
         manifest.push_str("\n[security]\nallow_overrides = true\n");
     }
-    fs::write(root.join("Ocl.toml"), manifest).expect("write Ocl.toml");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write Ocp.toml");
 }
 
 #[test]
@@ -71,14 +71,14 @@ fn v10_cli_deps_verify_enforces_override_guardrails() {
     let root_s = root.to_string_lossy().to_string();
     let empty_env = BTreeMap::new();
 
-    let init = run_ocl_cli(&["init", &root_s], &empty_env);
+    let init = run_ocp_cli(&["init", &root_s], &empty_env);
     assert_ok(&init, "init");
 
     write_manifest_with_override(&root, false);
-    let resolve = run_ocl_cli(&["deps", "resolve", &root_s], &empty_env);
+    let resolve = run_ocp_cli(&["deps", "resolve", &root_s], &empty_env);
     assert_ok(&resolve, "deps resolve");
 
-    let verify_disabled = run_ocl_cli(&["deps", "verify", &root_s], &empty_env);
+    let verify_disabled = run_ocp_cli(&["deps", "verify", &root_s], &empty_env);
     assert!(
         !verify_disabled.status.success(),
         "deps verify must fail when override section exists but allow_overrides=false"
@@ -90,7 +90,7 @@ fn v10_cli_deps_verify_enforces_override_guardrails() {
     );
 
     write_manifest_with_override(&root, true);
-    let verify_missing_env = run_ocl_cli(&["deps", "verify", &root_s], &empty_env);
+    let verify_missing_env = run_ocp_cli(&["deps", "verify", &root_s], &empty_env);
     assert!(
         !verify_missing_env.status.success(),
         "deps verify must fail when env gate is missing"
@@ -102,7 +102,7 @@ fn v10_cli_deps_verify_enforces_override_guardrails() {
     );
 
     let mut override_env = BTreeMap::new();
-    override_env.insert("OCL_ALLOW_OVERRIDES", "1");
-    let verify_pass = run_ocl_cli(&["deps", "verify", &root_s], &override_env);
+    override_env.insert("OCP_ALLOW_OVERRIDES", "1");
+    let verify_pass = run_ocp_cli(&["deps", "verify", &root_s], &override_env);
     assert_ok(&verify_pass, "deps verify with override env");
 }

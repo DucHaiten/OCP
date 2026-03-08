@@ -1,6 +1,6 @@
-# Governance OCP-OCL v1.0
+# Governance OCP v1.0
 
-Tài liệu này giải thích cách OCP-OCL được quản trị ở mức public-facing:
+Tài liệu này giải thích cách OCP được quản trị ở mức public-facing:
 - ai là người có quyền quyết định;
 - thay đổi nào cần được kiểm soát chặt;
 - người dùng và contributor nên hiểu quyền hạn của dự án theo cách nào.
@@ -12,12 +12,12 @@ Nó không thay thế các file gốc ở root như `GOVERNANCE.md`, `CODEOWNERS
 
 Nếu bạn chỉ cần hiểu rất nhanh:
 
-1. OCP-OCL hiện là dự án do một owner chính điều phối.
+1. OCP hiện là dự án do một owner chính điều phối.
 2. Không phải mọi contributor đều có quyền quyết định policy, release, hoặc licensing direction.
 3. Các thay đổi lớn phải đi qua plan gate, test, và evidence; không được chốt bằng cảm tính.
 4. “Official build” và quyền phát hành chính thức phải gắn với trust chain, không phải ai fork cũng tự nhận được.
 
-## 1) Governance trong OCP-OCL dùng để làm gì?
+## 1) Governance trong OCP dùng để làm gì?
 
 Governance ở đây không phải là lý thuyết trừu tượng.
 
@@ -34,9 +34,9 @@ Nếu không có governance rõ, dự án rất dễ gặp các vấn đề:
 - mơ hồ giữa fork/community build và official build;
 - khó giữ nhất quán giữa docs, legal, release, và trust chain.
 
-## 2) Mô hình hiện tại của OCP-OCL nên hiểu thế nào?
+## 2) Mô hình hiện tại của OCP nên hiểu thế nào?
 
-Theo trạng thái repo và plan hiện hành, OCP-OCL đang ở mô hình:
+Theo trạng thái repo và plan hiện hành, OCP đang ở mô hình:
 - owner-led project;
 - release/policy direction được giữ chặt;
 - contribution được chấp nhận theo workflow rõ, không mặc định kéo theo quyền quyết định chiến lược.
@@ -96,7 +96,7 @@ Các thay đổi sau phải được coi là nhạy cảm và không nên xử l
 - release gate status;
 - governance/ownership files ở root.
 
-Với OCP-OCL, các thay đổi như vậy phải đi theo hướng:
+Với OCP, các thay đổi như vậy phải đi theo hướng:
 - có plan rõ,
 - có evidence,
 - có test phù hợp nếu phần đó machine-checkable,
@@ -105,7 +105,7 @@ Với OCP-OCL, các thay đổi như vậy phải đi theo hướng:
 ## 6) Official build nghĩa là gì trong logic governance?
 
 Ở mức governance, “official build” không nên được hiểu là:
-- bản nào nhìn giống OCL thì là official;
+- bản nào nhìn giống OCP thì là official;
 - bản nào do người khác build lại thì tự động thành official;
 - fork nào giữ tên gần giống thì có thể tự nhận là bản chính thức.
 
@@ -120,7 +120,7 @@ Phần chi tiết hơn về tên/logo/branding sẽ thuộc:
 
 ## 7) Governance liên quan gì tới plan và gate?
 
-Trong OCP-OCL, plan không chỉ là ghi chú công việc.
+Trong OCP, plan không chỉ là ghi chú công việc.
 
 Plan là một phần của governance thực tế, vì nó khóa:
 - scope,
@@ -185,7 +185,7 @@ Nó chỉ là bản giải thích để người đọc hiểu cách dự án v�
 ## 11) Kết luận
 
 Hiểu theo cách ngắn gọn nhất:
-- OCP-OCL hiện là dự án có owner authority rõ;
+- OCP hiện là dự án có owner authority rõ;
 - contribution không đồng nghĩa với quyền điều hành;
 - release, licensing, commercial direction, và official build phải đi qua governance rõ ràng;
 - nếu chưa được chốt trong source of truth và evidence, thì chưa nên coi là quyết định chính thức.

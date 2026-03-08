@@ -27,7 +27,7 @@ fn v20_required_contracts_complete() {
         });
     }
 
-    let update = std::env::var("OCL_UPDATE_V20_REQUIRED_CONTRACTS")
+    let update = std::env::var("OCP_UPDATE_V20_REQUIRED_CONTRACTS")
         .ok()
         .as_deref()
         == Some("1");
@@ -83,7 +83,7 @@ fn v20_required_contracts_complete() {
             missing_global.push(item.contract_id.clone());
         }
     }
-    let sync_global = std::env::var("OCL_UPDATE_V20_GLOBAL_REQUIRED_CONTRACTS")
+    let sync_global = std::env::var("OCP_UPDATE_V20_GLOBAL_REQUIRED_CONTRACTS")
         .ok()
         .as_deref()
         == Some("1");
@@ -102,11 +102,11 @@ fn v20_required_contracts_complete() {
     let inventory_hash =
         v20::sha256_hex_bytes(v20::canonical_json_string(&inventory_value).as_bytes());
     let report = json!({
-        "schema": "ocl.w20.required_contracts_v20_report.v1",
+        "schema": "ocp.w20.required_contracts_v20_report.v1",
         "status": "PASS",
         "required_count": required.entries.len(),
         "inventory_hash_sha256": inventory_hash,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20::run_manifest_sha256()
     });
     v20::write_report("contracts/required_contracts_v20_report.json", &report);

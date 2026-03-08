@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.legal.pack_required.v1",
+  "schema": "ocp.legal.pack_required.v1",
   "contract_id": "v1.legal_pack_required",
   "version": "v1",
   "required_root_files": [

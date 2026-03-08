@@ -1,7 +1,7 @@
 #[path = "w17_gate_c_common.rs"]
 mod w17;
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     canonicalize_path_for_profile, enforce_locale_timezone, enforce_supported_runtime_profile,
     parse_supported_platform_profile, profile_matches_runtime, supported_platform_profile_ids,
     DeterminismError,

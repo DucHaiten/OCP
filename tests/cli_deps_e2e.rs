@@ -13,23 +13,23 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v10_cli_deps_e2e_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v10_cli_deps_e2e_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
+fn run_ocp_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args);
     for (k, v) in envs {
         cmd.env(k, v);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 fn assert_ok(output: &Output, step: &str) {
@@ -55,16 +55,16 @@ fn read_non_builtin_signer(lock_path: &Path) -> String {
     panic!("non-builtin signer not found in deps.lock.v3");
 }
 
-fn first_oclpkg(root: &Path) -> PathBuf {
-    let pkg_dir = root.join(".oclpkg");
-    let entries = fs::read_dir(&pkg_dir).expect("read .oclpkg");
+fn first_ocppkg(root: &Path) -> PathBuf {
+    let pkg_dir = root.join(".ocppkg");
+    let entries = fs::read_dir(&pkg_dir).expect("read .ocppkg");
     for entry in entries {
         let path = entry.expect("entry").path();
-        if path.extension().and_then(|s| s.to_str()) == Some("oclpkg") {
+        if path.extension().and_then(|s| s.to_str()) == Some("ocppkg") {
             return path;
         }
     }
-    panic!("no .oclpkg artifact found in {}", pkg_dir.display());
+    panic!("no .ocppkg artifact found in {}", pkg_dir.display());
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn v10_cli_deps_and_pack_commands_work_end_to_end() {
     let root_s = root.to_string_lossy().to_string();
     let empty_env = BTreeMap::new();
 
-    let init = run_ocl_cli(
+    let init = run_ocp_cli(
         &["init", &root_s, "--template", "dep-permission"],
         &empty_env,
     );
@@ -81,52 +81,52 @@ fn v10_cli_deps_and_pack_commands_work_end_to_end() {
     assert!(root
         .join("deps")
         .join("widgets")
-        .join("package.oclp")
+        .join("package.ocpp")
         .exists());
 
-    let resolve = run_ocl_cli(&["deps", "resolve", &root_s], &empty_env);
+    let resolve = run_ocp_cli(&["deps", "resolve", &root_s], &empty_env);
     assert_ok(&resolve, "deps resolve");
     assert!(root.join("deps.lock.v3").exists(), "missing deps.lock.v3");
-    assert!(root.join("ocl.lock").exists(), "missing ocl.lock");
+    assert!(root.join("ocp.lock").exists(), "missing ocp.lock");
 
     let signer = read_non_builtin_signer(&root.join("deps.lock.v3"));
     let trust = format!("[trusted_signers.path]\nkeys = [\"{}\"]\n", signer);
     fs::write(root.join("trust.toml"), trust).expect("write trust.toml");
 
-    let verify = run_ocl_cli(&["deps", "verify", &root_s], &empty_env);
+    let verify = run_ocp_cli(&["deps", "verify", &root_s], &empty_env);
     assert_ok(&verify, "deps verify");
 
-    let update = run_ocl_cli(
+    let update = run_ocp_cli(
         &["deps", "update", &root_s, "widgets", "--write-legacy-lock"],
         &empty_env,
     );
     assert_ok(&update, "deps update");
     assert!(root.join("deps.lock.v2").exists(), "missing deps.lock.v2");
 
-    let build = run_ocl_cli(&["pack", "build", &root_s], &empty_env);
+    let build = run_ocp_cli(&["pack", "build", &root_s], &empty_env);
     assert_ok(&build, "pack build");
-    let artifact = first_oclpkg(&root);
+    let artifact = first_ocppkg(&root);
     let artifact_s = artifact.to_string_lossy().to_string();
 
     let mut tampered = fs::read_to_string(&artifact).expect("read artifact");
     tampered = tampered.replace("signature_ed25519=", "signature_ed25519=broken-");
     fs::write(&artifact, tampered).expect("write tampered artifact");
 
-    let verify_fail = run_ocl_cli(&["pack", "verify", &artifact_s], &empty_env);
+    let verify_fail = run_ocp_cli(&["pack", "verify", &artifact_s], &empty_env);
     assert!(
         !verify_fail.status.success(),
         "pack verify must fail on tampered signature"
     );
 
-    let sign = run_ocl_cli(&["pack", "sign", &artifact_s], &empty_env);
+    let sign = run_ocp_cli(&["pack", "sign", &artifact_s], &empty_env);
     assert_ok(&sign, "pack sign");
 
-    let verify_pass = run_ocl_cli(&["pack", "verify", &artifact_s], &empty_env);
+    let verify_pass = run_ocp_cli(&["pack", "verify", &artifact_s], &empty_env);
     assert_ok(&verify_pass, "pack verify after sign");
 
     let registry = root.join("registry_v10");
     let registry_s = registry.to_string_lossy().to_string();
-    let publish = run_ocl_cli(
+    let publish = run_ocp_cli(
         &["pack", "publish", &artifact_s, "--registry", &registry_s],
         &empty_env,
     );

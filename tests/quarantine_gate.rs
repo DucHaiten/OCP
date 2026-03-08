@@ -12,29 +12,29 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_cli_quarantine_gate_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_cli_quarantine_gate_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str], quarantine_env: Option<&str>) -> Output {
+fn run_ocp_cli(args: &[&str], quarantine_env: Option<&str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
-        .env_remove("OCL_QUARANTINE");
+        .env_remove("OCP_QUARANTINE");
     if let Some(value) = quarantine_env {
-        cmd.env("OCL_QUARANTINE", value);
+        cmd.env("OCP_QUARANTINE", value);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 fn set_project_lane(root: &Path, lane: &str) {
-    let manifest = root.join("Ocl.toml");
-    let raw = fs::read_to_string(&manifest).expect("read Ocl.toml");
+    let manifest = root.join("Ocp.toml");
+    let raw = fs::read_to_string(&manifest).expect("read Ocp.toml");
     let mut in_project = false;
     let mut replaced = false;
     let mut patched = String::new();
@@ -54,12 +54,12 @@ fn set_project_lane(root: &Path, lane: &str) {
     }
 
     assert!(replaced, "manifest missing [project].lane");
-    fs::write(&manifest, patched).expect("write Ocl.toml");
+    fs::write(&manifest, patched).expect("write Ocp.toml");
 }
 
 fn latest_artifact_dir(root: &Path) -> PathBuf {
-    let artifacts_root = root.join(".ocl_artifacts");
-    let read = fs::read_dir(&artifacts_root).expect("read .ocl_artifacts");
+    let artifacts_root = root.join(".ocp_artifacts");
+    let read = fs::read_dir(&artifacts_root).expect("read .ocp_artifacts");
     let mut dirs = Vec::new();
     for entry in read {
         let path = entry.expect("entry").path();
@@ -76,7 +76,7 @@ fn quarantine_gate_requires_env_and_writes_replay_metadata() {
     let root = temp_project_dir("gate");
     let root_s = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_s, "--template", "mini-game"], None);
+    let init = run_ocp_cli(&["init", &root_s, "--template", "mini-game"], None);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
@@ -86,18 +86,18 @@ fn quarantine_gate_requires_env_and_writes_replay_metadata() {
 
     set_project_lane(&root, "quarantine");
 
-    let run_without = run_ocl_cli(&["run", &root_s], None);
+    let run_without = run_ocp_cli(&["run", &root_s], None);
     assert!(
         !run_without.status.success(),
         "run without env must fail for quarantine lane"
     );
     let stderr_without = String::from_utf8_lossy(&run_without.stderr);
     assert!(
-        stderr_without.contains("OCL_QUARANTINE=1"),
+        stderr_without.contains("OCP_QUARANTINE=1"),
         "stderr should mention required quarantine env, got: {stderr_without}"
     );
 
-    let run_with = run_ocl_cli(&["run", &root_s], Some("1"));
+    let run_with = run_ocp_cli(&["run", &root_s], Some("1"));
     assert!(
         run_with.status.success(),
         "run with env failed:\nstdout={}\nstderr={}",
@@ -143,13 +143,13 @@ fn quarantine_gate_requires_env_and_writes_replay_metadata() {
         "missing cassette/cassette_hash.txt"
     );
 
-    let replay_without = run_ocl_cli(&["replay", &run_dir.to_string_lossy()], None);
+    let replay_without = run_ocp_cli(&["replay", &run_dir.to_string_lossy()], None);
     assert!(
         !replay_without.status.success(),
         "replay without env must fail for quarantine lane"
     );
 
-    let replay_with = run_ocl_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
+    let replay_with = run_ocp_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
     assert!(
         replay_with.status.success(),
         "replay with env failed:\nstdout={}\nstderr={}",

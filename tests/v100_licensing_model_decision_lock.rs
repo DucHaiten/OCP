@@ -23,12 +23,12 @@ fn v100_licensing_model_decision_lock() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.business.licensing_model_decision_report.v1",
+        "schema": "ocp.w100.business.licensing_model_decision_report.v1",
         "status": "PASS",
         "locked_model": "dual_license",
         "cla_required": true,
         "ambiguous_option_fields_present": false,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100g::run_manifest_sha256()
     });
     v100g::write_report("business/licensing_model_decision_report.json", &report);

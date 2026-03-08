@@ -17,7 +17,7 @@ pub fn repo_root() -> PathBuf {
 pub fn w18_cassette_dir() -> PathBuf {
     repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w18")
         .join("cassette")
 }
@@ -25,7 +25,7 @@ pub fn w18_cassette_dir() -> PathBuf {
 pub fn w18_security_dir() -> PathBuf {
     repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w18")
         .join("security")
 }
@@ -39,27 +39,27 @@ pub fn temp_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v18_gate_d_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v18_gate_d_{tag}_{stamp}"))
 }
 
 pub fn ensure_artifact_layout(root: &Path) -> PathBuf {
-    let artifact = root.join(".ocl_artifacts").join("run_demo");
+    let artifact = root.join(".ocp_artifacts").join("run_demo");
     fs::create_dir_all(artifact.join("cassette")).expect("create cassette dir");
     artifact
 }
 
-pub fn run_ocl_cli(args: &[&str]) -> Output {
+pub fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 pub fn assert_success(output: &Output) -> String {
@@ -122,8 +122,8 @@ pub fn merge_cassette_operability_section(section: &str, value: JsonValue) {
         read_json(&out_path)
     } else {
         json!({
-            "schema": "ocl.w18.cassette.cassette_operability_report.v1",
-            "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+            "schema": "ocp.w18.cassette.cassette_operability_report.v1",
+            "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
             "sections": JsonValue::Object(JsonMap::new())
         })
     };

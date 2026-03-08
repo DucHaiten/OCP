@@ -52,7 +52,7 @@ fn v100_release_dependency_policy() {
     let run_manifest = v100b::read_json(
         &v100b::repo_root()
             .join("target")
-            .join("ocl")
+            .join("ocp")
             .join("w100")
             .join("meta")
             .join("run_manifest.json"),
@@ -72,12 +72,12 @@ fn v100_release_dependency_policy() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.release.release_dependency_policy_report.v1",
+        "schema": "ocp.w100.release.release_dependency_policy_report.v1",
         "status": "PASS",
         "dependency_mode": dependency_mode,
         "allowed_modes": allowed,
         "deny_allow_network_channels": deny_channels,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100b::run_manifest_sha256()
     });
     v100b::write_report("release/release_dependency_policy_report.json", &report);

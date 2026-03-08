@@ -36,7 +36,7 @@ fn v19_editor_ci_entrypoint() {
     assert!(status.success(), "cargo xtask --help must succeed");
 
     let report = json!({
-        "schema": "ocl.w19.community.editor_ci_entrypoint_report.v1",
+        "schema": "ocp.w19.community.editor_ci_entrypoint_report.v1",
         "status": "PASS",
         "entrypoint": "cargo xtask editor-ci",
         "checks": [
@@ -44,7 +44,7 @@ fn v19_editor_ci_entrypoint() {
             "xtask crate present",
             "cargo xtask --help succeeds"
         ],
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19g::run_manifest_sha256()
     });
     v19g::write_report("community/editor_ci_entrypoint_report.json", &report);

@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.editor.publish_channels.v1",
+  "schema": "ocp.editor.publish_channels.v1",
   "contract_id": "editor.editor_publish_channels",
   "version": "v1",
   "channels": [

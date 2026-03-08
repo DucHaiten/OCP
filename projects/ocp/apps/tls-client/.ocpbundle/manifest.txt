@@ -1,0 +1,4 @@
+version=1
+file=src/main.ocp
+file=tests/smoke.ocp
+dep=std|0.1.0|7578c00340467769

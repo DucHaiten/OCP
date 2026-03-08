@@ -14,7 +14,7 @@ fn read_json(path: PathBuf) -> JsonValue {
 fn write_report(rel_path: &str, value: &JsonValue) {
     let out = repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w100")
         .join(rel_path);
     if let Some(parent) = out.parent() {
@@ -47,7 +47,7 @@ fn v100_installer_script_contract() {
     let iss_path = repo_root()
         .join("installer")
         .join("windows")
-        .join("ocl-win-x64.iss");
+        .join("ocp-win-x64.iss");
     let build_script_path = repo_root()
         .join("tools")
         .join("release")
@@ -65,11 +65,11 @@ fn v100_installer_script_contract() {
     let installer_filename = installer_contract
         .get("installer_filename")
         .and_then(JsonValue::as_str)
-        .unwrap_or("ocl-v1.0.0-setup-win-x64.exe");
+        .unwrap_or("ocp-v1.0.0-setup-win-x64.exe");
     let icon_asset = installer_contract
         .get("installer_icon_asset")
         .and_then(JsonValue::as_str)
-        .unwrap_or("installer/windows/ocl-installer.ico");
+        .unwrap_or("installer/windows/ocp-installer.ico");
     let output_base = installer_filename.trim_end_matches(".exe");
     assert!(
         iss.contains(&format!("OutputBaseFilename={output_base}")),
@@ -79,7 +79,7 @@ fn v100_installer_script_contract() {
     let default_install_path = installer_contract
         .get("default_install_path")
         .and_then(JsonValue::as_str)
-        .unwrap_or("C:\\Program Files\\OCP-OCL\\");
+        .unwrap_or("C:\\Program Files\\OCP\\");
     let add_to_path_scope = installer_contract
         .get("add_to_path_scope")
         .and_then(JsonValue::as_str)
@@ -91,7 +91,7 @@ fn v100_installer_script_contract() {
     let vscode_manual_fallback_command = installer_contract
         .get("vscode_manual_fallback_command")
         .and_then(JsonValue::as_str)
-        .unwrap_or("code --install-extension ocp-ocl-vscode-v1.0.0.vsix --force");
+        .unwrap_or("code --install-extension ocp-vscode-v1.0.0.vsix --force");
     let vscode_detection_modes = installer_contract
         .get("vscode_detection_modes")
         .and_then(JsonValue::as_array)
@@ -101,8 +101,8 @@ fn v100_installer_script_contract() {
         .filter_map(|v| v.as_str().map(|s| s.to_string()))
         .collect::<Vec<String>>();
     assert!(
-        default_install_path.contains("OCP-OCL")
-            && iss.contains("DefaultDirName={autopf}\\OCP-OCL"),
+        default_install_path.contains("OCP")
+            && iss.contains("DefaultDirName={autopf}\\OCP"),
         "installer script must align with default install directory contract"
     );
     let icon_path = repo_root().join(icon_asset.replace('/', "\\"));
@@ -156,7 +156,7 @@ fn v100_installer_script_contract() {
         .unwrap_or(false)
     {
         assert!(
-            iss.contains("Add OCP-OCL CLI to PATH (recommended)"),
+            iss.contains("Add OCP CLI to PATH (recommended)"),
             "installer script must expose explicit add-to-PATH confirmation wording"
         );
     }
@@ -173,16 +173,16 @@ fn v100_installer_script_contract() {
     }
 
     assert!(
-        iss.contains("Source: \"{#StageRoot}\\ocl.exe\""),
-        "installer script must install staged ocl.exe"
+        iss.contains("Source: \"{#StageRoot}\\ocp.exe\""),
+        "installer script must install staged ocp.exe"
     );
     assert!(
-        iss.contains("Source: \"{#StageRoot}\\ocl-lsp.exe\""),
-        "installer script must install staged ocl-lsp.exe"
+        iss.contains("Source: \"{#StageRoot}\\ocp-lsp.exe\""),
+        "installer script must install staged ocp-lsp.exe"
     );
     assert!(
-        iss.contains("Source: \"{#StageRoot}\\ocl-dap.exe\""),
-        "installer script must install staged ocl-dap.exe"
+        iss.contains("Source: \"{#StageRoot}\\ocp-dap.exe\""),
+        "installer script must install staged ocp-dap.exe"
     );
     assert!(
         iss.contains("Source: \"{#StageRoot}\\INSTALL-NEXT-STEPS.txt\""),
@@ -193,13 +193,13 @@ fn v100_installer_script_contract() {
         "build script must ensure installer icon asset exists"
     );
     assert!(
-        build_script.contains("target\\release\\ocl-cli.exe"),
-        "build script must resolve ocl-cli release binary"
+        build_script.contains("target\\release\\ocp-cli.exe"),
+        "build script must resolve ocp-cli release binary"
     );
     assert!(
-        build_script.contains("target\\release\\ocl-lsp.exe")
-            && build_script.contains("target\\release\\ocl-dap.exe"),
-        "build script must resolve ocl-lsp/ocl-dap release binaries"
+        build_script.contains("target\\release\\ocp-lsp.exe")
+            && build_script.contains("target\\release\\ocp-dap.exe"),
+        "build script must resolve ocp-lsp/ocp-dap release binaries"
     );
     assert!(
         build_script.contains("ISCC.exe"),
@@ -221,7 +221,7 @@ fn v100_installer_script_contract() {
     if vscode_install_mode == "manual" {
         assert!(
             build_script.contains("VSCode extension is installed separately")
-                && build_script.contains("ocp-ocl-vscode-v1.0.0.vsix"),
+                && build_script.contains("ocp-vscode-v1.0.0.vsix"),
             "manual VSIX mode must be reflected in installer next steps"
         );
     } else if vscode_install_mode == "auto_if_code_cli_present" {
@@ -269,14 +269,14 @@ fn v100_installer_script_contract() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.install.installer_script_contract_report.v1",
+        "schema": "ocp.w100.install.installer_script_contract_report.v1",
         "status": "PASS",
-        "installer_script": "installer/windows/ocl-win-x64.iss",
+        "installer_script": "installer/windows/ocp-win-x64.iss",
         "build_script": "tools/release/build_win_installer.ps1",
         "installer_filename": installer_filename,
         "installer_icon_asset": icon_asset,
         "vscode_install_mode": vscode_install_mode,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json"
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json"
     });
     write_report("install/installer_script_contract_report.json", &report);
 }

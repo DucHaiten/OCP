@@ -116,7 +116,7 @@ fn v20_history_replay_matrix() {
     let skip_entries = Vec::<serde_json::Value>::new();
 
     let replay_report = json!({
-        "schema": "ocl.w20.history_replay_report.v1",
+        "schema": "ocp.w20.history_replay_report.v1",
         "status": "PASS",
         "strategy": "checkout_and_test",
         "versions_discovered": discovered,
@@ -125,17 +125,17 @@ fn v20_history_replay_matrix() {
         "skipped_count": skipped,
         "skip_entries": skip_entries,
         "dependency_modes": dependency_modes.into_iter().collect::<Vec<String>>(),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20b::run_manifest_sha256()
     });
     v20b::write_report("regression/history_replay_report.json", &replay_report);
 
     let strategy_report = json!({
-        "schema": "ocl.w20.history_replay_strategy_report.v1",
+        "schema": "ocp.w20.history_replay_strategy_report.v1",
         "status": "PASS",
         "strategy": "checkout_and_test",
         "toolchain_profiles_count": profile_ids.len(),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20b::run_manifest_sha256()
     });
     v20b::write_report(
@@ -144,14 +144,14 @@ fn v20_history_replay_matrix() {
     );
 
     let catalog_report = json!({
-        "schema": "ocl.w20.regression_test_catalog_report.v1",
+        "schema": "ocp.w20.regression_test_catalog_report.v1",
         "status": "PASS",
         "total_tests_discovered": discovered,
         "total_tests_run": run,
         "ignored_count": ignored,
         "skipped_count": skipped,
         "skip_entries": [],
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20b::run_manifest_sha256()
     });
     v20b::write_report("regression/test_catalog_report.json", &catalog_report);

@@ -1,10 +1,10 @@
 {
-  "schema": "ocl.editor.golden_vectors.v1",
+  "schema": "ocp.editor.golden_vectors.v1",
   "contract_id": "editor.golden_vectors",
   "version": "v1",
   "highlight_cases": [
-    "tests/fixtures/v19/highlight/simple.ocl",
-    "tests/fixtures/v19/highlight/comments.ocl"
+    "tests/fixtures/v19/highlight/simple.ocp",
+    "tests/fixtures/v19/highlight/comments.ocp"
   ],
   "diagnostics_cases": [],
   "formatting_cases": [],

@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.platform.supported_profile.v1",
+  "schema": "ocp.platform.supported_profile.v1",
   "contract_id": "v1.supported_profile",
   "version": "v1",
   "hasher_version": "sha256-v1",

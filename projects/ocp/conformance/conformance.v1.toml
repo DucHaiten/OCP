@@ -1,0 +1,61 @@
+version = 1
+
+[[scenario]]
+name = "hello-cli"
+path = "projects/ocp/apps/hello-cli"
+reactor_ticks = 0
+composer = false
+
+[[scenario]]
+name = "web-fetch"
+path = "projects/ocp/apps/web-fetch"
+reactor_ticks = 0
+composer = false
+
+[[scenario]]
+name = "mini-server"
+path = "projects/ocp/apps/mini-server"
+reactor_ticks = 8
+composer = false
+
+[[scenario]]
+name = "scheduler"
+path = "projects/ocp/apps/scheduler"
+reactor_ticks = 8
+composer = false
+
+[[scenario]]
+name = "composer-demo"
+path = "projects/ocp/apps/composer-demo"
+reactor_ticks = 0
+composer = true
+
+[[scenario]]
+name = "plugin-demo"
+path = "projects/ocp/apps/plugin-demo"
+reactor_ticks = 0
+composer = false
+
+[[scenario]]
+name = "tls-client"
+path = "projects/ocp/apps/tls-client"
+reactor_ticks = 0
+composer = false
+
+[[scenario]]
+name = "sqlite-app"
+path = "projects/ocp/apps/sqlite-app"
+reactor_ticks = 0
+composer = false
+
+[[scenario]]
+name = "tcp-jsonl-server-real"
+path = "projects/ocp/apps/tcp-jsonl-server-real"
+reactor_ticks = 8
+composer = false
+
+[[scenario]]
+name = "ui-demo"
+path = "projects/ocp/apps/ui-demo"
+reactor_ticks = 0
+composer = false

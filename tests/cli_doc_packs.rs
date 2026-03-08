@@ -5,22 +5,22 @@ fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args);
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 #[test]
 fn cli_doc_packs_text_contains_required_sections() {
-    let out = run_ocl_cli(&["doc", "packs"]);
+    let out = run_ocp_cli(&["doc", "packs"]);
     assert!(
         out.status.success(),
         "doc packs failed:\nstdout={}\nstderr={}",
@@ -46,7 +46,7 @@ fn cli_doc_packs_text_contains_required_sections() {
 
 #[test]
 fn cli_doc_packs_json_contains_known_pack_fields() {
-    let out = run_ocl_cli(&["doc", "packs", "--json"]);
+    let out = run_ocp_cli(&["doc", "packs", "--json"]);
     assert!(
         out.status.success(),
         "doc packs --json failed:\nstdout={}\nstderr={}",

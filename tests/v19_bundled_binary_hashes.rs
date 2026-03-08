@@ -45,11 +45,11 @@ fn v19_bundled_binary_hashes_match_manifest() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.release.binary_bootstrap_report.v1",
+        "schema": "ocp.w19.release.binary_bootstrap_report.v1",
         "status": "PASS",
         "phase": "bundled_binary_hashes",
         "compared": compared,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/binary_bootstrap_report.json", &report);

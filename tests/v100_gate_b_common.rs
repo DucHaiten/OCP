@@ -65,7 +65,7 @@ pub fn sha256_hex_file(path: &Path) -> String {
 pub fn release_root() -> PathBuf {
     repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w100")
         .join("release")
 }
@@ -196,7 +196,7 @@ fn file_signature_payload(
     trust_epoch: u64,
 ) -> String {
     format!(
-        "ocl-v100-file-sign-v1|file_path={}|file_hash_sha256={}|pubkey_id={}|trust_epoch={}",
+        "ocp-v100-file-sign-v1|file_path={}|file_hash_sha256={}|pubkey_id={}|trust_epoch={}",
         file_path, hash, pubkey_id, trust_epoch
     )
 }
@@ -208,7 +208,7 @@ fn sign_file(path: &Path, pubkey_id: &str, trust_epoch: u64) -> PathBuf {
         file_signature_payload(&file_path, &hash, pubkey_id, trust_epoch).as_bytes(),
     );
     let sig = json!({
-        "schema": "ocl.release.file.sig.v1",
+        "schema": "ocp.release.file.sig.v1",
         "algorithm": "sha256-v1",
         "signature_schema_version": "1",
         "file_path": file_path,
@@ -269,7 +269,7 @@ pub fn parse_file_signature(path: &Path) -> FileSignatureV100 {
 
 pub fn verify_file_signature(path: &Path, sig_path: &Path) -> (bool, String) {
     let sig = parse_file_signature(sig_path);
-    if sig.schema != "ocl.release.file.sig.v1" {
+    if sig.schema != "ocp.release.file.sig.v1" {
         return (false, "schema".to_string());
     }
     if sig.algorithm != "sha256-v1" {
@@ -418,26 +418,26 @@ pub fn ensure_release_fixture_v100() -> ReleaseFixtureV100 {
     });
 
     let manifest = json!({
-        "schema": "ocl.release.artifact_manifest.v1",
+        "schema": "ocp.release.artifact_manifest.v1",
         "contract_id": "v1.release_artifact_manifest",
         "version": "v1",
         "release_version": "v1.0.0",
         "release_channel": "github_release",
         "created_at_utc": "2026-03-07T00:00:00Z",
-        "toolchain_digest_ref": "target/ocl/w100/meta/run_manifest.json",
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "toolchain_digest_ref": "target/ocp/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "artifacts": artifacts
     });
     write_json_pretty(&manifest_path, &manifest);
     let manifest_sig = sign_file(&manifest_path, &key_id, trust_epoch);
 
     let summary = json!({
-        "schema": "ocl.w100.release.release_asset_matrix_report.v1",
+        "schema": "ocp.w100.release.release_asset_matrix_report.v1",
         "status": "PASS",
         "channel": "github_release",
         "required_assets": required_assets,
         "generated_assets": artifact_hashes.keys().cloned().collect::<Vec<String>>(),
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_report("release/release_asset_matrix_report.json", &summary);

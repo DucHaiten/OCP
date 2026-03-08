@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.editor.ci_harness.v1",
+  "schema": "ocp.editor.ci_harness.v1",
   "contract_id": "editor.editor_ci_harness",
   "version": "v1",
   "os_profiles": [
@@ -8,7 +8,7 @@
     "macos-arm64"
   ],
   "commands": [
-    "pnpm --dir editor/vscode/ocp-ocl run test:integration"
+    "pnpm --dir editor/vscode/ocp run test:integration"
   ],
   "provenance_required_fields": [
     "run_id",

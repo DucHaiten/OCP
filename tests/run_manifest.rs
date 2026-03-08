@@ -9,7 +9,7 @@ fn temp_project(tag: &str) -> std::path::PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("ocl_v16_run_manifest_{tag}_{stamp}"));
+    let root = std::env::temp_dir().join(format!("ocp_v16_run_manifest_{tag}_{stamp}"));
     fs::create_dir_all(&root).expect("create temp project");
     root
 }
@@ -18,17 +18,17 @@ fn temp_project(tag: &str) -> std::path::PathBuf {
 fn run_manifest_contains_required_fields_and_derived_lane() {
     let project = temp_project("lane");
     fs::write(
-        project.join("Ocl.toml"),
-        "[project]\nname = \"tmp\"\nentry = \"main.ocl\"\nlane = \"quarantine\"\n",
+        project.join("Ocp.toml"),
+        "[project]\nname = \"tmp\"\nentry = \"main.ocp\"\nlane = \"quarantine\"\n",
     )
-    .expect("write Ocl.toml");
+    .expect("write Ocp.toml");
     fs::write(project.join("deps.lock.v3"), "version = 3\n").expect("write deps.lock.v3");
 
     let allowed_env_flags = vec![
-        "OCL_QUARANTINE".to_string(),
-        "OCL_ALLOW_OVERRIDES".to_string(),
+        "OCP_QUARANTINE".to_string(),
+        "OCP_ALLOW_OVERRIDES".to_string(),
     ];
-    let observed_env_flags = vec!["OCL_QUARANTINE".to_string()];
+    let observed_env_flags = vec!["OCP_QUARANTINE".to_string()];
     let manifest = v16::build_run_manifest(&project, allowed_env_flags.clone(), observed_env_flags);
 
     let root = manifest.as_object().expect("manifest object");
@@ -53,7 +53,7 @@ fn run_manifest_contains_required_fields_and_derived_lane() {
         "lane_profile must be derived from project manifest"
     );
 
-    v16::enforce_run_manifest_allowlist(&allowed_env_flags, &["OCL_QUARANTINE".to_string()])
+    v16::enforce_run_manifest_allowlist(&allowed_env_flags, &["OCP_QUARANTINE".to_string()])
         .expect("allowlist check");
 
     let out_path = v16::w16_target_root()

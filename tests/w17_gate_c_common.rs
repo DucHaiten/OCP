@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     canonical_round_robin_order, canonical_task_event_order, canonicalize_env_entries,
     canonicalize_iteration_paths, canonicalize_text_boundary, enforce_locale_timezone,
     evaluate_entropy_policy, parse_supported_platform_profile, resolve_task_lifecycle,
@@ -69,8 +69,8 @@ pub fn write_gate_c_report() {
     let locale_ok = enforce_locale_timezone("C.UTF-8", "UTC").is_ok();
 
     let report = json!({
-        "schema": "ocl.w17.determinism.core.v1",
-        "run_manifest_ref": "target/ocl/w17/meta/run_manifest.json",
+        "schema": "ocp.w17.determinism.core.v1",
+        "run_manifest_ref": "target/ocp/w17/meta/run_manifest.json",
         "supported_profiles": supported_platform_profile_ids(),
         "scheduler": {
             "ordering_digest": scheduler_digest,
@@ -104,7 +104,7 @@ pub fn write_gate_c_report() {
     });
 
     let out_dir = PathBuf::from("target")
-        .join("ocl")
+        .join("ocp")
         .join("w17")
         .join("determinism");
     fs::create_dir_all(&out_dir).expect("create deterministic output dir");

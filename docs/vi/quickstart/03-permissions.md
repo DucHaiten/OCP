@@ -1,9 +1,9 @@
 # Quickstart 03 - Permissions
 
 ```bash
-ocl perm snapshot
-ocl perm diff
-ocl perm approve
+ocp perm snapshot
+ocp perm diff
+ocp perm approve
 ```
 
 Không dùng wildcard trong lane strict.

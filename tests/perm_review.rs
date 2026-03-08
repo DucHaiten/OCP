@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::init_project;
+use ocp_sdk::init_project;
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -15,23 +15,23 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v15_perm_review_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v15_perm_review_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
+fn run_ocp_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args);
     for (k, v) in envs {
         cmd.env(k, v);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 fn assert_ok(output: &Output, step: &str) {
@@ -56,7 +56,7 @@ fn write_manifest_v1(root: &Path) {
         "allow = [\"std.log.info\"]\n",
         "deny = []\n",
     );
-    fs::write(root.join("Ocl.toml"), manifest).expect("write manifest v1");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write manifest v1");
 }
 
 fn write_manifest_v2_with_new_permission(root: &Path) {
@@ -74,7 +74,7 @@ fn write_manifest_v2_with_new_permission(root: &Path) {
         "[permissions.std_fs]\n",
         "read = [\"./data/**\"]\n",
     );
-    fs::write(root.join("Ocl.toml"), manifest).expect("write manifest v2");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write manifest v2");
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn v15_perm_review_requires_approval_for_new_permission_diff() {
     let new_dir_s = new_dir.to_string_lossy().to_string();
 
     let empty_env = BTreeMap::new();
-    let snapshot_old = run_ocl_cli(
+    let snapshot_old = run_ocp_cli(
         &["perm", "snapshot", &root_s, "--out-dir", &old_dir_s],
         &empty_env,
     );
@@ -103,7 +103,7 @@ fn v15_perm_review_requires_approval_for_new_permission_diff() {
     );
 
     write_manifest_v2_with_new_permission(&root);
-    let snapshot_new = run_ocl_cli(
+    let snapshot_new = run_ocp_cli(
         &["perm", "snapshot", &root_s, "--out-dir", &new_dir_s],
         &empty_env,
     );
@@ -122,7 +122,7 @@ fn v15_perm_review_requires_approval_for_new_permission_diff() {
     let diff_report_s = diff_report.to_string_lossy().to_string();
     let approval_file_s = approval_file.to_string_lossy().to_string();
 
-    let diff_fail = run_ocl_cli(
+    let diff_fail = run_ocp_cli(
         &[
             "perm",
             "diff",
@@ -145,7 +145,7 @@ fn v15_perm_review_requires_approval_for_new_permission_diff() {
         "unexpected stderr: {stderr_fail}"
     );
 
-    let approve = run_ocl_cli(
+    let approve = run_ocp_cli(
         &[
             "perm",
             "approve",
@@ -164,7 +164,7 @@ fn v15_perm_review_requires_approval_for_new_permission_diff() {
     assert_ok(&approve, "perm approve");
     assert!(approval_file.exists(), "approval file missing");
 
-    let review_alias = run_ocl_cli(
+    let review_alias = run_ocp_cli(
         &[
             "perm",
             "review",

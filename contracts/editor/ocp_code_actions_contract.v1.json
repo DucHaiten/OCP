@@ -1,0 +1,14 @@
+{
+  "schema": "ocp.editor.code_actions_contract.v1",
+  "contract_id": "editor.ocp_code_actions_contract",
+  "version": "v1",
+  "code_action_ids": [
+    "ocp.codeAction.permissionFixPlan",
+    "ocp.codeAction.openDiff",
+    "ocp.codeAction.applyPatch",
+    "ocp.codeAction.openBudgetAnalyze",
+    "ocp.codeAction.openCassetteReport",
+    "ocp.codeAction.openContractMismatch"
+  ],
+  "strict_lane_no_bypass": true
+}

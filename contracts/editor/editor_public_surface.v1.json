@@ -1,33 +1,33 @@
 {
-  "schema": "ocl.editor.public_surface.v1",
+  "schema": "ocp.editor.public_surface.v1",
   "contract_id": "editor.editor_public_surface",
   "version": "v1",
-  "language_id": "ocp-ocl",
+  "language_id": "ocp",
   "extensions": [
-    ".ocl",
-    ".oclp",
-    ".oclt"
+    ".ocp",
+    ".ocpp",
+    ".ocpt"
   ],
   "settings_keys": [
-    "ocpOcl.laneProfile",
-    "ocpOcl.traceLevel",
-    "ocpOcl.enableSemanticTokens",
-    "ocpOcl.serverPath"
+    "ocp.laneProfile",
+    "ocp.traceLevel",
+    "ocp.enableSemanticTokens",
+    "ocp.serverPath"
   ],
   "command_ids": [
-    "ocpOcl.formatDocument",
-    "ocpOcl.checkWorkspace",
-    "ocpOcl.openDoctorReport",
-    "ocpOcl.openFixPlan",
-    "ocpOcl.openDebugTrace"
+    "ocp.formatDocument",
+    "ocp.checkWorkspace",
+    "ocp.openDoctorReport",
+    "ocp.openFixPlan",
+    "ocp.openDebugTrace"
   ],
   "code_action_ids": [
-    "ocpOcl.codeAction.permissionFixPlan",
-    "ocpOcl.codeAction.openDiff",
-    "ocpOcl.codeAction.applyPatch",
-    "ocpOcl.codeAction.openBudgetAnalyze",
-    "ocpOcl.codeAction.openCassetteReport",
-    "ocpOcl.codeAction.openContractMismatch"
+    "ocp.codeAction.permissionFixPlan",
+    "ocp.codeAction.openDiff",
+    "ocp.codeAction.applyPatch",
+    "ocp.codeAction.openBudgetAnalyze",
+    "ocp.codeAction.openCassetteReport",
+    "ocp.codeAction.openContractMismatch"
   ],
   "lsp_protocol_version": "3.17",
   "dap_protocol_version": "1.70"

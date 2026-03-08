@@ -1,7 +1,7 @@
 #[path = "w17_gate_c_common.rs"]
 mod w17;
 
-use ocp_ocl::ocp_ocl::{evaluate_entropy_policy, EntropySource};
+use ocp::ocp::{evaluate_entropy_policy, EntropySource};
 
 #[test]
 fn locked_lane_blocks_host_entropy_without_governed_path() {

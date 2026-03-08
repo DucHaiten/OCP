@@ -1,4 +1,4 @@
-use ocl_sdk::strict_lane_code_action_allowed_v19;
+use ocp_sdk::strict_lane_code_action_allowed_v19;
 use serde_json::json;
 
 #[path = "v19_gate_a_common.rs"]
@@ -10,7 +10,7 @@ fn v19_code_actions_strict_lane_negative_blocks_bypass() {
 
     let code_actions_path = v19::contracts_root()
         .join("editor")
-        .join("ocl_code_actions_contract.v1.json");
+        .join("ocp_code_actions_contract.v1.json");
     let contract = v19::read_json(&code_actions_path);
 
     let bypass_request = json!({
@@ -31,19 +31,19 @@ fn v19_code_actions_strict_lane_negative_blocks_bypass() {
 
     let denied_bypass = strict_lane_code_action_allowed_v19(
         "locked_v071",
-        "ocpOcl.codeAction.applyPatch",
+        "ocp.codeAction.applyPatch",
         &bypass_request,
         &contract,
     );
     let denied_direct_write = strict_lane_code_action_allowed_v19(
         "locked_v071",
-        "ocpOcl.codeAction.applyPatch",
+        "ocp.codeAction.applyPatch",
         &direct_write_request,
         &contract,
     );
     let allowed_valid = strict_lane_code_action_allowed_v19(
         "locked_v071",
-        "ocpOcl.codeAction.applyPatch",
+        "ocp.codeAction.applyPatch",
         &valid_request,
         &contract,
     );
@@ -59,14 +59,14 @@ fn v19_code_actions_strict_lane_negative_blocks_bypass() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.editor.code_actions_report.v1",
+        "schema": "ocp.w19.editor.code_actions_report.v1",
         "status": "PASS",
         "phase": "strict_lane_negative",
         "denied_bypass": denied_bypass,
         "denied_direct_write": denied_direct_write,
         "allowed_valid": allowed_valid,
         "contract_path": code_actions_path.to_string_lossy().replace('\\', "/"),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("editor/code_actions_report.json", &report);

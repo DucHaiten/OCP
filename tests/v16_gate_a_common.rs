@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ocp_ocl::ocp_ocl::{pretty_schema, Cacheability, CapabilityRegistry, DeterminismClass};
+use ocp::ocp::{pretty_schema, Cacheability, CapabilityRegistry, DeterminismClass};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
@@ -70,7 +70,7 @@ pub fn repo_root() -> PathBuf {
 }
 
 pub fn w16_target_root() -> PathBuf {
-    repo_root().join("target").join("ocl").join("w16")
+    repo_root().join("target").join("ocp").join("w16")
 }
 
 pub fn sha256_hex_bytes(bytes: &[u8]) -> String {
@@ -126,7 +126,7 @@ pub fn write_json_pretty(path: &Path, value: &JsonValue) {
 pub fn read_conformance_schema_version_v15() -> String {
     let path = repo_root()
         .join("projects")
-        .join("ocp-ocl")
+        .join("ocp")
         .join("conformance")
         .join("conformance.v5.toml");
     let raw = fs::read_to_string(&path).unwrap_or_else(|_| panic!("read {}", path.display()));
@@ -149,9 +149,9 @@ pub fn read_conformance_schema_version_v15() -> String {
 pub fn read_trace_schema_version_v15() -> u64 {
     let path = repo_root()
         .join("projects")
-        .join("ocp-ocl")
+        .join("ocp")
         .join("crates")
-        .join("ocl-cli")
+        .join("ocp-cli")
         .join("src")
         .join("main.rs");
     let raw = fs::read_to_string(&path).unwrap_or_else(|_| panic!("read {}", path.display()));
@@ -253,40 +253,40 @@ pub fn current_contract_inventory_v16() -> Vec<ContractInventoryEntryV16> {
             contract_id: "manifest.schema".to_string(),
             version: "v0.15-line".to_string(),
             schema_hash: sha256_hex_text(&snapshot.manifest_schema_version),
-            producer: "ocl-sdk:projects/ocp-ocl/crates/ocl-sdk/src/lib.rs".to_string(),
-            consumer: "ocl-cli+ocl-runtime-core".to_string(),
+            producer: "ocp-sdk:projects/ocp/crates/ocp-sdk/src/lib.rs".to_string(),
+            consumer: "ocp-cli+ocp-runtime-core".to_string(),
             allowed_diffs_v016: "none".to_string(),
         },
         ContractInventoryEntryV16 {
             contract_id: "trace.schema".to_string(),
             version: "v0.11-line".to_string(),
             schema_hash: sha256_hex_text(&snapshot.trace_schema_version.to_string()),
-            producer: "ocl-cli:projects/ocp-ocl/crates/ocl-cli/src/main.rs".to_string(),
-            consumer: "ocl-cli+ocl-sdk".to_string(),
+            producer: "ocp-cli:projects/ocp/crates/ocp-cli/src/main.rs".to_string(),
+            consumer: "ocp-cli+ocp-sdk".to_string(),
             allowed_diffs_v016: "none".to_string(),
         },
         ContractInventoryEntryV16 {
             contract_id: "lane.literals".to_string(),
             version: "v0.8+".to_string(),
             schema_hash: sha256_hex_text(&snapshot.lane_literals.join("|")),
-            producer: "ocl-sdk+ocl-cli".to_string(),
-            consumer: "ocl-runtime-core+ocl-cli".to_string(),
+            producer: "ocp-sdk+ocp-cli".to_string(),
+            consumer: "ocp-runtime-core+ocp-cli".to_string(),
             allowed_diffs_v016: "none".to_string(),
         },
         ContractInventoryEntryV16 {
             contract_id: "lockfile.sot".to_string(),
             version: "v0.15-line".to_string(),
             schema_hash: sha256_hex_text(&snapshot.lockfile_sot),
-            producer: "ocl-sdk".to_string(),
-            consumer: "ocl-cli".to_string(),
+            producer: "ocp-sdk".to_string(),
+            consumer: "ocp-cli".to_string(),
             allowed_diffs_v016: "none".to_string(),
         },
         ContractInventoryEntryV16 {
             contract_id: "registry.pack_contracts".to_string(),
             version: "v0.15-line".to_string(),
             schema_hash: snapshot_hash,
-            producer: "ocp_ocl::CapabilityRegistry".to_string(),
-            consumer: "ocl-runtime-core+ocl-sdk+ocl-cli".to_string(),
+            producer: "ocp::CapabilityRegistry".to_string(),
+            consumer: "ocp-runtime-core+ocp-sdk+ocp-cli".to_string(),
             allowed_diffs_v016: "additive-only".to_string(),
         },
         ContractInventoryEntryV16 {
@@ -311,7 +311,7 @@ pub fn current_contract_inventory_v16() -> Vec<ContractInventoryEntryV16> {
 }
 
 pub fn derive_lane_profile(project_root: &Path) -> String {
-    let path = project_root.join("Ocl.toml");
+    let path = project_root.join("Ocp.toml");
     if !path.exists() {
         return "locked_v071".to_string();
     }
@@ -487,5 +487,5 @@ pub fn enforce_run_manifest_allowlist(
 pub fn compute_history_signature(index: &HistoryEvidenceIndexV1) -> String {
     let value = serde_json::to_value(index).expect("index to value");
     let canonical = canonical_json_string(&value);
-    sha256_hex_text(&format!("ocl-history-evidence-v1|{canonical}"))
+    sha256_hex_text(&format!("ocp-history-evidence-v1|{canonical}"))
 }

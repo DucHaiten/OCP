@@ -43,8 +43,8 @@ fn v18_migration_noop_proof_enforces_per_report_schema_lock() {
     }
 
     let report = json!({
-        "schema": "ocl.w18.migration.noop_proof_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.migration.noop_proof_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "reports": [
             {
                 "name": "cassette_upgrade_report.json",

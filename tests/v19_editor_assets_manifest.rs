@@ -18,7 +18,7 @@ fn v19_editor_assets_manifest_hashes_match() {
         .and_then(serde_json::Value::as_array_mut)
         .expect("assets array");
 
-    let update = std::env::var("OCL_UPDATE_V19_ASSETS_MANIFEST")
+    let update = std::env::var("OCP_UPDATE_V19_ASSETS_MANIFEST")
         .ok()
         .as_deref()
         == Some("1");
@@ -61,11 +61,11 @@ fn v19_editor_assets_manifest_hashes_match() {
     }
 
     let report = json!({
-        "schema": "ocl.w19.editor.assets_manifest_report.v1",
+        "schema": "ocp.w19.editor.assets_manifest_report.v1",
         "status": "PASS",
         "asset_count": evidence.len(),
         "assets": evidence,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("editor/editor_assets_manifest_report.json", &report);

@@ -185,8 +185,8 @@ try {
         type = "request"
         command = "initialize"
         arguments = @{
-            clientID = "ocl-smoke"
-            adapterID = "ocp-ocl"
+            clientID = "ocp-smoke"
+            adapterID = "ocp"
         }
     }
     $dapInit = Wait-ProtocolMessage -Reader $dap.Reader -Predicate {

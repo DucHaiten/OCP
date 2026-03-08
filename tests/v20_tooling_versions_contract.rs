@@ -70,12 +70,12 @@ fn v20_tooling_versions_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w20.tooling_versions_report.v1",
+        "schema": "ocp.w20.tooling_versions_report.v1",
         "status": "PASS",
         "tooling_id": tooling_id,
         "required_count": required.len(),
         "external_count": external.len(),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20::run_manifest_sha256()
     });
     v20::write_report("contracts/tooling_versions_report.json", &report);

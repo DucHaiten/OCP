@@ -9,7 +9,7 @@ fn v17_perm_doctor_blocks_wildcard_in_locked_lane_and_writes_report() {
     w17_perm_common::write_manifest_with_fs_rule(&root, "locked_v071", "./**");
 
     let root_s = root.to_string_lossy().to_string();
-    let output = w17_perm_common::run_ocl_cli(&["perm", "doctor", &root_s], &BTreeMap::new());
+    let output = w17_perm_common::run_ocp_cli(&["perm", "doctor", &root_s], &BTreeMap::new());
     assert!(
         !output.status.success(),
         "perm doctor must fail in locked_v071"
@@ -30,7 +30,7 @@ fn v17_perm_doctor_blocks_wildcard_in_locked_lane_and_writes_report() {
 
     let report = root
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w17")
         .join("dx")
         .join("dx_friction_report.json");

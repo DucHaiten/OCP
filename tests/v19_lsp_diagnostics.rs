@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::lsp_diagnostics_from_source_v19;
+use ocp_sdk::lsp_diagnostics_from_source_v19;
 use serde_json::json;
 
 #[path = "v19_gate_a_common.rs"]
@@ -20,8 +20,8 @@ fn fixture(rel: &str) -> String {
 fn v19_lsp_diagnostics_realtime_core() {
     v19::ensure_run_manifest();
 
-    let bad = fixture("diagnostics_error.ocl");
-    let ok = fixture("diagnostics_ok.ocl");
+    let bad = fixture("diagnostics_error.ocp");
+    let ok = fixture("diagnostics_ok.ocp");
 
     let bad_diags = lsp_diagnostics_from_source_v19(&bad, 19);
     let ok_diags = lsp_diagnostics_from_source_v19(&ok, 19);
@@ -36,11 +36,11 @@ fn v19_lsp_diagnostics_realtime_core() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.lsp.diagnostics_report.v1",
+        "schema": "ocp.w19.lsp.diagnostics_report.v1",
         "status": "PASS",
         "bad_diagnostics": bad_diags,
         "ok_diagnostics_count": ok_diags.len(),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("lsp/diagnostics_report.json", &report);

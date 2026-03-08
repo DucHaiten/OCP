@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.editor.signing_trust_root.v1",
+  "schema": "ocp.editor.signing_trust_root.v1",
   "contract_id": "editor.editor_signing_trust_root",
   "version": "v1",
   "pubkey_allowlist": [

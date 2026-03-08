@@ -40,7 +40,7 @@ fn cassette_chunking_writes_content_addressed_blocks() {
     seed_v08_cassette(&artifact);
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
+    let out = common::run_ocp_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
     let stdout = common::assert_success(&out);
     let parsed: JsonValue = serde_json::from_str(&stdout).expect("json output");
     let block_count = parsed

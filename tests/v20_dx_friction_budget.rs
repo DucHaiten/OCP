@@ -39,20 +39,20 @@ fn v20_dx_friction_budget() {
     );
 
     let dx_report = json!({
-        "schema": "ocl.w20.dx_friction_report.v1",
+        "schema": "ocp.w20.dx_friction_report.v1",
         "status": "PASS",
         "observed": {
             "interactions_to_unblock": observed_interactions,
             "required_manual_edits": observed_manual_edits,
             "policy_roundtrips": observed_roundtrips
         },
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20e::run_manifest_sha256()
     });
     v20e::write_report("user/dx_friction_report.json", &dx_report);
 
     let budget_report = json!({
-        "schema": "ocl.w20.dx_friction_budget_report.v1",
+        "schema": "ocp.w20.dx_friction_budget_report.v1",
         "status": "PASS",
         "budget": {
             "max_interactions_to_unblock": max_interactions,
@@ -64,7 +64,7 @@ fn v20_dx_friction_budget() {
             "required_manual_edits": observed_manual_edits,
             "policy_roundtrips": observed_roundtrips
         },
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20e::run_manifest_sha256()
     });
     v20e::write_report("user/dx_friction_budget_report.json", &budget_report);

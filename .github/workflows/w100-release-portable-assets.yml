@@ -6,10 +6,10 @@ on:
     paths:
       - ".github/workflows/w100-release-portable-assets.yml"
       - ".cargo/config.toml"
-      - "projects/ocp-ocl/crates/ocl-cli/**"
-      - "projects/ocp-ocl/crates/ocl-lsp/**"
-      - "projects/ocp-ocl/crates/ocl-dap/**"
-      - "projects/ocp-ocl/crates/ocl-sdk/**"
+      - "projects/ocp/crates/ocp-cli/**"
+      - "projects/ocp/crates/ocp-lsp/**"
+      - "projects/ocp/crates/ocp-dap/**"
+      - "projects/ocp/crates/ocp-sdk/**"
       - "tools/release/build_portable_archives.ps1"
       - "contracts/release/v1.0/release_asset_matrix.v1.json"
       - "contracts/release/v1.0/portable_install_contract.v1.json"
@@ -27,24 +27,24 @@ jobs:
           targets: x86_64-unknown-linux-musl
 
       - name: Build linux-x64 binaries
-        run: cargo build --release -p ocl-cli -p ocl-lsp -p ocl-dap --target x86_64-unknown-linux-musl
+        run: cargo build --release -p ocp-cli -p ocp-lsp -p ocp-dap --target x86_64-unknown-linux-musl
 
       - name: Package linux-x64 portable archive
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p target/ocl/w100/release
-          mkdir -p target/ocl/w100/ci/linux-x64
-          cp target/x86_64-unknown-linux-musl/release/ocl-cli target/ocl/w100/ci/linux-x64/ocl
-          cp target/x86_64-unknown-linux-musl/release/ocl-lsp target/ocl/w100/ci/linux-x64/ocl-lsp
-          cp target/x86_64-unknown-linux-musl/release/ocl-dap target/ocl/w100/ci/linux-x64/ocl-dap
-          tar -czf target/ocl/w100/release/ocl-v1.0.0-linux-x64.tar.gz -C target/ocl/w100/ci/linux-x64 .
+          mkdir -p target/ocp/w100/release
+          mkdir -p target/ocp/w100/ci/linux-x64
+          cp target/x86_64-unknown-linux-musl/release/ocp-cli target/ocp/w100/ci/linux-x64/ocp
+          cp target/x86_64-unknown-linux-musl/release/ocp-lsp target/ocp/w100/ci/linux-x64/ocp-lsp
+          cp target/x86_64-unknown-linux-musl/release/ocp-dap target/ocp/w100/ci/linux-x64/ocp-dap
+          tar -czf target/ocp/w100/release/ocp-v1.0.0-linux-x64.tar.gz -C target/ocp/w100/ci/linux-x64 .
 
       - name: Upload linux-x64 portable asset
         uses: actions/upload-artifact@v4
         with:
           name: w100-portable-linux-x64
-          path: target/ocl/w100/release/ocl-v1.0.0-linux-x64.tar.gz
+          path: target/ocp/w100/release/ocp-v1.0.0-linux-x64.tar.gz
           if-no-files-found: error
 
   macos_portable:
@@ -59,22 +59,22 @@ jobs:
           targets: aarch64-apple-darwin
 
       - name: Build macos-arm64 binaries
-        run: cargo build --release -p ocl-cli -p ocl-lsp -p ocl-dap --target aarch64-apple-darwin
+        run: cargo build --release -p ocp-cli -p ocp-lsp -p ocp-dap --target aarch64-apple-darwin
 
       - name: Package macos-arm64 portable archive
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p target/ocl/w100/release
-          mkdir -p target/ocl/w100/ci/macos-arm64
-          cp target/aarch64-apple-darwin/release/ocl-cli target/ocl/w100/ci/macos-arm64/ocl
-          cp target/aarch64-apple-darwin/release/ocl-lsp target/ocl/w100/ci/macos-arm64/ocl-lsp
-          cp target/aarch64-apple-darwin/release/ocl-dap target/ocl/w100/ci/macos-arm64/ocl-dap
-          tar -czf target/ocl/w100/release/ocl-v1.0.0-macos-arm64.tar.gz -C target/ocl/w100/ci/macos-arm64 .
+          mkdir -p target/ocp/w100/release
+          mkdir -p target/ocp/w100/ci/macos-arm64
+          cp target/aarch64-apple-darwin/release/ocp-cli target/ocp/w100/ci/macos-arm64/ocp
+          cp target/aarch64-apple-darwin/release/ocp-lsp target/ocp/w100/ci/macos-arm64/ocp-lsp
+          cp target/aarch64-apple-darwin/release/ocp-dap target/ocp/w100/ci/macos-arm64/ocp-dap
+          tar -czf target/ocp/w100/release/ocp-v1.0.0-macos-arm64.tar.gz -C target/ocp/w100/ci/macos-arm64 .
 
       - name: Upload macos-arm64 portable asset
         uses: actions/upload-artifact@v4
         with:
           name: w100-portable-macos-arm64
-          path: target/ocl/w100/release/ocl-v1.0.0-macos-arm64.tar.gz
+          path: target/ocp/w100/release/ocp-v1.0.0-macos-arm64.tar.gz
           if-no-files-found: error

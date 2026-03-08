@@ -1,6 +1,6 @@
 # Build artifacts
 target/
-projects/ocp-ocl/crates/ocl-cli/target/
+projects/ocp/crates/ocp-cli/target/
 
 # Python cache
 Rules/guard/__pycache__/

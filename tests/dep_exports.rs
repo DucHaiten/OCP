@@ -2,14 +2,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{init_project, verify_dependency_exports_and_collect_provenance_v10, SdkError};
+use ocp_sdk::{init_project, verify_dependency_exports_and_collect_provenance_v10, SdkError};
 
 fn temp_project_dir(tag: &str) -> PathBuf {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_nanos();
-    std::env::temp_dir().join(format!("ocl_v10_dep_exports_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v10_dep_exports_{tag}_{stamp}"))
 }
 
 fn write_text(path: &Path, content: &str) {
@@ -22,7 +22,7 @@ fn write_text(path: &Path, content: &str) {
 fn setup_dep_project(root: &Path, exported_modules: &str) {
     init_project(root).expect("init project");
     write_text(
-        &root.join("Ocl.toml"),
+        &root.join("Ocp.toml"),
         concat!(
             "[package]\n",
             "name = \"dep_exports_demo\"\n",
@@ -34,7 +34,7 @@ fn setup_dep_project(root: &Path, exported_modules: &str) {
         ),
     );
     write_text(
-        &root.join("src").join("main.ocl"),
+        &root.join("src").join("main.ocp"),
         r#"
 import toolkit.api.math;
 let ok = dep_ready();
@@ -42,7 +42,7 @@ condition(ok);
 "#,
     );
     write_text(
-        &root.join("deps").join("toolkit").join("package.oclp"),
+        &root.join("deps").join("toolkit").join("package.ocpp"),
         &format!(
             "[package]\nname = \"toolkit\"\nversion = \"1.0.0\"\nentry = \"api.math\"\n\n[exports]\nmodules = {exported_modules}\n"
         ),
@@ -53,7 +53,7 @@ condition(ok);
             .join("toolkit")
             .join("src")
             .join("api")
-            .join("math.ocl"),
+            .join("math.ocp"),
         r#"
 fn dep_ready() {
   return true;
@@ -80,7 +80,7 @@ fn v10_dep_exports_collects_provenance_for_project_and_dependency_modules() {
             && p.package_id.starts_with("dep:toolkit@1.0.0#")
             && p.file_path
                 .replace('\\', "/")
-                .ends_with("deps/toolkit/src/api/math.ocl")),
+                .ends_with("deps/toolkit/src/api/math.ocp")),
         "missing dependency provenance entry: {provenance:#?}"
     );
 }

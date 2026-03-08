@@ -9,7 +9,7 @@ fn v18_cassette_upgrade_v08_to_v17_rehearsal_writes_schema_locked_report() {
             .get("schema")
             .and_then(serde_json::Value::as_str)
             .unwrap_or(""),
-        "ocl.w18.migration.cassette_upgrade_report.v1"
+        "ocp.w18.migration.cassette_upgrade_report.v1"
     );
     assert!(
         report

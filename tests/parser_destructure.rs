@@ -1,4 +1,4 @@
-use ocp_ocl::ocp_ocl::{parse_program, Expr, LetPattern, Stmt};
+use ocp::ocp::{parse_program, Expr, LetPattern, Stmt};
 
 #[test]
 fn parse_let_record_destructure_ok() {

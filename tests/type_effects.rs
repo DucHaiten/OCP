@@ -1,4 +1,4 @@
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, CapabilityRegistry, ErrorCode, KeyCapabilityKind, TypeChecker,
 };
 

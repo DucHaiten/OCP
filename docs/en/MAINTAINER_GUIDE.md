@@ -1,4 +1,4 @@
-# OCL Maintainer Guide v1.0 (EN)
+# OCP Maintainer Guide v1.0 (EN)
 
 This English file exists so links from the English user-facing docs do not break.
 

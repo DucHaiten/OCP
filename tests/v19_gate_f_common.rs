@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ocl_sdk::{sign_contract_json_v19, verify_contract_json_signature_v19};
+use ocp_sdk::{sign_contract_json_v19, verify_contract_json_signature_v19};
 use serde_json::Value as JsonValue;
 
 #[path = "v19_gate_a_common.rs"]
@@ -52,7 +52,7 @@ pub fn write_json_pretty(path: &Path, value: &JsonValue) {
 pub fn release_root() -> PathBuf {
     repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w19")
         .join("release")
 }
@@ -76,22 +76,22 @@ pub fn ensure_release_fixture_v19() -> ReleaseFixtureV19 {
     ensure_run_manifest();
 
     let release_root = release_root();
-    let vsix_path = release_root.join("ocp-ocl.vsix");
+    let vsix_path = release_root.join("ocp.vsix");
     let bin_dir = release_root.join("bin");
     fs::create_dir_all(&bin_dir).expect("create release bin dir");
 
-    write_if_needed(&vsix_path, b"OCP-OCL VSIX v19 fixture\n");
+    write_if_needed(&vsix_path, b"OCP VSIX v19 fixture\n");
 
     let mut binaries = BTreeMap::<String, PathBuf>::new();
-    let cli = bin_dir.join("ocl-cli");
-    let lsp = bin_dir.join("ocl-lsp");
-    let dap = bin_dir.join("ocl-dap");
-    write_if_needed(&cli, b"ocl-cli fixture v19\n");
-    write_if_needed(&lsp, b"ocl-lsp fixture v19\n");
-    write_if_needed(&dap, b"ocl-dap fixture v19\n");
-    binaries.insert("ocl-cli".to_string(), cli);
-    binaries.insert("ocl-lsp".to_string(), lsp);
-    binaries.insert("ocl-dap".to_string(), dap);
+    let cli = bin_dir.join("ocp-cli");
+    let lsp = bin_dir.join("ocp-lsp");
+    let dap = bin_dir.join("ocp-dap");
+    write_if_needed(&cli, b"ocp-cli fixture v19\n");
+    write_if_needed(&lsp, b"ocp-lsp fixture v19\n");
+    write_if_needed(&dap, b"ocp-dap fixture v19\n");
+    binaries.insert("ocp-cli".to_string(), cli);
+    binaries.insert("ocp-lsp".to_string(), lsp);
+    binaries.insert("ocp-dap".to_string(), dap);
 
     let mut binary_hashes = BTreeMap::<String, String>::new();
     for (name, path) in &binaries {
@@ -107,7 +107,7 @@ pub fn ensure_release_fixture_v19() -> ReleaseFixtureV19 {
         .join("editor")
         .join("editor_release_manifest.v1.json");
     let mut manifest = read_json(&contract_path);
-    manifest["vsix_path"] = JsonValue::String("target/ocl/w19/release/ocp-ocl.vsix".to_string());
+    manifest["vsix_path"] = JsonValue::String("target/ocp/w19/release/ocp.vsix".to_string());
     manifest["vsix_sha256"] = JsonValue::String(vsix_sha256.clone());
 
     if let Some(items) = manifest

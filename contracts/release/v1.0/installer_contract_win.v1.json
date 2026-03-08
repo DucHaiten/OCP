@@ -1,10 +1,10 @@
 {
-  "schema": "ocl.release.installer_contract_win.v1",
+  "schema": "ocp.release.installer_contract_win.v1",
   "contract_id": "v1.installer_contract_win",
   "version": "v1",
-  "installer_filename": "ocl-v1.0.0-setup-win-x64.exe",
-  "installer_icon_asset": "installer/windows/ocl-installer.ico",
-  "default_install_path": "C:\\Program Files\\OCP-OCL\\",
+  "installer_filename": "ocp-v1.0.0-setup-win-x64.exe",
+  "installer_icon_asset": "installer/windows/ocp-installer.ico",
+  "default_install_path": "C:\\Program Files\\OCP\\",
   "supports_install_dir_choice": true,
   "supports_add_to_path": true,
   "supports_add_to_path_confirmation": true,
@@ -17,10 +17,10 @@
     "local_appdata",
     "path_lookup_absolute"
   ],
-  "vscode_manual_fallback_command": "code --install-extension ocp-ocl-vscode-v1.0.0.vsix --force",
+  "vscode_manual_fallback_command": "code --install-extension ocp-vscode-v1.0.0.vsix --force",
   "supports_uninstall": true,
   "post_install_checks": [
-    "ocl --version",
-    "ocl init hello"
+    "ocp --version",
+    "ocp init hello"
   ]
 }

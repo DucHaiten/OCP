@@ -1,7 +1,7 @@
 #[path = "w17_gate_e_common.rs"]
 mod w17;
 
-use ocl_sdk::evaluate_capability_edge_v17;
+use ocp_sdk::evaluate_capability_edge_v17;
 
 #[test]
 fn v17_capability_laundering_denies_when_edge_grant_missing() {

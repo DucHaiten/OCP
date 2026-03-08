@@ -1,7 +1,7 @@
 # Quickstart 06 - Debug
 
 ```bash
-ocl dbg
+ocp dbg
 ```
 
 Dùng trace để tái lập và khoanh vùng lỗi.

@@ -1,7 +1,7 @@
 # Ops - Budget Analyze
 
 ```bash
-ocl budget analyze
+ocp budget analyze
 ```
 
 Inspect the machine-readable budget path to identify exhaustion points.

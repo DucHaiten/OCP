@@ -55,12 +55,12 @@ fn v20_threat_model_contract() {
     }
 
     let report = json!({
-        "schema": "ocl.w20.threat_model_report.v1",
+        "schema": "ocp.w20.threat_model_report.v1",
         "status": "PASS",
         "threat_model_id": threat_model_id,
         "assets_count": assets.len(),
         "trust_boundaries_count": trust_boundaries.len(),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20::run_manifest_sha256()
     });
     v20::write_report("contracts/threat_model_report.json", &report);

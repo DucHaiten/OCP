@@ -12,29 +12,29 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_cli_cassette_format_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_cli_cassette_format_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str], quarantine_env: Option<&str>) -> Output {
+fn run_ocp_cli(args: &[&str], quarantine_env: Option<&str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
-        .env_remove("OCL_QUARANTINE");
+        .env_remove("OCP_QUARANTINE");
     if let Some(value) = quarantine_env {
-        cmd.env("OCL_QUARANTINE", value);
+        cmd.env("OCP_QUARANTINE", value);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 fn set_project_lane(root: &Path, lane: &str) {
-    let manifest = root.join("Ocl.toml");
-    let raw = fs::read_to_string(&manifest).expect("read Ocl.toml");
+    let manifest = root.join("Ocp.toml");
+    let raw = fs::read_to_string(&manifest).expect("read Ocp.toml");
     let mut in_project = false;
     let mut replaced = false;
     let mut patched = String::new();
@@ -54,12 +54,12 @@ fn set_project_lane(root: &Path, lane: &str) {
     }
 
     assert!(replaced, "manifest missing [project].lane");
-    fs::write(&manifest, patched).expect("write Ocl.toml");
+    fs::write(&manifest, patched).expect("write Ocp.toml");
 }
 
 fn latest_artifact_dir(root: &Path) -> PathBuf {
-    let artifacts_root = root.join(".ocl_artifacts");
-    let read = fs::read_dir(&artifacts_root).expect("read .ocl_artifacts");
+    let artifacts_root = root.join(".ocp_artifacts");
+    let read = fs::read_dir(&artifacts_root).expect("read .ocp_artifacts");
     let mut dirs = Vec::new();
     for entry in read {
         let path = entry.expect("entry").path();
@@ -89,7 +89,7 @@ fn cassette_bundle_hash_and_replay_fail_honest_on_tamper() {
     let root = temp_project_dir("bundle");
     let root_s = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_s, "--template", "mini-game"], None);
+    let init = run_ocp_cli(&["init", &root_s, "--template", "mini-game"], None);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
@@ -98,7 +98,7 @@ fn cassette_bundle_hash_and_replay_fail_honest_on_tamper() {
     );
     set_project_lane(&root, "quarantine");
 
-    let run = run_ocl_cli(&["run", &root_s], Some("1"));
+    let run = run_ocp_cli(&["run", &root_s], Some("1"));
     assert!(
         run.status.success(),
         "run failed:\nstdout={}\nstderr={}",
@@ -157,7 +157,7 @@ fn cassette_bundle_hash_and_replay_fail_honest_on_tamper() {
         "replay cassette_hash must match cassette_hash.txt"
     );
 
-    let replay_ok = run_ocl_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
+    let replay_ok = run_ocp_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
     assert!(
         replay_ok.status.success(),
         "replay must pass before tamper:\nstdout={}\nstderr={}",
@@ -170,7 +170,7 @@ fn cassette_bundle_hash_and_replay_fail_honest_on_tamper() {
         format!("{index}\n"),
     )
     .expect("tamper index");
-    let replay_fail = run_ocl_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
+    let replay_fail = run_ocp_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
     assert!(
         !replay_fail.status.success(),
         "tampered cassette must fail replay"

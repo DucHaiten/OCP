@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{init_project, resolve_deps_v3, sync_deps_lock_v1};
+use ocp_sdk::{init_project, resolve_deps_v3, sync_deps_lock_v1};
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -15,23 +15,23 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v16_attestation_negative_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v16_attestation_negative_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
+fn run_ocp_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args);
     for (k, v) in envs {
         cmd.env(k, v);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 fn assert_ok(output: &Output, step: &str) {
@@ -57,7 +57,7 @@ fn setup_project(root: &Path) {
         "allow = [\"*\"]\n",
         "deny = [\"std.net.poll\"]\n",
     );
-    fs::write(root.join("Ocl.toml"), manifest).expect("write manifest");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write manifest");
     sync_deps_lock_v1(root).expect("sync deps.lock");
     resolve_deps_v3(root, false).expect("resolve deps.lock.v3");
 }
@@ -69,10 +69,10 @@ fn attestation_tamper_negative_verify_attest_must_fail() {
     let envs = BTreeMap::new();
     let root_s = root.to_string_lossy().to_string();
 
-    let build = run_ocl_cli(&["build", &root_s, "--source-only", "--attest"], &envs);
+    let build = run_ocp_cli(&["build", &root_s, "--source-only", "--attest"], &envs);
     assert_ok(&build, "build --attest");
 
-    let artifact_dir = root.join("target").join("ocl").join("attestation");
+    let artifact_dir = root.join("target").join("ocp").join("attestation");
     let manifest_path = artifact_dir.join("build_manifest.json");
     let raw_manifest = fs::read_to_string(&manifest_path).expect("read build manifest");
     let tampered_manifest =
@@ -84,7 +84,7 @@ fn attestation_tamper_negative_verify_attest_must_fail() {
     fs::write(&manifest_path, tampered_manifest).expect("write tampered manifest");
 
     let artifact_dir_s = artifact_dir.to_string_lossy().to_string();
-    let verify = run_ocl_cli(&["verify", "--attest", &artifact_dir_s], &envs);
+    let verify = run_ocp_cli(&["verify", "--attest", &artifact_dir_s], &envs);
     assert!(
         !verify.status.success(),
         "verify --attest must fail after tamper\nstdout={}\nstderr={}",

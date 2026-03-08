@@ -1,6 +1,6 @@
 use std::sync::{Mutex, OnceLock};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, Value,
 };
 
@@ -41,10 +41,10 @@ fn fs_adapter_denies_parent_traversal_path() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let root = std::env::temp_dir().join("ocl_fs_boundary_root");
+    let root = std::env::temp_dir().join("ocp_fs_boundary_root");
     std::fs::create_dir_all(&root).expect("create root");
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_read = EnvVarGuard::set("OCL_STD_FS_ALLOW_READ", "./**");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_read = EnvVarGuard::set("OCP_STD_FS_ALLOW_READ", "./**");
 
     let src = r#"
 observe("std.fs.read_text", "tier2", ctx("path=../escape.txt"), budget(5)) -> r;

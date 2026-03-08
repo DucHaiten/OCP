@@ -28,10 +28,10 @@ fn v20_install_upgrade_uninstall() {
     }
 
     let report = json!({
-        "schema": "ocl.w20.user_install_upgrade_report.v1",
+        "schema": "ocp.w20.user_install_upgrade_report.v1",
         "status": "PASS",
         "profiles": results,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20e::run_manifest_sha256()
     });
 

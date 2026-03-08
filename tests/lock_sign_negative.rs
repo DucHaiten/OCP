@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{
+use ocp_sdk::{
     init_project, resolve_deps_v3, sign_deps_lock_v3_v15, sync_deps_lock_v1,
     verify_deps_lock_v3_signature_v15,
 };
@@ -12,7 +12,7 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v16_lock_sign_negative_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v16_lock_sign_negative_{tag}_{stamp}"))
 }
 
 fn prepare_basic_project(root: &Path) {
@@ -26,7 +26,7 @@ fn prepare_basic_project(root: &Path) {
         "[dependencies]\n",
         "std = \"0.1.0\"\n"
     );
-    fs::write(root.join("Ocl.toml"), manifest).expect("write manifest");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write manifest");
     sync_deps_lock_v1(root).expect("sync deps.lock");
     resolve_deps_v3(root, false).expect("resolve deps.lock.v3");
 }

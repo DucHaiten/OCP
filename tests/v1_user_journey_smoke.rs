@@ -24,20 +24,20 @@ fn temp_project_dir(tag: &str) -> PathBuf {
     dir
 }
 
-fn run_ocl_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
+fn run_ocp_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args);
     for (k, v) in envs {
         cmd.env(k, v);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 fn assert_ok(output: &Output, step: &str) {
@@ -63,14 +63,14 @@ fn list_dirs(path: &Path) -> Vec<PathBuf> {
 }
 
 fn latest_artifact_dir(project_root: &Path) -> PathBuf {
-    let mut dirs = list_dirs(&project_root.join(".ocl_artifacts"));
-    assert!(!dirs.is_empty(), "missing run artifacts in .ocl_artifacts");
+    let mut dirs = list_dirs(&project_root.join(".ocp_artifacts"));
+    assert!(!dirs.is_empty(), "missing run artifacts in .ocp_artifacts");
     dirs.pop().expect("latest artifact")
 }
 
 fn patch_manifest_for_permission_delta(project_root: &Path) {
-    let manifest_path = project_root.join("Ocl.toml");
-    let raw = fs::read_to_string(&manifest_path).expect("read Ocl.toml");
+    let manifest_path = project_root.join("Ocp.toml");
+    let raw = fs::read_to_string(&manifest_path).expect("read Ocp.toml");
     let from = "allow = [\"std.fs.*\", \"std.kv.*\", \"std.time.*\"]";
     let to = "allow = [\"std.fs.*\", \"std.kv.*\", \"std.time.*\", \"std.proc.*\"]";
     let patched = raw.replace(from, to);
@@ -78,7 +78,7 @@ fn patch_manifest_for_permission_delta(project_root: &Path) {
         raw, patched,
         "permission delta patch must update [permissions.package].allow"
     );
-    fs::write(manifest_path, patched).expect("write patched Ocl.toml");
+    fs::write(manifest_path, patched).expect("write patched Ocp.toml");
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
     let empty_env = BTreeMap::new();
     let mut steps = Vec::new();
 
-    let init = run_ocl_cli(&["init", &root_s, "--template", "tool-cli"], &empty_env);
+    let init = run_ocp_cli(&["init", &root_s, "--template", "tool-cli"], &empty_env);
     assert_ok(&init, "init tool-cli");
     steps.push(json!({
         "name": "init_template",
@@ -96,7 +96,7 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
         "evidence": "project initialized with template tool-cli"
     }));
 
-    let lock_sync = run_ocl_cli(&["lock", "sync", &root_s], &empty_env);
+    let lock_sync = run_ocp_cli(&["lock", "sync", &root_s], &empty_env);
     assert_ok(&lock_sync, "lock sync");
     steps.push(json!({
         "name": "lock_sync",
@@ -104,7 +104,7 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
         "evidence": "deps.lock.v3 generated"
     }));
 
-    let lock_sign = run_ocl_cli(&["lock", "sign", &root_s, "--key", "ci-rc"], &empty_env);
+    let lock_sign = run_ocp_cli(&["lock", "sign", &root_s, "--key", "ci-rc"], &empty_env);
     assert_ok(&lock_sign, "lock sign");
     steps.push(json!({
         "name": "lock_sign",
@@ -112,7 +112,7 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
         "evidence": "deps.lock.v3.sig generated"
     }));
 
-    let lock_verify = run_ocl_cli(&["lock", "verify", &root_s], &empty_env);
+    let lock_verify = run_ocp_cli(&["lock", "verify", &root_s], &empty_env);
     assert_ok(&lock_verify, "lock verify");
     steps.push(json!({
         "name": "lock_verify",
@@ -127,7 +127,7 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
     let perm_old_s = perm_old_dir.to_string_lossy().to_string();
     let perm_new_s = perm_new_dir.to_string_lossy().to_string();
 
-    let perm_snapshot_old = run_ocl_cli(
+    let perm_snapshot_old = run_ocp_cli(
         &["perm", "snapshot", &root_s, "--out-dir", &perm_old_s],
         &empty_env,
     );
@@ -135,7 +135,7 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
 
     patch_manifest_for_permission_delta(&root);
 
-    let perm_snapshot_new = run_ocl_cli(
+    let perm_snapshot_new = run_ocp_cli(
         &["perm", "snapshot", &root_s, "--out-dir", &perm_new_s],
         &empty_env,
     );
@@ -150,7 +150,7 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
     let diff_report_s = diff_report.to_string_lossy().to_string();
     let approval_file_s = approval_file.to_string_lossy().to_string();
 
-    let diff_before = run_ocl_cli(
+    let diff_before = run_ocp_cli(
         &[
             "perm",
             "diff",
@@ -172,7 +172,7 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
         "perm diff before approval must expose RC-PERMISSION-UNAPPROVED"
     );
 
-    let perm_approve = run_ocl_cli(
+    let perm_approve = run_ocp_cli(
         &[
             "perm",
             "approve",
@@ -190,7 +190,7 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
     );
     assert_ok(&perm_approve, "perm approve");
 
-    let diff_after = run_ocl_cli(
+    let diff_after = run_ocp_cli(
         &[
             "perm",
             "diff",
@@ -210,9 +210,9 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
         "evidence": "permission delta reviewed and approved"
     }));
 
-    let build_attest = run_ocl_cli(&["build", &root_s, "--source-only", "--attest"], &empty_env);
+    let build_attest = run_ocp_cli(&["build", &root_s, "--source-only", "--attest"], &empty_env);
     assert_ok(&build_attest, "build --attest");
-    let attestation_dir = root.join("target").join("ocl").join("attestation");
+    let attestation_dir = root.join("target").join("ocp").join("attestation");
     assert!(
         attestation_dir.join("build_manifest.json").exists(),
         "missing build_manifest.json"
@@ -223,7 +223,7 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
     );
 
     let attestation_dir_s = attestation_dir.to_string_lossy().to_string();
-    let verify_attest = run_ocl_cli(&["verify", "--attest", &attestation_dir_s], &empty_env);
+    let verify_attest = run_ocp_cli(&["verify", "--attest", &attestation_dir_s], &empty_env);
     assert_ok(&verify_attest, "verify --attest");
     steps.push(json!({
         "name": "build_and_verify_attest",
@@ -231,11 +231,11 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
         "evidence": "attestation generated and verified"
     }));
 
-    let run = run_ocl_cli(&["run", &root_s], &empty_env);
+    let run = run_ocp_cli(&["run", &root_s], &empty_env);
     assert_ok(&run, "run");
     let artifact = latest_artifact_dir(&root);
 
-    let replay = run_ocl_cli(&["replay", &artifact.to_string_lossy()], &empty_env);
+    let replay = run_ocp_cli(&["replay", &artifact.to_string_lossy()], &empty_env);
     assert_ok(&replay, "replay");
     steps.push(json!({
         "name": "run_and_replay",
@@ -249,7 +249,7 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
         concat!("where\n", "step\n", "locals\n", "last\n"),
     )
     .expect("write dbg script");
-    let dbg = run_ocl_cli(
+    let dbg = run_ocp_cli(
         &[
             "dbg",
             &artifact.to_string_lossy(),
@@ -269,14 +269,14 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
 
     let rc_dir = repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w16")
         .join("rc");
     fs::create_dir_all(&rc_dir).expect("create w16 rc output dir");
 
     let journey_report = json!({
-        "schema": "ocl.w16.rc.golden_user_journey.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.rc.golden_user_journey.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "project_root": root.to_string_lossy(),
         "steps": steps,
         "artifacts": {
@@ -294,8 +294,8 @@ fn v1_user_journey_smoke_runs_end_to_end_and_writes_rc_reports() {
     .expect("write golden_user_journey_report.json");
 
     let rc_dryrun_report = json!({
-        "schema": "ocl.w16.rc.dryrun.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.rc.dryrun.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "status": "PASS",
         "checks": {
             "golden_user_journey": true,

@@ -80,7 +80,7 @@ fn v100_signing_trust_root_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.signing_trust_root_report.v1",
+        "schema": "ocp.w100.signing_trust_root_report.v1",
         "status": "PASS",
         "trust_contract_path": trust_path.to_string_lossy().replace('\\', "/"),
         "key_ids": key_ids,
@@ -90,7 +90,7 @@ fn v100_signing_trust_root_contract() {
             "current": current
         },
         "key_rotation_policy": rotation_policy,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100::run_manifest_sha256()
     });
     v100::write_report("contracts/signing_trust_root_report.json", &report);

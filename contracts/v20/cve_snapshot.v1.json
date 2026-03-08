@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.cve_snapshot.v1",
+  "schema": "ocp.v20.cve_snapshot.v1",
   "contract_id": "v20.cve_snapshot",
   "version": "v1",
   "snapshot_id": "w20-cve-snapshot-2026-03-06",

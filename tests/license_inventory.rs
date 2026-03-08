@@ -97,12 +97,12 @@ fn v16_license_inventory_is_generated_and_policy_passes() {
         denied
     );
 
-    let out_dir = root.join("target").join("ocl").join("w16").join("security");
+    let out_dir = root.join("target").join("ocp").join("w16").join("security");
     fs::create_dir_all(&out_dir).expect("create w16 security output dir");
 
     let inventory = json!({
-        "schema": "ocl.w16.security.license_inventory.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.security.license_inventory.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "policy": {
             "deny_licenses": deny_licenses
         },
@@ -118,7 +118,7 @@ fn v16_license_inventory_is_generated_and_policy_passes() {
 
     let sbom = json!({
         "schema": "spdx-lite.v1",
-        "generated_by": "ocl v0.16 gate 16-F",
+        "generated_by": "ocp v0.16 gate 16-F",
         "package_count": packages.len(),
         "packages": packages
             .iter()

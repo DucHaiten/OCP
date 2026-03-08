@@ -1,0 +1,20 @@
+{
+  "Function Template": {
+    "prefix": "ocp-fn",
+    "body": [
+      "fn ${1:name}(${2:arg}: ${3:value}) {",
+      "  let ${4:result} = ${2};",
+      "  return ${4:result};",
+      "}"
+    ],
+    "description": "Insert a basic OCP function template."
+  },
+  "Observe Commit": {
+    "prefix": "ocp-observe-commit",
+    "body": [
+      "let observed = observe(\"${1:key}\");",
+      "commit(observed);"
+    ],
+    "description": "Insert observe/commit flow."
+  }
+}

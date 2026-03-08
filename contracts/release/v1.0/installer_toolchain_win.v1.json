@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.release.installer_toolchain_win.v1",
+  "schema": "ocp.release.installer_toolchain_win.v1",
   "contract_id": "v1.installer_toolchain_win",
   "version": "v1",
   "builder": "inno",

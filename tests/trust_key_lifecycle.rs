@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use ocl_sdk::{evaluate_trust_lifecycle_v17, TrustKeyRecordV17};
+use ocp_sdk::{evaluate_trust_lifecycle_v17, TrustKeyRecordV17};
 use serde_json::json;
 
 #[test]
@@ -37,13 +37,13 @@ fn v17_trust_lifecycle_selects_latest_active_key_and_writes_report() {
     );
 
     let out_dir = PathBuf::from("target")
-        .join("ocl")
+        .join("ocp")
         .join("w17")
         .join("contracts");
     fs::create_dir_all(&out_dir).expect("create w17 contracts output dir");
     let report = json!({
-        "schema": "ocl.w17.trust_lifecycle_report.v1",
-        "run_manifest_ref": "target/ocl/w17/meta/run_manifest.json",
+        "schema": "ocp.w17.trust_lifecycle_report.v1",
+        "run_manifest_ref": "target/ocp/w17/meta/run_manifest.json",
         "current_epoch": summary.current_epoch,
         "active_key_id": summary.active_key_id,
         "active_key_epoch": summary.active_key_epoch,

@@ -17,7 +17,7 @@ fn v100_release_artifact_manifest() {
             .get("schema")
             .and_then(JsonValue::as_str)
             .unwrap_or(""),
-        "ocl.release.artifact_manifest.v1"
+        "ocp.release.artifact_manifest.v1"
     );
     assert_eq!(
         manifest
@@ -38,7 +38,7 @@ fn v100_release_artifact_manifest() {
             .get("toolchain_digest_ref")
             .and_then(JsonValue::as_str)
             .unwrap_or(""),
-        "target/ocl/w100/meta/run_manifest.json"
+        "target/ocp/w100/meta/run_manifest.json"
     );
 
     let artifacts = manifest

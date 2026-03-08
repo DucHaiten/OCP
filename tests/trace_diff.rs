@@ -12,21 +12,21 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_trace_diff_v11_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_trace_diff_v11_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 fn write_program_start(path: &PathBuf) {
@@ -129,7 +129,7 @@ fn trace_diff_strict_reports_first_divergence_and_changed_key() {
         &trace_event_line(2, 2, "stmt_exec", None, Some("ok"), None, None, "h-left-2"),
     );
 
-    let output = run_ocl_cli(&[
+    let output = run_ocp_cli(&[
         "trace",
         "diff",
         &left_dir.to_string_lossy(),
@@ -240,7 +240,7 @@ fn trace_diff_align_matches_by_call_id_instead_of_position() {
         ),
     );
 
-    let output = run_ocl_cli(&[
+    let output = run_ocp_cli(&[
         "trace",
         "diff",
         &left_dir.to_string_lossy(),

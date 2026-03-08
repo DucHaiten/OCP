@@ -4,7 +4,7 @@ use std::process::{Command, Output};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, Value,
 };
 
@@ -17,29 +17,29 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_cli_std_proc_exec_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_cli_std_proc_exec_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str], quarantine_env: Option<&str>) -> Output {
+fn run_ocp_cli(args: &[&str], quarantine_env: Option<&str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
-        .env_remove("OCL_QUARANTINE");
+        .env_remove("OCP_QUARANTINE");
     if let Some(value) = quarantine_env {
-        cmd.env("OCL_QUARANTINE", value);
+        cmd.env("OCP_QUARANTINE", value);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 fn configure_manifest_for_proc_quarantine(root: &Path) {
-    let manifest = root.join("Ocl.toml");
-    let raw = fs::read_to_string(&manifest).expect("read Ocl.toml");
+    let manifest = root.join("Ocp.toml");
+    let raw = fs::read_to_string(&manifest).expect("read Ocp.toml");
     let mut patched = raw.replace("lane = \"locked_v071\"", "lane = \"quarantine\"");
     patched = patched.replace(
         "allow = [\"std.fs.*\", \"std.kv.*\", \"std.time.*\"]",
@@ -54,12 +54,12 @@ fn configure_manifest_for_proc_quarantine(root: &Path) {
         patched.push_str("max_stdout_bytes = 64\n");
         patched.push_str("max_stderr_bytes = 64\n");
     }
-    fs::write(&manifest, patched).expect("write Ocl.toml");
+    fs::write(&manifest, patched).expect("write Ocp.toml");
 }
 
 fn latest_artifact_dir(root: &Path) -> PathBuf {
-    let artifacts_root = root.join(".ocl_artifacts");
-    let read = fs::read_dir(&artifacts_root).expect("read .ocl_artifacts");
+    let artifacts_root = root.join(".ocp_artifacts");
+    let read = fs::read_dir(&artifacts_root).expect("read .ocp_artifacts");
     let mut dirs = Vec::new();
     for entry in read {
         let path = entry.expect("entry").path();
@@ -103,7 +103,7 @@ impl Drop for EnvVarGuard {
     }
 }
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {
@@ -119,7 +119,7 @@ fn std_proc_exec_record_and_replay_with_nonzero_and_truncation() {
     let root = temp_project_dir("record_replay");
     let root_s = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_s, "--template", "tool-cli"], None);
+    let init = run_ocp_cli(&["init", &root_s, "--template", "tool-cli"], None);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
@@ -133,15 +133,15 @@ fn std_proc_exec_record_and_replay_with_nonzero_and_truncation() {
 observe("std.proc.exec", "tier2", ctx("bin=python;args=-c,print('ABCDEFGHIJ');timeout_ms=3000;max_stdout_bytes=4"), budget(5)) -> p2;
 condition(true);
 "#;
-    fs::write(root.join("src").join("main.ocl"), source).expect("write source");
+    fs::write(root.join("src").join("main.ocp"), source).expect("write source");
 
-    let run_without = run_ocl_cli(&["run", &root_s], None);
+    let run_without = run_ocp_cli(&["run", &root_s], None);
     assert!(
         !run_without.status.success(),
         "quarantine proc run without env must fail"
     );
 
-    let run_with = run_ocl_cli(&["run", &root_s], Some("1"));
+    let run_with = run_ocp_cli(&["run", &root_s], Some("1"));
     assert!(
         run_with.status.success(),
         "run with quarantine env failed:\nstdout={}\nstderr={}",
@@ -169,13 +169,13 @@ condition(true);
         "truncated proc output must be recorded as degraded"
     );
 
-    let replay_without = run_ocl_cli(&["replay", &run_dir.to_string_lossy()], None);
+    let replay_without = run_ocp_cli(&["replay", &run_dir.to_string_lossy()], None);
     assert!(
         !replay_without.status.success(),
         "replay without quarantine env must fail for lane quarantine"
     );
 
-    let replay_with = run_ocl_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
+    let replay_with = run_ocp_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
     assert!(
         replay_with.status.success(),
         "replay with quarantine env failed:\nstdout={}\nstderr={}",
@@ -189,16 +189,16 @@ fn std_proc_exec_denies_bin_outside_allowlist() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _lane = EnvVarGuard::set("OCL_PROJECT_LANE", "quarantine");
-    let _mode = EnvVarGuard::set("OCL_QUARANTINE_MODE", "record");
-    let _allow = EnvVarGuard::set("OCL_STD_PROC_ALLOW_BINS", "python");
-    let _timeout = EnvVarGuard::set("OCL_STD_PROC_TIMEOUT_MS", "2000");
-    let _max_out = EnvVarGuard::set("OCL_STD_PROC_MAX_STDOUT_BYTES", "1024");
-    let _max_err = EnvVarGuard::set("OCL_STD_PROC_MAX_STDERR_BYTES", "1024");
+    let _lane = EnvVarGuard::set("OCP_PROJECT_LANE", "quarantine");
+    let _mode = EnvVarGuard::set("OCP_QUARANTINE_MODE", "record");
+    let _allow = EnvVarGuard::set("OCP_STD_PROC_ALLOW_BINS", "python");
+    let _timeout = EnvVarGuard::set("OCP_STD_PROC_TIMEOUT_MS", "2000");
+    let _max_out = EnvVarGuard::set("OCP_STD_PROC_MAX_STDOUT_BYTES", "1024");
+    let _max_err = EnvVarGuard::set("OCP_STD_PROC_MAX_STDERR_BYTES", "1024");
 
-    let tmp_record = std::env::temp_dir().join("ocl_std_proc_record_guard.tmp");
+    let tmp_record = std::env::temp_dir().join("ocp_std_proc_record_guard.tmp");
     let _record = EnvVarGuard::set(
-        "OCL_V08_PROC_RECORD_PATH",
+        "OCP_V08_PROC_RECORD_PATH",
         tmp_record.to_string_lossy().as_ref(),
     );
 

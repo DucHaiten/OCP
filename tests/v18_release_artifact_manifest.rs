@@ -24,7 +24,7 @@ fn v18_release_artifact_manifest_contains_required_artifacts_and_hashes() {
             .get("schema")
             .and_then(JsonValue::as_str)
             .unwrap_or(""),
-        "ocl.w18.rc.release_artifact_manifest.v1"
+        "ocp.w18.rc.release_artifact_manifest.v1"
     );
     let artifacts = manifest
         .get("artifacts")

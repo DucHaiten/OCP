@@ -29,14 +29,14 @@ fn v20_chaos_io_network_fs() {
     ];
 
     let report = json!({
-        "schema": "ocl.w20.chaos_io_network_fs_report.v1",
+        "schema": "ocp.w20.chaos_io_network_fs_report.v1",
         "status": "PASS",
         "feature_gate": "w20_chaos",
         "required_fault_points": required,
         "observed_fault_points": points,
         "io_cases": io_cases,
         "unexpected_success_count": 0,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20d::run_manifest_sha256()
     });
 

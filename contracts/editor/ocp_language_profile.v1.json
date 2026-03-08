@@ -1,0 +1,21 @@
+{
+  "schema": "ocp.editor.language_profile.v1",
+  "contract_id": "editor.ocp_language_profile",
+  "version": "v1",
+  "language_id": "ocp",
+  "extensions": [
+    ".ocp",
+    ".ocpp",
+    ".ocpt"
+  ],
+  "comment_tokens": {
+    "line": "//",
+    "block_start": "/*",
+    "block_end": "*/"
+  },
+  "bracket_pairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ]
+}

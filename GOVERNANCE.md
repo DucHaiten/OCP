@@ -1,8 +1,8 @@
-# OCP-OCL Governance
+# OCP Governance
 
 ## 1) Mục đích
 
-File này định nghĩa cách OCP-OCL được quản trị ở mức dự án:
+File này định nghĩa cách OCP được quản trị ở mức dự án:
 - ai có quyền quyết định cuối cùng;
 - thay đổi nào cần kiểm soát chặt;
 - bản phát hành nào được coi là chính thức;
@@ -13,7 +13,7 @@ Các tài liệu diễn giải thêm cho người đọc nằm dưới `docs/vi/
 
 ## 2) Mô hình governance hiện tại
 
-OCP-OCL hiện vận hành theo mô hình:
+OCP hiện vận hành theo mô hình:
 - owner-led project;
 - release authority tập trung;
 - contribution mở nhưng không tự động kéo theo quyền điều hành dự án.
@@ -24,7 +24,7 @@ Nói ngắn gọn:
 
 ## 3) Release authority
 
-Release authority của OCP-OCL có quyền chốt:
+Release authority của OCP có quyền chốt:
 - release chính thức;
 - gate status cuối cùng trước phát hành;
 - trust-root và signed artifact chain;
@@ -74,7 +74,7 @@ Các thay đổi sau được coi là thay đổi lớn:
 
 ## 6) Official build
 
-Một bản build chỉ nên được coi là `Official OCP-OCL Build` khi:
+Một bản build chỉ nên được coi là `Official OCP Build` khi:
 - thuộc chuỗi phát hành chính thức của dự án;
 - nằm trong signed artifact scope của release;
 - phù hợp trust chain đã khóa trong contracts và release evidence.
@@ -129,7 +129,7 @@ Rule:
 
 ## 10) Kết luận
 
-Governance của OCP-OCL hiện dựa trên một nguyên tắc đơn giản:
+Governance của OCP hiện dựa trên một nguyên tắc đơn giản:
 - contribution là đầu vào mở;
 - authority chốt release và policy phải rõ;
 - official status phải gắn với trust chain và release evidence;

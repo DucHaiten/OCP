@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use ocl_sdk::evaluate_downgrade_attempt_v17;
+use ocp_sdk::evaluate_downgrade_attempt_v17;
 use serde_json::json;
 
 #[test]
@@ -25,13 +25,13 @@ fn v17_downgrade_guard_enforces_lane_policy_and_writes_compat_report() {
     assert_eq!(quarantine.reason_code, "RC-DOWNGRADE-AUDIT");
 
     let out_dir = PathBuf::from("target")
-        .join("ocl")
+        .join("ocp")
         .join("w17")
         .join("compat");
     fs::create_dir_all(&out_dir).expect("create w17 compat output dir");
     let report = json!({
-        "schema": "ocl.w17.v016_line_compat_report.v1",
-        "run_manifest_ref": "target/ocl/w17/meta/run_manifest.json",
+        "schema": "ocp.w17.v016_line_compat_report.v1",
+        "run_manifest_ref": "target/ocp/w17/meta/run_manifest.json",
         "lane_literals": ["locked_v071", "locked_v06", "quarantine"],
         "downgrade_policy": {
             "locked_v071": {

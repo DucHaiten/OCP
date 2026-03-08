@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 Write-Host "[commit-safe] Unstage generated/build outputs..."
 $generatedPaths = @(
     "target",
-    "projects/ocp-ocl/crates/ocl-cli/target",
+    "projects/ocp/crates/ocp-cli/target",
     "Rules/guard/__pycache__"
 )
 
@@ -50,11 +50,11 @@ if ($stagedForCommit.Count -eq 0) {
 # Default an toàn cho workflow plan/docs:
 # luôn cho phép large-doc rewrite có chủ đích, vẫn giữ tất cả guard khác.
 if (-not $StrictLargeDoc) {
-    $env:OCL_RULES_ALLOW_LARGE_DOC = "1"
+    $env:OCP_RULES_ALLOW_LARGE_DOC = "1"
 }
 
 if ($AllowGenerated) {
-    $env:OCL_RULES_ALLOW_GENERATED = "1"
+    $env:OCP_RULES_ALLOW_GENERATED = "1"
 }
 
 Write-Host "[commit-safe] Running staged guard..."

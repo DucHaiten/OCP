@@ -79,12 +79,12 @@ fn v100_docs_required_sections() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.docs.docs_coverage_report.v1",
+        "schema": "ocp.w100.docs.docs_coverage_report.v1",
         "status": "PASS",
         "readme_sections_verified": readme_ok,
         "user_guide_sections_verified": guide_ok,
         "en_translation_required_for_current_gate": en_required,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
     v100d::write_report("docs/docs_coverage_report.json", &report);

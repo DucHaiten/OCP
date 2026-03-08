@@ -19,7 +19,7 @@ fn v18_dos_caps_gate_enforces_entry_caps_and_missing_chunk_fail_honest() {
         ],
     );
     let cap_artifact_s = cap_artifact.to_string_lossy().to_string();
-    let capped = common::run_ocl_cli(&[
+    let capped = common::run_ocp_cli(&[
         "cassette",
         "upgrade",
         &cap_artifact_s,
@@ -36,7 +36,7 @@ fn v18_dos_caps_gate_enforces_entry_caps_and_missing_chunk_fail_honest() {
         &["{\"id\":\"z1\",\"type\":\"wallclock\",\"unix_ms\":9}"],
     );
     let missing_artifact_s = missing_artifact.to_string_lossy().to_string();
-    let upgraded = common::run_ocl_cli(&[
+    let upgraded = common::run_ocp_cli(&[
         "cassette",
         "upgrade",
         &missing_artifact_s,
@@ -65,12 +65,12 @@ fn v18_dos_caps_gate_enforces_entry_caps_and_missing_chunk_fail_honest() {
         .join(format!("{first_block}.json"));
     fs::remove_file(&block_path).expect("remove referenced block");
 
-    let gc = common::run_ocl_cli(&["cassette", "gc", &missing_artifact_s]);
+    let gc = common::run_ocp_cli(&["cassette", "gc", &missing_artifact_s]);
     common::assert_failed_with(&gc, "X-CASSETTE-MISSING-BLOCK");
 
     let report = json!({
-        "schema": "ocl.w18.security.dos_caps_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.security.dos_caps_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "entry_cap_check": {
             "artifact_dir": cap_artifact.to_string_lossy().replace('\\', "/"),
             "reason_code": "X-CASSETTE-MAX-ENTRIES",

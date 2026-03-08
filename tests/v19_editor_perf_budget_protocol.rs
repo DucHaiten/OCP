@@ -63,15 +63,15 @@ fn v19_editor_perf_budget_protocol() {
     let sample_files = fs::read_dir(&dataset)
         .unwrap_or_else(|_| panic!("read dir {}", dataset.display()))
         .filter_map(Result::ok)
-        .filter(|entry| entry.path().extension().and_then(|v| v.to_str()) == Some("ocl"))
+        .filter(|entry| entry.path().extension().and_then(|v| v.to_str()) == Some("ocp"))
         .count();
     assert!(
         sample_files >= 2,
-        "dataset requires at least two .ocl fixtures"
+        "dataset requires at least two .ocp fixtures"
     );
 
     let report = json!({
-        "schema": "ocl.w19.perf.editor_perf_protocol_report.v1",
+        "schema": "ocp.w19.perf.editor_perf_protocol_report.v1",
         "status": "PASS",
         "dataset_id": dataset_id,
         "dataset_path": dataset_path,
@@ -80,7 +80,7 @@ fn v19_editor_perf_budget_protocol() {
         "quantile_index_rule": quantile_rule,
         "counters": counters,
         "fixture_count": sample_files,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19g::run_manifest_sha256()
     });
     v19g::write_report("perf/editor_perf_protocol_report.json", &report);

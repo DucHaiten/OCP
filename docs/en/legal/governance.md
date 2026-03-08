@@ -1,6 +1,6 @@
-# Governance OCP-OCL v1.0
+# Governance OCP v1.0
 
-This document explains how OCP-OCL is governed at the public-facing level:
+This document explains how OCP is governed at the public-facing level:
 - who has decision authority;
 - which changes require tight control;
 - how users and contributors should understand the project's authority model.
@@ -12,12 +12,12 @@ It does not replace the root source files such as `GOVERNANCE.md`, `CODEOWNERS`,
 
 If you only need the quick version:
 
-1. OCP-OCL is currently coordinated as an owner-led project.
+1. OCP is currently coordinated as an owner-led project.
 2. Not every contributor has authority over policy, release direction, or licensing direction.
 3. Large changes must go through plan gates, tests, and evidence; they are not decided by intuition alone.
 4. “Official build” status and official release authority must be tied to the trust chain; a fork does not get that status automatically.
 
-## 1) What is governance for in OCP-OCL?
+## 1) What is governance for in OCP?
 
 Governance here is not abstract theory.
 
@@ -34,9 +34,9 @@ Without clear governance, a project like this quickly runs into problems such as
 - confusion between fork/community builds and official builds;
 - difficulty keeping docs, legal policy, release policy, and trust chain aligned.
 
-## 2) How should the current OCP-OCL model be understood?
+## 2) How should the current OCP model be understood?
 
-Based on the current repo state and the active plan, OCP-OCL is currently an:
+Based on the current repo state and the active plan, OCP is currently an:
 - owner-led project;
 - with tightly held release and policy direction;
 - with contributions accepted through a clear workflow, but without contributions automatically carrying strategic decision power.
@@ -96,7 +96,7 @@ The following changes should be treated as sensitive and should not be handled l
 - release gate status;
 - root governance and ownership files.
 
-For OCP-OCL, changes like these should follow a path with:
+For OCP, changes like these should follow a path with:
 - a clear plan,
 - evidence,
 - appropriate tests when the area is machine-checkable,
@@ -105,7 +105,7 @@ For OCP-OCL, changes like these should follow a path with:
 ## 6) What does “official build” mean in governance terms?
 
 From the governance side, “official build” should not be understood as:
-- any build that looks like OCL;
+- any build that looks like OCP;
 - any build that someone else compiled from the same source;
 - any fork that keeps a similar name.
 
@@ -120,7 +120,7 @@ More detail about name, logo, and branding belongs in:
 
 ## 7) How does governance relate to the plan and gates?
 
-In OCP-OCL, the plan is not just a work note.
+In OCP, the plan is not just a work note.
 
 It is part of practical governance because it locks:
 - scope,
@@ -185,7 +185,7 @@ It is only an explanation document to help readers understand how the project op
 ## 11) Conclusion
 
 The shortest safe understanding is:
-- OCP-OCL currently has clear owner authority;
+- OCP currently has clear owner authority;
 - contribution is not the same thing as governance authority;
 - release, licensing, commercial direction, and official-build status must go through explicit governance;
 - if something is not locked in the sources of truth and backed by evidence, it should not yet be treated as an official project decision.

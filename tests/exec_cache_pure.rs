@@ -1,6 +1,6 @@
-use ocp_ocl::ocp_ocl::{execute_program, parse_program, typecheck_program, ExecConfig, Value};
+use ocp::ocp::{execute_program, parse_program, typecheck_program, ExecConfig, Value};
 
-fn run_program(src: &str, enable_exec_cache: bool) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str, enable_exec_cache: bool) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     execute_program(

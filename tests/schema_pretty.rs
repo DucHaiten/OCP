@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     pretty_schema, schema_skeleton, FieldConstraints, FieldSpec, SchemaType, Value,
 };
 

@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, Value,
 };
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {
@@ -63,9 +63,9 @@ fn shadow_report_v2_has_required_sections_and_is_deterministic() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _policy_allow = EnvVarGuard::set("OCL_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "beam");
-    let _max_report = EnvVarGuard::set("OCL_STD_SHADOW_MAX_REPORT_BYTES", "4096");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _policy_allow = EnvVarGuard::set("OCP_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "beam");
+    let _max_report = EnvVarGuard::set("OCP_STD_SHADOW_MAX_REPORT_BYTES", "4096");
 
     let src = r#"
 observe("std.shadow.search", "tier2", ctx("policy=beam;variants_json=[{\"score\":20,\"tag\":\"a\"},{\"score\":50,\"tag\":\"b\"},{\"score\":30,\"tag\":\"c\"}];max_branches=3;beam_width=3;top_k=3;rounds=2;per_branch_step_cap=80;per_branch_budget_cap=5000;global_step_cap=240;global_budget_cap=15000;state_score_weight=1;outcome_weight=0;cost_budget_weight=0;cost_steps_weight=0;reason_penalty_weight=0;max_diff_keys=8;max_report_bytes=4096"), budget(5)) -> s;
@@ -110,9 +110,9 @@ fn shadow_report_v2_truncates_deterministically_when_bytes_cap_is_small() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _policy_allow = EnvVarGuard::set("OCL_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "portfolio");
-    let _max_report = EnvVarGuard::set("OCL_STD_SHADOW_MAX_REPORT_BYTES", "120");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _policy_allow = EnvVarGuard::set("OCP_STD_SHADOW_SCHEDULER_POLICY_ALLOW", "portfolio");
+    let _max_report = EnvVarGuard::set("OCP_STD_SHADOW_MAX_REPORT_BYTES", "120");
 
     let src = r#"
 observe("std.shadow.search", "tier2", ctx("policy=portfolio;variants_json=[{\"score\":10,\"a\":1,\"b\":2,\"c\":3},{\"score\":20,\"a\":9,\"b\":8,\"c\":7},{\"score\":30,\"a\":4,\"b\":5,\"c\":6},{\"score\":40,\"a\":7,\"b\":1,\"c\":2}];max_branches=4;rounds=4;top_k=4;per_branch_step_cap=80;per_branch_budget_cap=5000;global_step_cap=320;global_budget_cap=20000;state_score_weight=1;outcome_weight=0;cost_budget_weight=0;cost_steps_weight=0;reason_penalty_weight=0;max_diff_keys=16;max_report_bytes=120"), budget(5)) -> s;

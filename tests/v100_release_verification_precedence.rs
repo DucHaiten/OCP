@@ -40,12 +40,12 @@ fn v100_release_verification_precedence() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.release.release_verification_precedence_report.v1",
+        "schema": "ocp.w100.release.release_verification_precedence_report.v1",
         "status": "PASS",
         "primary": primary,
         "secondary": secondary,
         "on_mismatch": on_mismatch,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100b::run_manifest_sha256()
     });
     v100b::write_report(

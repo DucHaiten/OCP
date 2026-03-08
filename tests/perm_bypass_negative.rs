@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::init_project;
+use ocp_sdk::init_project;
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -15,23 +15,23 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v16_perm_negative_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v16_perm_negative_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
+fn run_ocp_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args);
     for (k, v) in envs {
         cmd.env(k, v);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 fn assert_ok(output: &Output, step: &str) {
@@ -45,7 +45,7 @@ fn assert_ok(output: &Output, step: &str) {
 
 fn write_manifest_v1(root: &Path) {
     fs::write(
-        root.join("Ocl.toml"),
+        root.join("Ocp.toml"),
         concat!(
             "[package]\n",
             "name = \"perm_negative\"\n",
@@ -64,7 +64,7 @@ fn write_manifest_v1(root: &Path) {
 
 fn write_manifest_v2(root: &Path) {
     fs::write(
-        root.join("Ocl.toml"),
+        root.join("Ocp.toml"),
         concat!(
             "[package]\n",
             "name = \"perm_negative\"\n",
@@ -98,14 +98,14 @@ fn perm_bypass_negative_unapproved_diff_must_fail() {
     let new_dir_s = new_dir.to_string_lossy().to_string();
     let envs = BTreeMap::new();
 
-    let snap_old = run_ocl_cli(
+    let snap_old = run_ocp_cli(
         &["perm", "snapshot", &root_s, "--out-dir", &old_dir_s],
         &envs,
     );
     assert_ok(&snap_old, "perm snapshot old");
 
     write_manifest_v2(&root);
-    let snap_new = run_ocl_cli(
+    let snap_new = run_ocp_cli(
         &["perm", "snapshot", &root_s, "--out-dir", &new_dir_s],
         &envs,
     );
@@ -121,7 +121,7 @@ fn perm_bypass_negative_unapproved_diff_must_fail() {
     let diff_report_s = diff_report.to_string_lossy().to_string();
     let approval_file_s = approval_file.to_string_lossy().to_string();
 
-    let diff = run_ocl_cli(
+    let diff = run_ocp_cli(
         &[
             "perm",
             "diff",

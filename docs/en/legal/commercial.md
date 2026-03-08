@@ -1,6 +1,6 @@
-# Commercial Terms OCP-OCL v1.0
+# Commercial Terms OCP v1.0
 
-This document explains the commercial path of OCP-OCL in a way that users and organizations can read in order to make an initial decision.
+This document explains the commercial path of OCP in a way that users and organizations can read in order to make an initial decision.
 
 The goal of this file is not to replace a specific commercial agreement.  
 Its goal is to clarify:
@@ -12,14 +12,14 @@ Its goal is to clarify:
 
 If you only need the quick conclusion, these are the four most important points:
 
-1. OCP-OCL follows a `dual-license` model.
+1. OCP follows a `dual-license` model.
 2. The OSS side remains `AGPL-3.0-only`.
 3. The commercial path does not automatically apply just because you are a company or just because your use has a commercial context.
 4. If you need terms that differ from the OSS side, you must go through a separate commercial agreement.
 
-## 1) What is the commercial path of OCP-OCL?
+## 1) What is the commercial path of OCP?
 
-The commercial path is a separate licensing route for cases that do not want to use, or cannot use, OCP-OCL only under the OSS side.
+The commercial path is a separate licensing route for cases that do not want to use, or cannot use, OCP only under the OSS side.
 
 In plain language:
 - if you use the OSS path, you read and comply with `LICENSE`;
@@ -34,7 +34,7 @@ The point that needs to be understood clearly:
 
 You should move to the commercial path if one or more of the following applies:
 
-- you want to distribute, embed, or integrate OCP-OCL into a proprietary product;
+- you want to distribute, embed, or integrate OCP into a proprietary product;
 - you need separate legal terms for an organization, company, or procurement process;
 - you need support committed in writing;
 - you need SLA, warranty, indemnity, or similar enterprise-style terms;
@@ -73,7 +73,7 @@ The commercial path exists to support cases that need:
 ### 4.2) What this file does not promise automatically
 
 This file does not mean:
-- every organization using OCP-OCL must buy;
+- every organization using OCP must buy;
 - every enterprise use case automatically gets an exception;
 - a price list, SLA, or warranty is already available for everyone by default;
 - reading this file alone gives you a valid commercial license.
@@ -105,7 +105,7 @@ These three files serve different purposes:
 
 ### `docs/en/legal/licensing.md`
 - explains the overall picture:
-  - what license OCP-OCL uses;
+  - what license OCP uses;
   - what dual-license means;
   - when you should evaluate the OSS path and when you should move to the commercial path.
 
@@ -177,7 +177,7 @@ If you are making a decision with real legal, financial, or procurement conseque
 ## 11) Conclusion
 
 The most practical reading is:
-- OCP-OCL has a commercial path, but that path does not arise automatically;
+- OCP has a commercial path, but that path does not arise automatically;
 - the OSS side remains the default if no separate agreement exists;
 - the commercial path exists to handle needs that do not fit the OSS side;
 - any separate exception or commercial right must be confirmed explicitly and must not be inferred.

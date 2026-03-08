@@ -13,8 +13,8 @@ fn v18_cli_alias_contract_doctor_and_fix_forward_one_to_one() {
     let root_s = root.to_string_lossy().to_string();
     let envs = BTreeMap::new();
 
-    let canonical_doctor = common::run_ocl_cli(&["perm", "doctor", &root_s], &envs);
-    let alias_doctor = common::run_ocl_cli(&["doctor", &root_s], &envs);
+    let canonical_doctor = common::run_ocp_cli(&["perm", "doctor", &root_s], &envs);
+    let alias_doctor = common::run_ocp_cli(&["doctor", &root_s], &envs);
     assert_eq!(
         canonical_doctor.status.code(),
         alias_doctor.status.code(),
@@ -26,8 +26,8 @@ fn v18_cli_alias_contract_doctor_and_fix_forward_one_to_one() {
         "doctor alias stdout must match canonical command"
     );
 
-    let canonical_fix_plan = common::run_ocl_cli(&["perm", "fix", "--plan", &root_s], &envs);
-    let alias_fix_plan = common::run_ocl_cli(&["fix", "--plan", &root_s], &envs);
+    let canonical_fix_plan = common::run_ocp_cli(&["perm", "fix", "--plan", &root_s], &envs);
+    let alias_fix_plan = common::run_ocp_cli(&["fix", "--plan", &root_s], &envs);
     assert_eq!(
         canonical_fix_plan.status.code(),
         alias_fix_plan.status.code(),

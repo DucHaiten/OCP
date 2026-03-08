@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use ocl_sdk::sign_contract_json_v18;
+use ocp_sdk::sign_contract_json_v18;
 use serde_json::json;
 
 #[path = "v19_gate_a_common.rs"]
@@ -42,7 +42,7 @@ fn v19_editor_inventory_sync() {
         }
     }
 
-    let update = std::env::var("OCL_UPDATE_V19_GLOBAL_REQUIRED_CONTRACTS")
+    let update = std::env::var("OCP_UPDATE_V19_GLOBAL_REQUIRED_CONTRACTS")
         .ok()
         .as_deref()
         == Some("1");
@@ -72,12 +72,12 @@ fn v19_editor_inventory_sync() {
         .unwrap_or_else(|_| panic!("sign {}", global_path.display()));
 
     let report = json!({
-        "schema": "ocl.w19.editor_inventory_sync_report.v1",
+        "schema": "ocp.w19.editor_inventory_sync_report.v1",
         "status": "PASS",
         "editor_required_count": editor_required.entries.len(),
         "global_required_count": global_required.entries.len(),
         "global_required_signature_path": sig_path.to_string_lossy().replace('\\', "/"),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("contracts/editor_inventory_sync_report.json", &report);

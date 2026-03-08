@@ -1,8 +1,8 @@
 # Quickstart 02 - Hello CLI
 
 ```bash
-ocl init hello
+ocp init hello
 cd hello
-ocl run
+ocp run
 ```
 

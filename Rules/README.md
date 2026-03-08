@@ -22,12 +22,12 @@ python Rules/guard/guard_repo.py --mode all
 ```
 
 ## Chính sách fail-hard
-- Sai UTF-8 hoặc mojibake trong `AGENTS.md`/`OCP-OCL-MVP-PLAN-v*.md` -> FAIL.
+- Sai UTF-8 hoặc mojibake trong `AGENTS.md`/`OCP-MVP-PLAN-v*.md` -> FAIL.
 - Plan thiếu cấu trúc bắt buộc (`Template`, `Status`, `Operational commands`, `Planning Freeze`, `Implementation Closeout`) -> FAIL.
 - Gate `DONE` nhưng thiếu log `Planning Freeze` hoặc `Implementation Closeout` -> FAIL.
 - Block `Implementation Closeout` thiếu field bắt buộc -> FAIL.
 - Sửa plan quá lớn trong 1 commit (nghi ngờ rewrite/snapshot) -> FAIL.
-  - Override tạm thời: đặt env `OCL_RULES_ALLOW_LARGE_DOC=1`.
+  - Override tạm thời: đặt env `OCP_RULES_ALLOW_LARGE_DOC=1`.
 
 ## Ghi chú
 - Guard này chặn tối đa phần có thể chặn bằng code.

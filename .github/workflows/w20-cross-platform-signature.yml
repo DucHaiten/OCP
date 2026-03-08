@@ -41,7 +41,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: w20-cross-platform-${{ matrix.profile }}
-          path: target/ocl/w20/regression/os
+          path: target/ocp/w20/regression/os
           if-no-files-found: error
 
   aggregate:
@@ -58,7 +58,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: w20-cross-platform-*
-          path: target/ocl/w20/regression/os
+          path: target/ocp/w20/regression/os
           merge-multiple: true
 
       - name: Verify aggregate
@@ -70,5 +70,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: w20-cross-platform-aggregate
-          path: target/ocl/w20/regression/cross_platform_signature_aggregate_report.json
+          path: target/ocp/w20/regression/cross_platform_signature_aggregate_report.json
           if-no-files-found: error

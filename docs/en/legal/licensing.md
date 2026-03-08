@@ -1,7 +1,7 @@
-# Licensing OCP-OCL v1.0
+# Licensing OCP v1.0
 
 This document is for readers who want quick, practical answers to questions such as:
-- Can I use OCP-OCL through the open-source route?
+- Can I use OCP through the open-source route?
 - When do I need to discuss a commercial path?
 - If I contribute to the project, how does that affect later usage and release rights?
 
@@ -12,17 +12,17 @@ It does not replace the `LICENSE` file, a separate commercial agreement, or lega
 
 If you only need the quick conclusion, these are the three most important points:
 
-1. The open-source side of OCP-OCL uses `AGPL-3.0-only`.
+1. The open-source side of OCP uses `AGPL-3.0-only`.
 2. The project follows a `dual-license` model, which means there may be a separate commercial path in addition to the open-source path.
 3. If you contribute to the project, you must go through the CLA flow required by current policy.
 
-## 1) What license does OCP-OCL use?
+## 1) What license does OCP use?
 
-The official open-source license of OCP-OCL is:
+The official open-source license of OCP is:
 - `AGPL-3.0-only`
 
 This point needs to be understood clearly:
-- OCP-OCL does not use a custom-made license instead of AGPL.
+- OCP does not use a custom-made license instead of AGPL.
 - If you see descriptions such as `GGPL`, `governed GPL`, or similar wording elsewhere, treat them as shorthand for the project's philosophy or governance style, not as a legal license name that replaces `AGPL-3.0-only`.
 
 If there is any difference between an explanation and the original license text, the `LICENSE` file at the root of the repo is the primary legal source for the open-source path.
@@ -34,7 +34,7 @@ If there is any difference between an explanation and the original license text,
 It means the project has two distinct licensing paths:
 
 ### 2.1) Open-source path
-You use OCP-OCL under `AGPL-3.0-only`.
+You use OCP under `AGPL-3.0-only`.
 
 ### 2.2) Commercial path
 In some situations, the project may provide a separate commercial license or separate commercial terms outside the open-source path.
@@ -46,7 +46,7 @@ In plain language:
 ## 3) When can I use the open-source path?
 
 In general, you can consider the OSS path if:
-- you accept using OCP-OCL under `AGPL-3.0-only`;
+- you accept using OCP under `AGPL-3.0-only`;
 - you accept the obligations that come with that license;
 - you do not need a separate legal exception;
 - you do not need separately committed support, SLA, warranty, or indemnity terms.
@@ -59,12 +59,12 @@ Common situations that often fit the OSS path:
 
 Important point:
 - the project does not automatically grant exceptions just because you are an individual, a small team, a startup, or “only trying it out”.
-- if you plan to use OCP-OCL through the OSS path in an important context, you should read the `LICENSE` file carefully yourself.
+- if you plan to use OCP through the OSS path in an important context, you should read the `LICENSE` file carefully yourself.
 
 ## 4) When should I move to the commercial path?
 
 You should discuss the commercial path if one or more of the following applies:
-- you want to use or distribute OCP-OCL in a proprietary model;
+- you want to use or distribute OCP in a proprietary model;
 - you need separate legal terms for an organization or company;
 - you need committed support, SLA, warranty, indemnity, or procurement paperwork;
 - you need a clearly documented licensing position for legal, audit, or internal procurement review;
@@ -79,7 +79,7 @@ If that file is not yet complete in a given snapshot, the safe reading is:
 
 ## 5) What is the project not claiming right now?
 
-To avoid misunderstanding, you should not interpret OCP-OCL in any of the following ways unless a separate policy says so clearly:
+To avoid misunderstanding, you should not interpret OCP in any of the following ways unless a separate policy says so clearly:
 - “free for small users, mandatory payment for large users”;
 - “internal use always means you do not need to care about the license”;
 - “every organization must buy a commercial license”;
@@ -149,7 +149,7 @@ If you are making a decision with serious legal or commercial consequences, you 
 ## 9) Conclusion
 
 The simplest safe reading is:
-- OCP-OCL has an open-source path under `AGPL-3.0-only`;
+- OCP has an open-source path under `AGPL-3.0-only`;
 - the project keeps a `dual-license` model;
 - contribution through the CLA flow is a mandatory policy requirement;
 - if you need terms that differ from the OSS path, you must go through the separate commercial path and must not infer those terms on your own.

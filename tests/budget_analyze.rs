@@ -58,7 +58,7 @@ fn budget_analyze_outputs_machine_readable_budget_path() {
     );
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&["budget", "analyze", &artifact_s, "--json"]);
+    let out = common::run_ocp_cli(&["budget", "analyze", &artifact_s, "--json"]);
     let stdout = common::assert_success(&out);
     let parsed: JsonValue = serde_json::from_str(&stdout).expect("parse budget analyze json");
 

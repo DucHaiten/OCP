@@ -12,7 +12,7 @@ from typing import Iterable
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-PLAN_FILE_RE = re.compile(r"^OCP-OCL-MVP-PLAN-v\d+(?:\.\d+)*\.md$", re.IGNORECASE)
+PLAN_FILE_RE = re.compile(r"^OCP-MVP-PLAN-v\d+(?:\.\d+)*\.md$", re.IGNORECASE)
 
 # Keep only high-signal mojibake tokens; avoid broad tokens that can hit valid Vietnamese text.
 MOJIBAKE_PATTERNS = [
@@ -337,7 +337,7 @@ def check_agents_structure(path: Path, text: str) -> list[str]:
 
 
 def check_large_plan_rewrite(path: Path) -> list[str]:
-    if os.environ.get("OCL_RULES_ALLOW_LARGE_DOC", "").strip() == "1":
+    if os.environ.get("OCP_RULES_ALLOW_LARGE_DOC", "").strip() == "1":
         return []
     rel = path.relative_to(REPO_ROOT).as_posix()
     try:
@@ -359,7 +359,7 @@ def check_large_plan_rewrite(path: Path) -> list[str]:
         return [
             (
                 f"{path}: large plan rewrite detected (+{add}/-{delete}). "
-                "Use smaller apply_patch hunks or set OCL_RULES_ALLOW_LARGE_DOC=1 for intentional large updates."
+                "Use smaller apply_patch hunks or set OCP_RULES_ALLOW_LARGE_DOC=1 for intentional large updates."
             )
         ]
     return []
@@ -367,7 +367,7 @@ def check_large_plan_rewrite(path: Path) -> list[str]:
 
 def check_change_scope(candidates: Iterable[Path]) -> list[str]:
     errors: list[str] = []
-    if os.environ.get("OCL_RULES_ALLOW_GENERATED", "").strip() == "1":
+    if os.environ.get("OCP_RULES_ALLOW_GENERATED", "").strip() == "1":
         return errors
     for path in candidates:
         if not path.exists():
@@ -397,7 +397,7 @@ def unique_existing(paths: Iterable[Path]) -> list[Path]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="OCP-OCL Rules Guard")
+    parser = argparse.ArgumentParser(description="OCP Rules Guard")
     parser.add_argument(
         "--mode",
         choices=["changed", "all"],

@@ -18,7 +18,7 @@ fn v20_user_journeys_editor() {
     let connector_steps = v20e::journey_steps(connector);
 
     let expected_editor = vec![
-        "open .ocl file",
+        "open .ocp file",
         "diagnostics realtime",
         "format on save",
         "go to definition",
@@ -43,9 +43,9 @@ fn v20_user_journeys_editor() {
 
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let integration_refs = vec![
-        "target/ocl/w19/rc/os/win-x64/vscode_integration_report.json",
-        "target/ocl/w19/rc/os/linux-x64/vscode_integration_report.json",
-        "target/ocl/w19/rc/os/macos-arm64/vscode_integration_report.json",
+        "target/ocp/w19/rc/os/win-x64/vscode_integration_report.json",
+        "target/ocp/w19/rc/os/linux-x64/vscode_integration_report.json",
+        "target/ocp/w19/rc/os/macos-arm64/vscode_integration_report.json",
     ];
     for rel in &integration_refs {
         let full = repo_root.join(rel);
@@ -56,13 +56,13 @@ fn v20_user_journeys_editor() {
         );
     }
 
-    let integration_cmd = "corepack pnpm --dir editor/vscode/ocp-ocl run test:integration";
+    let integration_cmd = "corepack pnpm --dir editor/vscode/ocp run test:integration";
     let mut hasher = Sha256::new();
     hasher.update(integration_cmd.as_bytes());
     let integration_cmd_digest = format!("{:x}", hasher.finalize());
 
     let report = json!({
-        "schema": "ocl.w20.user_editor_journey_report.v1",
+        "schema": "ocp.w20.user_editor_journey_report.v1",
         "status": "PASS",
         "journeys": [
             {
@@ -87,7 +87,7 @@ fn v20_user_journeys_editor() {
             "vsce_version": run_manifest.get("vsce_version").and_then(serde_json::Value::as_str).unwrap_or("unknown"),
             "ovsx_version": run_manifest.get("ovsx_version").and_then(serde_json::Value::as_str).unwrap_or("unknown")
         },
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20e::run_manifest_sha256()
     });
 

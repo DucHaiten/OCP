@@ -62,7 +62,7 @@ fn v16_perf_baseline_bundle_signature_and_hash_verify() {
     let manifest_raw = fs::read_to_string(&manifest_path).expect("read baseline_manifest.json");
     let manifest: BaselineManifest =
         serde_json::from_str(&manifest_raw).expect("parse baseline_manifest.json");
-    assert_eq!(manifest.schema, "ocl.w16.perf.baseline_manifest.v1");
+    assert_eq!(manifest.schema, "ocp.w16.perf.baseline_manifest.v1");
     assert_eq!(manifest.hasher, "sha256-v1");
     assert_eq!(manifest.baseline_id, "v0.15-line");
     assert!(
@@ -89,7 +89,7 @@ fn v16_perf_baseline_bundle_signature_and_hash_verify() {
     let signature_raw = fs::read_to_string(&signature_path).expect("read baseline_manifest.sig");
     let signature: BaselineSignature =
         serde_json::from_str(&signature_raw).expect("parse baseline_manifest.sig");
-    assert_eq!(signature.schema, "ocl.w16.perf.baseline_manifest.sig.v1");
+    assert_eq!(signature.schema, "ocp.w16.perf.baseline_manifest.sig.v1");
     assert_eq!(signature.hasher, "sha256-v1");
 
     let computed_signature = sha256_hex_file(&manifest_path);
@@ -98,11 +98,11 @@ fn v16_perf_baseline_bundle_signature_and_hash_verify() {
         "baseline manifest signature must match pinned SoT bytes"
     );
 
-    let out_dir = root.join("target").join("ocl").join("w16").join("perf");
+    let out_dir = root.join("target").join("ocp").join("w16").join("perf");
     fs::create_dir_all(&out_dir).expect("create w16 perf output dir");
     let report = json!({
-        "schema": "ocl.w16.perf.baseline_verify.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.perf.baseline_verify.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "baseline_id": manifest.baseline_id,
         "manifest_path": "baselines/v015/baseline_manifest.json",
         "signature_path": "baselines/v015/baseline_manifest.sig",

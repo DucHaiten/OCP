@@ -1,7 +1,7 @@
-# Contributing to OCP-OCL
+# Contributing to OCP
 
 ## Required Workflow
-- Follow the active plan gate in `OCP-OCL-MVP-PLAN-v*.md`.
+- Follow the active plan gate in `OCP-MVP-PLAN-v*.md`.
 - Do not mark a gate `DONE` without targeted tests passing.
 - Keep changes contract-first and evidence-backed.
 
@@ -16,7 +16,7 @@
   - `docs/en/legal/licensing.md`
 
 ## Commercial and OSS Path
-- The OSS side of OCP-OCL is `AGPL-3.0-only`.
+- The OSS side of OCP is `AGPL-3.0-only`.
 - The project keeps a `dual_license` model.
 - If your intended use needs terms beyond the OSS side, read:
   - `docs/vi/legal/commercial.md`

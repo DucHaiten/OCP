@@ -1,0 +1,7 @@
+version=1
+file=src/generated/core_fetch.ocp
+file=src/generated/core_log.ocp
+file=src/generated/mod.ocp
+file=src/main.ocp
+file=tests/smoke.ocp
+dep=std|0.1.0|7578c00340467769

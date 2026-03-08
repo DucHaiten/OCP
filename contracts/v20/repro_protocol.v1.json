@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.repro_protocol.v1",
+  "schema": "ocp.v20.repro_protocol.v1",
   "contract_id": "v20.repro_protocol",
   "version": "v1",
   "clean_build_runs": 2,

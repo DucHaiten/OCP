@@ -1,4 +1,4 @@
-use ocp_ocl::ocp_ocl::{parse_program, typecheck_program, ErrorCode};
+use ocp::ocp::{parse_program, typecheck_program, ErrorCode};
 
 #[test]
 fn type_ctx_schema_accepts_valid_literal_record() {

@@ -1,4 +1,4 @@
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     build_hir_and_hash, canonical_hir_bytes, parse_program, HIR_HASHER_VERSION_V1,
     HIR_SCHEMA_VERSION,
 };

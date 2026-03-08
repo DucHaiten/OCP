@@ -26,7 +26,7 @@ fn has_unqualified_phrase(section: &str, phrase: &str) -> bool {
 
 #[test]
 fn v017_release_positioning_guard_enforces_locked_claims() {
-    let plan_path = PathBuf::from("docs/plans/history/OCP-OCL-MVP-PLAN-v0.17.md");
+    let plan_path = PathBuf::from("docs/plans/history/OCP-MVP-PLAN-v0.17.md");
     let plan_text = w17::read_utf8(&plan_path);
     let positioning =
         extract_markdown_section(&plan_text, "### 8.3 Performance positioning (LOCKED)");
@@ -89,8 +89,8 @@ fn v017_release_positioning_guard_enforces_locked_claims() {
         && behavior_claims_only;
 
     let report = json!({
-        "schema": "ocl.w17.release_positioning_guard_report.v1",
-        "run_manifest_ref": "target/ocl/w17/meta/run_manifest.json",
+        "schema": "ocp.w17.release_positioning_guard_report.v1",
+        "run_manifest_ref": "target/ocp/w17/meta/run_manifest.json",
         "positioning": {
             "required_phrases": required_phrases,
             "missing_required": missing_required,

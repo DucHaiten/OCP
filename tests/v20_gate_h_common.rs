@@ -40,7 +40,7 @@ pub fn write_report(rel_path: &str, report: &JsonValue) {
 pub fn signoff_root() -> PathBuf {
     repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w20")
         .join("signoff")
 }
@@ -101,7 +101,7 @@ pub fn ensure_final_findings_report() -> JsonValue {
         "severity": "MEDIUM",
         "repro_steps_hash": medium_repro,
         "status": "CLOSED",
-        "evidence_packet_ref": "target/ocl/w20/user/dx_friction_budget_report.json"
+        "evidence_packet_ref": "target/ocp/w20/user/dx_friction_budget_report.json"
     });
     let low_entry = json!({
         "finding_id": build_finding_id("docs.release", "wording-polish", &low_repro),
@@ -110,7 +110,7 @@ pub fn ensure_final_findings_report() -> JsonValue {
         "severity": "LOW",
         "repro_steps_hash": low_repro,
         "status": "CLOSED",
-        "evidence_packet_ref": "target/ocl/w20/release/repro_protocol_report.json"
+        "evidence_packet_ref": "target/ocp/w20/release/repro_protocol_report.json"
     });
 
     let severity_groups = json!({
@@ -121,11 +121,11 @@ pub fn ensure_final_findings_report() -> JsonValue {
     });
 
     let report = json!({
-        "schema": "ocl.w20.signoff.final_findings_report.v1",
+        "schema": "ocp.w20.signoff.final_findings_report.v1",
         "status": "PASS",
         "release_blocking_open_count": 0,
         "severity_groups": severity_groups,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_report("signoff/final_findings_report.json", &report);
@@ -157,16 +157,16 @@ pub fn ensure_finding_reclassification_report() -> JsonValue {
         "from_severity": "MEDIUM",
         "to_severity": "LOW",
         "allowed": true,
-        "review_record_ref": "target/ocl/w20/signoff/reclass_review_record.json",
+        "review_record_ref": "target/ocp/w20/signoff/reclass_review_record.json",
         "reclassification_reason_code": "RC-RECLASS-APPROVED-WITH-EVIDENCE"
     });
 
     let report = json!({
-        "schema": "ocl.w20.signoff.finding_reclassification_report.v1",
+        "schema": "ocp.w20.signoff.finding_reclassification_report.v1",
         "status": "PASS",
         "anti_gaming_enforced": true,
         "attempts": [blocked_missing_evidence, allowed_complete],
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_report("signoff/finding_reclassification_report.json", &report);
@@ -177,19 +177,19 @@ fn suite_artifact_path(suite_id: &str) -> PathBuf {
     match suite_id {
         "determinism_replay" => repo_root()
             .join("target")
-            .join("ocl")
+            .join("ocp")
             .join("w20")
             .join("regression")
             .join("history_replay_report.json"),
         "editor_integration" => repo_root()
             .join("target")
-            .join("ocl")
+            .join("ocp")
             .join("w20")
             .join("user")
             .join("editor_journey_report.json"),
         "cross_platform_signature" => repo_root()
             .join("target")
-            .join("ocl")
+            .join("ocp")
             .join("w20")
             .join("regression")
             .join("cross_platform_signature_aggregate_report.json"),
@@ -248,10 +248,10 @@ pub fn ensure_stability_repeat_report() -> JsonValue {
     }
 
     let report = json!({
-        "schema": "ocl.w20.signoff.stability_repeat_report.v1",
+        "schema": "ocp.w20.signoff.stability_repeat_report.v1",
         "status": "PASS",
         "suite_results": suite_results,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_report("signoff/stability_repeat_report.json", &report);
@@ -260,7 +260,7 @@ pub fn ensure_stability_repeat_report() -> JsonValue {
 
 fn release_gate_statuses() -> JsonValue {
     let mut statuses = JsonMap::<String, JsonValue>::new();
-    let root = repo_root().join("target").join("ocl").join("w20");
+    let root = repo_root().join("target").join("ocp").join("w20");
     let checks = [
         (
             "20-A",
@@ -332,8 +332,8 @@ pub fn ensure_final_signoff_bundle() -> (JsonValue, JsonValue) {
         .map(|v| v.as_str().unwrap_or_default().to_string())
         .collect::<Vec<String>>();
 
-    let bundle_rel = "target/ocl/w20/signoff/final_signoff_bundle.json".to_string();
-    let go_rel = "target/ocl/w20/signoff/v1_release_go_no_go.json".to_string();
+    let bundle_rel = "target/ocp/w20/signoff/final_signoff_bundle.json".to_string();
+    let go_rel = "target/ocp/w20/signoff/v1_release_go_no_go.json".to_string();
 
     let mut missing_before = Vec::<String>::new();
     for rel in &required {
@@ -395,7 +395,7 @@ pub fn ensure_final_signoff_bundle() -> (JsonValue, JsonValue) {
     let cross_platform = read_json(
         &repo_root()
             .join("target")
-            .join("ocl")
+            .join("ocp")
             .join("w20")
             .join("regression")
             .join("cross_platform_signature_aggregate_report.json"),
@@ -437,15 +437,15 @@ pub fn ensure_final_signoff_bundle() -> (JsonValue, JsonValue) {
 
     let (supply_chain_summary, deterministic_supply_chain_claim) = supply_chain_mode_summary();
     let bundle_report = json!({
-        "schema": "ocl.w20.signoff.final_signoff_bundle.v1",
+        "schema": "ocp.w20.signoff.final_signoff_bundle.v1",
         "status": "PASS",
         "required_gate_status": gate_statuses,
         "required_gates_all_done": all_gates_done,
         "release_blocking_open_count": open_critical + open_high,
         "required_severity_groups": required_groups,
-        "cross_platform_signature_report_ref": "target/ocl/w20/regression/cross_platform_signature_aggregate_report.json",
-        "stability_repeat_report_ref": "target/ocl/w20/signoff/stability_repeat_report.json",
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "cross_platform_signature_report_ref": "target/ocp/w20/regression/cross_platform_signature_aggregate_report.json",
+        "stability_repeat_report_ref": "target/ocp/w20/signoff/stability_repeat_report.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_report("signoff/final_signoff_bundle.json", &bundle_report);
@@ -458,14 +458,14 @@ pub fn ensure_final_signoff_bundle() -> (JsonValue, JsonValue) {
         };
 
     let go_report = json!({
-        "schema": "ocl.w20.signoff.v1_release_go_no_go.v1",
+        "schema": "ocp.w20.signoff.v1_release_go_no_go.v1",
         "status": "PASS",
         "signal": go_signal,
-        "required_report_ref": "target/ocl/w20/signoff/final_signoff_bundle.json",
+        "required_report_ref": "target/ocp/w20/signoff/final_signoff_bundle.json",
         "release_blocking_open_count": open_critical + open_high,
         "supply_chain_replay_mode_summary": supply_chain_summary,
         "deterministic_supply_chain_replay_claim": deterministic_supply_chain_claim,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_report("signoff/v1_release_go_no_go.json", &go_report);

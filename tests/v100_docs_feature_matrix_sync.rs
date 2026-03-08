@@ -41,12 +41,12 @@ fn v100_docs_feature_matrix_sync() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.docs.feature_matrix_sync_report.v1",
+        "schema": "ocp.w100.docs.feature_matrix_sync_report.v1",
         "status": "PASS",
         "matrix_file": matrix_file,
         "commands_verified": commands_verified,
         "sync_policy": matrix_contract.get("sync_policy").cloned().unwrap_or(JsonValue::Null),
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
     v100d::write_report("docs/feature_matrix_sync_report.json", &report);

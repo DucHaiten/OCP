@@ -49,14 +49,14 @@ fn v20_repro_build_evidence() {
     }
 
     let report = json!({
-        "schema": "ocl.w20.release.reproducibility_report.v1",
+        "schema": "ocp.w20.release.reproducibility_report.v1",
         "status": "PASS",
         "clean_build_runs": clean_build_runs,
         "manifest_byte_equal": true,
         "artifact_sha256_equal": true,
         "manifest_sha256": v20g::sha256_hex_file(&v20g::manifest_path()),
         "artifact_hashes": first_hashes,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20g::run_manifest_sha256()
     });
     v20g::write_report("release/reproducibility_report.json", &report);

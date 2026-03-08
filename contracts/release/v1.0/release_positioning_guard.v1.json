@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.release.positioning_guard.v1",
+  "schema": "ocp.release.positioning_guard.v1",
   "contract_id": "v1.release_positioning_guard",
   "version": "v1",
   "supported_profile_claim": "supported_profile_only",

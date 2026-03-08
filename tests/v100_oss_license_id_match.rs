@@ -33,11 +33,11 @@ fn v100_oss_license_id_match() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.business.oss_license_match_report.v1",
+        "schema": "ocp.w100.business.oss_license_match_report.v1",
         "status": "PASS",
         "oss_license_id": "AGPL-3.0-only",
         "oss_license_file": "LICENSE",
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100g::run_manifest_sha256()
     });
     v100g::write_report("business/oss_license_match_report.json", &report);

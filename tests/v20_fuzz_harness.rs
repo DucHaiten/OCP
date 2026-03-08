@@ -81,7 +81,7 @@ fn v20_fuzz_harness() {
         .expect("fuzz executed cases overflow");
 
     let fuzz_report = json!({
-        "schema": "ocl.w20.hardcore_fuzz_report.v1",
+        "schema": "ocp.w20.hardcore_fuzz_report.v1",
         "status": "PASS",
         "seeds_total": seeds_total,
         "cases_per_seed": cases_per_seed,
@@ -90,20 +90,20 @@ fn v20_fuzz_harness() {
         "executed_cases": executed_cases,
         "crashes_found": 0,
         "crashes_unclassified": 0,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20c::run_manifest_sha256()
     });
     v20c::write_report("hardcore/fuzz_report.json", &fuzz_report);
 
     let crash_corpus_report = json!({
-        "schema": "ocl.w20.hardcore_crash_corpus_report.v1",
+        "schema": "ocp.w20.hardcore_crash_corpus_report.v1",
         "status": "PASS",
         "crash_entries": [],
         "crashes_found": 0,
         "minimized_entries": 0,
         "missing_crash_hash_entries": 0,
         "missing_repro_artifact_entries": 0,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20c::run_manifest_sha256()
     });
     v20c::write_report("hardcore/crash_corpus_report.json", &crash_corpus_report);

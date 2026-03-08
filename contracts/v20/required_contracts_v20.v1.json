@@ -146,6 +146,6 @@
       "version": "v1"
     }
   ],
-  "schema": "ocl.contracts.required_v20.v1",
+  "schema": "ocp.contracts.required_v20.v1",
   "version": "v1"
 }

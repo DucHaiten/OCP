@@ -39,7 +39,7 @@ fn v19_semantic_tokens_golden_matches_expected_stream() {
         .join("fixtures")
         .join("v19")
         .join("lsp")
-        .join("semantic_tokens.ocl");
+        .join("semantic_tokens.ocp");
     let source = fs::read_to_string(&fixture_path)
         .unwrap_or_else(|_| panic!("read {}", fixture_path.display()));
     let actual = tokenize_for_semantic(&source);
@@ -59,7 +59,7 @@ fn v19_semantic_tokens_golden_matches_expected_stream() {
     assert_eq!(actual, expected, "semantic token stream must match golden");
 
     let report = json!({
-        "schema": "ocl.w19.editor.semantic_tokens_golden_report.v1",
+        "schema": "ocp.w19.editor.semantic_tokens_golden_report.v1",
         "status": "PASS",
         "fixture_path": fixture_path.to_string_lossy().replace('\\', "/"),
         "token_count": actual.len(),
@@ -67,7 +67,7 @@ fn v19_semantic_tokens_golden_matches_expected_stream() {
             "lexeme": lexeme,
             "kind": kind
         })).collect::<Vec<_>>(),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("editor/semantic_tokens_golden_report.json", &report);

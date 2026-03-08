@@ -56,7 +56,7 @@ fn v100_docs_language_policy() {
         .unwrap_or(false));
 
     let report = json!({
-        "schema": "ocl.w100.docs.language_policy_report.v1",
+        "schema": "ocp.w100.docs.language_policy_report.v1",
         "status": "PASS",
         "readme_mode": "bilingual_single_file",
         "docs_mode": "split_vi_en",
@@ -64,7 +64,7 @@ fn v100_docs_language_policy() {
         "en_translation_required_for_current_gate": en_required,
         "vi_user_guide": "docs/vi/USER_GUIDE.md",
         "en_user_guide": if en.exists() { JsonValue::String("docs/en/USER_GUIDE.md".to_string()) } else { JsonValue::Null },
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
     v100d::write_report("docs/docs_language_policy_report.json", &report);

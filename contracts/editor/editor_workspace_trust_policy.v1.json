@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.editor.workspace_trust_policy.v1",
+  "schema": "ocp.editor.workspace_trust_policy.v1",
   "contract_id": "editor.editor_workspace_trust_policy",
   "version": "v1",
   "untrusted_mode": {

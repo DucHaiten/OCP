@@ -1,0 +1,114 @@
+schema = "ocp.conformance.manifest.v5"
+
+[[scenario]]
+name = "foundation-workflow-basic"
+path = "projects/ocp/conformance/fixtures/foundation-workflow-basic"
+steps = ["check", "run", "test", "build"]
+expected_status = "pass"
+
+[[scenario]]
+name = "foundation-agent-swarm-basic"
+path = "projects/ocp/conformance/fixtures/foundation-agent-swarm-basic"
+steps = ["check", "run", "test", "build"]
+expected_status = "pass"
+
+[[scenario]]
+name = "foundation-organ-install-noop"
+path = "projects/ocp/conformance/fixtures/foundation-workflow-basic"
+steps = ["organ_install"]
+organ_name = "noop.organ"
+organ_version = "0.1.0"
+expected_status = "pass"
+
+[[scenario]]
+name = "foundation-missing-organs-lock"
+path = "projects/ocp/conformance/fixtures/foundation-missing-organs-lock"
+steps = ["kit_doctor"]
+expected_status = "fail"
+expected_error_code = "V-COSMOS-LOCK-REQUIRED"
+
+[[scenario]]
+name = "foundation-wiring-drift"
+path = "projects/ocp/conformance/fixtures/foundation-wiring-drift"
+steps = ["organ_verify"]
+expected_status = "fail"
+expected_error_code = "V-COSMOS-LOCK-REQUIRED"
+
+[[scenario]]
+name = "core-exec-pass"
+path = "projects/ocp/conformance/fixtures/core-exec-pass"
+lane = "locked_v071"
+steps = ["check", "run"]
+expected_status = "pass"
+expected_signature_file = "../expected/core-exec-pass.signature.txt"
+
+[[scenario]]
+name = "core-type-fail"
+path = "projects/ocp/conformance/fixtures/core-type-fail"
+lane = "locked_v071"
+steps = ["check"]
+expected_status = "fail"
+expected_error_code = "T-TYPE-MISMATCH"
+
+[[scenario]]
+name = "core-parse-fail"
+path = "projects/ocp/conformance/fixtures/core-parse-fail"
+lane = "locked_v071"
+steps = ["check"]
+expected_status = "fail"
+expected_error_code = "P-UNEXPECTED-TOKEN"
+
+[[scenario]]
+name = "core-exec-fail"
+path = "projects/ocp/conformance/fixtures/core-exec-fail"
+lane = "locked_v071"
+steps = ["run"]
+expected_status = "fail"
+expected_error_code = "X-COND-FALSE"
+
+[[scenario]]
+name = "packs-tool-fs-read"
+path = "projects/ocp/conformance/fixtures/packs-tool-fs-read"
+lane = "locked_v071"
+steps = ["check", "run"]
+expected_status = "pass"
+
+[[scenario]]
+name = "packs-consumer-ui"
+path = "projects/ocp/conformance/fixtures/packs-consumer-ui"
+lane = "locked_v071"
+steps = ["check", "run"]
+expected_status = "pass"
+
+[[scenario]]
+name = "shadow-search-rr"
+path = "projects/ocp/conformance/fixtures/shadow-search-rr"
+lane = "locked_v071"
+steps = ["check", "run"]
+expected_status = "pass"
+
+[[scenario]]
+name = "quarantine-wallclock-replay"
+path = "projects/ocp/conformance/fixtures/quarantine-wallclock-replay"
+lane = "quarantine"
+steps = ["replay_artifact"]
+expected_status = "pass"
+expected_signature_file = "../expected/quarantine-wallclock-replay.signature.txt"
+
+[[scenario]]
+name = "supplychain-effective-permissions"
+path = "projects/ocp/conformance/fixtures/supplychain-effective-permissions"
+lane = "locked_v06"
+steps = ["check"]
+expected_status = "pass"
+expected_signature_file = "expected/signature.txt"
+expected_deps_file = "expected/outputs/deps.json"
+expected_permissions_effective_file = "expected/outputs/permissions_effective.json"
+
+[[scenario]]
+name = "cache-core-exec-pass"
+path = "projects/ocp/conformance/fixtures/core-exec-pass"
+lane = "locked_v071"
+steps = ["run"]
+expected_status = "pass"
+expected_signature_file = "../expected/core-exec-pass.signature.txt"

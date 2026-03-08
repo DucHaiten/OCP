@@ -38,12 +38,12 @@ fn v100_installer_signing_identity() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.install.installer_signing_identity_report.v1",
+        "schema": "ocp.w100.install.installer_signing_identity_report.v1",
         "status": "PASS",
         "code_signing_mode": signing_mode,
         "authenticode_expected_subject": subject,
         "authenticode_thumbprint": thumbprint,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100c::run_manifest_sha256()
     });
     v100c::write_report("install/installer_signing_identity_report.json", &report);

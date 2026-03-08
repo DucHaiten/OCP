@@ -29,14 +29,14 @@ fn v100_commercial_terms_pointer_repo_path() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.business.commercial_terms_pointer_report.v1",
+        "schema": "ocp.w100.business.commercial_terms_pointer_report.v1",
         "status": "PASS",
         "commercial_terms_pointer": {
             "vi": vi,
             "en": en
         },
         "repo_internal_only": true,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100g::run_manifest_sha256()
     });
     v100g::write_report("business/commercial_terms_pointer_report.json", &report);

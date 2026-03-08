@@ -1,0 +1,23 @@
+{
+  "schema": "ocp.editor.settings_schema.v1",
+  "contract_id": "editor.ocp_settings_schema",
+  "version": "v1",
+  "settings": {
+    "ocp.laneProfile": {
+      "type": "string",
+      "default": "locked_v071"
+    },
+    "ocp.traceLevel": {
+      "type": "string",
+      "default": "errors"
+    },
+    "ocp.enableSemanticTokens": {
+      "type": "boolean",
+      "default": true
+    },
+    "ocp.serverPath": {
+      "type": "string",
+      "default": ""
+    }
+  }
+}

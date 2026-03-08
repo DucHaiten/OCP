@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.contract.sot_aliases.v1",
+  "schema": "ocp.contract.sot_aliases.v1",
   "contract_id": "v1.sot_aliases",
   "version": "v1",
   "hasher_version": "sha256-v1",

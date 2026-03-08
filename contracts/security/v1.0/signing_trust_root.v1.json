@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.security.signing_trust_root.v1",
+  "schema": "ocp.security.signing_trust_root.v1",
   "contract_id": "v1.signing_trust_root",
   "version": "v1",
   "trust_root_public_keys": [

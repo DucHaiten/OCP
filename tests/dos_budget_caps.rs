@@ -28,7 +28,7 @@ fn cassette_upgrade_respects_max_block_bytes_cap() {
     .expect("write cassette meta");
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&[
+    let out = common::run_ocp_cli(&[
         "cassette",
         "upgrade",
         &artifact_s,

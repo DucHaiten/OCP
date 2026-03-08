@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, Value,
 };
 
@@ -43,7 +43,7 @@ fn temp_fs_root(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    std::env::temp_dir().join(format!("ocl_std_fs_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_std_fs_{tag}_{stamp}"))
 }
 
 fn write_text(path: &Path, content: &str) {
@@ -53,7 +53,7 @@ fn write_text(path: &Path, content: &str) {
     std::fs::write(path, content).expect("write file");
 }
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {
@@ -72,8 +72,8 @@ fn std_fs_read_text_ok_and_stat_not_found_returns_ok_exists_false() {
     let root = temp_fs_root("read_stat");
     write_text(&root.join("data/in.txt"), "hello");
 
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_read_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_READ", "./data/**");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_read_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_READ", "./data/**");
 
     let src = r#"
 observe("std.fs.read_text", "tier2", ctx("path=./data/in.txt"), budget(5)) -> r;
@@ -116,9 +116,9 @@ fn std_fs_read_text_degraded_when_truncated() {
     let root = temp_fs_root("truncate");
     write_text(&root.join("data/in.txt"), "abcdef");
 
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_read_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_READ", "./data/**");
-    let _max_guard = EnvVarGuard::set("OCL_STD_FS_MAX_READ_BYTES", "4");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_read_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_READ", "./data/**");
+    let _max_guard = EnvVarGuard::set("OCP_STD_FS_MAX_READ_BYTES", "4");
 
     let src = r#"
 observe("std.fs.read_text", "tier2", ctx("path=./data/in.txt"), budget(5)) -> r;
@@ -149,8 +149,8 @@ fn std_fs_list_dir_sorted_and_truncated() {
     write_text(&root.join("data/a.txt"), "a");
     write_text(&root.join("data/c.txt"), "c");
 
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_list_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_LIST", "./data/**");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_list_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_LIST", "./data/**");
 
     let src = r#"
 observe("std.fs.list_dir", "tier2", ctx("path=./data;cap=2"), budget(5)) -> l;
@@ -190,8 +190,8 @@ fn std_fs_read_text_denies_path_escape() {
     let root = temp_fs_root("escape");
     std::fs::create_dir_all(&root).expect("create root");
 
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_read_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_READ", "./data/**");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_read_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_READ", "./data/**");
 
     let src = r#"
 observe("std.fs.read_text", "tier2", ctx("path=../secret.txt"), budget(5)) -> r;

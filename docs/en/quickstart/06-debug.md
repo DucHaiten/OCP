@@ -1,7 +1,7 @@
 # Quickstart 06 - Debug
 
 ```bash
-ocl dbg
+ocp dbg
 ```
 
 Use trace output to isolate deterministic failures.

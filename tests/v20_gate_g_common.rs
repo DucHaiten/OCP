@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ocl_sdk::{sign_contract_json_v20, verify_contract_json_signature_v20};
+use ocp_sdk::{sign_contract_json_v20, verify_contract_json_signature_v20};
 use serde_json::{json, Value as JsonValue};
 
 #[path = "v20_gate_a_common.rs"]
@@ -49,7 +49,7 @@ pub fn sha256_hex_file(path: &Path) -> String {
 pub fn release_root() -> PathBuf {
     repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w20")
         .join("release")
 }
@@ -80,18 +80,18 @@ pub fn final_audit_scope() -> JsonValue {
 
 pub fn release_required_artifacts_for_gate_g() -> Vec<&'static str> {
     vec![
-        "target/ocl/w20/meta/run_manifest.json",
-        "target/ocl/w20/contracts/contract_chain_report.json",
-        "target/ocl/w20/contracts/required_contracts_v20_report.json",
-        "target/ocl/w20/regression/history_replay_report.json",
-        "target/ocl/w20/regression/cross_platform_signature_aggregate_report.json",
-        "target/ocl/w20/hardcore/fuzz_report.json",
-        "target/ocl/w20/hardcore/mutation_report.json",
-        "target/ocl/w20/hardcore/chaos_report.json",
-        "target/ocl/w20/user/golden_journeys_report.json",
-        "target/ocl/w20/security/redteam_report.json",
-        "target/ocl/w20/security/cve_gate_report.json",
-        "target/ocl/w20/security/cve_snapshot_report.json",
+        "target/ocp/w20/meta/run_manifest.json",
+        "target/ocp/w20/contracts/contract_chain_report.json",
+        "target/ocp/w20/contracts/required_contracts_v20_report.json",
+        "target/ocp/w20/regression/history_replay_report.json",
+        "target/ocp/w20/regression/cross_platform_signature_aggregate_report.json",
+        "target/ocp/w20/hardcore/fuzz_report.json",
+        "target/ocp/w20/hardcore/mutation_report.json",
+        "target/ocp/w20/hardcore/chaos_report.json",
+        "target/ocp/w20/user/golden_journeys_report.json",
+        "target/ocp/w20/security/redteam_report.json",
+        "target/ocp/w20/security/cve_gate_report.json",
+        "target/ocp/w20/security/cve_snapshot_report.json",
     ]
 }
 
@@ -130,13 +130,13 @@ pub fn manifest_payload_v20() -> (JsonValue, BTreeMap<String, String>) {
     });
 
     let payload = json!({
-        "schema": "ocl.w20.release.v1_rc_manifest.v1",
+        "schema": "ocp.w20.release.v1_rc_manifest.v1",
         "contract_id": "v20.v1_rc_manifest",
         "version": "v1",
         "hasher_version": "sha256-v1",
         "target_release": "v1.0-rc",
-        "toolchain_digest_ref": "target/ocl/w20/meta/run_manifest.json",
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "toolchain_digest_ref": "target/ocp/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "artifacts": artifacts
     });
     (payload, hashes)

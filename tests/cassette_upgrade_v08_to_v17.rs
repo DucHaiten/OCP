@@ -33,7 +33,7 @@ fn cassette_upgrade_v08_to_v17_creates_block_store_layout() {
     seed_v08_cassette(&artifact);
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
+    let out = common::run_ocp_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
     let stdout = common::assert_success(&out);
     let parsed: JsonValue = serde_json::from_str(&stdout).expect("json output");
 
@@ -71,7 +71,7 @@ fn cassette_upgrade_v08_to_v17_creates_block_store_layout() {
     );
     assert!(
         root.join("target")
-            .join("ocl")
+            .join("ocp")
             .join("w17")
             .join("cassette")
             .join("cassette_migration_report.json")

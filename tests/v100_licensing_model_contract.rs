@@ -20,7 +20,7 @@ fn v100_licensing_model_contract() {
             .get("schema")
             .and_then(JsonValue::as_str)
             .unwrap_or(""),
-        "ocl.business.licensing_model.v1"
+        "ocp.business.licensing_model.v1"
     );
     assert_eq!(
         contract
@@ -61,7 +61,7 @@ fn v100_licensing_model_contract() {
     assert!(pointer.contains_key("vi") && pointer.contains_key("en"));
 
     let report = json!({
-        "schema": "ocl.w100.business.licensing_model_report.v1",
+        "schema": "ocp.w100.business.licensing_model_report.v1",
         "status": "PASS",
         "model": "dual_license",
         "oss_license_id": "AGPL-3.0-only",
@@ -71,7 +71,7 @@ fn v100_licensing_model_contract() {
             "vi": pointer.get("vi").and_then(JsonValue::as_str).unwrap_or(""),
             "en": pointer.get("en").and_then(JsonValue::as_str).unwrap_or("")
         },
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100g::run_manifest_sha256()
     });
     v100g::write_report("business/licensing_model_report.json", &report);

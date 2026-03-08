@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.release_gate_v1_0.v1",
+  "schema": "ocp.v20.release_gate_v1_0.v1",
   "contract_id": "v20.release_gate_v1_0",
   "version": "v1",
   "required_gate_status": [
@@ -13,5 +13,5 @@
     "20-H"
   ],
   "required_go_signal": "GO",
-  "required_report": "target/ocl/w20/signoff/v1_release_go_no_go.json"
+  "required_report": "target/ocp/w20/signoff/v1_release_go_no_go.json"
 }

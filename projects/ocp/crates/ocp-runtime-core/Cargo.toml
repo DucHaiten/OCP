@@ -1,0 +1,13 @@
+[package]
+name = "ocp-runtime-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["DucHaiten"]
+license = "AGPL-3.0-only"
+
+[lib]
+name = "ocp_runtime_core"
+path = "src/lib.rs"
+
+[dependencies]
+ocp = { path = "../../../../" }

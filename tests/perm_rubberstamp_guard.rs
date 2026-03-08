@@ -13,7 +13,7 @@ fn v17_perm_rubberstamp_guard_is_strict_in_locked_v071_and_warn_only_in_locked_v
 
     let strict_root_s = strict_root.to_string_lossy().to_string();
     let strict_output =
-        w17_perm_common::run_ocl_cli(&["perm", "doctor", &strict_root_s], &BTreeMap::new());
+        w17_perm_common::run_ocp_cli(&["perm", "doctor", &strict_root_s], &BTreeMap::new());
     assert!(
         !strict_output.status.success(),
         "locked_v071 must reject wildcard permission pattern"
@@ -25,12 +25,12 @@ fn v17_perm_rubberstamp_guard_is_strict_in_locked_v071_and_warn_only_in_locked_v
 
     let compat_root_s = compat_root.to_string_lossy().to_string();
     let compat_output =
-        w17_perm_common::run_ocl_cli(&["perm", "doctor", &compat_root_s], &BTreeMap::new());
+        w17_perm_common::run_ocp_cli(&["perm", "doctor", &compat_root_s], &BTreeMap::new());
     w17_perm_common::assert_ok(&compat_output, "perm doctor in locked_v06");
 
     let report_path = compat_root
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w17")
         .join("dx")
         .join("dx_friction_report.json");

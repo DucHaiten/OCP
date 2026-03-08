@@ -1,6 +1,6 @@
 # Legal Docs (EN)
 
-This folder contains the public-facing legal interpretation docs for the OCP-OCL v1.0 release.
+This folder contains the public-facing legal interpretation docs for the OCP v1.0 release.
 
 This tree is written for readers who need to answer practical questions quickly:
 - what the OSS license is;

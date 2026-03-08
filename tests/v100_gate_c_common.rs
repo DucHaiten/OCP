@@ -34,7 +34,7 @@ pub fn write_report(rel_path: &str, report: &JsonValue) {
     }
     let out = repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w100")
         .join(rel_path);
     write_json_pretty(&out, report)
@@ -51,7 +51,7 @@ pub fn release_root() -> PathBuf {
 pub fn install_root() -> PathBuf {
     repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w100")
         .join("install")
 }
@@ -90,11 +90,11 @@ fn simulated_program_files_dir() -> PathBuf {
     install_root()
         .join("simulated")
         .join("ProgramFiles")
-        .join("OCP-OCL")
+        .join("OCP")
 }
 
 fn simulated_cli_path() -> PathBuf {
-    simulated_program_files_dir().join("ocl.exe")
+    simulated_program_files_dir().join("ocp.exe")
 }
 
 fn simulated_uninstaller_path() -> PathBuf {
@@ -111,7 +111,7 @@ fn ensure_simulated_win_installation() -> JsonValue {
     let installer_name = installer
         .get("installer_filename")
         .and_then(JsonValue::as_str)
-        .unwrap_or("ocl-v1.0.0-setup-win-x64.exe");
+        .unwrap_or("ocp-v1.0.0-setup-win-x64.exe");
     assert!(
         fixture.release_root.join(installer_name).exists(),
         "missing installer asset `{installer_name}`"
@@ -121,12 +121,12 @@ fn ensure_simulated_win_installation() -> JsonValue {
     fs::create_dir_all(&program_dir).expect("create simulated program files dir");
     fs::write(
         simulated_cli_path(),
-        "OCP-OCL CLI simulated binary v1.0.0\n",
+        "OCP CLI simulated binary v1.0.0\n",
     )
-    .expect("write simulated ocl.exe");
+    .expect("write simulated ocp.exe");
     fs::write(
         simulated_uninstaller_path(),
-        "OCP-OCL simulated uninstaller\n",
+        "OCP simulated uninstaller\n",
     )
     .expect("write simulated uninstall.exe");
 
@@ -140,19 +140,19 @@ fn ensure_simulated_win_installation() -> JsonValue {
         .collect::<Vec<String>>();
 
     let next_steps = json!([
-        "If VSCode extension was auto-installed, you can open VSCode and start coding in .ocl files immediately.",
-        "ocl --version",
-        "ocl init hello",
-        "The installer lets the user choose the install directory and confirm whether OCP-OCL should be added to PATH.",
+        "If VSCode extension was auto-installed, you can open VSCode and start coding in .ocp files immediately.",
+        "ocp --version",
+        "ocp init hello",
+        "The installer lets the user choose the install directory and confirm whether OCP should be added to PATH.",
         "If you opt in to PATH, the installer writes to the system PATH because the setup runs elevated.",
-        "If VSCode is detected, the installer may auto-install ocp-ocl-vscode-v1.0.0.vsix.",
+        "If VSCode is detected, the installer may auto-install ocp-vscode-v1.0.0.vsix.",
         "Supported VSCode detection paths: Program Files, LocalAppData, or any absolute code.cmd path returned by `where code.cmd`.",
         "If VSCode auto-install fails, inspect <install-dir>/vscode-extension-install.log.",
-        "Manual fallback: code --install-extension ocp-ocl-vscode-v1.0.0.vsix --force",
+        "Manual fallback: code --install-extension ocp-vscode-v1.0.0.vsix --force",
         "Verify release integrity before production use: docs/vi/security/verify-download.md"
     ]);
     let state = json!({
-        "schema": "ocl.w100.install.simulated_state.v1",
+        "schema": "ocp.w100.install.simulated_state.v1",
         "installed": true,
         "install_dir": program_dir.to_string_lossy().replace('\\', "/"),
         "post_install_checks": post_checks,
@@ -166,14 +166,14 @@ pub fn ensure_win_installer_smoke_report() -> JsonValue {
     ensure_run_manifest();
     let state = ensure_simulated_win_installation();
     let report = json!({
-        "schema": "ocl.w100.install.win_installer_smoke_report.v1",
+        "schema": "ocp.w100.install.win_installer_smoke_report.v1",
         "status": "PASS",
         "installed": true,
-        "installer_asset": "ocl-v1.0.0-setup-win-x64.exe",
+        "installer_asset": "ocp-v1.0.0-setup-win-x64.exe",
         "install_dir": state.get("install_dir").and_then(JsonValue::as_str).unwrap_or_default(),
         "post_install_checks": state.get("post_install_checks").cloned().unwrap_or(JsonValue::Array(Vec::new())),
         "next_steps": state.get("next_steps").cloned().unwrap_or(JsonValue::Array(Vec::new())),
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_report("install/win_installer_smoke_report.json", &report);
@@ -189,12 +189,12 @@ pub fn ensure_win_uninstall_smoke_report() -> JsonValue {
     write_json_pretty(&simulated_install_state_path(), &state);
 
     let report = json!({
-        "schema": "ocl.w100.install.win_uninstall_smoke_report.v1",
+        "schema": "ocp.w100.install.win_uninstall_smoke_report.v1",
         "status": "PASS",
         "uninstalled": true,
         "stale_processes_after_uninstall": 0,
         "uninstall_artifact_present": simulated_uninstaller_path().exists(),
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_report("install/win_uninstall_smoke_report.json", &report);
@@ -231,8 +231,8 @@ pub fn ensure_portable_install_report() -> JsonValue {
             .join(asset.replace(['.', '-'], "_"));
         fs::create_dir_all(&extract_dir).expect("create portable extract dir");
         fs::write(
-            extract_dir.join("ocl"),
-            "OCP-OCL portable simulated binary\n",
+            extract_dir.join("ocp"),
+            "OCP portable simulated binary\n",
         )
         .expect("write portable simulated binary");
         extracted.push(json!({
@@ -243,11 +243,11 @@ pub fn ensure_portable_install_report() -> JsonValue {
     }
 
     let report = json!({
-        "schema": "ocl.w100.install.portable_install_report.v1",
+        "schema": "ocp.w100.install.portable_install_report.v1",
         "status": "PASS",
         "portable_assets": assets,
         "extracted_targets": extracted,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_report("install/portable_install_report.json", &report);

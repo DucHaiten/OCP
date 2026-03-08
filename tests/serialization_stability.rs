@@ -1,4 +1,4 @@
-use ocl_sdk::{canonical_json_string_v17, canonical_json_value_v17};
+use ocp_sdk::{canonical_json_string_v17, canonical_json_value_v17};
 use serde_json::json;
 
 #[test]

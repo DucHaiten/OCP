@@ -2,14 +2,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{init_project, resolve_deps_v3, verify_deps_lock_v3};
+use ocp_sdk::{init_project, resolve_deps_v3, verify_deps_lock_v3};
 
 fn temp_project_dir(tag: &str) -> PathBuf {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v10_lock_resolve_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v10_lock_resolve_{tag}_{stamp}"))
 }
 
 fn write_manifest_for_lock_v3(root: &Path) {
@@ -22,11 +22,11 @@ fn write_manifest_for_lock_v3(root: &Path) {
         "engine_ui_widgets = { name=\"engine-ui-widgets\", version=\"0.3.*\", source=\"registry\" }\n",
         "local_tools = { name=\"local-tools\", version=\"1.*\", source=\"path\" }\n",
     );
-    fs::write(root.join("Ocl.toml"), manifest).expect("write Ocl.toml");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write Ocp.toml");
 }
 
 #[test]
-fn v10_lock_v3_resolve_is_deterministic_and_exports_ocl_lock() {
+fn v10_lock_v3_resolve_is_deterministic_and_exports_ocp_lock() {
     let root = temp_project_dir("det");
     init_project(&root).expect("init");
     write_manifest_for_lock_v3(&root);
@@ -35,7 +35,7 @@ fn v10_lock_v3_resolve_is_deterministic_and_exports_ocl_lock() {
     assert_eq!(run1.deps_resolved, 3);
     assert!(!run1.wrote_legacy_lock_v2);
     assert!(run1.lock_v3_path.exists());
-    assert!(run1.ocl_lock_path.exists());
+    assert!(run1.ocp_lock_path.exists());
 
     let lock_text_1 = fs::read_to_string(&run1.lock_v3_path).expect("read deps.lock.v3 run1");
     assert!(lock_text_1.contains("version=3"));

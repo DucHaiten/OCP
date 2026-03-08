@@ -38,7 +38,7 @@ fn v19_node_supplychain_lock_policy() {
     let lock_path = f19::repo_root()
         .join("editor")
         .join("vscode")
-        .join("ocp-ocl")
+        .join("ocp")
         .join("pnpm-lock.yaml");
     let (lock_present, lock_hash_match, actual_lock_hash) = if lock_path.exists() {
         let bytes = fs::read(&lock_path).expect("read pnpm lock");
@@ -57,7 +57,7 @@ fn v19_node_supplychain_lock_policy() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.release.node_supplychain_report.v1",
+        "schema": "ocp.w19.release.node_supplychain_report.v1",
         "status": "PASS",
         "lock_path": lock_path.to_string_lossy().replace('\\', "/"),
         "lock_present": lock_present,
@@ -65,7 +65,7 @@ fn v19_node_supplychain_lock_policy() {
         "actual_pnpm_lock_hash": actual_lock_hash,
         "node_version": node_version,
         "pnpm_version": pnpm_version,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/node_supplychain_report.json", &report);

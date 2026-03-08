@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.final_audit_scope.v1",
+  "schema": "ocp.v20.final_audit_scope.v1",
   "contract_id": "v20.final_audit_scope",
   "version": "v1",
   "scope": {

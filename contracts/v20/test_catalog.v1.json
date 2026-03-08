@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.test_catalog.v1",
+  "schema": "ocp.v20.test_catalog.v1",
   "contract_id": "v20.test_catalog",
   "version": "v1",
   "policy": {

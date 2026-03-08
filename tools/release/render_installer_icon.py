@@ -27,7 +27,7 @@ def build_icon(size: int = 256) -> Image.Image:
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    out_path = repo_root / "installer" / "windows" / "ocl-installer.ico"
+    out_path = repo_root / "installer" / "windows" / "ocp-installer.ico"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     icon = build_icon()

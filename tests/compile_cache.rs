@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocp_ocl::ocp_ocl::{compile_with_cache, CompileCacheKeyInput, HIR_SCHEMA_VERSION};
+use ocp::ocp::{compile_with_cache, CompileCacheKeyInput, HIR_SCHEMA_VERSION};
 
 fn test_cache_root(name: &str) -> PathBuf {
     let tick = SystemTime::now()
@@ -9,7 +9,7 @@ fn test_cache_root(name: &str) -> PathBuf {
         .expect("clock should be monotonic")
         .as_nanos();
     PathBuf::from("target")
-        .join("ocl")
+        .join("ocp")
         .join("tests")
         .join("compile_cache")
         .join(format!("{name}_{tick}"))
@@ -18,7 +18,7 @@ fn test_cache_root(name: &str) -> PathBuf {
 fn base_key_input() -> CompileCacheKeyInput {
     CompileCacheKeyInput {
         compiler_version: "compiler-v13".to_string(),
-        ocl_version: "ocl-v0.13".to_string(),
+        ocp_version: "ocp-v0.13".to_string(),
         lane_literal: "locked_v071".to_string(),
         lock_hash: "lock_hash_demo".to_string(),
         trust_hash: "trust_hash_demo".to_string(),
@@ -27,7 +27,7 @@ fn base_key_input() -> CompileCacheKeyInput {
         schema_versions_of_packs: "schema_v1".to_string(),
         entry_module_hash: "entry_hash_demo".to_string(),
         source_bundle_hash: "source_bundle_hash_demo".to_string(),
-        cache_toggle_inputs: vec!["OCL_CACHE_PROFILE=default".to_string()],
+        cache_toggle_inputs: vec!["OCP_CACHE_PROFILE=default".to_string()],
     }
 }
 

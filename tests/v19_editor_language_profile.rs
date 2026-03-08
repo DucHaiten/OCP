@@ -9,7 +9,7 @@ fn v19_editor_language_profile_matches_extension_manifest() {
 
     let contract_path = v19::contracts_root()
         .join("editor")
-        .join("ocl_language_profile.v1.json");
+        .join("ocp_language_profile.v1.json");
     let contract = v19::read_json(&contract_path);
     let package = v19::editor_package_json();
 
@@ -17,7 +17,7 @@ fn v19_editor_language_profile_matches_extension_manifest() {
         .get("language_id")
         .and_then(serde_json::Value::as_str)
         .expect("contract language_id");
-    assert_eq!(language_id, "ocp-ocl");
+    assert_eq!(language_id, "ocp");
 
     let contract_ext = v19::sorted_strings_from_json_array(
         contract.get("extensions").expect("contract extensions"),
@@ -36,7 +36,7 @@ fn v19_editor_language_profile_matches_extension_manifest() {
                 .map(|id| id == language_id)
                 .unwrap_or(false)
         })
-        .expect("language entry for ocp-ocl");
+        .expect("language entry for ocp");
 
     let package_ext = v19::sorted_strings_from_json_array(
         lang_entry
@@ -49,12 +49,12 @@ fn v19_editor_language_profile_matches_extension_manifest() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.editor.language_profile_report.v1",
+        "schema": "ocp.w19.editor.language_profile_report.v1",
         "status": "PASS",
         "language_id": language_id,
         "extensions": contract_ext,
         "contract_path": contract_path.to_string_lossy().replace('\\', "/"),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("editor/language_profile_report.json", &report);

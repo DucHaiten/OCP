@@ -33,7 +33,7 @@ fn v100_plan_archive_layout_policy() {
     for entry in std::fs::read_dir(&root).expect("read root") {
         let entry = entry.expect("root entry");
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with("OCP-OCL-MVP-PLAN-v") && name.ends_with(".md") {
+        if name.starts_with("OCP-MVP-PLAN-v") && name.ends_with(".md") {
             root_plans.push(name);
         }
     }
@@ -55,7 +55,7 @@ fn v100_plan_archive_layout_policy() {
     for entry in std::fs::read_dir(&history_root).expect("read history root") {
         let entry = entry.expect("history entry");
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with("OCP-OCL-MVP-PLAN-v0.") && name.ends_with(".md") {
+        if name.starts_with("OCP-MVP-PLAN-v0.") && name.ends_with(".md") {
             history_plans.push(name);
         }
     }
@@ -82,12 +82,12 @@ fn v100_plan_archive_layout_policy() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.docs.plan_archive_layout_report.v1",
+        "schema": "ocp.w100.docs.plan_archive_layout_report.v1",
         "status": "PASS",
         "root_plans": root_plans,
         "history_plan_count": history_plans.len(),
         "plans_index": index_path.to_string_lossy().replace('\\', "/"),
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
     v100d::write_report("docs/plan_archive_layout_report.json", &report);

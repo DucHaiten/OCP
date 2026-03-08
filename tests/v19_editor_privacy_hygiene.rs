@@ -33,18 +33,18 @@ fn v19_editor_privacy_hygiene_policy_blocks_sensitive_tokens() {
     assert!(!forbidden.is_empty(), "forbidden fields must not be empty");
     assert!(!env_dump_allowed, "env_dump_allowed must be false");
 
-    let safe_line = "OCL diagnostics ready for workspace";
+    let safe_line = "OCP diagnostics ready for workspace";
     let unsafe_line = "received auth_token from request";
     assert!(!violates_privacy(safe_line, &forbidden));
     assert!(violates_privacy(unsafe_line, &forbidden));
 
     let report = json!({
-        "schema": "ocl.w19.security.editor_privacy_hygiene_report.v1",
+        "schema": "ocp.w19.security.editor_privacy_hygiene_report.v1",
         "status": "PASS",
         "forbidden_fields_count": forbidden.len(),
         "env_dump_allowed": env_dump_allowed,
         "policy_path": policy_path.to_string_lossy().replace('\\', "/"),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("security/editor_privacy_hygiene_report.json", &report);

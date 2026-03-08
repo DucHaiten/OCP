@@ -9,7 +9,7 @@ fn v18_pack_abi_upgrade_rehearsal_noop_keeps_contract_hash() {
             .get("schema")
             .and_then(serde_json::Value::as_str)
             .unwrap_or(""),
-        "ocl.w18.migration.pack_abi_upgrade_report.v1"
+        "ocp.w18.migration.pack_abi_upgrade_report.v1"
     );
     assert_eq!(
         report.get("no_op").and_then(serde_json::Value::as_bool),

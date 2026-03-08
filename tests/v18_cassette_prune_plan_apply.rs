@@ -11,7 +11,7 @@ fn seed_and_upgrade(artifact: &std::path::Path) {
         &["{\"id\":\"e1\",\"type\":\"wallclock\",\"unix_ms\":1}"],
     );
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
+    let out = common::run_ocp_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
     let _ = common::assert_success(&out);
 }
 
@@ -30,7 +30,7 @@ fn v18_cassette_prune_plan_apply_removes_orphans_and_keeps_indexed_blocks() {
     assert!(orphan_path.exists(), "orphan block must exist before prune");
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let plan = common::run_ocl_cli(&["cassette", "prune", &artifact_s, "--plan", "--json"]);
+    let plan = common::run_ocp_cli(&["cassette", "prune", &artifact_s, "--plan", "--json"]);
     let plan_stdout = common::assert_success(&plan);
     let plan_json: JsonValue = serde_json::from_str(&plan_stdout).expect("parse prune plan");
     let orphan_blocks = plan_json
@@ -45,7 +45,7 @@ fn v18_cassette_prune_plan_apply_removes_orphans_and_keeps_indexed_blocks() {
         "prune plan must include injected orphan block"
     );
 
-    let apply = common::run_ocl_cli(&["cassette", "prune", &artifact_s, "--apply", "--json"]);
+    let apply = common::run_ocp_cli(&["cassette", "prune", &artifact_s, "--apply", "--json"]);
     let apply_stdout = common::assert_success(&apply);
     let apply_json: JsonValue = serde_json::from_str(&apply_stdout).expect("parse prune apply");
     let applied_blocks = apply_json

@@ -1,7 +1,7 @@
 #[path = "w17_gate_c_common.rs"]
 mod w17;
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     canonicalize_env_entries, canonicalize_iteration_paths, parse_supported_platform_profile,
 };
 

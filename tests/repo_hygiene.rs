@@ -27,8 +27,8 @@ fn parse_lines(output: &[u8]) -> Vec<String> {
 fn is_allowed_tracked_artifact(path: &str) -> bool {
     matches!(
         path,
-        "projects/ocp-ocl/apps/composer-demo/target/ocl/composer/cache.v1"
-            | "projects/ocp-ocl/conformance/fixtures/quarantine-wallclock-replay/.ocl_artifacts/conformance.replay/replay.toml"
+        "projects/ocp/apps/composer-demo/target/ocp/composer/cache.v1"
+            | "projects/ocp/conformance/fixtures/quarantine-wallclock-replay/.ocp_artifacts/conformance.replay/replay.toml"
     )
 }
 
@@ -48,8 +48,8 @@ fn v16_repo_hygiene_report_has_no_forbidden_tracked_artifacts_or_secrets() {
         .filter(|path| {
             (path.starts_with("target/")
                 || path.contains("/target/")
-                || path.starts_with(".ocl_artifacts/")
-                || path.contains("/.ocl_artifacts/")
+                || path.starts_with(".ocp_artifacts/")
+                || path.contains("/.ocp_artifacts/")
                 || path.contains("__pycache__"))
                 && !is_allowed_tracked_artifact(path)
         })
@@ -95,13 +95,13 @@ fn v16_repo_hygiene_report_has_no_forbidden_tracked_artifacts_or_secrets() {
 
     let out_dir = repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w16")
         .join("security");
     fs::create_dir_all(&out_dir).expect("create w16 security output dir");
     let report = json!({
-        "schema": "ocl.w16.security.repo_hygiene.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.security.repo_hygiene.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "repo_clean": dirty_entries.is_empty(),
         "dirty_entries_count": dirty_entries.len(),
         "dirty_entries_sample": dirty_entries.iter().take(20).cloned().collect::<Vec<String>>(),

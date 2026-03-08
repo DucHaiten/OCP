@@ -32,10 +32,10 @@ fn v19_editor_docs_presence() {
     }
 
     let report = json!({
-        "schema": "ocl.w19.community.editor_docs_readiness_report.v1",
+        "schema": "ocp.w19.community.editor_docs_readiness_report.v1",
         "status": "PASS",
         "documents": items,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("community/editor_docs_readiness_report.json", &report);

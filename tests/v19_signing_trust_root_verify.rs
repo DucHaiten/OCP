@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::verify_contract_json_signature_v19;
+use ocp_sdk::verify_contract_json_signature_v19;
 use serde_json::json;
 
 #[path = "v19_gate_f_common.rs"]
@@ -65,14 +65,14 @@ fn v19_signing_trust_root_verify_for_release_manifest() {
     assert!(verified.signature_verified);
 
     let report = json!({
-        "schema": "ocl.w19.security.signing_trust_root_report.v1",
+        "schema": "ocp.w19.security.signing_trust_root_report.v1",
         "status": "PASS",
         "trust_contract_path": trust_path.to_string_lossy().replace('\\', "/"),
         "signer": signer,
         "trust_epoch": epoch,
         "source_policy": source_policy,
         "signature_verified": verified.signature_verified,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("security/signing_trust_root_report.json", &report);

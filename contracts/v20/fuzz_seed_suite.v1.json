@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.fuzz_seed_suite.v1",
+  "schema": "ocp.v20.fuzz_seed_suite.v1",
   "contract_id": "v20.fuzz_seed_suite",
   "version": "v1",
   "suite_id": "w20-fuzz-seeds-v1",

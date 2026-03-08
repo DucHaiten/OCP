@@ -54,13 +54,13 @@ fn v100_cla_inbound_outbound_policy() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.business.cla_inbound_outbound_policy_report.v1",
+        "schema": "ocp.w100.business.cla_inbound_outbound_policy_report.v1",
         "status": "PASS",
         "cla_type": "license_grant",
         "inbound": "cla",
         "outbound": "AGPL-3.0-only+commercial",
         "cla_required_for": required_for,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100g::run_manifest_sha256()
     });
     v100g::write_report("business/cla_inbound_outbound_policy_report.json", &report);

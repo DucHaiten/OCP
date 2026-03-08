@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use ocl_sdk::required_bundled_binaries_v19;
+use ocp_sdk::required_bundled_binaries_v19;
 use serde_json::json;
 
 #[path = "v19_gate_f_common.rs"]
@@ -53,12 +53,12 @@ fn v19_bundled_tooling_presence_from_bundle_only() {
     }
 
     let report = json!({
-        "schema": "ocl.w19.release.bundled_tooling_presence_report.v1",
+        "schema": "ocp.w19.release.bundled_tooling_presence_report.v1",
         "status": "PASS",
         "contract_path": contract_path.to_string_lossy().replace('\\', "/"),
         "required_binaries": required,
         "path_dependency_allowed": path_dependency_allowed,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/bundled_tooling_presence_report.json", &report);

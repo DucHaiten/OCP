@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use ocl_sdk::{verify_w17_contract_set_v17, W17_REQUIRED_CONTRACT_FILES};
+use ocp_sdk::{verify_w17_contract_set_v17, W17_REQUIRED_CONTRACT_FILES};
 use serde_json::json;
 
 #[test]
@@ -19,13 +19,13 @@ fn v17_contract_sot_verify_all_required_contracts_and_write_report() {
     );
 
     let out_dir = PathBuf::from("target")
-        .join("ocl")
+        .join("ocp")
         .join("w17")
         .join("contracts");
     fs::create_dir_all(&out_dir).expect("create w17 contracts output dir");
     let report = json!({
-        "schema": "ocl.w17.contract_sot_report.v1",
-        "run_manifest_ref": "target/ocl/w17/meta/run_manifest.json",
+        "schema": "ocp.w17.contract_sot_report.v1",
+        "run_manifest_ref": "target/ocp/w17/meta/run_manifest.json",
         "contracts_root": summary.root.to_string_lossy().replace('\\', "/"),
         "required_count": summary.required_count,
         "verified_count": summary.verified_count,

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{
+use ocp_sdk::{
     init_project, parse_conformance_manifest_v1, run_conformance_v1, ConformanceManifestV1,
     ConformanceRunOptionsV1, ConformanceStepV1,
 };
@@ -26,7 +26,7 @@ fn temp_dir_for_test(tag: &str) -> PathBuf {
 }
 
 fn conformance_v5_path() -> &'static Path {
-    Path::new("projects/ocp-ocl/conformance/conformance.v5.toml")
+    Path::new("projects/ocp/conformance/conformance.v5.toml")
 }
 
 fn subset_manifest<F>(manifest: &ConformanceManifestV1, predicate: F) -> ConformanceManifestV1
@@ -116,12 +116,12 @@ fn run_conformance_reports_signature_mismatch() {
     let root = temp_dir_for_test("run-signature-mismatch");
     let project = root.join("project");
     init_project(&project).expect("init project");
-    let ocl_toml = project.join("Ocl.toml");
-    let mut manifest_text = fs::read_to_string(&ocl_toml).expect("read Ocl.toml");
+    let ocp_toml = project.join("Ocp.toml");
+    let mut manifest_text = fs::read_to_string(&ocp_toml).expect("read Ocp.toml");
     manifest_text.push_str(
         "\n[permissions.package]\nallow = [\"std.log.info\", \"std.fs.read_text\"]\ndeny = []\n",
     );
-    fs::write(&ocl_toml, manifest_text).expect("patch Ocl.toml permissions");
+    fs::write(&ocp_toml, manifest_text).expect("patch Ocp.toml permissions");
 
     let expected_dir = root.join("expected");
     fs::create_dir_all(&expected_dir).expect("create expected dir");
@@ -267,14 +267,14 @@ fn v16_unified_conformance_matrix_generates_report_artifacts() {
         .join("run_manifest.json");
     if !run_manifest_path.exists() {
         let allowed_env_flags = [
-            "OCL_PROFILE",
-            "OCL_CONFORMANCE_DEFAULT",
-            "OCL_CACHE_DISABLE",
-            "OCL_ALLOW_OVERRIDES",
-            "OCL_QUARANTINE",
+            "OCP_PROFILE",
+            "OCP_CONFORMANCE_DEFAULT",
+            "OCP_CACHE_DISABLE",
+            "OCP_ALLOW_OVERRIDES",
+            "OCP_QUARANTINE",
         ];
         let observed_env_flags = std::env::vars()
-            .filter(|(key, _)| key.starts_with("OCL_"))
+            .filter(|(key, _)| key.starts_with("OCP_"))
             .map(|(key, _)| key)
             .collect::<Vec<_>>();
         let run_manifest = v16::build_run_manifest(
@@ -314,9 +314,9 @@ fn v16_unified_conformance_matrix_generates_report_artifacts() {
     }
 
     let unified = json!({
-        "schema": "ocl.w16.conformance.unified.v1",
-        "manifest_path": "projects/ocp-ocl/conformance/conformance.v5.toml",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.conformance.unified.v1",
+        "manifest_path": "projects/ocp/conformance/conformance.v5.toml",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "run_manifest": run_manifest,
         "engine": full_first.engine,
         "runtime_mode": full_first.runtime_mode,
@@ -338,8 +338,8 @@ fn v16_unified_conformance_matrix_generates_report_artifacts() {
     let txt = format!(
         concat!(
             "Unified Conformance Report (v0.16)\n",
-            "manifest: projects/ocp-ocl/conformance/conformance.v5.toml\n",
-            "run_manifest: target/ocl/w16/meta/run_manifest.json\n",
+            "manifest: projects/ocp/conformance/conformance.v5.toml\n",
+            "run_manifest: target/ocp/w16/meta/run_manifest.json\n",
             "engine: {}\n",
             "runtime_mode: {}\n",
             "scenarios_total: {}\n",
@@ -393,14 +393,14 @@ fn v16_unified_conformance_matrix_generates_report_artifacts() {
             .get("schema")
             .and_then(JsonValue::as_str)
             .unwrap_or_default(),
-        "ocl.w16.conformance.unified.v1"
+        "ocp.w16.conformance.unified.v1"
     );
     assert_eq!(
         persisted
             .get("run_manifest_ref")
             .and_then(JsonValue::as_str)
             .unwrap_or_default(),
-        "target/ocl/w16/meta/run_manifest.json"
+        "target/ocp/w16/meta/run_manifest.json"
     );
     assert!(
         persisted

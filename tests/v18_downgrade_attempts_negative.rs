@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::evaluate_downgrade_attempt_v17;
+use ocp_sdk::evaluate_downgrade_attempt_v17;
 use serde_json::json;
 
 #[path = "v18_gate_b_common.rs"]
@@ -24,8 +24,8 @@ fn v18_downgrade_attempts_negative_obey_lane_policy() {
     assert_eq!(unknown.reason_code, "RC-LANE-UNSUPPORTED");
 
     let report = json!({
-        "schema": "ocl.w18.migration.downgrade_attempts_negative.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.migration.downgrade_attempts_negative.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "strict_lane": {
             "allowed": strict.allowed,
             "requires_audit_marker": strict.requires_audit_marker,

@@ -12,21 +12,21 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_cli_tool_v072_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_cli_tool_v072_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 fn list_dirs(path: &Path) -> Vec<PathBuf> {
@@ -47,7 +47,7 @@ fn cli_tool_cli_template_and_golden_flow_pass() {
     let root = temp_project_dir("golden_pass");
     let root_str = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_str, "--template", "tool-cli"]);
+    let init = run_ocp_cli(&["init", &root_str, "--template", "tool-cli"]);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
@@ -55,10 +55,10 @@ fn cli_tool_cli_template_and_golden_flow_pass() {
         String::from_utf8_lossy(&init.stderr)
     );
 
-    assert!(root.join("Ocl.toml").exists(), "missing Ocl.toml");
+    assert!(root.join("Ocp.toml").exists(), "missing Ocp.toml");
     assert!(
-        root.join("src").join("main.ocl").exists(),
-        "missing src/main.ocl"
+        root.join("src").join("main.ocp").exists(),
+        "missing src/main.ocp"
     );
     assert!(root.join("README.md").exists(), "missing README.md");
     assert!(
@@ -76,7 +76,7 @@ fn cli_tool_cli_template_and_golden_flow_pass() {
         "missing fixtures/expected/out.json"
     );
 
-    let test = run_ocl_cli(&[
+    let test = run_ocp_cli(&[
         "test",
         &root_str,
         "--golden",
@@ -90,8 +90,8 @@ fn cli_tool_cli_template_and_golden_flow_pass() {
         String::from_utf8_lossy(&test.stderr)
     );
 
-    let artifacts_root = root.join(".ocl_artifacts");
-    assert!(artifacts_root.exists(), "missing .ocl_artifacts");
+    let artifacts_root = root.join(".ocp_artifacts");
+    assert!(artifacts_root.exists(), "missing .ocp_artifacts");
     let run_dirs = list_dirs(&artifacts_root);
     assert!(!run_dirs.is_empty(), "missing run artifact dir");
     let run_dir = &run_dirs[0];
@@ -135,7 +135,7 @@ fn cli_tool_cli_golden_mismatch_fails() {
     let root = temp_project_dir("golden_fail");
     let root_str = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_str, "--template", "tool-cli"]);
+    let init = run_ocp_cli(&["init", &root_str, "--template", "tool-cli"]);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
@@ -149,7 +149,7 @@ fn cli_tool_cli_golden_mismatch_fails() {
     )
     .expect("write mismatch golden");
 
-    let test = run_ocl_cli(&[
+    let test = run_ocp_cli(&[
         "test",
         &root_str,
         "--golden",

@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::{sign_contract_json_v20, verify_contract_json_signature_v20};
+use ocp_sdk::{sign_contract_json_v20, verify_contract_json_signature_v20};
 use serde_json::json;
 
 #[path = "v20_gate_g_common.rs"]
@@ -41,14 +41,14 @@ fn v20_rollback_rehearsal() {
     assert!(verify.signature_verified, "restored signature must verify");
 
     let report = json!({
-        "schema": "ocl.w20.release.rollback_drill_report.v1",
+        "schema": "ocp.w20.release.rollback_drill_report.v1",
         "status": "PASS",
         "backup_manifest": backup_manifest.to_string_lossy().replace('\\', "/"),
         "backup_signature": backup_sig.to_string_lossy().replace('\\', "/"),
         "restored_hash": restored_hash,
         "original_hash": original_manifest_hash,
         "signature_verified": verify.signature_verified,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20g::run_manifest_sha256()
     });
     v20g::write_report("release/rollback_drill_report.json", &report);

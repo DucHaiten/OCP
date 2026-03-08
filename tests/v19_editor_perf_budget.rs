@@ -35,13 +35,13 @@ fn v19_editor_perf_budget() {
     {
         let entry = item.expect("dir entry");
         let path = entry.path();
-        if path.extension().and_then(|v| v.to_str()) != Some("ocl") {
+        if path.extension().and_then(|v| v.to_str()) != Some("ocp") {
             continue;
         }
         let bytes = fs::read(&path).unwrap_or_else(|_| panic!("read {}", path.display()));
         total_bytes += bytes.len();
     }
-    assert!(total_bytes > 0, "dataset must contain .ocl bytes");
+    assert!(total_bytes > 0, "dataset must contain .ocp bytes");
 
     let mut keystroke_samples = Vec::<u64>::new();
     for i in 0..sample_count {
@@ -93,7 +93,7 @@ fn v19_editor_perf_budget() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.perf.editor_perf_budget_report.v1",
+        "schema": "ocp.w19.perf.editor_perf_budget_report.v1",
         "status": "PASS",
         "dataset_path": dataset_rel,
         "sample_count": sample_count,
@@ -105,7 +105,7 @@ fn v19_editor_perf_budget() {
             "cancelled_requests_max_poll_iterations": cancelled_requests_max_poll_iterations
         },
         "thresholds": thresholds,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19g::run_manifest_sha256()
     });
     v19g::write_report("perf/editor_perf_budget_report.json", &report);

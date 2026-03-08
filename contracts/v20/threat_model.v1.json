@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.threat_model.v1",
+  "schema": "ocp.v20.threat_model.v1",
   "contract_id": "v20.threat_model",
   "version": "v1",
   "threat_model_id": "w20-final-gate-threat-model-v1",

@@ -1,7 +1,7 @@
-# Licensing OCP-OCL v1.0
+# Licensing OCP v1.0
 
 Tài liệu này dành cho người đang muốn trả lời nhanh các câu hỏi thực dụng:
-- Tôi có thể dùng OCP-OCL theo hướng mã nguồn mở không?
+- Tôi có thể dùng OCP theo hướng mã nguồn mở không?
 - Khi nào tôi cần trao đổi theo hướng thương mại?
 - Nếu tôi đóng góp vào dự án thì điều đó ảnh hưởng gì tới quyền sử dụng và phát hành sau này?
 
@@ -12,17 +12,17 @@ Nó không thay thế file `LICENSE`, hợp đồng thương mại riêng, hoặ
 
 Nếu bạn chỉ cần kết luận nhanh, đây là 3 điểm quan trọng nhất:
 
-1. Nhánh mã nguồn mở của OCP-OCL dùng `AGPL-3.0-only`.
+1. Nhánh mã nguồn mở của OCP dùng `AGPL-3.0-only`.
 2. Dự án theo mô hình `dual-license`, tức là ngoài nhánh mã nguồn mở còn có thể có nhánh thương mại riêng.
 3. Nếu bạn đóng góp vào dự án, bạn phải đi qua CLA theo chính sách hiện hành.
 
-## 1) OCP-OCL đang dùng license gì?
+## 1) OCP đang dùng license gì?
 
-License mã nguồn mở chính thức của OCP-OCL là:
+License mã nguồn mở chính thức của OCP là:
 - `AGPL-3.0-only`
 
 Đây là điểm cần hiểu thật rõ:
-- OCP-OCL không dùng một license tự chế thay cho AGPL.
+- OCP không dùng một license tự chế thay cho AGPL.
 - Nếu ở đâu đó có các cụm mô tả như `GGPL`, `governed GPL`, hoặc cách gọi gần nghĩa, hãy hiểu đó là cách nói về triết lý/quản trị dự án, không phải tên license pháp lý thay thế cho `AGPL-3.0-only`.
 
 Nếu có khác biệt giữa lời giải thích và văn bản license gốc, file `LICENSE` ở root repo mới là nguồn pháp lý chính để đọc theo nhánh mã nguồn mở.
@@ -34,7 +34,7 @@ Nếu có khác biệt giữa lời giải thích và văn bản license gốc, 
 Nó có nghĩa là dự án có hai con đường cấp quyền khác nhau:
 
 ### 2.1) Nhánh mã nguồn mở
-Bạn dùng OCP-OCL theo `AGPL-3.0-only`.
+Bạn dùng OCP theo `AGPL-3.0-only`.
 
 ### 2.2) Nhánh thương mại
 Trong một số trường hợp, dự án có thể cung cấp license hoặc điều khoản thương mại riêng, tách khỏi nhánh mã nguồn mở.
@@ -46,7 +46,7 @@ Nói đơn giản:
 ## 3) Khi nào tôi có thể dùng theo nhánh mã nguồn mở?
 
 Thông thường, bạn có thể xem xét dùng theo nhánh OSS nếu:
-- bạn chấp nhận dùng OCP-OCL theo `AGPL-3.0-only`;
+- bạn chấp nhận dùng OCP theo `AGPL-3.0-only`;
 - bạn chấp nhận các nghĩa vụ tương ứng của license đó;
 - bạn không cần ngoại lệ pháp lý riêng;
 - bạn không cần support/SLA/warranty/indemnity được cam kết bằng văn bản riêng.
@@ -59,12 +59,12 @@ Các tình huống thường phù hợp với nhánh OSS:
 
 Điểm quan trọng:
 - dự án không tự động cấp ngoại lệ chỉ vì bạn là cá nhân, nhóm nhỏ, startup, hoặc “mới dùng thử”.
-- nếu bạn định dùng OCP-OCL theo nhánh OSS trong một bối cảnh quan trọng, bạn nên tự đọc kỹ file `LICENSE`.
+- nếu bạn định dùng OCP theo nhánh OSS trong một bối cảnh quan trọng, bạn nên tự đọc kỹ file `LICENSE`.
 
 ## 4) Khi nào tôi nên đi theo nhánh thương mại?
 
 Bạn nên trao đổi theo hướng thương mại nếu rơi vào một hoặc nhiều trường hợp sau:
-- bạn muốn dùng hoặc phân phối OCP-OCL theo mô hình proprietary;
+- bạn muốn dùng hoặc phân phối OCP theo mô hình proprietary;
 - bạn cần điều khoản pháp lý riêng cho tổ chức/doanh nghiệp;
 - bạn cần support cam kết, SLA, warranty, indemnity, hoặc hồ sơ mua sắm;
 - bạn cần một vị thế license rõ ràng cho pháp chế, kiểm toán, hoặc procurement nội bộ;
@@ -79,7 +79,7 @@ Nếu file đó chưa hoàn tất trong snapshot hiện tại, cách hiểu an t
 
 ## 5) Dự án hiện không tuyên bố những gì?
 
-Để tránh hiểu sai, hiện tại bạn không nên tự diễn giải OCP-OCL theo các kiểu sau nếu chưa có tài liệu riêng nói rõ:
+Để tránh hiểu sai, hiện tại bạn không nên tự diễn giải OCP theo các kiểu sau nếu chưa có tài liệu riêng nói rõ:
 - “miễn phí cho nhỏ, bắt buộc trả tiền cho lớn”;
 - “cứ dùng nội bộ là luôn không cần quan tâm tới license”;
 - “mọi tổ chức đều bắt buộc phải mua commercial license”;
@@ -149,7 +149,7 @@ Nếu bạn đang ra quyết định có tác động pháp lý hoặc thương 
 ## 9) Kết luận
 
 Hiểu theo cách đơn giản nhất:
-- OCP-OCL có nhánh mã nguồn mở theo `AGPL-3.0-only`;
+- OCP có nhánh mã nguồn mở theo `AGPL-3.0-only`;
 - dự án giữ mô hình `dual-license`;
 - contribution đi qua CLA là yêu cầu bắt buộc của policy hiện hành;
 - nếu bạn cần điều khoản khác với nhánh OSS, bạn phải đi theo nhánh thương mại riêng, không tự suy diễn.

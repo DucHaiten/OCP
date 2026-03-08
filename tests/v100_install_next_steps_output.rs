@@ -15,12 +15,12 @@ fn v100_install_next_steps_output() {
         .filter_map(|v| v.as_str().map(|s| s.to_string()))
         .collect::<Vec<String>>();
     assert!(
-        steps.iter().any(|s| s.contains("ocl --version")),
-        "next_steps must include `ocl --version`"
+        steps.iter().any(|s| s.contains("ocp --version")),
+        "next_steps must include `ocp --version`"
     );
     assert!(
-        steps.iter().any(|s| s.contains("ocl init hello")),
-        "next_steps must include `ocl init hello`"
+        steps.iter().any(|s| s.contains("ocp init hello")),
+        "next_steps must include `ocp init hello`"
     );
     assert!(
         steps

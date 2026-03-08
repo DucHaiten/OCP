@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::{lsp_definition_locations_v19, lsp_reference_locations_v19};
+use ocp_sdk::{lsp_definition_locations_v19, lsp_reference_locations_v19};
 use serde_json::json;
 
 #[path = "v19_gate_a_common.rs"]
@@ -15,7 +15,7 @@ fn v19_lsp_definition_references_core() {
         .join("fixtures")
         .join("v19")
         .join("lsp")
-        .join("navigation.ocl");
+        .join("navigation.ocp");
     let source = fs::read_to_string(&fixture_path)
         .unwrap_or_else(|_| panic!("read {}", fixture_path.display()));
 
@@ -30,12 +30,12 @@ fn v19_lsp_definition_references_core() {
     assert_eq!(defs[0].line, 1, "helper definition line must be stable");
 
     let report = json!({
-        "schema": "ocl.w19.lsp.navigation_report.v1",
+        "schema": "ocp.w19.lsp.navigation_report.v1",
         "status": "PASS",
         "phase": "definition_references",
         "definitions": defs,
         "references": refs,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("lsp/navigation_report.json", &report);

@@ -50,23 +50,23 @@ fn v100_docs_bilingual_structure_parity() {
 
     if !parity_required {
         let parity = json!({
-            "schema": "ocl.w100.docs.bilingual_structure_parity_report.v1",
+            "schema": "ocp.w100.docs.bilingual_structure_parity_report.v1",
             "status": "DEFERRED",
             "current_translation_stage": policy.get("current_translation_stage").cloned().unwrap_or(JsonValue::Null),
             "reason": "vi-first approval policy: en translation not yet gate-blocking",
-            "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+            "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
             "run_manifest_sha256": v100d::run_manifest_sha256()
         });
         v100d::write_report("docs/docs_bilingual_structure_parity_report.json", &parity);
 
         let manual_review = json!({
-            "schema": "ocl.w100.docs.bilingual_manual_review_record.v1",
+            "schema": "ocp.w100.docs.bilingual_manual_review_record.v1",
             "status": if manual_review_required { "PENDING" } else { "DEFERRED" },
             "review_scope": "vi_to_en_faithful_translation",
             "source_of_truth": "docs/vi/USER_GUIDE.md",
             "target": "docs/en/USER_GUIDE.md",
             "notes": "Translation review opens only after Vietnamese content is approved.",
-            "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+            "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
             "run_manifest_sha256": v100d::run_manifest_sha256()
         });
         v100d::write_report(
@@ -121,26 +121,26 @@ fn v100_docs_bilingual_structure_parity() {
     );
 
     let parity = json!({
-        "schema": "ocl.w100.docs.bilingual_structure_parity_report.v1",
+        "schema": "ocp.w100.docs.bilingual_structure_parity_report.v1",
         "status": "PASS",
         "heading_ids": vi_ids,
         "command_blocks_count": vi_blocks.len(),
         "link_targets_count": vi_links.len(),
         "version_strings": ["v1.0.0"],
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
     v100d::write_report("docs/docs_bilingual_structure_parity_report.json", &parity);
 
     let manual_review = json!({
-        "schema": "ocl.w100.docs.bilingual_manual_review_record.v1",
+        "schema": "ocp.w100.docs.bilingual_manual_review_record.v1",
         "status": "PASS",
         "review_scope": "vi_to_en_faithful_translation",
         "reviewer": "project-owner",
         "source_of_truth": "docs/vi/USER_GUIDE.md",
         "target": "docs/en/USER_GUIDE.md",
         "notes": "Structural parity and command parity verified; terminology reviewed manually.",
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
     v100d::write_report(

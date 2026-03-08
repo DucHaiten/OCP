@@ -50,7 +50,7 @@ pub fn write_release_report(rel_path: &str, report: &JsonValue) {
 pub fn signoff_root() -> PathBuf {
     repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w100")
         .join("signoff")
 }
@@ -101,7 +101,7 @@ fn resolve_present_release_asset(name: &str, release_files: &BTreeSet<String>) -
 
 fn gate_statuses_from_plan() -> BTreeMap<String, String> {
     let mut out = BTreeMap::<String, String>::new();
-    let raw = read_text(&repo_root().join("OCP-OCL-MVP-PLAN-v1.0.md"));
+    let raw = read_text(&repo_root().join("OCP-MVP-PLAN-v1.0.md"));
     for line in raw.lines() {
         let trimmed = line.trim();
         if !trimmed.starts_with("- Gate 1.0-") {
@@ -220,14 +220,14 @@ fn report_status(path: &Path) -> String {
 
 fn required_signoff_artifacts() -> Vec<String> {
     vec![
-        "target/ocl/w100/release/release_artifact_manifest.json".to_string(),
-        "target/ocl/w100/release/release_artifact_manifest.json.sig".to_string(),
-        "target/ocl/w100/release/SHA256SUMS".to_string(),
-        "target/ocl/w100/release/SHA256SUMS.sig".to_string(),
-        "target/ocl/w100/release/publish_rehearsal_report.json".to_string(),
-        "target/ocl/w100/release/publish_signed_assets_scope_report.json".to_string(),
-        "target/ocl/w100/signoff/final_findings_report.json".to_string(),
-        "target/ocl/w100/signoff/go_no_go_filename_contract_report.json".to_string(),
+        "target/ocp/w100/release/release_artifact_manifest.json".to_string(),
+        "target/ocp/w100/release/release_artifact_manifest.json.sig".to_string(),
+        "target/ocp/w100/release/SHA256SUMS".to_string(),
+        "target/ocp/w100/release/SHA256SUMS.sig".to_string(),
+        "target/ocp/w100/release/publish_rehearsal_report.json".to_string(),
+        "target/ocp/w100/release/publish_signed_assets_scope_report.json".to_string(),
+        "target/ocp/w100/signoff/final_findings_report.json".to_string(),
+        "target/ocp/w100/signoff/go_no_go_filename_contract_report.json".to_string(),
     ]
 }
 
@@ -299,7 +299,7 @@ pub fn ensure_publish_signed_assets_scope_report() -> JsonValue {
     missing_disallowed.sort();
 
     let report = json!({
-        "schema": "ocl.w100.signoff.publish_signed_assets_scope_report.v1",
+        "schema": "ocp.w100.signoff.publish_signed_assets_scope_report.v1",
         "status": if missing_disallowed.is_empty() && docs_ok { "PASS" } else { "FAIL" },
         "official_signed_assets_scope": contract_scope_sorted,
         "present_in_release_root": present,
@@ -317,7 +317,7 @@ pub fn ensure_publish_signed_assets_scope_report() -> JsonValue {
             .unwrap_or(JsonValue::Object(JsonMap::new())),
         "docs_scope_checks": doc_checks,
         "release_publish_scope_contract_ref": "contracts/release/v1.0/release_publish_scope.v1.json",
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_release_report("release/publish_signed_assets_scope_report.json", &report);
@@ -345,7 +345,7 @@ pub fn ensure_publish_rehearsal_report() -> JsonValue {
     let scope_report_path = release_root().join("publish_signed_assets_scope_report.json");
 
     let report = json!({
-        "schema": "ocl.w100.signoff.publish_rehearsal_report.v1",
+        "schema": "ocp.w100.signoff.publish_rehearsal_report.v1",
         "status": if all_stage_assets_present
             && report_status(&signature_report_path) == "PASS"
             && report_status(&scope_report_path) == "PASS" {
@@ -362,8 +362,8 @@ pub fn ensure_publish_rehearsal_report() -> JsonValue {
         "staging_required_assets": stage_required,
         "staging_asset_resolution": resolved_stage_assets,
         "staging_required_assets_present": all_stage_assets_present,
-        "publish_signed_assets_scope_report_ref": "target/ocl/w100/release/publish_signed_assets_scope_report.json",
-        "release_artifact_signature_report_ref": "target/ocl/w100/release/release_artifact_signature_report.json",
+        "publish_signed_assets_scope_report_ref": "target/ocp/w100/release/publish_signed_assets_scope_report.json",
+        "release_artifact_signature_report_ref": "target/ocp/w100/release/release_artifact_signature_report.json",
         "release_publish_scope_contract_ref": "contracts/release/v1.0/release_publish_scope.v1.json",
         "source_trust_scope": scope_report
             .get("source_trust_scope")
@@ -373,7 +373,7 @@ pub fn ensure_publish_rehearsal_report() -> JsonValue {
             .get("verification_precedence")
             .cloned()
             .unwrap_or(JsonValue::Object(JsonMap::new())),
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_release_report("release/publish_rehearsal_report.json", &report);
@@ -383,7 +383,7 @@ pub fn ensure_publish_rehearsal_report() -> JsonValue {
 pub fn ensure_final_findings_report() -> JsonValue {
     ensure_run_manifest();
     let report = json!({
-        "schema": "ocl.w100.signoff.final_findings_report.v1",
+        "schema": "ocp.w100.signoff.final_findings_report.v1",
         "status": "PASS",
         "release_blocking_open_count": 0,
         "severity_groups": {
@@ -392,7 +392,7 @@ pub fn ensure_final_findings_report() -> JsonValue {
             "MEDIUM": { "open": 0, "closed": 0, "entries": [] },
             "LOW": { "open": 0, "closed": 0, "entries": [] }
         },
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_signoff_report("signoff/final_findings_report.json", &report);
@@ -401,15 +401,15 @@ pub fn ensure_final_findings_report() -> JsonValue {
 
 pub fn ensure_go_no_go_filename_contract_report() -> JsonValue {
     ensure_run_manifest();
-    let expected_rel = "target/ocl/w100/signoff/v1_0_release_go_no_go.json";
+    let expected_rel = "target/ocp/w100/signoff/v1_0_release_go_no_go.json";
     let expected_filename = "v1_0_release_go_no_go.json";
     let report = json!({
-        "schema": "ocl.w100.signoff.go_no_go_filename_contract_report.v1",
+        "schema": "ocp.w100.signoff.go_no_go_filename_contract_report.v1",
         "status": "PASS",
         "expected_rel_path": expected_rel,
         "expected_filename": expected_filename,
         "filename_matches_contract": true,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_signoff_report("signoff/go_no_go_filename_contract_report.json", &report);
@@ -473,18 +473,18 @@ pub fn ensure_final_signoff_bundle() -> (JsonValue, JsonValue) {
     };
 
     let bundle = json!({
-        "schema": "ocl.w100.signoff.final_signoff_bundle.v1",
+        "schema": "ocp.w100.signoff.final_signoff_bundle.v1",
         "status": bundle_status,
         "prerequisite_gate_status": prerequisite_gate_status,
         "prerequisite_gates_all_done": prerequisite_gates_all_done,
         "release_blocking_open_count": open_critical + open_high,
-        "publish_signed_assets_scope_report_ref": "target/ocl/w100/release/publish_signed_assets_scope_report.json",
-        "publish_rehearsal_report_ref": "target/ocl/w100/release/publish_rehearsal_report.json",
-        "final_findings_report_ref": "target/ocl/w100/signoff/final_findings_report.json",
-        "go_no_go_filename_contract_report_ref": "target/ocl/w100/signoff/go_no_go_filename_contract_report.json",
+        "publish_signed_assets_scope_report_ref": "target/ocp/w100/release/publish_signed_assets_scope_report.json",
+        "publish_rehearsal_report_ref": "target/ocp/w100/release/publish_rehearsal_report.json",
+        "final_findings_report_ref": "target/ocp/w100/signoff/final_findings_report.json",
+        "go_no_go_filename_contract_report_ref": "target/ocp/w100/signoff/go_no_go_filename_contract_report.json",
         "required_artifacts": required_artifacts,
         "missing_required_artifacts": missing,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_signoff_report("signoff/final_signoff_bundle.json", &bundle);
@@ -506,7 +506,7 @@ pub fn ensure_final_signoff_bundle() -> (JsonValue, JsonValue) {
     };
 
     let go_no_go = json!({
-        "schema": "ocl.w100.signoff.v1_0_release_go_no_go.v1",
+        "schema": "ocp.w100.signoff.v1_0_release_go_no_go.v1",
         "status": "PASS",
         "signal": signal,
         "blocking_reasons": blocking_reasons,
@@ -516,8 +516,8 @@ pub fn ensure_final_signoff_bundle() -> (JsonValue, JsonValue) {
         "publish_rehearsal_status": publish_rehearsal.get("status").cloned().unwrap_or(JsonValue::String("UNKNOWN".to_string())),
         "publish_signed_assets_scope_status": publish_scope.get("status").cloned().unwrap_or(JsonValue::String("UNKNOWN".to_string())),
         "go_no_go_filename_contract_status": filename_contract.get("status").cloned().unwrap_or(JsonValue::String("UNKNOWN".to_string())),
-        "required_report_ref": "target/ocl/w100/signoff/final_signoff_bundle.json",
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "required_report_ref": "target/ocp/w100/signoff/final_signoff_bundle.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": run_manifest_sha256()
     });
     write_signoff_report("signoff/v1_0_release_go_no_go.json", &go_no_go);

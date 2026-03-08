@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::init_project;
+use ocp_sdk::init_project;
 use serde_json::json;
 
 pub fn temp_project_dir(tag: &str) -> PathBuf {
@@ -12,7 +12,7 @@ pub fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_nanos();
-    std::env::temp_dir().join(format!("ocl_v17_connector_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v17_connector_{tag}_{stamp}"))
 }
 
 pub fn write_text(path: &Path, content: &str) {
@@ -24,14 +24,14 @@ pub fn write_text(path: &Path, content: &str) {
 
 pub fn init_connector_project(root: &Path, manifest: &str, main_source: &str) {
     init_project(root).expect("init project");
-    write_text(&root.join("Ocl.toml"), manifest);
-    write_text(&root.join("src").join("main.ocl"), main_source);
+    write_text(&root.join("Ocp.toml"), manifest);
+    write_text(&root.join("src").join("main.ocp"), main_source);
 }
 
 pub fn write_gate_f_report() {
     let report = json!({
-        "schema": "ocl.w17.connector_baseline_report.v1",
-        "run_manifest_ref": "target/ocl/w17/meta/run_manifest.json",
+        "schema": "ocp.w17.connector_baseline_report.v1",
+        "run_manifest_ref": "target/ocp/w17/meta/run_manifest.json",
         "connectors": [
             {
                 "connector_id": "std.db.sql",
@@ -52,7 +52,7 @@ pub fn write_gate_f_report() {
     });
 
     let out_dir = PathBuf::from("target")
-        .join("ocl")
+        .join("ocp")
         .join("w17")
         .join("connectors");
     fs::create_dir_all(&out_dir).expect("create connectors output dir");

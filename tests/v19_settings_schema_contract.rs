@@ -9,7 +9,7 @@ fn v19_settings_schema_contract_matches_package_defaults() {
 
     let contract_path = v19::contracts_root()
         .join("editor")
-        .join("ocl_settings_schema.v1.json");
+        .join("ocp_settings_schema.v1.json");
     let contract = v19::read_json(&contract_path);
     let package = v19::editor_package_json();
 
@@ -52,11 +52,11 @@ fn v19_settings_schema_contract_matches_package_defaults() {
     }
 
     let report = json!({
-        "schema": "ocl.w19.editor.settings_schema_report.v1",
+        "schema": "ocp.w19.editor.settings_schema_report.v1",
         "status": "PASS",
         "settings_count": contract_settings.len(),
         "contract_path": contract_path.to_string_lossy().replace('\\', "/"),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("editor/settings_schema_report.json", &report);

@@ -10,7 +10,7 @@ fn v19_release_positioning_guard() {
     let harness = v19g::read_json("contracts/editor/editor_ci_harness.v1.json");
     let publish_channels = v19g::read_json("contracts/editor/editor_publish_channels.v1.json");
     let perf_budget = v19g::read_json("contracts/editor/editor_perf_budget.v1.json");
-    let version_matrix = v19g::read_json("contracts/editor/ocl_version_compat_matrix.v1.json");
+    let version_matrix = v19g::read_json("contracts/editor/ocp_version_compat_matrix.v1.json");
 
     let profiles = harness
         .get("os_profiles")
@@ -63,7 +63,7 @@ fn v19_release_positioning_guard() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.rc.editor_release_readiness_report.v1",
+        "schema": "ocp.w19.rc.editor_release_readiness_report.v1",
         "status": "PASS",
         "positioning_guard": {
             "supported_profiles": profiles,
@@ -72,7 +72,7 @@ fn v19_release_positioning_guard() {
             "unsupported_claims": []
         },
         "compatibility_entries": compatibility_entries,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19g::run_manifest_sha256()
     });
     v19g::write_report("rc/editor_release_readiness_report.json", &report);

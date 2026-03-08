@@ -1,26 +1,26 @@
 {
-  "schema": "ocl.editor.release_manifest.v1",
+  "schema": "ocp.editor.release_manifest.v1",
   "contract_id": "editor.editor_release_manifest",
   "version": "v1",
   "channel": "vscode_marketplace",
-  "vsix_path": "target/ocl/w19/release/ocp-ocl.vsix",
+  "vsix_path": "target/ocp/w19/release/ocp.vsix",
   "vsix_sha256": "__AUTO__",
   "binaries": [
     {
-      "name": "ocl-cli",
-      "path": "target/ocl/w19/release/bin/ocl-cli",
+      "name": "ocp-cli",
+      "path": "target/ocp/w19/release/bin/ocp-cli",
       "sha256": "__AUTO__",
       "signature_status": "required"
     },
     {
-      "name": "ocl-lsp",
-      "path": "target/ocl/w19/release/bin/ocl-lsp",
+      "name": "ocp-lsp",
+      "path": "target/ocp/w19/release/bin/ocp-lsp",
       "sha256": "__AUTO__",
       "signature_status": "required"
     },
     {
-      "name": "ocl-dap",
-      "path": "target/ocl/w19/release/bin/ocl-dap",
+      "name": "ocp-dap",
+      "path": "target/ocp/w19/release/bin/ocp-dap",
       "sha256": "__AUTO__",
       "signature_status": "required"
     }

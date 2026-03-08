@@ -7,7 +7,7 @@ use serde_json::json;
 mod v16;
 
 fn snapshot_path() -> PathBuf {
-    PathBuf::from("projects/ocp-ocl/conformance/expected/contracts/stability_contract_v15.json")
+    PathBuf::from("projects/ocp/conformance/expected/contracts/stability_contract_v15.json")
 }
 
 fn run_manifest_path() -> PathBuf {
@@ -25,7 +25,7 @@ fn stability_contract_snapshot_v15_additive_only() {
     let current = v16::current_stability_snapshot_v15();
     let path = snapshot_path();
 
-    if std::env::var("OCL_UPDATE_V15_CONTRACT_SNAPSHOT")
+    if std::env::var("OCP_UPDATE_V15_CONTRACT_SNAPSHOT")
         .ok()
         .as_deref()
         == Some("1")
@@ -36,7 +36,7 @@ fn stability_contract_snapshot_v15_additive_only() {
         let rendered = serde_json::to_string_pretty(&current).expect("render snapshot");
         fs::write(&path, rendered).expect("write snapshot");
         panic!(
-            "updated {}. Re-run test without OCL_UPDATE_V15_CONTRACT_SNAPSHOT=1",
+            "updated {}. Re-run test without OCP_UPDATE_V15_CONTRACT_SNAPSHOT=1",
             path.display()
         );
     }
@@ -98,9 +98,9 @@ fn stability_contract_snapshot_v15_additive_only() {
     }
 
     let allowed_env_flags = vec![
-        "OCL_QUARANTINE".to_string(),
-        "OCL_ALLOW_OVERRIDES".to_string(),
-        "OCL_TRUST_MODE".to_string(),
+        "OCP_QUARANTINE".to_string(),
+        "OCP_ALLOW_OVERRIDES".to_string(),
+        "OCP_TRUST_MODE".to_string(),
     ];
     let observed_env_flags = Vec::<String>::new();
     let run_manifest =
@@ -124,11 +124,11 @@ fn stability_contract_snapshot_v15_additive_only() {
         "lockfile_sot": current.lockfile_sot,
     });
     let report = json!({
-        "schema": "ocl.contract.freeze.report.v16",
+        "schema": "ocp.contract.freeze.report.v16",
         "status": "PASS",
         "baseline_path": path.to_string_lossy(),
         "snapshot_hash_sha256": v16::sha256_hex_text(&v16::canonical_json_string(&current_value)),
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
     });
 
     let contract_dir = contract_dir();

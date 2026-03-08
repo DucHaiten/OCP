@@ -62,12 +62,12 @@ fn v20_history_toolchain_matrix() {
     }
 
     let report = json!({
-        "schema": "ocl.w20.history_toolchain_matrix_report.v1",
+        "schema": "ocp.w20.history_toolchain_matrix_report.v1",
         "status": "PASS",
         "profile_count": profile_ids.len(),
         "replay_entries_count": entries.len(),
         "matrix_hash_sha256": v20b::sha256_hex_file(&matrix_path),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20b::run_manifest_sha256()
     });
     v20b::write_report("regression/history_toolchain_matrix_report.json", &report);

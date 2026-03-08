@@ -1,9 +1,9 @@
 {
-  "schema": "ocl.release.manifest_schema.v1",
+  "schema": "ocp.release.manifest_schema.v1",
   "contract_id": "v1.release_manifest_schema",
   "version": "v1",
-  "manifest_file": "target/ocl/w100/release/release_artifact_manifest.json",
-  "signature_file": "target/ocl/w100/release/release_artifact_manifest.sig",
+  "manifest_file": "target/ocp/w100/release/release_artifact_manifest.json",
+  "signature_file": "target/ocp/w100/release/release_artifact_manifest.sig",
   "required_top_fields": [
     "schema",
     "contract_id",

@@ -1,4 +1,4 @@
-use ocl_sdk::{evaluate_adapter_cve_policy_v17, AdapterCveSeverityV17};
+use ocp_sdk::{evaluate_adapter_cve_policy_v17, AdapterCveSeverityV17};
 use serde_json::json;
 
 #[path = "v20_gate_f_common.rs"]
@@ -76,7 +76,7 @@ fn v20_cve_gate() {
     );
 
     let report = json!({
-        "schema": "ocl.w20.security.cve_gate_report.v1",
+        "schema": "ocp.w20.security.cve_gate_report.v1",
         "status": "PASS",
         "snapshot_id": snapshot.get("snapshot_id").and_then(serde_json::Value::as_str).unwrap_or("unknown"),
         "source_mode": source_mode,
@@ -103,7 +103,7 @@ fn v20_cve_gate() {
                 "reason_code": quarantine_high.reason_code
             }
         },
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20f::run_manifest_sha256()
     });
     v20f::write_report("security/cve_gate_report.json", &report);

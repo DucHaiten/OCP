@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use ocl_sdk::evaluate_capability_edge_v17;
+use ocp_sdk::evaluate_capability_edge_v17;
 
 #[path = "v18_gate_e_common.rs"]
 mod common;

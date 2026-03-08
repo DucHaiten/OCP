@@ -1,11 +1,11 @@
 use std::sync::{Mutex, OnceLock};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, TraceEvent,
     Value,
 };
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {
@@ -49,8 +49,8 @@ fn std_game_tick_info_uses_fixed_dt_and_tick() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_GAME_ENABLED", "1");
-    let _dt = EnvVarGuard::set("OCL_STD_GAME_FIXED_DT_MS", "20");
+    let _enabled = EnvVarGuard::set("OCP_STD_GAME_ENABLED", "1");
+    let _dt = EnvVarGuard::set("OCP_STD_GAME_FIXED_DT_MS", "20");
 
     let src = r#"
 observe("std.game.tick_info", "tier2", ctx("tick=7"), budget(5)) -> g;
@@ -76,10 +76,10 @@ fn std_game_rng_is_deterministic_and_emits_trace() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_GAME_ENABLED", "1");
-    let _seed = EnvVarGuard::set("OCL_STD_GAME_BASE_SEED", "99");
-    let _streams = EnvVarGuard::set("OCL_STD_GAME_RNG_STREAMS", "main,loot");
-    let _count_cap = EnvVarGuard::set("OCL_STD_GAME_RNG_MAX_COUNT", "8");
+    let _enabled = EnvVarGuard::set("OCP_STD_GAME_ENABLED", "1");
+    let _seed = EnvVarGuard::set("OCP_STD_GAME_BASE_SEED", "99");
+    let _streams = EnvVarGuard::set("OCP_STD_GAME_RNG_STREAMS", "main,loot");
+    let _count_cap = EnvVarGuard::set("OCP_STD_GAME_RNG_MAX_COUNT", "8");
 
     let src = r#"
 observe("std.game.rng", "tier2", ctx("stream=main;count=4;tick=9"), budget(5)) -> r;
@@ -141,8 +141,8 @@ fn std_game_rng_invalid_stream_returns_insufficient() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_GAME_ENABLED", "1");
-    let _streams = EnvVarGuard::set("OCL_STD_GAME_RNG_STREAMS", "main,loot");
+    let _enabled = EnvVarGuard::set("OCP_STD_GAME_ENABLED", "1");
+    let _streams = EnvVarGuard::set("OCP_STD_GAME_RNG_STREAMS", "main,loot");
 
     let src = r#"
 observe("std.game.rng", "tier2", ctx("stream=bad;count=2;tick=1"), budget(5)) -> r;
@@ -161,8 +161,8 @@ fn std_game_state_delta_commit_is_idempotent_for_trace_apply() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_GAME_ENABLED", "1");
-    let _cap = EnvVarGuard::set("OCL_STD_GAME_STATE_DELTA_MAX_BYTES", "256");
+    let _enabled = EnvVarGuard::set("OCP_STD_GAME_ENABLED", "1");
+    let _cap = EnvVarGuard::set("OCP_STD_GAME_STATE_DELTA_MAX_BYTES", "256");
 
     let src = r#"
 observe("std.game.state_delta", "tier2", ctx("idempotency_key=turn-1;delta=hp+1"), budget(5)) -> d;
@@ -199,8 +199,8 @@ fn std_game_state_delta_exceed_cap_returns_deferred() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_GAME_ENABLED", "1");
-    let _cap = EnvVarGuard::set("OCL_STD_GAME_STATE_DELTA_MAX_BYTES", "8");
+    let _enabled = EnvVarGuard::set("OCP_STD_GAME_ENABLED", "1");
+    let _cap = EnvVarGuard::set("OCP_STD_GAME_STATE_DELTA_MAX_BYTES", "8");
 
     let src = r#"
 observe("std.game.state_delta", "tier2", ctx("idempotency_key=turn-2;delta=abcdefghijklmnop"), budget(5)) -> d;

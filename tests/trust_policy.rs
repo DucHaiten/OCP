@@ -2,14 +2,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{check_project_with_lock, init_project, resolve_deps_v3, sync_deps_lock_v1};
+use ocp_sdk::{check_project_with_lock, init_project, resolve_deps_v3, sync_deps_lock_v1};
 
 fn temp_project_dir(tag: &str) -> PathBuf {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v15_trust_policy_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v15_trust_policy_{tag}_{stamp}"))
 }
 
 fn write_manifest_with_dep(root: &Path, lane: &str, source: &str) {
@@ -29,7 +29,7 @@ fn write_manifest_with_dep(root: &Path, lane: &str, source: &str) {
         ),
         lane, source
     );
-    fs::write(root.join("Ocl.toml"), manifest).expect("write Ocl.toml");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write Ocp.toml");
 }
 
 fn prepare_project(root: &Path, lane: &str, source: &str) -> PathBuf {
@@ -37,22 +37,22 @@ fn prepare_project(root: &Path, lane: &str, source: &str) -> PathBuf {
     write_manifest_with_dep(root, lane, source);
     fs::create_dir_all(root.join("deps").join("widgets").join("src")).expect("create dep src");
     fs::write(
-        root.join("deps").join("widgets").join("package.oclp"),
+        root.join("deps").join("widgets").join("package.ocpp"),
         concat!(
             "[package]\n",
             "name = \"engine-ui-widgets\"\n",
             "version = \"0.3.0\"\n",
-            "entry = \"src/widget.ocl\"\n\n",
+            "entry = \"src/widget.ocp\"\n\n",
             "[exports]\n",
             "modules = [\"widget\"]\n"
         ),
     )
-    .expect("write dep package.oclp");
+    .expect("write dep package.ocpp");
     fs::write(
         root.join("deps")
             .join("widgets")
             .join("src")
-            .join("widget.ocl"),
+            .join("widget.ocp"),
         "let ok = true;\ncondition(ok);\n",
     )
     .expect("write dep src");

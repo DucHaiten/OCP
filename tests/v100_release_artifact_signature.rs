@@ -29,11 +29,11 @@ fn v100_release_artifact_signature() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.release.release_artifact_signature_report.v1",
+        "schema": "ocp.w100.release.release_artifact_signature_report.v1",
         "status": "PASS",
         "manifest_signature_verified": manifest_ok,
         "checksums_signature_verified": checksums_ok,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100b::run_manifest_sha256()
     });
     v100b::write_report("release/release_artifact_signature_report.json", &report);

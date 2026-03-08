@@ -1,4 +1,4 @@
-use ocl_sdk::{
+use ocp_sdk::{
     artifact_hash_from_bytes_v17, semantic_hash_from_bytes_v17, W17_ARTIFACT_HASH_VERSION,
     W17_SEMANTIC_HASH_VERSION,
 };

@@ -28,7 +28,7 @@ fn v20_rc_smoke_all_profiles() {
 
     let aggregate_path = v20g::repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w20")
         .join("regression")
         .join("cross_platform_signature_aggregate_report.json");
@@ -66,11 +66,11 @@ fn v20_rc_smoke_all_profiles() {
     }
 
     let report = json!({
-        "schema": "ocl.w20.release.rc_smoke_profiles_report.v1",
+        "schema": "ocp.w20.release.rc_smoke_profiles_report.v1",
         "status": "PASS",
         "required_profiles": required_profiles,
-        "aggregate_report_ref": "target/ocl/w20/regression/cross_platform_signature_aggregate_report.json",
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "aggregate_report_ref": "target/ocp/w20/regression/cross_platform_signature_aggregate_report.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20g::run_manifest_sha256()
     });
     v20g::write_report("release/rc_smoke_profiles_report.json", &report);

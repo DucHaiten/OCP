@@ -9,7 +9,7 @@ fn v18_manifest_schema_upgrade_rehearsal_noop_is_deterministic() {
             .get("schema")
             .and_then(serde_json::Value::as_str)
             .unwrap_or(""),
-        "ocl.w18.migration.manifest_upgrade_report.v1"
+        "ocp.w18.migration.manifest_upgrade_report.v1"
     );
     assert_eq!(
         report.get("no_op").and_then(serde_json::Value::as_bool),

@@ -1,4 +1,4 @@
-use ocl_sdk::verify_contract_json_signature_v20;
+use ocp_sdk::verify_contract_json_signature_v20;
 use serde_json::json;
 
 #[path = "v20_gate_h_common.rs"]
@@ -47,12 +47,12 @@ fn v20_finding_schema_contract() {
     }
 
     let report = json!({
-        "schema": "ocl.w20.signoff.finding_schema_contract_report.v1",
+        "schema": "ocp.w20.signoff.finding_schema_contract_report.v1",
         "status": "PASS",
         "finding_schema_hash": finding_summary.contract_hash_sha256,
         "zero_open_policy_hash": policy_summary.contract_hash_sha256,
         "required_fields_count": required_fields.len(),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20h::run_manifest_sha256()
     });
     v20h::write_report("signoff/finding_schema_contract_report.json", &report);

@@ -1,10 +1,10 @@
 {
     "entries":  [
                     {
-                        "commit_or_tag":  "OCL-v0.1",
+                        "commit_or_tag":  "OCP-v0.1",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.1.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.1.md",
                                                    "sha256":  "9da6a31d8adb4313dcee4106985e123db674c6d33b8c10b17091dd82d2824b62"
                                                }
                                            ],
@@ -12,10 +12,10 @@
                         "version_id":  "v0.1"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.2",
+                        "commit_or_tag":  "OCP-v0.2",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.2.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.2.md",
                                                    "sha256":  "5ab3a78b04b1166518cf0454f63dea96e128c41d205276a057d4df875bc58f64"
                                                }
                                            ],
@@ -23,10 +23,10 @@
                         "version_id":  "v0.2"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.3",
+                        "commit_or_tag":  "OCP-v0.3",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.3.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.3.md",
                                                    "sha256":  "a2d30190329b42d3c591d79aa43313989dcf2421f48c35feefb67cdf6a6f248a"
                                                }
                                            ],
@@ -34,10 +34,10 @@
                         "version_id":  "v0.3"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.4",
+                        "commit_or_tag":  "OCP-v0.4",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.4.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.4.md",
                                                    "sha256":  "67344554fc0d04c9c6a4a2f8c93059c6f7089f43047f37762289f04b9c38fe8b"
                                                }
                                            ],
@@ -45,10 +45,10 @@
                         "version_id":  "v0.4"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.5",
+                        "commit_or_tag":  "OCP-v0.5",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.5.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.5.md",
                                                    "sha256":  "b7903389bdb6df14d644a0d80d699e765cd7d1d7a022be70edb424ed77525ae0"
                                                }
                                            ],
@@ -56,10 +56,10 @@
                         "version_id":  "v0.5"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.6",
+                        "commit_or_tag":  "OCP-v0.6",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.6.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.6.md",
                                                    "sha256":  "c24804112c34226a6eb8da64d25489ab18a752485ccc7bcf5ff9e25aedf1be26"
                                                }
                                            ],
@@ -67,10 +67,10 @@
                         "version_id":  "v0.6"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.7",
+                        "commit_or_tag":  "OCP-v0.7",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.7.1.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.7.1.md",
                                                    "sha256":  "446813587251ec9cc0df21d2e0170babde743698f1b95a65d10844bf27c3ee8a"
                                                }
                                            ],
@@ -78,10 +78,10 @@
                         "version_id":  "v0.7"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.8",
+                        "commit_or_tag":  "OCP-v0.8",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.8.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.8.md",
                                                    "sha256":  "dd1b53744b93edaa59f03ed2093994fb44173a5d0bd916ac8cd8b07854ce4d85"
                                                }
                                            ],
@@ -89,10 +89,10 @@
                         "version_id":  "v0.8"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.9",
+                        "commit_or_tag":  "OCP-v0.9",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.9.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.9.md",
                                                    "sha256":  "dd5961f614c7cd2437b9953f10ea111edc10601cc8c92b4d543ee1769e91807d"
                                                }
                                            ],
@@ -100,10 +100,10 @@
                         "version_id":  "v0.9"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.10",
+                        "commit_or_tag":  "OCP-v0.10",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.10.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.10.md",
                                                    "sha256":  "7de323cc7e6d973b3c1f218422f3f6d0889a1dbe7834559b5499e56b88977a84"
                                                }
                                            ],
@@ -111,10 +111,10 @@
                         "version_id":  "v0.10"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.11",
+                        "commit_or_tag":  "OCP-v0.11",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.11.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.11.md",
                                                    "sha256":  "5f15af08f85fd37b010231947e32e729144a52ac42f220f7180c0df5cc75866f"
                                                }
                                            ],
@@ -122,10 +122,10 @@
                         "version_id":  "v0.11"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.12",
+                        "commit_or_tag":  "OCP-v0.12",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.12.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.12.md",
                                                    "sha256":  "c58c5f03860eb1a4c8b54c47387037b4b7be1c2eecdb699260acf4af94e2964b"
                                                }
                                            ],
@@ -133,10 +133,10 @@
                         "version_id":  "v0.12"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.13",
+                        "commit_or_tag":  "OCP-v0.13",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.13.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.13.md",
                                                    "sha256":  "7739a018e77f922efbf0358c8dd1d4f9bb495ad0a5e62c42aeddd703ce625f60"
                                                }
                                            ],
@@ -144,10 +144,10 @@
                         "version_id":  "v0.13"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.14",
+                        "commit_or_tag":  "OCP-v0.14",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.14.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.14.md",
                                                    "sha256":  "0c9cd1b30b4edc56c66dd8e24e82ac780dbf23ad660a64e3b082704086af580e"
                                                }
                                            ],
@@ -155,10 +155,10 @@
                         "version_id":  "v0.14"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.15",
+                        "commit_or_tag":  "OCP-v0.15",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.15.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.15.md",
                                                    "sha256":  "e3de4d48d6ce9b1b1f8a0ec03d9c4e8109c5d685a7c94c7f174736825ad3d884"
                                                }
                                            ],
@@ -166,10 +166,10 @@
                         "version_id":  "v0.15"
                     },
                     {
-                        "commit_or_tag":  "OCL-v0.20",
+                        "commit_or_tag":  "OCP-v0.20",
                         "evidence_files":  [
                                                {
-                                                   "path":  "docs/plans/history/OCP-OCL-MVP-PLAN-v0.20.md",
+                                                   "path":  "docs/plans/history/OCP-MVP-PLAN-v0.20.md",
                                                    "sha256":  "3667fd0c19534944b10f8cc98404f828de102e7c0a5a84817f0bb0a121e7c314"
                                                }
                                            ],
@@ -178,5 +178,5 @@
                     }
                 ],
     "hasher":  "sha256-v1",
-    "schema":  "ocl.history.evidence.index.v1"
+    "schema":  "ocp.history.evidence.index.v1"
 }

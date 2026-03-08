@@ -1,11 +1,11 @@
-# Hướng Dẫn Sử Dụng OCL v1.0 (VI)
+# Hướng Dẫn Sử Dụng OCP v1.0 (VI)
 
 Tài liệu này là điểm vào chính cho người dùng v1.0.  
 Mục tiêu: đọc một lần, làm được từ A đến Z mà không cần dò nhiều nơi khác.
 
 Phạm vi tài liệu:
 - Cài đặt và xác minh tính toàn vẹn bản phát hành.
-- Học ngôn ngữ OCL từ vỡ lòng đến tự viết được chương trình cơ bản.
+- Học ngôn ngữ OCP từ vỡ lòng đến tự viết được chương trình cơ bản.
 - Dùng CLI theo luồng chuẩn: `init -> lock -> perm -> build/verify attest -> run/replay -> debug`.
 - Vận hành thường ngày: `doctor`, `fix`, `budget analyze`.
 - Lỗi thường gặp và cách khắc phục thực tế.
@@ -26,15 +26,15 @@ Quy ước nhãn ví dụ trong file này:
 - [Lộ trình đọc 1 file duy nhất (A->Z)](#learning-path)
 - [Install](#install)
 - [Quickstart](#quickstart)
-- [Learn OCL](#learn-ocl)
+- [Learn OCP](#learn-ocp)
 - [5 mẫu code bạn sẽ copy nhiều nhất](#copy-patterns)
 - [Manifest mẫu theo template](#template-manifests)
 - [Capability starter pack](#capability-starter-pack)
 - [Language reference ngắn (ví dụ chạy được)](#language-reference-short)
 - [Project mẫu mini-game hoàn chỉnh](#mini-game-project)
 - [Project mẫu tool-http hoàn chỉnh](#tool-http-project)
-- [Language Quickstart (viết code OCL đầu tiên)](#language-quickstart)
-- [Nền tảng cần biết để dùng OCL](#concepts)
+- [Language Quickstart (viết code OCP đầu tiên)](#language-quickstart)
+- [Nền tảng cần biết để dùng OCP](#concepts)
 - [Permissions](#permissions)
 - [Lock Trust Attest](#lock-trust-attest)
 - [Run Replay](#run-replay)
@@ -58,21 +58,21 @@ Quy ước nhãn ví dụ trong file này:
 
 Nếu bạn cần bắt đầu ngay, đi theo thứ tự này:
 1. Cài đặt và verify bản tải (`Install`).
-2. Viết và chạy chương trình đầu tiên (`Learn OCL` + `Language Quickstart`).
+2. Viết và chạy chương trình đầu tiên (`Learn OCP` + `Language Quickstart`).
 3. Chạy flow chuẩn (`Quickstart` -> `Permissions` -> `Lock Trust Attest` -> `Run Replay` -> `Debug`).
 4. Nếu kẹt: xem `Troubleshooting`.
 
 Chuỗi lệnh tối thiểu để chạy một project:
 
 ```bash
-ocl init <project_dir> --template tool-cli
-ocl lock sync <project_dir>
-ocl lock sign <project_dir> --key <keyid>
-ocl lock verify <project_dir> --lock deps.lock.v3
-ocl perm snapshot <project_dir>
-ocl build <project_dir> --attest
-ocl run <project_dir>
-ocl replay <artifact_dir>
+ocp init <project_dir> --template tool-cli
+ocp lock sync <project_dir>
+ocp lock sign <project_dir> --key <keyid>
+ocp lock verify <project_dir> --lock deps.lock.v3
+ocp perm snapshot <project_dir>
+ocp build <project_dir> --attest
+ocp run <project_dir>
+ocp replay <artifact_dir>
 ```
 
 <a id="learning-path"></a>
@@ -81,7 +81,7 @@ ocl replay <artifact_dir>
 Để học đúng thứ tự, không bị ngợp:
 1. `Install` để cài + verify bản tải.
 2. `Quickstart` để chạy project đầu tiên.
-3. `Learn OCL` + `Language Quickstart` để tự viết/sửa `src/main.ocl`.
+3. `Learn OCP` + `Language Quickstart` để tự viết/sửa `src/main.ocp`.
 4. `Nền tảng cần biết` (mục 1..6) để nắm chắc mô hình `observe -> match -> commit`.
 5. `Permissions` -> `Lock Trust Attest` -> `Run Replay` -> `Debug`.
 6. `Troubleshooting` khi gặp lỗi thực tế.
@@ -98,15 +98,15 @@ ocl replay <artifact_dir>
 - Nếu dùng VSCode: cần VSCode để cài VSIX editor extension.
 
 ### 2) Cài đặt trên Windows (installer)
-1. Tải file `ocl-v1.0.0-setup-win-x64.exe` từ GitHub Release chính thức.
+1. Tải file `ocp-v1.0.0-setup-win-x64.exe` từ GitHub Release chính thức.
 2. Chạy installer và chọn:
    - Thư mục cài đặt trên ổ bạn muốn dùng.
-   - Tùy chọn thêm `ocl` vào `PATH` (installer hỏi rõ, khuyến nghị bật).
+   - Tùy chọn thêm `ocp` vào `PATH` (installer hỏi rõ, khuyến nghị bật).
    - Tùy chọn cài VSCode extension ngay nếu installer phát hiện VSCode.
 3. Mở terminal mới, chạy:
 
 ```bash
-ocl --version
+ocp --version
 ```
 
 Nếu lệnh không nhận:
@@ -114,18 +114,18 @@ Nếu lệnh không nhận:
 - Kiểm tra lại `PATH`.
 
 Ghi rõ phạm vi:
-- Installer Windows này dùng icon OCL, cho phép chọn thư mục cài, có xác nhận riêng cho `PATH`, cài `ocl.exe` + `ocl-lsp.exe` + `ocl-dap.exe`, và bundle kèm `ocp-ocl-vscode-v1.0.0.vsix`.
+- Installer Windows này dùng icon OCP, cho phép chọn thư mục cài, có xác nhận riêng cho `PATH`, cài `ocp.exe` + `ocp-lsp.exe` + `ocp-dap.exe`, và bundle kèm `ocp-vscode-v1.0.0.vsix`.
 - Nếu máy có VSCode ở vị trí chuẩn hoặc có `code` CLI, installer sẽ tự cài VSCode extension.
 - Nếu auto-install không chạy, dùng file VSIX đã được cài kèm để cài thủ công ở bước `5) Cài VSCode extension`.
 
 ### 3) Cài đặt portable (Windows/Linux/macOS)
 1. Tải gói portable đúng nền tảng.
 2. Giải nén vào thư mục cố định.
-3. Thêm thư mục chứa binary `ocl` vào `PATH`.
+3. Thêm thư mục chứa binary `ocp` vào `PATH`.
 4. Kiểm tra:
 
 ```bash
-ocl --version
+ocp --version
 ```
 
 ### 4) Kiểm tra tính toàn vẹn bản tải (bắt buộc trước production)
@@ -141,14 +141,14 @@ Quy trình nhanh ngay tại đây:
 3. Verify trust-root trước:
 
 ```bash
-ocl verify --contract-signature contracts/security/v1.0/signing_trust_root.v1.json.sig
+ocp verify --contract-signature contracts/security/v1.0/signing_trust_root.v1.json.sig
 ```
 
 Kết quả mong đợi (ví dụ):
 - `verify contract signature ok (...)`
 
 4. Verify chữ ký file phát hành (`release_artifact_manifest.sig`, `SHA256SUMS.sig`):
-   - kiểm tra `schema = ocl.release.file.sig.v1`,
+   - kiểm tra `schema = ocp.release.file.sig.v1`,
    - `pubkey_id` và `trust_epoch` phải thuộc trust-root ở bước 3,
    - `file_hash_sha256` phải khớp hash thực tế của file tương ứng.
 5. Chỉ cài đặt khi cả hash và signature đều hợp lệ.
@@ -167,9 +167,9 @@ Chi tiết đầy đủ (bao gồm verification precedence): `docs/vi/security/v
 ### 5) Cài VSCode extension
 Nếu bạn dùng VSCode:
 1. Nếu installer đã auto-install extension, chỉ cần mở lại VSCode.
-2. Nếu chưa có extension, tải hoặc dùng file đã được installer cài kèm: `ocp-ocl-vscode-v1.0.0.vsix`.
+2. Nếu chưa có extension, tải hoặc dùng file đã được installer cài kèm: `ocp-vscode-v1.0.0.vsix`.
 3. Cài VSIX trong VSCode.
-4. Mở file `.ocl` để kiểm syntax highlight; workflow editor nâng cao xem ở mục `Editor workflow (VSCode/LSP/DAP)`.
+4. Mở file `.ocp` để kiểm syntax highlight; workflow editor nâng cao xem ở mục `Editor workflow (VSCode/LSP/DAP)`.
 
 ---
 
@@ -179,12 +179,12 @@ Nếu bạn dùng VSCode:
 ### 1) Khởi tạo dự án
 
 ```bash
-ocl init hello --template tool-cli
+ocp init hello --template tool-cli
 cd hello
 ```
 
 Mục đích:
-- Tạo skeleton dự án OCL chuẩn.
+- Tạo skeleton dự án OCP chuẩn.
 - Thiết lập điểm vào để chạy/kiểm tra tiếp theo.
 
 Ghi chú:
@@ -193,9 +193,9 @@ Ghi chú:
 ### 2) Đồng bộ lock trước khi chạy
 
 ```bash
-ocl lock sync <project_dir>
-ocl lock sign <project_dir> --key <keyid>
-ocl lock verify <project_dir> --lock deps.lock.v3
+ocp lock sync <project_dir>
+ocp lock sign <project_dir> --key <keyid>
+ocp lock verify <project_dir> --lock deps.lock.v3
 ```
 
 Mục đích:
@@ -206,9 +206,9 @@ Mục đích:
 ### 3) Chụp và duyệt permission
 
 ```bash
-ocl perm snapshot <project_dir> --out-dir <perm_dir>
-ocl perm diff <old_snapshot> <new_snapshot> --out <diff_report.json> --approval <permissions.approval.toml>
-ocl perm approve <diff_report.json> --approval <permissions.approval.toml> --by <id> --date <YYYY-MM-DD>
+ocp perm snapshot <project_dir> --out-dir <perm_dir>
+ocp perm diff <old_snapshot> <new_snapshot> --out <diff_report.json> --approval <permissions.approval.toml>
+ocp perm approve <diff_report.json> --approval <permissions.approval.toml> --by <id> --date <YYYY-MM-DD>
 ```
 
 Mục đích:
@@ -224,10 +224,10 @@ Chuỗi file khuyến nghị:
 Ví dụ chạy phát ăn ngay:
 
 ```bash
-ocl perm snapshot . --out-dir ./.ocl_perm/baseline
-ocl perm snapshot . --out-dir ./.ocl_perm/current
-ocl perm diff ./.ocl_perm/baseline/permissions.snapshot.json ./.ocl_perm/current/permissions.snapshot.json --out ./.ocl_perm/permission_diff_report.json --approval permissions.approval.toml
-ocl perm approve ./.ocl_perm/permission_diff_report.json --approval permissions.approval.toml --by dev.local --date 2026-03-07
+ocp perm snapshot . --out-dir ./.ocp_perm/baseline
+ocp perm snapshot . --out-dir ./.ocp_perm/current
+ocp perm diff ./.ocp_perm/baseline/permissions.snapshot.json ./.ocp_perm/current/permissions.snapshot.json --out ./.ocp_perm/permission_diff_report.json --approval permissions.approval.toml
+ocp perm approve ./.ocp_perm/permission_diff_report.json --approval permissions.approval.toml --by dev.local --date 2026-03-07
 ```
 
 Gợi ý dùng đúng nhịp:
@@ -239,8 +239,8 @@ Gợi ý dùng đúng nhịp:
 ### 4) Build + verify attest
 
 ```bash
-ocl build <project_dir> --attest
-ocl verify --attest <artifact_dir>
+ocp build <project_dir> --attest
+ocp verify --attest <artifact_dir>
 ```
 
 Mục đích:
@@ -250,8 +250,8 @@ Mục đích:
 ### 5) Chạy và replay
 
 ```bash
-ocl run <project_dir>
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp run <project_dir>
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Mục đích:
@@ -259,12 +259,12 @@ Mục đích:
 - `replay`: tái lập theo đúng artifact run để kiểm determinism/signature.
 
 Gợi ý:
-- Sau `ocl run`, tìm thư mục run mới nhất trong `.ocl_artifacts/` rồi đưa path đó vào `ocl replay`.
+- Sau `ocp run`, tìm thư mục run mới nhất trong `.ocp_artifacts/` rồi đưa path đó vào `ocp replay`.
 
 ### 6) Debug khi có sự cố
 
 ```bash
-ocl dbg <artifact_dir>
+ocp dbg <artifact_dir>
 ```
 
 Mục đích:
@@ -275,11 +275,11 @@ Mục đích:
 Nếu bạn làm tool đọc/ghi file, state cục bộ, hoặc cần test replay ổn định:
 
 ```bash
-ocl init my-tool --template tool-cli
+ocp init my-tool --template tool-cli
 cd my-tool
-ocl test . --golden fixtures/expected --clean
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp test . --golden fixtures/expected --clean
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Mục tiêu:
@@ -291,40 +291,40 @@ Mục tiêu:
 Nếu bạn muốn thử app/game có UI hoặc shadow preview:
 
 ```bash
-ocl init demo-game --template mini-game
-ocl run demo-game
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp init demo-game --template mini-game
+ocp run demo-game
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Hoặc:
 
 ```bash
-ocl init demo-shadow --template shadow-preview
-ocl run demo-shadow --shadow branch-a --shadow-policy forbid_commit
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp init demo-shadow --template shadow-preview
+ocp run demo-shadow --shadow branch-a --shadow-policy forbid_commit
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 ---
 
-<a id="learn-ocl"></a>
-## Learn OCL
+<a id="learn-ocp"></a>
+## Learn OCP
 
-Mục tiêu phần này: sau khi đọc xong, bạn phải tự sửa template và tự dựng được một project OCL nhỏ mà không cần mở thêm file hướng dẫn khác.
+Mục tiêu phần này: sau khi đọc xong, bạn phải tự sửa template và tự dựng được một project OCP nhỏ mà không cần mở thêm file hướng dẫn khác.
 
-### OCL trong 90 giây
-- OCL tách rõ 3 bước:
+### OCP trong 90 giây
+- OCP tách rõ 3 bước:
   1. `observe(...)`: lấy dữ liệu/effect handle từ capability đã cấp quyền.
   2. `match` Result4: quyết định nhánh xử lý.
   3. `commit(...)`: chỉ dùng khi muốn chấp nhận side-effect.
-- OCL không giả định I/O luôn thành công.
+- OCP không giả định I/O luôn thành công.
 - `replay` là bằng chứng tái lập để audit/debug.
 
-### 5 quy tắc để viết được OCL
+### 5 quy tắc để viết được OCP
 1. Muốn đọc dữ liệu ngoài => `observe`.
 2. Sau `observe` luôn `match` theo 4-kind.
 3. Chỉ `commit` ở nhánh policy/lane cho phép.
 4. Gặp `INSUFFICIENT/DEFERRED` => fail-honest (không đi đường tắt).
-5. Sau khi chạy, luôn kiểm lại bằng `ocl replay <artifact_dir>`.
+5. Sau khi chạy, luôn kiểm lại bằng `ocp replay <artifact_dir>`.
 
 ### Baseline cú pháp v1.0 (nhập môn chắc chắn dùng được)
 Đây là baseline nhập môn, không phải đặc tả đầy đủ toàn bộ ngôn ngữ.
@@ -351,8 +351,8 @@ Khi nào nên dùng:
 - Dự án đã có nhiều module hoặc xử lý batch: mở dần các construct trên.
 
 Quy tắc an toàn:
-1. Mỗi lần mở rộng cú pháp, chạy `ocl check <project_dir> --locked`.
-2. Luôn chạy lại `ocl run` + `ocl replay` sau khi refactor logic ngôn ngữ.
+1. Mỗi lần mở rộng cú pháp, chạy `ocp check <project_dir> --locked`.
+2. Luôn chạy lại `ocp run` + `ocp replay` sau khi refactor logic ngôn ngữ.
 
 ### Cú pháp tối thiểu đầy đủ (đủ để tự bắt đầu viết độc lập)
 Đây là phần “tối thiểu nhưng đủ dùng” để bạn không bị kẹt ở chỗ phải đoán cú pháp.
@@ -362,7 +362,7 @@ Trong mục này:
 
 Mẫu cú pháp gọn nhất:
 
-```ocl
+```ocp
 // comment 1 dòng
 module app.demo;
 
@@ -429,19 +429,19 @@ Những quy tắc cú pháp bạn phải nhớ:
 
 Nguyên tắc tra schema:
 - Đây là 5 key phổ biến nhất để bắt đầu.
-- Khi dùng key khác, chạy `ocl doc packs` hoặc `ocl doc packs --json` để xem catalog/schema packs trước khi đoán request.
+- Khi dùng key khác, chạy `ocp doc packs` hoặc `ocp doc packs --json` để xem catalog/schema packs trước khi đoán request.
 - Nếu payload sai shape, runtime/typecheck sẽ báo các lỗi kiểu `RC-CTX-INVALID` hoặc lỗi contract liên quan.
 
-### Chương trình OCL nhỏ nhất
+### Chương trình OCP nhỏ nhất
 
-```ocl
+```ocp
 module app.hello;
 condition(true);
 ```
 
 ### Ví dụ 1: 1 observe + 1 match (không commit)
 
-```ocl
+```ocp
 module app.read_only;
 
 let rd_req = { path: "./fixtures/in/sample.json" };
@@ -463,7 +463,7 @@ Giải thích:
 
 ### Ví dụ 2: 2 bước nối nhau (mkdir -> write_text)
 
-```ocl
+```ocp
 module app.pipeline;
 
 let mk_req = { path: "./out", recursive: true };
@@ -489,7 +489,7 @@ condition(true);
 
 ### Ví dụ 3: đọc input -> ghi report
 
-```ocl
+```ocp
 module app.report;
 
 let rd_req = { path: "./fixtures/in/sample.txt" };
@@ -525,9 +525,9 @@ Giải thích:
 4. `observe`.
 5. `match` 4-kind.
 6. Quyết định nhánh nào được `commit`.
-7. `ocl run <project_dir>`.
-8. `ocl replay <artifact_dir>`.
-9. Nếu fail: `ocl dbg <artifact_dir>`.
+7. `ocp run <project_dir>`.
+8. `ocp replay <artifact_dir>`.
+9. Nếu fail: `ocp dbg <artifact_dir>`.
 
 ### 3 lỗi người mới gặp nhiều nhất
 1. `RC-CTX-INVALID`
@@ -535,7 +535,7 @@ Giải thích:
 - Cách xử lý: đổi sang record typed đúng field.
 
 2. `RC-*-PERMISSION-DENIED`
-- Nguyên nhân: thiếu permission trong `Ocl.toml`.
+- Nguyên nhân: thiếu permission trong `Ocp.toml`.
 - Cách xử lý: snapshot/diff/approve permission đúng workflow.
 
 3. `INSUFFICIENT`
@@ -544,7 +544,7 @@ Giải thích:
 
 ### FAQ người mới
 #### Vì sao không gọi write trực tiếp mà phải observe rồi commit?
-Vì OCL tách “nhìn thấy effect” và “chấp nhận effect” để audit/policy kiểm soát rõ.
+Vì OCP tách “nhìn thấy effect” và “chấp nhận effect” để audit/policy kiểm soát rõ.
 
 #### DEGRADED có được commit không?
 Có thể, nhưng chỉ khi contract capability và policy/lane cho phép. Ở mức nhập môn, mặc định chỉ commit ở nhánh `OK`.
@@ -564,7 +564,7 @@ Khi code đã dài hơn baseline, bạn có thể dùng sugar để giảm boile
 
 Ví dụ:
 
-```ocl
+```ocp
 observe("std.json.parse", "tier2", { text: "{\"ok\":true}" }, budget(5)) -> rs;
 let parsed = try rs else { 0 };
 let reason = try rs else { r.reason_code };
@@ -578,15 +578,15 @@ condition(true);
 
 Nguyên tắc:
 - Sugar phải cho ra semantics tương đương với `match` 4-kind canonical.
-- `std.json.parse` trong ví dụ này chỉ dùng để minh họa sugar trên `Result4`; khi cần request/schema chính xác cho key này, hãy tra `ocl doc packs --json`.
+- `std.json.parse` trong ví dụ này chỉ dùng để minh họa sugar trên `Result4`; khi cần request/schema chính xác cho key này, hãy tra `ocp doc packs --json`.
 - Trong `try r else { ... }`, biến ngầm `r` bên trong khối `else` trỏ tới chính `Result4` gốc; vì vậy `try rs else { r.reason_code }` là cú pháp hợp lệ, không phải typo.
-- Luôn chạy lại `ocl check --locked` + `ocl replay` sau khi refactor sang sugar.
+- Luôn chạy lại `ocp check --locked` + `ocp replay` sau khi refactor sang sugar.
 
 ### Lộ trình thực hành 15 phút
-1. `ocl init hello-ocl --template tool-cli`
-2. Sửa `src/main.ocl` theo Ví dụ 2.
-3. `ocl run .`
-4. `ocl replay ./.ocl_artifacts/<run_id>/`
+1. `ocp init hello-ocp --template tool-cli`
+2. Sửa `src/main.ocp` theo Ví dụ 2.
+3. `ocp run .`
+4. `ocp replay ./.ocp_artifacts/<run_id>/`
 5. Thử cố ý giảm `budget(1)` để thấy `INSUFFICIENT`, rồi sửa lại.
 
 ### 3 bài tập tăng dần để tự tin tự viết
@@ -601,8 +601,8 @@ Yêu cầu:
 3. Ở nhánh `OK`, chỉ cần `condition(true);`.
 
 Đạt khi:
-- `ocl run .` pass.
-- `ocl replay <artifact_dir>` pass.
+- `ocp run .` pass.
+- `ocp replay <artifact_dir>` pass.
 
 #### Bài 2: đọc input rồi ghi report
 Mục tiêu:
@@ -624,9 +624,9 @@ Mục tiêu:
 
 Yêu cầu:
 1. Giảm `budget(5)` xuống `budget(1)` ở một call.
-2. Chạy `ocl run .` để quan sát `INSUFFICIENT` hoặc reason code liên quan.
+2. Chạy `ocp run .` để quan sát `INSUFFICIENT` hoặc reason code liên quan.
 3. Tăng budget lại hoặc giảm phạm vi request.
-4. Chạy lại `ocl run .` và `ocl replay <artifact_dir>`.
+4. Chạy lại `ocp run .` và `ocp replay <artifact_dir>`.
 
 Đạt khi:
 - Bạn nhìn được `reason_code`.
@@ -640,9 +640,9 @@ Nhãn ví dụ:
 
 ```text
 hello-guide/
-  Ocl.toml
+  Ocp.toml
   src/
-    main.ocl
+    main.ocp
   fixtures/
     in/
       sample.json
@@ -650,7 +650,7 @@ hello-guide/
       out.json
 ```
 
-`Ocl.toml` mẫu:
+`Ocp.toml` mẫu:
 
 ```toml
 [package]
@@ -659,7 +659,7 @@ version = "0.1.0"
 
 [project]
 lane = "locked_v071"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [targets]
 default = "main"
@@ -701,9 +701,9 @@ Ghi chú:
 - Nó cố ý cấp đủ nhóm quyền cho ví dụ trong guide, chưa phải cấu hình least-privilege chặt nhất cho production.
 - Khi bắt đầu làm project thật, hãy thu hẹp dần `permissions.*` theo đúng key bạn dùng.
 
-`src/main.ocl` mẫu:
+`src/main.ocp` mẫu:
 
-```ocl
+```ocp
 module app.tool_cli;
 
 let rd_req = { path: "./fixtures/in/sample.json" };
@@ -758,18 +758,18 @@ match kvp {
 ```
 
 Cách chạy:
-1. `ocl check . --locked`
-2. `ocl test . --golden fixtures/expected --clean`
-3. `ocl run .`
-4. `ocl replay ./.ocl_artifacts/<run_id>/`
+1. `ocp check . --locked`
+2. `ocp test . --golden fixtures/expected --clean`
+3. `ocp run .`
+4. `ocp replay ./.ocp_artifacts/<run_id>/`
 
 Kỳ vọng tối thiểu:
 - Có file `./out/out.json` với nội dung JSON hợp lệ, ví dụ `{"status":"OK"}`.
-- Có artifact `.ocl_artifacts/<run_id>/`.
+- Có artifact `.ocp_artifacts/<run_id>/`.
 - Có thể replay lại không lệch signature.
 
 Ghi chú quan trọng:
-- `ocl init --template tool-cli` hiện sinh `src/main.ocl` kiểu compat với `ctx("...")`.
+- `ocp init --template tool-cli` hiện sinh `src/main.ocp` kiểu compat với `ctx("...")`.
 - Trong guide này mình chuyển ngay sang record typed để dạy kiểu viết canonical hơn cho v1.0 user-facing.
 
 <a id="copy-patterns"></a>
@@ -778,7 +778,7 @@ Ghi chú quan trọng:
 
 #### Mẫu 1: đọc file, không commit
 
-```ocl
+```ocp
 let rd_req = { path: "./fixtures/in/sample.json" };
 observe("std.fs.read_text", "tier2", rd_req, budget(5)) -> rd;
 match rd {
@@ -791,7 +791,7 @@ match rd {
 
 #### Mẫu 2: tạo thư mục rồi ghi file
 
-```ocl
+```ocp
 let mk_req = { path: "./out", recursive: true };
 observe("std.fs.mkdir", "tier2", mk_req, budget(5)) -> mk;
 match mk {
@@ -813,7 +813,7 @@ match wr {
 
 #### Mẫu 3: đọc input rồi ghi report
 
-```ocl
+```ocp
 let rd_req = { path: "./fixtures/in/sample.txt" };
 observe("std.fs.read_text", "tier2", rd_req, budget(5)) -> rd;
 match rd {
@@ -835,7 +835,7 @@ match rd {
 
 #### Mẫu 4: ghi state cục bộ bằng KV
 
-```ocl
+```ocp
 let kv_req = { key: "tool.last_run", value: "ok", overwrite: true };
 observe("std.kv.put", "tier2", kv_req, budget(5)) -> kvp;
 match kvp {
@@ -848,7 +848,7 @@ match kvp {
 
 #### Mẫu 5: `guard` và `try ... else`
 
-```ocl
+```ocp
 observe("std.fs.read_text", "tier2", { path: "./fixtures/in/sample.json" }, budget(5)) -> r;
 guard r;
 
@@ -868,12 +868,12 @@ Mẹo dùng nhanh:
 
 <a id="template-manifests"></a>
 ### 11) Manifest mẫu theo template
-Phần này dành cho lúc bạn không chỉ muốn viết `src/main.ocl`, mà còn muốn hiểu ngay template nào kéo theo manifest gì.
+Phần này dành cho lúc bạn không chỉ muốn viết `src/main.ocp`, mà còn muốn hiểu ngay template nào kéo theo manifest gì.
 
 Nguyên tắc:
 - Các manifest dưới đây bám theo template CLI hiện đang có trong repo.
 - Đây là mẫu khởi động/onboarding, không phải profile least-privilege chặt nhất cho production.
-- Nếu bạn chỉnh template hoặc runtime line sau này, luôn kiểm tra lại bằng `ocl init ... --template ...` và `ocl check --locked`.
+- Nếu bạn chỉnh template hoặc runtime line sau này, luôn kiểm tra lại bằng `ocp init ... --template ...` và `ocp check --locked`.
 
 #### `tool-cli` dùng khi nào?
 - Tool file/config chạy trong lane locked.
@@ -885,9 +885,9 @@ Manifest: xem ngay ở mục `Project mẫu hoàn chỉnh nhỏ`; đó chính l�
 #### `tool-http` dùng khi nào?
 - Tool cần HTTP thật theo lane `quarantine`.
 - Cần cassette record/replay.
-- Chấp nhận env gate `OCL_QUARANTINE=1`.
+- Chấp nhận env gate `OCP_QUARANTINE=1`.
 
-`Ocl.toml` mẫu `tool-http` theo template hiện tại:
+`Ocp.toml` mẫu `tool-http` theo template hiện tại:
 
 ```toml
 [package]
@@ -896,7 +896,7 @@ version = "0.1.0"
 
 [project]
 lane = "quarantine"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [quarantine]
 mode = "record"
@@ -941,32 +941,32 @@ max_list_entries = 500
 Luồng chạy tối thiểu:
 
 ```bash
-ocl init my-http --template tool-http
+ocp init my-http --template tool-http
 cd my-http
-export OCL_QUARANTINE=1
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+export OCP_QUARANTINE=1
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 ```powershell
-ocl init my-http --template tool-http
+ocp init my-http --template tool-http
 cd my-http
-$env:OCL_QUARANTINE="1"
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+$env:OCP_QUARANTINE="1"
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Điểm cần nhớ:
 - `tool-http` là record/replay cho IO nondeterministic, không phải locked lane.
 - Template source hiện tại cho `tool-http` đã dùng record typed cho HTTP/fs request.
-- Mẫu này chủ yếu minh họa `quarantine` + cassette; khi cần đọc payload HTTP thật (`status`, `body`, metadata response), hãy xem `ocl doc packs --json` và artifact replay của chính run đó.
+- Mẫu này chủ yếu minh họa `quarantine` + cassette; khi cần đọc payload HTTP thật (`status`, `body`, metadata response), hãy xem `ocp doc packs --json` và artifact replay của chính run đó.
 
 #### `mini-game` dùng khi nào?
 - Muốn thử capability app/game theo lane locked.
 - Cần `engine.game.run`.
 - Muốn chạy/replay một mini scenario mà không phải tự dựng runtime từ số 0.
 
-`Ocl.toml` mẫu `mini-game` theo template hiện tại:
+`Ocp.toml` mẫu `mini-game` theo template hiện tại:
 
 ```toml
 [package]
@@ -975,7 +975,7 @@ version = "0.1.0"
 
 [project]
 lane = "locked_v071"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [targets]
 default = "main"
@@ -1001,15 +1001,15 @@ state_delta_max_bytes = 65536
 Luồng chạy tối thiểu:
 
 ```bash
-ocl init demo-game --template mini-game
+ocp init demo-game --template mini-game
 cd demo-game
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Điểm cần nhớ:
 - `mini-game` template hiện tại vẫn sinh source compat kiểu `ctx("...")` cho `engine.game.run`.
-- Điều này phản ánh đúng template đang ship; nếu muốn style user-facing canonical hơn, bạn có thể giữ manifest nhưng viết lại `src/main.ocl` sau khi init.
+- Điều này phản ánh đúng template đang ship; nếu muốn style user-facing canonical hơn, bạn có thể giữ manifest nhưng viết lại `src/main.ocp` sau khi init.
 
 <a id="capability-starter-pack"></a>
 ### 12) Capability starter pack
@@ -1021,8 +1021,8 @@ Nguyên tắc đọc mục này:
 - Nguồn sự thật chi tiết nhất về schema vẫn là:
 
 ```bash
-ocl doc packs
-ocl doc packs --json
+ocp doc packs
+ocp doc packs --json
 ```
 
 #### Nhóm file system (`permissions.std_fs`)
@@ -1031,13 +1031,13 @@ ocl doc packs --json
 - Dùng khi nào: đọc file text/json đầu vào.
 - Request tối thiểu:
 
-```ocl
+```ocp
 { path: "./fixtures/in/sample.json" }
 ```
 
 - Request mở rộng thường gặp:
 
-```ocl
+```ocp
 { path: "./README.md", max_bytes: 128 }
 ```
 
@@ -1059,7 +1059,7 @@ OK/DEGRADED => { text, truncated, bytes }
 - Dùng khi nào: tạo thư mục output/workdir.
 - Request tối thiểu:
 
-```ocl
+```ocp
 { path: "./out", recursive: true }
 ```
 
@@ -1070,7 +1070,7 @@ OK/DEGRADED => { text, truncated, bytes }
 - Dùng khi nào: ghi file text/json/report.
 - Request tối thiểu:
 
-```ocl
+```ocp
 { path: "./out/out.json", text: "{\"status\":\"OK\"}", overwrite: true }
 ```
 
@@ -1083,7 +1083,7 @@ OK/DEGRADED => { text, truncated, bytes }
 - Dùng khi nào: đọc state cục bộ deterministic.
 - Request tối thiểu:
 
-```ocl
+```ocp
 { key: "app.flag" }
 ```
 
@@ -1094,13 +1094,13 @@ OK/DEGRADED => { text, truncated, bytes }
 - Dùng khi nào: ghi checkpoint, marker, hoặc state nhỏ.
 - Request tối thiểu:
 
-```ocl
+```ocp
 { key: "tool.last_run", value: "ok", overwrite: true }
 ```
 
 - Biến thể đã có trong test:
 
-```ocl
+```ocp
 { key: "app.answer", value_json: 42, overwrite: true }
 ```
 
@@ -1113,13 +1113,13 @@ OK/DEGRADED => { text, truncated, bytes }
 - Dùng khi nào: lấy tick/time logic deterministic trong lane locked.
 - Request tối thiểu:
 
-```ocl
+```ocp
 { scope: "tool" }
 ```
 
 - Biến thể đã có trong test:
 
-```ocl
+```ocp
 { tick: 7, dt_ms: 20 }
 ```
 
@@ -1137,12 +1137,12 @@ OK => { tick, dt_ms }
 - Dùng khi nào: cần wallclock thật trong lane `quarantine`.
 - Request tối thiểu:
 
-```ocl
+```ocp
 { scope: "tool" }
 ```
 
 - Có `commit` không: không.
-- Ghi nhớ: key này thuộc nhóm nondeterministic; dùng cùng `OCL_QUARANTINE=1`.
+- Ghi nhớ: key này thuộc nhóm nondeterministic; dùng cùng `OCP_QUARANTINE=1`.
 
 #### Nhóm network / process (`quarantine`)
 
@@ -1150,7 +1150,7 @@ OK => { tick, dt_ms }
 - Dùng khi nào: gọi HTTP thật có cassette record/replay.
 - Request tối thiểu:
 
-```ocl
+```ocp
 { method: "GET", url: "http://mock.local/demo", timeout_ms: 3000, max_body_bytes: 16 }
 ```
 
@@ -1172,13 +1172,13 @@ truncated
 req_hash
 ```
 
-- Với HTTP, nếu bạn cần đọc full payload map của response để viết logic, hãy xem trực tiếp `ocl doc packs --json` và artifact replay của run thật trước khi hardcode.
+- Với HTTP, nếu bạn cần đọc full payload map của response để viết logic, hãy xem trực tiếp `ocp doc packs --json` và artifact replay của run thật trước khi hardcode.
 
 `std.proc.exec`
 - Dùng khi nào: chạy process thật trong lane `quarantine`.
 - Request tối thiểu theo template:
 
-```ocl
+```ocp
 { bin: "mock.proc", args: "--template", timeout_ms: 3000, max_stdout_bytes: 32 }
 ```
 
@@ -1191,20 +1191,20 @@ req_hash
 - Dùng khi nào: loop app/game deterministic theo runtime pack.
 - Request starter hiện có trong template đang ship:
 
-```ocl
+```ocp
 ctx("entry_module=app.mini_game;phase=frame;tick=1;stream=main;count=4;input_cap=8;events=key:Space|text:start;draw_cap=8;draw_list=text:1,1,mini-game,12;state_json={\"score\":0}")
 ```
 
 - Có `commit` không: không theo template starter.
 - Ghi nhớ:
   - template hiện tại vẫn dùng compat `ctx("...")`,
-  - nếu bạn định viết app/game thật, nên xem thêm `ocl doc packs` và template `mini-game`.
+  - nếu bạn định viết app/game thật, nên xem thêm `ocp doc packs` và template `mini-game`.
 
 `std.shadow.search`
 - Dùng khi nào: tìm/so nhánh shadow bounded.
 - Request starter hiện có trong fixture/template:
 
-```ocl
+```ocp
 ctx("policy=round_robin;variants_json=[{\"x\":1},{\"x\":2},{\"x\":3}];max_branches=3;per_branch_step_cap=80;per_branch_budget_cap=2000;global_step_cap=240;global_budget_cap=12000;top_k=3;rounds=2")
 ```
 
@@ -1215,10 +1215,10 @@ ctx("policy=round_robin;variants_json=[{\"x\":1},{\"x\":2},{\"x\":3}];max_branch
 
 Checklist khi dùng capability mới:
 1. Tìm key gần nhất trong starter pack này.
-2. Chạy `ocl doc packs` để xem `permission_class`, `ctx_schema`, `payload_schema`, `example`.
+2. Chạy `ocp doc packs` để xem `permission_class`, `ctx_schema`, `payload_schema`, `example`.
 3. Viết request record hoặc `ctx("...")` đúng theo key đó.
-4. Chạy `ocl check . --locked` hoặc lane tương ứng.
-5. Chạy `ocl run .` rồi `ocl replay <artifact_dir>`.
+4. Chạy `ocp check . --locked` hoặc lane tương ứng.
+5. Chạy `ocp run .` rồi `ocp replay <artifact_dir>`.
 
 #### Cách đọc `result/payload` theo capability
 Điều ổn định nhất ở mọi capability là lớp vỏ `Result4`:
@@ -1229,7 +1229,7 @@ Checklist khi dùng capability mới:
 Với project đầu tay, đây là cách đọc an toàn:
 1. Dùng `match` hoặc `guard` trước.
 2. Chỉ đọc sâu vào payload khi bạn đã biết schema của key đó.
-3. Nếu chưa chắc payload shape, xem `ocl doc packs --json` trước khi hardcode logic.
+3. Nếu chưa chắc payload shape, xem `ocp doc packs --json` trước khi hardcode logic.
 
 Một số payload shape đã có test thật trong repo:
 
@@ -1263,8 +1263,8 @@ Một số payload shape đã có test thật trong repo:
 Với các key như `std.fs.read_text`, `std.time.tick_info`, `std.net.http.request`, `std.shadow.search`:
 - Guide này chỉ pin request starter.
 - Khi cần đọc payload thật để viết logic, hãy xem:
-  1. `ocl doc packs`
-  2. `ocl doc packs --json`
+  1. `ocp doc packs`
+  2. `ocp doc packs --json`
   3. artifact replay/audit của chính run đó
 
 <a id="language-reference-short"></a>
@@ -1276,7 +1276,7 @@ Ghi chú:
 
 #### `module`, `import`, `fn`, `return`
 
-```ocl
+```ocp
 module app.demo;
 import toolkit.api.math;
 
@@ -1295,7 +1295,7 @@ Khi dùng:
 
 #### `repeat` và `for ... cap`
 
-```ocl
+```ocp
 module app.loops;
 
 let xs = [1, 2, 3];
@@ -1310,7 +1310,7 @@ Khi dùng:
 
 #### `guard` và `try ... else`
 
-```ocl
+```ocp
 module app.sugar;
 
 observe("std.fs.read_text", "tier2", { path: "./fixtures/in/sample.json" }, budget(5)) -> r;
@@ -1330,11 +1330,11 @@ Khi dùng:
 
 Nguyên tắc an toàn:
 - Viết được bằng `match` trước, rồi mới refactor sang sugar.
-- Sau mỗi refactor, chạy `ocl check . --locked` và `ocl replay <artifact_dir>`.
+- Sau mỗi refactor, chạy `ocp check . --locked` và `ocp replay <artifact_dir>`.
 
 <a id="mini-game-project"></a>
 ### 14) Project mẫu mini-game hoàn chỉnh
-Đây là project mẫu tối thiểu cho user muốn thử OCL ở hướng app/game chứ không phải tool file.
+Đây là project mẫu tối thiểu cho user muốn thử OCP ở hướng app/game chứ không phải tool file.
 
 Nhãn ví dụ:
 - `Canonical pattern` cho user mới: mẫu code dưới đây đã thêm `match frame` để bám đúng nguyên tắc nhập môn.
@@ -1344,12 +1344,12 @@ Cây thư mục:
 
 ```text
 demo-game/
-  Ocl.toml
+  Ocp.toml
   src/
-    main.ocl
+    main.ocp
 ```
 
-`Ocl.toml`:
+`Ocp.toml`:
 
 ```toml
 [package]
@@ -1358,7 +1358,7 @@ version = "0.1.0"
 
 [project]
 lane = "locked_v071"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [targets]
 default = "main"
@@ -1381,9 +1381,9 @@ rng_max_count = 32
 state_delta_max_bytes = 65536
 ```
 
-`src/main.ocl`:
+`src/main.ocp`:
 
-```ocl
+```ocp
 module app.mini_game;
 
 observe("engine.game.run", "tier2", ctx("entry_module=app.mini_game;phase=frame;tick=1;stream=main;count=4;input_cap=8;events=key:Space|text:start;draw_cap=8;draw_list=text:1,1,mini-game,12;state_json={\"score\":0}"), budget(10)) -> frame;
@@ -1398,15 +1398,15 @@ match frame {
 Chạy:
 
 ```bash
-ocl check . --locked
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp check . --locked
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Kỳ vọng:
-- Có `.ocl_artifacts/<run_id>/audit.jsonl`
-- Có `.ocl_artifacts/<run_id>/signature.txt`
-- Có `.ocl_artifacts/<run_id>/replay.toml`
+- Có `.ocp_artifacts/<run_id>/audit.jsonl`
+- Có `.ocp_artifacts/<run_id>/signature.txt`
+- Có `.ocp_artifacts/<run_id>/replay.toml`
 - Replay pass ổn định
 
 Ghi chú:
@@ -1427,12 +1427,12 @@ Cây thư mục:
 
 ```text
 my-http/
-  Ocl.toml
+  Ocp.toml
   src/
-    main.ocl
+    main.ocp
 ```
 
-`Ocl.toml`:
+`Ocp.toml`:
 
 ```toml
 [package]
@@ -1441,7 +1441,7 @@ version = "0.1.0"
 
 [project]
 lane = "quarantine"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [quarantine]
 mode = "record"
@@ -1483,9 +1483,9 @@ max_write_bytes = 1048576
 max_list_entries = 500
 ```
 
-`src/main.ocl`:
+`src/main.ocp`:
 
-```ocl
+```ocp
 module app.tool_http;
 
 observe("std.net.http.request", "tier2", { method: "GET", url: "http://mock.local/template-http", timeout_ms: 3000, max_body_bytes: 32 }, budget(8)) -> net;
@@ -1516,37 +1516,37 @@ match wr {
 Chạy record:
 
 ```powershell
-$env:OCL_QUARANTINE="1"
-ocl check .
-ocl run .
+$env:OCP_QUARANTINE="1"
+ocp check .
+ocp run .
 ```
 
 ```bash
-export OCL_QUARANTINE=1
-ocl check .
-ocl run .
+export OCP_QUARANTINE=1
+ocp check .
+ocp run .
 ```
 
 Replay:
 
 ```powershell
-$env:OCL_QUARANTINE="1"
-ocl replay ./.ocl_artifacts/<run_id>/
+$env:OCP_QUARANTINE="1"
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 ```bash
-export OCL_QUARANTINE=1
-ocl replay ./.ocl_artifacts/<run_id>/
+export OCP_QUARANTINE=1
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Kỳ vọng:
 - Có file `./out/http.txt`
-- Có `.ocl_artifacts/<run_id>/cassette/cassette.jsonl`
+- Có `.ocp_artifacts/<run_id>/cassette/cassette.jsonl`
 - Cassette có entry `cap = "std.net.http.request"`
 - Replay pass khi env gate vẫn bật
 
 Fail-honest cần nhớ:
-- Nếu không bật `OCL_QUARANTINE="1"`, cả `run` lẫn `replay` của lane `quarantine` phải fail.
+- Nếu không bật `OCP_QUARANTINE="1"`, cả `run` lẫn `replay` của lane `quarantine` phải fail.
 - Nếu host hoặc method không nằm trong allowlist, runtime phải trả `INSUFFICIENT`, không tự hạ chuẩn.
 
 Ghi chú:
@@ -1554,11 +1554,11 @@ Ghi chú:
 - Mẫu ở đây là `canonical pattern` cho user mới; nó xử lý `net`, `mk`, `wr` theo `match` để bám đúng phần nhập môn.
 - Template `tool-http` đang ship hiện ngắn hơn, phù hợp cho smoke scaffold nhưng không nên coi là pattern đẹp nhất để viết logic mới.
 - Hãy ưu tiên init từ template thật rồi sửa dần về canonical pattern này.
-- Mẫu này ưu tiên dạy `quarantine` + cassette + side-effect có kiểm soát; khi cần viết logic đọc `status`/`body` từ response HTTP, hãy tra `ocl doc packs --json` và xem payload trong artifact replay của run thật.
+- Mẫu này ưu tiên dạy `quarantine` + cassette + side-effect có kiểm soát; khi cần viết logic đọc `status`/`body` từ response HTTP, hãy tra `ocp doc packs --json` và xem payload trong artifact replay của run thật.
 
 <a id="language-quickstart"></a>
-### 16) Viết code OCL đầu tiên (Language Quickstart)
-Mục tiêu phần này: bạn sửa `src/main.ocl` và chạy được ngay.
+### 16) Viết code OCP đầu tiên (Language Quickstart)
+Mục tiêu phần này: bạn sửa `src/main.ocp` và chạy được ngay.
 
 Nhãn ví dụ:
 - `Canonical pattern`: phần này là luồng học chính cho user mới, ưu tiên style record typed + `match` đầy đủ.
@@ -1570,22 +1570,22 @@ Quy ước của guide v1.0:
 Bước 1 - tạo project từ template có IO thực tế:
 
 ```bash
-ocl init hello-ocl --template tool-cli
-cd hello-ocl
+ocp init hello-ocp --template tool-cli
+cd hello-ocp
 ```
 
 Bước 2 - cấu trúc tối thiểu cần biết:
-- `Ocl.toml`: lane, permissions, entrypoint.
-- `src/main.ocl`: code chạy chính.
+- `Ocp.toml`: lane, permissions, entrypoint.
+- `src/main.ocp`: code chạy chính.
 - `fixtures/`: dữ liệu test mẫu của template.
 
 Ghi chú:
 - Template `tool-cli` hiện tại trong CLI vẫn sinh source compat dùng `ctx("k=v;...")`.
 - Trong hướng dẫn này, bạn thay ngay sang record typed để học theo style canonical v1.0.
 
-Bước 3 - thay `src/main.ocl` bằng mẫu chạy được:
+Bước 3 - thay `src/main.ocp` bằng mẫu chạy được:
 
-```ocl
+```ocp
 module app.tool_cli;
 
 let mk_req = { path: "./out", recursive: true };
@@ -1624,13 +1624,13 @@ condition(true);
 Bước 4 - chạy:
 
 ```bash
-ocl run .
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp run .
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 Bước 5 - đọc kết quả:
 - File output ở `./out/out.json`.
-- Artifact replay ở `.ocl_artifacts/<run_id>/`.
+- Artifact replay ở `.ocp_artifacts/<run_id>/`.
 
 Cheat sheet cú pháp tối thiểu (để tự viết tiếp):
 - Khai báo biến: `let x = 1;`
@@ -1641,7 +1641,7 @@ Cheat sheet cú pháp tối thiểu (để tự viết tiếp):
   2. `match r { OK => commit(r); ... }`
 - Mẫu chuẩn Result4:
 
-```ocl
+```ocp
 match r {
   OK => { /* nhánh thành công */ }
   DEGRADED => { /* nhánh giảm cấp */ }
@@ -1652,7 +1652,7 @@ match r {
 
 Mẫu xử lý đọc file theo kiểu fail-honest:
 
-```ocl
+```ocp
 let rd_req = { path: "./fixtures/in/sample.json" };
 observe("std.fs.read_text", "tier2", rd_req, budget(5)) -> rd;
 match rd {
@@ -1666,7 +1666,7 @@ match rd {
 ---
 
 <a id="concepts"></a>
-## [concepts] Nền tảng cần biết để dùng OCL
+## [concepts] Nền tảng cần biết để dùng OCP
 
 Phần này là kiến thức sử dụng thực tế.  
 Lịch sử chi tiết theo phiên bản nằm ở `docs/plans/history/*` (không nằm trong user guide vận hành).
@@ -1739,15 +1739,15 @@ Trước khi coi bản build là hợp lệ, tối thiểu phải qua:
 2. build + attest,
 3. verify attest/supply.
 
-Đây là lý do OCL phù hợp môi trường cần audit/release proof.
+Đây là lý do OCP phù hợp môi trường cần audit/release proof.
 
 ### 6) Manifest tối thiểu để chạy lane locked
-`Ocl.toml` tối thiểu nên có các phần sau:
+`Ocp.toml` tối thiểu nên có các phần sau:
 
 ```toml
 [project]
 lane = "locked_v071"
-entry = "src/main.ocl"
+entry = "src/main.ocp"
 
 [language]
 guard_mode = "return"
@@ -1766,17 +1766,17 @@ deny = []
 ## [permissions] Permissions
 
 ### 1) Vì sao permission là bắt buộc
-OCL không cho side-effect “trôi tự do”.  
+OCP không cho side-effect “trôi tự do”.  
 Mọi quyền I/O đều phải minh bạch, review được, và có dấu vết.
 
 ### 2) Ý nghĩa từng lệnh permission
-- `ocl perm snapshot <project_dir> [--out-dir <dir>]`
+- `ocp perm snapshot <project_dir> [--out-dir <dir>]`
   - Chụp baseline quyền.
   - Dùng khi bắt đầu thay đổi logic hoặc sau khi cập nhật dependency.
-- `ocl perm diff <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]`
+- `ocp perm diff <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]`
   - So sánh quyền mới với baseline.
   - Dùng để phát hiện tăng quyền bất thường.
-- `ocl perm approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]`
+- `ocp perm approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]`
   - Chấp thuận diff hợp lệ theo lane policy.
   - Không dùng để “duyệt nhanh cho qua”.
 
@@ -1787,9 +1787,9 @@ Mọi quyền I/O đều phải minh bạch, review được, và có dấu vế
 
 ### 4) Mẫu quy trình chuẩn
 1. Code thay đổi.
-2. Chạy `ocl perm snapshot <project_dir> --out-dir ./.ocl_perm`.
-3. Chạy `ocl perm diff <old_snapshot> <new_snapshot> --out permission_diff_report.json --approval permissions.approval.toml`.
-4. Nếu diff hợp lệ và có lý do rõ ràng: `ocl perm approve permission_diff_report.json --approval permissions.approval.toml --by <id> --date <YYYY-MM-DD>`.
+2. Chạy `ocp perm snapshot <project_dir> --out-dir ./.ocp_perm`.
+3. Chạy `ocp perm diff <old_snapshot> <new_snapshot> --out permission_diff_report.json --approval permissions.approval.toml`.
+4. Nếu diff hợp lệ và có lý do rõ ràng: `ocp perm approve permission_diff_report.json --approval permissions.approval.toml --by <id> --date <YYYY-MM-DD>`.
 5. Lưu `permission_diff_report.json` + `permissions.approval.toml` làm bằng chứng review.
 
 ---
@@ -1797,27 +1797,27 @@ Mọi quyền I/O đều phải minh bạch, review được, và có dấu vế
 <a id="lock-trust-attest"></a>
 ## [lock-trust-attest] Lock Trust Attest
 
-### 1) `ocl lock sync <project_dir>`
+### 1) `ocp lock sync <project_dir>`
 Tác dụng:
 - Đồng bộ lockfile theo trạng thái dependency hiện tại.
 - Chuẩn bị đầu vào ổn định cho verify/build.
 
-### 2) `ocl lock sign <project_dir> --key <keyid> [--lock deps.lock.v3]`
+### 2) `ocp lock sign <project_dir> --key <keyid> [--lock deps.lock.v3]`
 Tác dụng:
 - Ký `deps.lock.v3` sau khi sync để tạo `deps.lock.v3.sig`.
 - Đây là bước cần có trước `lock verify` khi đi theo strict flow có chữ ký.
 
-### 3) `ocl lock verify <project_dir> [--lock deps.lock.v3]`
+### 3) `ocp lock verify <project_dir> [--lock deps.lock.v3]`
 Tác dụng:
 - Kiểm lock/trust policy.
 - Phát hiện mismatch sớm trước khi chạy pipeline dài.
 
-### 4) `ocl build <project_dir> --attest`
+### 4) `ocp build <project_dir> --attest`
 Tác dụng:
 - Build kèm bằng chứng attestation.
 - Dùng cho môi trường cần chain-of-evidence.
 
-### 5) `ocl verify --attest <artifact_dir>`
+### 5) `ocp verify --attest <artifact_dir>`
 Tác dụng:
 - Xác minh attestation vừa tạo.
 - Chặn trường hợp artifact không đúng trust chain.
@@ -1832,25 +1832,25 @@ Tác dụng:
 <a id="run-replay"></a>
 ## [run-replay] Run Replay
 
-### 1) `ocl run <project_dir>`
+### 1) `ocp run <project_dir>`
 Tác dụng:
 - Chạy chương trình theo policy/lane hiện hành.
 - Sinh trace/artifacts phục vụ audit và debug.
 
-### 2) `ocl replay <artifact_dir>`
+### 2) `ocp replay <artifact_dir>`
 Tác dụng:
 - Tái hiện hành vi từ dữ liệu đã ghi.
 - Kiểm tra ổn định, tránh “máy này chạy khác máy kia”.
 
 Bundle artifact tối thiểu cần có:
-- `.ocl_artifacts/<run_id>/audit.jsonl`
-- `.ocl_artifacts/<run_id>/signature.txt`
-- `.ocl_artifacts/<run_id>/replay.toml`
+- `.ocp_artifacts/<run_id>/audit.jsonl`
+- `.ocp_artifacts/<run_id>/signature.txt`
+- `.ocp_artifacts/<run_id>/replay.toml`
 
 Ví dụ:
 
 ```bash
-ocl replay ./.ocl_artifacts/000123/
+ocp replay ./.ocp_artifacts/000123/
 ```
 
 Khi pass, CLI sẽ báo kiểu `replay ok (signature match: ...)`.
@@ -1866,24 +1866,24 @@ Không được “âm thầm fallback” sang IO thật.
 ### 4) Checklist nhanh khi replay lỗi
 1. Kiểm tra lock/trust đã verify.
 2. Kiểm tra dữ liệu cassette/chunk còn đủ.
-3. Chạy `ocl dbg` để xem trace chi tiết.
+3. Chạy `ocp dbg` để xem trace chi tiết.
 
 ---
 
 <a id="debug"></a>
 ## [debug] Debug
 
-### 1) `ocl dbg <artifact_dir>` dùng khi nào
+### 1) `ocp dbg <artifact_dir>` dùng khi nào
 - Run thất bại nhưng chưa rõ lý do.
 - Replay mismatch.
 - Muốn xác định đúng điểm chuyển trạng thái gây lỗi.
 
-### 2) Mục tiêu của debug trong OCL
+### 2) Mục tiêu của debug trong OCP
 - Không chỉ “thấy lỗi”.
 - Phải truy được nguyên nhân theo trace có cấu trúc.
 
 ### 3) Quy trình debug ngắn
-1. Chạy `ocl dbg <artifact_dir>`.
+1. Chạy `ocp dbg <artifact_dir>`.
 2. Xác định stage lỗi (observe/match/commit).
 3. Đối chiếu permission/lock/attest nếu liên quan.
 4. Sửa, rồi chạy lại quickstart flow tối thiểu.
@@ -1896,84 +1896,84 @@ Không được “âm thầm fallback” sang IO thật.
 ### A) Bộ lệnh canonical (workflow chuẩn v1.0)
 
 Đây là nhóm lệnh “bắt buộc nắm” để vận hành dự án theo luồng chính:
-- `ocl init <project_dir> [--template tool-cli|tool-http|tool-proc|tool-wallclock|mini-game|shadow-preview|dep-permission] [--preset workflow_basic|agent_swarm_basic]`
-- `ocl lock sync <project_dir>`
-- `ocl lock sign <project_dir> --key <keyid> [--lock deps.lock.v3]`
-- `ocl lock verify <project_dir> [--lock deps.lock.v3]`
-- `ocl perm snapshot <project_dir> [--out-dir <dir>]`
-- `ocl perm diff <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]`
-- `ocl perm approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]`
-- `ocl build <project_dir> --attest`
-- `ocl verify --attest <artifact_dir>`
-- `ocl run <project_dir>`
-- `ocl replay <artifact_dir>`
-- `ocl dbg <artifact_dir> [--script <file>]`
-- `ocl doctor <project_dir> [--out <report.json>]`
-- `ocl fix --plan <project_dir> [--out <permission_fix_plan.json>]`
-- `ocl fix --apply <project_dir> [--plan-file <permission_fix_plan.json>] [--patch <permission_fix.patch.toml>] [--out <permission_fix_safety_report.json>] [--approval <permissions.approval.toml>] --ack-risk --justification <text> --by <id> --date <YYYY-MM-DD>`
-- `ocl budget analyze <artifact_dir|audit.jsonl> [--json]`
+- `ocp init <project_dir> [--template tool-cli|tool-http|tool-proc|tool-wallclock|mini-game|shadow-preview|dep-permission] [--preset workflow_basic|agent_swarm_basic]`
+- `ocp lock sync <project_dir>`
+- `ocp lock sign <project_dir> --key <keyid> [--lock deps.lock.v3]`
+- `ocp lock verify <project_dir> [--lock deps.lock.v3]`
+- `ocp perm snapshot <project_dir> [--out-dir <dir>]`
+- `ocp perm diff <old> <new> [--out <report.json>] [--approval <permissions.approval.toml>]`
+- `ocp perm approve <diff_report.json> [--approval <permissions.approval.toml>] --by <id> --date <YYYY-MM-DD> [--note <text>]`
+- `ocp build <project_dir> --attest`
+- `ocp verify --attest <artifact_dir>`
+- `ocp run <project_dir>`
+- `ocp replay <artifact_dir>`
+- `ocp dbg <artifact_dir> [--script <file>]`
+- `ocp doctor <project_dir> [--out <report.json>]`
+- `ocp fix --plan <project_dir> [--out <permission_fix_plan.json>]`
+- `ocp fix --apply <project_dir> [--plan-file <permission_fix_plan.json>] [--patch <permission_fix.patch.toml>] [--out <permission_fix_safety_report.json>] [--approval <permissions.approval.toml>] --ack-risk --justification <text> --by <id> --date <YYYY-MM-DD>`
+- `ocp budget analyze <artifact_dir|audit.jsonl> [--json]`
 
 ### B) Bộ lệnh nâng cao (có trong CLI, dùng theo nhu cầu)
 
 #### 1) Thực thi, kiểm tra, và profiling nâng cao
-- `ocl check <project_dir> [--json] [--locked] [--universe <id>]`
-- `ocl run <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
-- `ocl fmt <project_dir> [--check]`
-- `ocl test <project_dir> [--locked] [--universe <id>] [--domain <id>] [...]`
-- `ocl cache stats <project_dir> [--json]`
-- `ocl cache clean <project_dir> --yes [--json]`
-- `ocl cache bench <project_dir> [--engine ...] [--locked] [--json]`
-- `ocl trace run <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
-- `ocl trace view <artifact_dir|audit.jsonl|legacy.trace> [...]`
-- `ocl trace diff <artifactA|auditA> <artifactB|auditB> [...]`
-- `ocl minimize <artifact_dir> --goal <...> [...]`
-- `ocl profile run <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
-- `ocl profile view <profile_file> [--top N] [--json]`
-- `ocl budget doctor <artifact_dir|audit.jsonl> [--json]`
-- `ocl doc packs [--json]`
+- `ocp check <project_dir> [--json] [--locked] [--universe <id>]`
+- `ocp run <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
+- `ocp fmt <project_dir> [--check]`
+- `ocp test <project_dir> [--locked] [--universe <id>] [--domain <id>] [...]`
+- `ocp cache stats <project_dir> [--json]`
+- `ocp cache clean <project_dir> --yes [--json]`
+- `ocp cache bench <project_dir> [--engine ...] [--locked] [--json]`
+- `ocp trace run <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
+- `ocp trace view <artifact_dir|audit.jsonl|legacy.trace> [...]`
+- `ocp trace diff <artifactA|auditA> <artifactB|auditB> [...]`
+- `ocp minimize <artifact_dir> --goal <...> [...]`
+- `ocp profile run <project_dir> [--out <file>] [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
+- `ocp profile view <profile_file> [--top N] [--json]`
+- `ocp budget doctor <artifact_dir|audit.jsonl> [--json]`
+- `ocp doc packs [--json]`
 
 #### 2) Supply-chain, package, dependency
-- `ocl publish <artifact.oclpkg> [--registry <dir>]`
-- `ocl fetch <artifact|package> [--registry <dir>] [--out <dir>]`
-- `ocl verify-supply <artifact.oclpkg>`
-- `ocl deps resolve <project_dir> [--write-legacy-lock]`
-- `ocl deps update <project_dir> [pkg] [--write-legacy-lock]`
-- `ocl deps verify <project_dir> [--no-lane-policy]`
-- `ocl pack build <project_dir> [--locked]`
-- `ocl pack sign <artifact.oclpkg>`
-- `ocl pack publish <artifact.oclpkg> [--registry <dir>]`
-- `ocl pack verify <artifact.oclpkg>`
+- `ocp publish <artifact.ocppkg> [--registry <dir>]`
+- `ocp fetch <artifact|package> [--registry <dir>] [--out <dir>]`
+- `ocp verify-supply <artifact.ocppkg>`
+- `ocp deps resolve <project_dir> [--write-legacy-lock]`
+- `ocp deps update <project_dir> [pkg] [--write-legacy-lock]`
+- `ocp deps verify <project_dir> [--no-lane-policy]`
+- `ocp pack build <project_dir> [--locked]`
+- `ocp pack sign <artifact.ocppkg>`
+- `ocp pack publish <artifact.ocppkg> [--registry <dir>]`
+- `ocp pack verify <artifact.ocppkg>`
 
 #### 3) Policy/cosmos/plugin/organ/kit
-- `ocl init <project_dir> --preset workflow_basic|agent_swarm_basic`
-- `ocl policy lock sync <project_dir>`
-- `ocl cosmos init <project_dir> [--preset default|ci]`
-- `ocl cosmos lock sync <project_dir> [--locked] [...]`
-- `ocl plugin lock sync <project_dir>`
-- `ocl plugin verify <project_dir>`
-- `ocl organ lock sync <project_dir> [--registry <index.toml>] [--json]`
-- `ocl organ verify <project_dir> [--locked|--unlocked] [--json]`
-- `ocl organ install <name> <version> [--project <dir>] [...]`
-- `ocl kit list [<project_dir>] [--json]`
-- `ocl kit doctor <project_dir> [--locked|--json]`
-- `ocl compose <project_dir> --phenotype <file> [...]`
+- `ocp init <project_dir> --preset workflow_basic|agent_swarm_basic`
+- `ocp policy lock sync <project_dir>`
+- `ocp cosmos init <project_dir> [--preset default|ci]`
+- `ocp cosmos lock sync <project_dir> [--locked] [...]`
+- `ocp plugin lock sync <project_dir>`
+- `ocp plugin verify <project_dir>`
+- `ocp organ lock sync <project_dir> [--registry <index.toml>] [--json]`
+- `ocp organ verify <project_dir> [--locked|--unlocked] [--json]`
+- `ocp organ install <name> <version> [--project <dir>] [...]`
+- `ocp kit list [<project_dir>] [--json]`
+- `ocp kit doctor <project_dir> [--locked|--json]`
+- `ocp compose <project_dir> --phenotype <file> [...]`
 
 Phân biệt nhanh:
-- `ocl init --preset workflow_basic|agent_swarm_basic`: preset foundation cấp project (public onboarding).
-- `ocl cosmos init --preset default|ci`: preset cosmos config chuyên sâu.
+- `ocp init --preset workflow_basic|agent_swarm_basic`: preset foundation cấp project (public onboarding).
+- `ocp cosmos init --preset default|ci`: preset cosmos config chuyên sâu.
 
 #### 4) Verify nâng cao
-- `ocl verify --attest <artifact_dir>`
-- `ocl verify --repro <artifact_dir>`
-- `ocl verify <project_dir> --phenotype <file> [...]`
+- `ocp verify --attest <artifact_dir>`
+- `ocp verify --repro <artifact_dir>`
+- `ocp verify <project_dir> --phenotype <file> [...]`
 
 ### C) Alias cần biết
-- `ocl doctor ...` là alias của `ocl perm doctor ...`
-- `ocl fix --plan|--apply ...` là alias của `ocl perm fix ...`
-- `ocl perm review ...` là alias của `ocl perm diff ...`
+- `ocp doctor ...` là alias của `ocp perm doctor ...`
+- `ocp fix --plan|--apply ...` là alias của `ocp perm fix ...`
+- `ocp perm review ...` là alias của `ocp perm diff ...`
 
 ### D) Khuyến nghị dùng lệnh an toàn
-- Luôn chạy `ocl --help` hoặc `ocl <group> --help` trước khi dùng lệnh nâng cao.
+- Luôn chạy `ocp --help` hoặc `ocp <group> --help` trước khi dùng lệnh nâng cao.
 - Với lệnh có khả năng thay đổi lock/permission/artifact, ưu tiên chạy trên nhánh riêng trước.
 
 Gợi ý tra cứu nhanh (canonical workflow):
@@ -2000,18 +2000,18 @@ Workflow ngắn:
 2. Chạy compose:
 
 ```bash
-ocl compose <project_dir> --phenotype <phenotype_file>
+ocp compose <project_dir> --phenotype <phenotype_file>
 ```
 
 3. Verify phenotype/build consistency:
 
 ```bash
-ocl verify <project_dir> --phenotype <phenotype_file>
+ocp verify <project_dir> --phenotype <phenotype_file>
 ```
 
 Artifacts thường gặp sau compose:
-- `src/generated/*.ocl`
-- `src/generated/mod.ocl`
+- `src/generated/*.ocp`
+- `src/generated/mod.ocp`
 - `assembly_proof.toml`
 
 Khi nào dùng:
@@ -2027,29 +2027,29 @@ Workflow ngắn:
 1. Init theo preset workflow public:
 
 ```bash
-ocl init <project_dir> --preset workflow_basic
+ocp init <project_dir> --preset workflow_basic
 # hoặc
-ocl init <project_dir> --preset agent_swarm_basic
+ocp init <project_dir> --preset agent_swarm_basic
 ```
 
 2. Preset sẽ kéo chain lock cần thiết (deps -> policy -> cosmos -> organ/kit khi có yêu cầu).  
    Sau đó đồng bộ lock cho organ graph:
 
 ```bash
-ocl organ lock sync <project_dir>
+ocp organ lock sync <project_dir>
 ```
 
 3. Verify organ trong lane mong muốn:
 
 ```bash
-ocl organ verify <project_dir> --locked
+ocp organ verify <project_dir> --locked
 ```
 
 4. Cài thêm organ + kiểm tra kit:
 
 ```bash
-ocl organ install <name> <version> --project <project_dir>
-ocl kit doctor <project_dir> --locked
+ocp organ install <name> <version> --project <project_dir>
+ocp kit doctor <project_dir> --locked
 ```
 
 Gợi ý chọn preset:
@@ -2063,7 +2063,7 @@ Lưu ý lane locked:
 ## Editor workflow (VSCode/LSP/DAP)
 
 `USER_GUIDE` không chỉ dừng ở “cài VSIX”; workflow khuyến nghị khi code trong editor:
-1. Cài VSIX và mở file `.ocl`.
+1. Cài VSIX và mở file `.ocp`.
 2. Mặc định có TextMate highlight + snippets; command bridge dùng bundled CLI khi workspace được trust.
 3. Trust behavior (quan trọng):
    - Workspace untrusted: chỉ shell tĩnh (grammar/snippets), không chạy command bridge runtime.
@@ -2071,20 +2071,20 @@ Lưu ý lane locked:
 4. Editor bridge dùng bundled CLI đã verify từ extension package, không phụ thuộc `PATH` host.
 5. Trạng thái runtime editor hiện tại trong repo:
    - command bridge dùng bundled CLI cho `fmt`, `check`, `doctor`, `fix --plan`, và mở trace từ artifact;
-   - runtime editor thật đã được bundle thành `ocl-lsp` / `ocl-dap`, hỗ trợ diagnostics realtime, hover, completion, go to definition, references, rename, formatting, code actions, semantic tokens, và replay-backed debug adapter trong workspace trusted.
+   - runtime editor thật đã được bundle thành `ocp-lsp` / `ocp-dap`, hỗ trợ diagnostics realtime, hover, completion, go to definition, references, rename, formatting, code actions, semantic tokens, và replay-backed debug adapter trong workspace trusted.
 6. Trước commit: chạy bridge command chuẩn:
 
 ```bash
-ocl fmt <project_dir> --check
-ocl check <project_dir> --locked
-ocl doctor <project_dir>
-ocl fix --plan <project_dir>
+ocp fmt <project_dir> --check
+ocp check <project_dir> --locked
+ocp doctor <project_dir>
+ocp fix --plan <project_dir>
 ```
 
 7. Nếu có artifact lỗi/replay mismatch:
 
 ```bash
-ocl dbg <artifact_dir>
+ocp dbg <artifact_dir>
 ```
 
 Khi nào dùng DAP/trace debug:
@@ -2099,21 +2099,21 @@ Dùng reactor khi bạn cần vòng lặp/tick bounded hoặc cần runtime repo
 Run reactor cơ bản:
 
 ```bash
-ocl run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --universe dev --domain main --view default
+ocp run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --universe dev --domain main --view default
 ```
 
 Trace reactor:
 
 ```bash
-ocl trace run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --out target/ocl/trace/reactor.audit.jsonl
-ocl trace view target/ocl/trace/reactor.audit.jsonl --tail 50
+ocp trace run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --out target/ocp/trace/reactor.audit.jsonl
+ocp trace view target/ocp/trace/reactor.audit.jsonl --tail 50
 ```
 
 Profile reactor:
 
 ```bash
-ocl profile run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --out target/ocl/profile/reactor.profile.json
-ocl profile view target/ocl/profile/reactor.profile.json --top 20
+ocp profile run <project_dir> --reactor --ticks 50 --runtime deterministic --locked --out target/ocp/profile/reactor.profile.json
+ocp profile view target/ocp/profile/reactor.profile.json --top 20
 ```
 
 Lưu ý:
@@ -2126,13 +2126,13 @@ Lưu ý:
 ## Luồng làm việc khuyến nghị
 
 Luồng mặc định cho nhóm phát triển:
-1. `ocl init <project_dir>` (hoặc vào dự án có sẵn).
-2. `ocl lock sync <project_dir>` + `ocl lock sign <project_dir> --key <keyid>` + `ocl lock verify <project_dir> --lock deps.lock.v3`.
-3. `ocl perm snapshot <project_dir>` + `ocl perm diff <old> <new>` + `ocl perm approve <diff_report.json> --by <id> --date <YYYY-MM-DD>`.
-4. `ocl build <project_dir> --attest` + `ocl verify --attest <artifact_dir>`.
-5. `ocl run <project_dir>` + `ocl replay <artifact_dir>`.
-6. Nếu có sự cố: `ocl doctor <project_dir>` -> `ocl fix --plan <project_dir>` -> `ocl fix --apply <project_dir> ...` -> `ocl dbg <artifact_dir>`.
-7. Nếu nghi ngờ quá ngân sách: `ocl budget analyze <artifact_dir|audit.jsonl>`.
+1. `ocp init <project_dir>` (hoặc vào dự án có sẵn).
+2. `ocp lock sync <project_dir>` + `ocp lock sign <project_dir> --key <keyid>` + `ocp lock verify <project_dir> --lock deps.lock.v3`.
+3. `ocp perm snapshot <project_dir>` + `ocp perm diff <old> <new>` + `ocp perm approve <diff_report.json> --by <id> --date <YYYY-MM-DD>`.
+4. `ocp build <project_dir> --attest` + `ocp verify --attest <artifact_dir>`.
+5. `ocp run <project_dir>` + `ocp replay <artifact_dir>`.
+6. Nếu có sự cố: `ocp doctor <project_dir>` -> `ocp fix --plan <project_dir>` -> `ocp fix --apply <project_dir> ...` -> `ocp dbg <artifact_dir>`.
+7. Nếu nghi ngờ quá ngân sách: `ocp budget analyze <artifact_dir|audit.jsonl>`.
 
 ---
 
@@ -2141,12 +2141,12 @@ Luồng mặc định cho nhóm phát triển:
 
 ### 1) Lệnh không chạy được sau cài đặt
 Triệu chứng:
-- `ocl` không được nhận diện.
+- `ocp` không được nhận diện.
 
 Xử lý:
 1. Mở terminal mới.
 2. Kiểm tra `PATH`.
-3. Chạy lại `ocl --version`.
+3. Chạy lại `ocp --version`.
 
 ### 2) `perm diff` tăng quyền bất thường
 Triệu chứng:
@@ -2162,8 +2162,8 @@ Triệu chứng:
 - Lock/trust mismatch.
 
 Xử lý:
-1. Chạy lại `ocl lock sync`.
-2. Nếu thiếu `deps.lock.v3.sig`, chạy `ocl lock sign <project_dir> --key <keyid>`.
+1. Chạy lại `ocp lock sync`.
+2. Nếu thiếu `deps.lock.v3.sig`, chạy `ocp lock sign <project_dir> --key <keyid>`.
 3. Verify lại.
 4. Nếu vẫn lỗi, kiểm tra trust policy/metadata.
 
@@ -2172,7 +2172,7 @@ Triệu chứng:
 - Attestation không khớp.
 
 Xử lý:
-1. Build lại với `ocl build --attest`.
+1. Build lại với `ocp build --attest`.
 2. Verify lại ngay sau build.
 3. Nếu lệch tiếp, kiểm tra môi trường và artifact path.
 
@@ -2183,20 +2183,20 @@ Triệu chứng:
 Xử lý:
 1. Ghi lại dữ liệu đúng flow.
 2. Không dùng fallback IO thật.
-3. Dùng `ocl dbg` để xác nhận điểm thiếu.
+3. Dùng `ocp dbg` để xác nhận điểm thiếu.
 
 ### 6) Tool IO bị chặn (`RC-*-PERMISSION-DENIED`)
 Triệu chứng:
 - `std.fs.*`, `std.kv.*`, hoặc `std.time.*` trả `INSUFFICIENT` do policy.
 
 Xử lý:
-1. Mở `Ocl.toml`, kiểm tra các section:
+1. Mở `Ocp.toml`, kiểm tra các section:
    - `[permissions.std_fs]`
    - `[permissions.std_kv]`
    - `[permissions.std_time]`
 2. Đối chiếu key gọi thực tế và allow/deny.
-3. Chạy lại `ocl check . --locked` để đọc hint policy từ diagnostics.
-4. Chạy lại `ocl test . --golden fixtures/expected --clean` để xác nhận flow đã ổn.
+3. Chạy lại `ocp check . --locked` để đọc hint policy từ diagnostics.
+4. Chạy lại `ocp test . --golden fixtures/expected --clean` để xác nhận flow đã ổn.
 
 ### 7) Lane `quarantine` bị chặn khi run/replay
 Triệu chứng:
@@ -2205,10 +2205,10 @@ Triệu chứng:
 Xử lý:
 1. Xác nhận project/artifact đang ở lane nào (`locked_v071`, `locked_v06`, hay `quarantine`).
 2. Nếu là `quarantine`, bật env gate trước khi chạy:
-   - PowerShell: `$env:OCL_QUARANTINE="1"`
-   - bash/zsh: `export OCL_QUARANTINE=1`
+   - PowerShell: `$env:OCP_QUARANTINE="1"`
+   - bash/zsh: `export OCP_QUARANTINE=1`
 3. Không dùng artifact `quarantine` để replay như locked lane (signature/lane marker khác nhau).
-4. Chạy lại `ocl run ...` rồi `ocl replay <artifact_dir>` trong cùng lane.
+4. Chạy lại `ocp run ...` rồi `ocp replay <artifact_dir>` trong cùng lane.
 
 ### 8) Cần hỗ trợ sâu hơn
 - `docs/vi/troubleshooting/common-errors.md`
@@ -2231,11 +2231,11 @@ Bạn có thể làm tool file/config trong lane locked với 3 nhóm key:
 
 Khi làm tool có IO:
 1. Khởi tạo bằng template:
-   - `ocl init <project_dir> --template tool-cli`
+   - `ocp init <project_dir> --template tool-cli`
 2. Test với golden:
-   - `ocl test <project_dir> --golden fixtures/expected --clean`
+   - `ocp test <project_dir> --golden fixtures/expected --clean`
 3. Replay từ artifact:
-   - `ocl replay ./.ocl_artifacts/<run_id>/`
+   - `ocp replay ./.ocp_artifacts/<run_id>/`
 
 Artifacts IO metadata quan trọng:
 - `io/fixtures_manifest.json`
@@ -2243,53 +2243,53 @@ Artifacts IO metadata quan trọng:
 - `replay.toml` (chứa `io_mode = "fixtures"` và đường dẫn fixture metadata)
 
 ### 8) Consumer packs cho app/game (nâng cao)
-OCL có thêm nhóm capability cho app/game:
+OCP có thêm nhóm capability cho app/game:
 - `std.ui.*`: UI theo mô hình draw-list (không phải widget framework nặng trong core).
 - `engine.game.*`: capability key family cho tick/rng/state deterministic; manifest thường cấp quyền qua `[permissions.std_game]`.
 - `std.shadow.*`: chạy nhánh shadow và compare report.
 
 Bắt đầu nhanh:
-1. `ocl init <project_dir> --template mini-game`
-2. `ocl run <project_dir>`
-3. `ocl replay ./.ocl_artifacts/<run_id>/`
+1. `ocp init <project_dir> --template mini-game`
+2. `ocp run <project_dir>`
+3. `ocp replay ./.ocp_artifacts/<run_id>/`
 
 Hoặc:
-1. `ocl init <project_dir> --template shadow-preview`
-2. `ocl run <project_dir> --shadow <id> --shadow-policy forbid_commit`
-3. `ocl replay ./.ocl_artifacts/<run_id>/`
+1. `ocp init <project_dir> --template shadow-preview`
+2. `ocp run <project_dir> --shadow <id> --shadow-policy forbid_commit`
+3. `ocp replay ./.ocp_artifacts/<run_id>/`
 
 Lưu ý lane:
 - `quarantine` là lane tách biệt cho capability nondeterministic theo env gate.
-- Khi chạy lane `quarantine`, cần bật `OCL_QUARANTINE=1`.
+- Khi chạy lane `quarantine`, cần bật `OCP_QUARANTINE=1`.
 - Artifact/signature của `quarantine` không dùng lẫn như lane locked.
 
 ### 9) Quarantine + cassette record/replay (nâng cao)
 Khi tool của bạn cần capability nondeterministic (HTTP/proc/wallclock), dùng lane `quarantine` thay vì cố chạy trong lane locked.
 
 Checklist vận hành đúng:
-1. Trong `Ocl.toml`, đặt lane `quarantine` và khai báo permission đúng capability.
+1. Trong `Ocp.toml`, đặt lane `quarantine` và khai báo permission đúng capability.
 2. Bật env gate trước khi chạy:
 
 ```powershell
-$env:OCL_QUARANTINE="1"
+$env:OCP_QUARANTINE="1"
 ```
 
 ```bash
-export OCL_QUARANTINE=1
+export OCP_QUARANTINE=1
 ```
 
-3. Chạy project như bình thường bằng `ocl run <project_dir>`.
+3. Chạy project như bình thường bằng `ocp run <project_dir>`.
 4. Replay từ artifact dir của lần chạy:
 
 ```bash
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 5. Nếu cần vận hành cassette lâu dài, dùng bộ lệnh:
-   - `ocl cassette stats`
-   - `ocl cassette prune`
-   - `ocl cassette gc`
-   - `ocl cassette upgrade`
+   - `ocp cassette stats`
+   - `ocp cassette prune`
+   - `ocp cassette gc`
+   - `ocp cassette upgrade`
 
 Mẫu project có sẵn cho v0.8 line:
 - `tool-http`
@@ -2302,14 +2302,14 @@ Nguyên tắc quan trọng:
 - `quarantine` chỉ dùng khi thật sự cần capability nondeterministic.
 
 ### 10) Schema + typing cho ctx/payload/effects (nâng cao)
-OCL tăng kiểm tra hợp đồng theo hướng “bắt lỗi sớm”:
+OCP tăng kiểm tra hợp đồng theo hướng “bắt lỗi sớm”:
 - `ctx` nên viết dạng record typed (không ưu tiên `ctx("k=v;...")` kiểu cũ).
 - `match`/`try`/`guard` kỳ vọng đúng kiểu `Result4`.
 - `commit(...)` chỉ hợp lệ với observe key có quyền commit theo contract.
 
 Mẫu khuyến nghị:
 
-```ocl
+```ocp
 let req = { path: "./out/result.json", overwrite: true };
 observe("std.fs.write_text", "tier2", req, budget(5)) -> wr;
 match wr {
@@ -2320,7 +2320,7 @@ match wr {
 }
 ```
 
-Nếu bạn đang chuyển từ script cũ còn dùng `ctx("...")`, có thể bật compat tạm thời trong `Ocl.toml`:
+Nếu bạn đang chuyển từ script cũ còn dùng `ctx("...")`, có thể bật compat tạm thời trong `Ocp.toml`:
 
 ```toml
 [compat]
@@ -2334,8 +2334,8 @@ Lộ trình an toàn:
 3. Chuyển về `deny` để khóa drift.
 
 Lệnh hữu ích khi làm việc với schema packs:
-- `ocl doc packs`
-- `ocl doc packs --json`
+- `ocp doc packs`
+- `ocp doc packs --json`
 
 Lỗi thường gặp từ line v0.9:
 - `RC-CTX-INVALID`: runtime báo `ctx` không khớp schema key.
@@ -2343,7 +2343,7 @@ Lỗi thường gặp từ line v0.9:
 - commit bị chặn ở compile-time khi key thuộc nhóm observe-only.
 
 ### 11) Packaging + lockfile + trust (nâng cao)
-OCL có luồng dependency/package đầy đủ để tái sử dụng module giữa nhiều dự án mà vẫn giữ kiểm soát supply-chain.
+OCP có luồng dependency/package đầy đủ để tái sử dụng module giữa nhiều dự án mà vẫn giữ kiểm soát supply-chain.
 
 Những điểm bạn cần nhớ khi vận hành:
 - SoT lockfile là `deps.lock.v3`.
@@ -2354,13 +2354,13 @@ Luồng chuẩn khi thêm/cập nhật dependency:
 1. Resolve graph:
 
 ```bash
-ocl deps resolve <project_dir>
+ocp deps resolve <project_dir>
 ```
 
 2. Verify lock + trust:
 
 ```bash
-ocl deps verify <project_dir>
+ocp deps verify <project_dir>
 ```
 
 3. Chạy build/run như bình thường sau khi verify pass.
@@ -2368,9 +2368,9 @@ ocl deps verify <project_dir>
 Nếu bạn đóng gói package để tái sử dụng:
 
 ```bash
-ocl pack build <project_dir>
-ocl pack sign <artifact.oclpkg>
-ocl pack verify <artifact.oclpkg>
+ocp pack build <project_dir>
+ocp pack sign <artifact.ocppkg>
+ocp pack verify <artifact.ocppkg>
 ```
 
 Permission dependency trong v0.10:
@@ -2391,25 +2391,25 @@ Luồng xử lý sự cố khuyến nghị:
 2. Xem trace để xác định điểm lỗi đầu tiên:
 
 ```bash
-ocl trace view <artifact_dir|audit.jsonl> --tail 50
+ocp trace view <artifact_dir|audit.jsonl> --tail 50
 ```
 
 3. Nếu cần so với baseline:
 
 ```bash
-ocl trace diff <artifactA|auditA> <artifactB|auditB> --mode align --out <out_dir>
+ocp trace diff <artifactA|auditA> <artifactB|auditB> --mode align --out <out_dir>
 ```
 
 4. Mở debugger replay:
 
 ```bash
-ocl dbg <artifact_dir>
+ocp dbg <artifact_dir>
 ```
 
 5. Khi đã xác định lỗi nhưng case còn quá lớn, rút gọn repro:
 
 ```bash
-ocl minimize <artifact_dir> --goal <error_code:X|divergence|kind:KIND> --out <out_dir>
+ocp minimize <artifact_dir> --goal <error_code:X|divergence|kind:KIND> --out <out_dir>
 ```
 
 Các điểm vận hành quan trọng:
@@ -2427,24 +2427,24 @@ Luồng dùng nhanh:
 1. Khởi tạo template:
 
 ```bash
-ocl init <project_dir> --template shadow-preview
+ocp init <project_dir> --template shadow-preview
 ```
 
 2. Chạy và tạo artifact:
 
 ```bash
-ocl run <project_dir>
+ocp run <project_dir>
 ```
 
 3. Replay để xác nhận ổn định:
 
 ```bash
-ocl replay ./.ocl_artifacts/<run_id>/
+ocp replay ./.ocp_artifacts/<run_id>/
 ```
 
 4. Khi cần so nhánh/bản build:
-   - `ocl trace view <artifact_dir>`
-   - `ocl trace diff <artifactA> <artifactB> --mode align`
+   - `ocp trace view <artifact_dir>`
+   - `ocp trace diff <artifactA> <artifactB> --mode align`
 
 Điểm quan trọng khi vận hành:
 - Policy shadow phải nằm trong allowlist dự án; nếu không sẽ bị chặn fail-honest với `RC-SHADOW-POLICY-DENIED`.
@@ -2457,7 +2457,7 @@ Nếu bạn cần benchmark nội bộ để đo hiệu quả reuse:
 - so sánh `steps_executed_total` trên cùng dataset/seed/lane.
 
 ### 14) IR + cache tái lập được (nâng cao)
-OCL thêm lớp tối ưu hiệu năng nhưng vẫn giữ mục tiêu “determinism trước, tốc độ sau”:
+OCP thêm lớp tối ưu hiệu năng nhưng vẫn giữ mục tiêu “determinism trước, tốc độ sau”:
 - compile cache (biên dịch/module)
 - execution cache cho nhánh thuần (pure)
 - observe cache theo policy an toàn.
@@ -2465,51 +2465,51 @@ OCL thêm lớp tối ưu hiệu năng nhưng vẫn giữ mục tiêu “determi
 Bộ lệnh vận hành cache:
 
 ```bash
-ocl cache stats <project_dir> [--json]
-ocl cache bench <project_dir> [--engine interpreter|bytecode|dual] [--locked] [--json]
-ocl cache clean <project_dir> --yes [--json]
+ocp cache stats <project_dir> [--json]
+ocp cache bench <project_dir> [--engine interpreter|bytecode|dual] [--locked] [--json]
+ocp cache clean <project_dir> --yes [--json]
 ```
 
 Khi dùng thực tế:
-1. Chạy `ocl cache stats` để xem hit/miss compile/exec/observe.
-2. Chạy `ocl cache bench` để so cold/warm/no-cache và kiểm tra `signature_equal`.
-3. Chỉ chạy `ocl cache clean --yes` khi cần reset hoàn toàn cache.
+1. Chạy `ocp cache stats` để xem hit/miss compile/exec/observe.
+2. Chạy `ocp cache bench` để so cold/warm/no-cache và kiểm tra `signature_equal`.
+3. Chỉ chạy `ocp cache clean --yes` khi cần reset hoàn toàn cache.
 
 Lưu ý quan trọng:
 - `cache clean` yêu cầu `--yes` để tránh xóa nhầm.
 - Lệnh clean sẽ dọn các thư mục cache/artifacts của project:
-  - `.ocl_artifacts`
-  - `.ocl_cache`
-  - `target/ocl/cache`
+  - `.ocp_artifacts`
+  - `.ocp_cache`
+  - `target/ocp/cache`
 - Benchmark v0.13 ghi report tại:
-  - `target/ocl/v13/cache_benchmark.json`
+  - `target/ocp/v13/cache_benchmark.json`
 
 Nguyên tắc an toàn:
 - Cache là tối ưu, không được thay đổi nghĩa chương trình.
 - Nếu bật cache mà signature lệch so với no-cache, coi như lỗi cần điều tra ngay.
 
 ### 15) Conformance suite + upgrade-check (nâng cao)
-OCL có lớp kiểm chứng hành vi ở cấp “hợp đồng toàn hệ”, không chỉ unit test rời.
+OCP có lớp kiểm chứng hành vi ở cấp “hợp đồng toàn hệ”, không chỉ unit test rời.
 
 Hai nhóm lệnh chính:
 
 ```bash
-ocl test --conformance list --manifest <manifest_file>
-ocl test --conformance run --manifest <manifest_file> --out <report_file> [--locked]
+ocp test --conformance list --manifest <manifest_file>
+ocp test --conformance run --manifest <manifest_file> --out <report_file> [--locked]
 ```
 
 Alias tương đương:
 
 ```bash
-ocl conformance list --manifest <manifest_file>
-ocl conformance run --manifest <manifest_file> --out <report_file> [--locked]
+ocp conformance list --manifest <manifest_file>
+ocp conformance run --manifest <manifest_file> --out <report_file> [--locked]
 ```
 
 Ví dụ thực tế:
 
 ```bash
-ocl test --conformance list --manifest projects/ocp-ocl/conformance/conformance.v5.toml
-ocl test --conformance run --manifest projects/ocp-ocl/conformance/conformance.v5.toml --out target/ocl/w14/reports/conformance_report.json
+ocp test --conformance list --manifest projects/ocp/conformance/conformance.v5.toml
+ocp test --conformance run --manifest projects/ocp/conformance/conformance.v5.toml --out target/ocp/w14/reports/conformance_report.json
 ```
 
 Khi chạy conformance ở chế độ `--locked`:
@@ -2519,7 +2519,7 @@ Khi chạy conformance ở chế độ `--locked`:
 Kiểm tra nâng cấp trước khi đổi runtime:
 
 ```bash
-ocl upgrade-check <project_dir> --manifest <manifest_file> --out <report_file> [--locked]
+ocp upgrade-check <project_dir> --manifest <manifest_file> --out <report_file> [--locked]
 ```
 
 Mục tiêu của `upgrade-check`:
@@ -2546,7 +2546,7 @@ Xem tại:
 Tra cứu ngay trong file này (ưu tiên):
 - [Tra cứu nhanh](#quick-reference)
 - [Language Quickstart](#language-quickstart)
-- [Nền tảng cần biết để dùng OCL](#concepts)
+- [Nền tảng cần biết để dùng OCP](#concepts)
 - [Permissions](#permissions)
 - [Danh mục lệnh đầy đủ](#commands)
 - [Troubleshooting](#troubleshooting)
@@ -2563,5 +2563,5 @@ Tài liệu ngoài file (chỉ dùng khi cần đào sâu):
 <a id="maintainer-guide"></a>
 ## Maintainer Guide
 
-Phần dành cho người vận hành release/gate đã tách riêng để USER_GUIDE tập trung cho người dùng viết/chạy OCL:
+Phần dành cho người vận hành release/gate đã tách riêng để USER_GUIDE tập trung cho người dùng viết/chạy OCP:
 - [docs/vi/MAINTAINER_GUIDE.md](/docs/vi/MAINTAINER_GUIDE.md)

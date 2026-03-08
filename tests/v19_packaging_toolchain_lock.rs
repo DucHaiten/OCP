@@ -1,4 +1,4 @@
-use ocl_sdk::version_rule_matches_v19;
+use ocp_sdk::version_rule_matches_v19;
 use serde_json::json;
 
 #[path = "v19_gate_f_common.rs"]
@@ -94,14 +94,14 @@ fn v19_packaging_toolchain_lock_contract() {
         .unwrap_or(false));
 
     let report = json!({
-        "schema": "ocl.w19.release.packaging_toolchain_report.v1",
+        "schema": "ocp.w19.release.packaging_toolchain_report.v1",
         "status": "PASS",
         "contract_path": contract_path.to_string_lossy().replace('\\', "/"),
         "node": node_status,
         "pnpm": pnpm_status,
         "vsce": vsce_status,
         "ovsx": ovsx_status,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/packaging_toolchain_report.json", &report);

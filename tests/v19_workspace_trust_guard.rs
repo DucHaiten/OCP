@@ -1,4 +1,4 @@
-use ocl_sdk::workspace_runtime_features_allowed_v19;
+use ocp_sdk::workspace_runtime_features_allowed_v19;
 use serde_json::json;
 
 #[path = "v19_gate_a_common.rs"]
@@ -26,12 +26,12 @@ fn v19_workspace_trust_guard_blocks_runtime_features_when_untrusted() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.security.workspace_trust_report.v1",
+        "schema": "ocp.w19.security.workspace_trust_report.v1",
         "status": "PASS",
         "policy_path": policy_path.to_string_lossy().replace('\\', "/"),
         "trusted_runtime_allowed": trusted_allowed,
         "untrusted_runtime_allowed": untrusted_allowed,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("security/workspace_trust_report.json", &report);

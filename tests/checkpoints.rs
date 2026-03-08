@@ -12,21 +12,21 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_checkpoints_v11_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_checkpoints_v11_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 fn list_dirs(path: &Path) -> Vec<PathBuf> {
@@ -43,7 +43,7 @@ fn list_dirs(path: &Path) -> Vec<PathBuf> {
 }
 
 fn latest_artifact_dir(project_root: &Path) -> PathBuf {
-    let artifacts_root = project_root.join(".ocl_artifacts");
+    let artifacts_root = project_root.join(".ocp_artifacts");
     let mut dirs = list_dirs(&artifacts_root);
     assert!(!dirs.is_empty(), "missing artifact dir");
     dirs.pop().expect("latest artifact dir")
@@ -62,7 +62,7 @@ fn replay_writes_checkpoint_bundle_with_rewind_validation() {
     let root = temp_project_dir("bundle");
     let root_s = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_s, "--template", "mini-game"]);
+    let init = run_ocp_cli(&["init", &root_s, "--template", "mini-game"]);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
@@ -70,7 +70,7 @@ fn replay_writes_checkpoint_bundle_with_rewind_validation() {
         String::from_utf8_lossy(&init.stderr)
     );
 
-    let run = run_ocl_cli(&["run", &root_s]);
+    let run = run_ocp_cli(&["run", &root_s]);
     assert!(
         run.status.success(),
         "run failed:\nstdout={}\nstderr={}",
@@ -79,7 +79,7 @@ fn replay_writes_checkpoint_bundle_with_rewind_validation() {
     );
 
     let artifact = latest_artifact_dir(&root);
-    let replay = run_ocl_cli(&["replay", &artifact.to_string_lossy()]);
+    let replay = run_ocp_cli(&["replay", &artifact.to_string_lossy()]);
     assert!(
         replay.status.success(),
         "replay failed:\nstdout={}\nstderr={}",
@@ -126,7 +126,7 @@ fn replay_checkpoint_final_digest_is_stable_across_replays() {
     let root = temp_project_dir("stable_digest");
     let root_s = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_s, "--template", "mini-game"]);
+    let init = run_ocp_cli(&["init", &root_s, "--template", "mini-game"]);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
@@ -134,7 +134,7 @@ fn replay_checkpoint_final_digest_is_stable_across_replays() {
         String::from_utf8_lossy(&init.stderr)
     );
 
-    let run = run_ocl_cli(&["run", &root_s]);
+    let run = run_ocp_cli(&["run", &root_s]);
     assert!(
         run.status.success(),
         "run failed:\nstdout={}\nstderr={}",
@@ -145,7 +145,7 @@ fn replay_checkpoint_final_digest_is_stable_across_replays() {
     let artifact = latest_artifact_dir(&root);
     let checkpoint_path = artifact.join("checkpoints").join("replay.checkpoints.json");
 
-    let replay_1 = run_ocl_cli(&["replay", &artifact.to_string_lossy()]);
+    let replay_1 = run_ocp_cli(&["replay", &artifact.to_string_lossy()]);
     assert!(
         replay_1.status.success(),
         "first replay failed:\nstdout={}\nstderr={}",
@@ -156,7 +156,7 @@ fn replay_checkpoint_final_digest_is_stable_across_replays() {
     let first_digest =
         extract_json_string_field(&first, "final_state_digest").expect("first final_state_digest");
 
-    let replay_2 = run_ocl_cli(&["replay", &artifact.to_string_lossy()]);
+    let replay_2 = run_ocp_cli(&["replay", &artifact.to_string_lossy()]);
     assert!(
         replay_2.status.success(),
         "second replay failed:\nstdout={}\nstderr={}",

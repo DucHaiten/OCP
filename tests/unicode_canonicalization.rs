@@ -1,7 +1,7 @@
 #[path = "w17_gate_c_common.rs"]
 mod w17;
 
-use ocp_ocl::ocp_ocl::{canonicalize_text_boundary, preserve_runtime_literal, DeterminismError};
+use ocp::ocp::{canonicalize_text_boundary, preserve_runtime_literal, DeterminismError};
 
 #[test]
 fn unicode_and_newline_canonicalization_is_stable_at_boundaries() {

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use ocl_sdk::verify_contract_json_signature_v19;
+use ocp_sdk::verify_contract_json_signature_v19;
 use serde_json::json;
 
 #[path = "v19_gate_f_common.rs"]
@@ -20,7 +20,7 @@ fn v19_binary_bootstrap_verify_policy_enforced() {
     let policy_path = f19::repo_root()
         .join("contracts")
         .join("editor")
-        .join("ocl_binary_bootstrap_policy.v1.json");
+        .join("ocp_binary_bootstrap_policy.v1.json");
     let policy = f19::read_json(&policy_path);
     assert_eq!(
         policy
@@ -63,13 +63,13 @@ fn v19_binary_bootstrap_verify_policy_enforced() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.release.binary_bootstrap_report.v1",
+        "schema": "ocp.w19.release.binary_bootstrap_report.v1",
         "status": "PASS",
         "phase": "verify_before_execute",
         "policy_path": policy_path.to_string_lossy().replace('\\', "/"),
         "checked": checked,
         "signature_verified": summary.signature_verified,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/binary_bootstrap_report.json", &report);

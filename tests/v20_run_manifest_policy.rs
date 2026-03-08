@@ -32,7 +32,7 @@ fn v20_run_manifest_policy() {
         "vsce_version",
         "ovsx_version",
         "editor_extension_version",
-        "ocl_cli_version",
+        "ocp_cli_version",
         "lsp_server_version",
         "dap_server_version",
         "signing_trust_root_id",
@@ -57,10 +57,10 @@ fn v20_run_manifest_policy() {
         .expect("observed env must respect allowlist");
 
     let report = json!({
-        "schema": "ocl.w20.run_manifest_policy_report.v1",
+        "schema": "ocp.w20.run_manifest_policy_report.v1",
         "status": "PASS",
         "field_count": root.len(),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20::run_manifest_sha256()
     });
     v20::write_report("contracts/run_manifest_policy_report.json", &report);

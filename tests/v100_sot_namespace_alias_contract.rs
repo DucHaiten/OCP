@@ -1,4 +1,4 @@
-use ocl_sdk::verify_sot_alias_contract_v18;
+use ocp_sdk::verify_sot_alias_contract_v18;
 use serde_json::json;
 
 #[path = "v100_gate_a_common.rs"]
@@ -26,7 +26,7 @@ fn v100_sot_namespace_alias_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.sot_namespace_alias_report.v1",
+        "schema": "ocp.w100.sot_namespace_alias_report.v1",
         "status": "PASS",
         "alias_count": summary.alias_count,
         "verified_count": summary.verified_count,
@@ -36,7 +36,7 @@ fn v100_sot_namespace_alias_contract() {
             "mirror_exists": item.mirror_exists,
             "bytes_identical": item.bytes_identical
         })).collect::<Vec<_>>(),
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100::run_manifest_sha256()
     });
     v100::write_report("contracts/sot_namespace_alias_report.json", &report);

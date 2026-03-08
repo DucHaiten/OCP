@@ -90,13 +90,13 @@ fn v19_editor_public_surface_matches_extension_contributions() {
     assert_eq!(contract_settings, package_settings);
 
     let report = json!({
-        "schema": "ocl.w19.editor_public_surface_report.v1",
+        "schema": "ocp.w19.editor_public_surface_report.v1",
         "status": "PASS",
         "contract_path": contract_path.to_string_lossy().replace('\\', "/"),
         "language_id": contract_language,
         "command_ids": contract_commands,
         "settings_keys": contract_settings,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("contracts/editor_public_surface_report.json", &report);

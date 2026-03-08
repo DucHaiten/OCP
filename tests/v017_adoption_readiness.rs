@@ -10,31 +10,31 @@ fn v017_adoption_readiness_collects_cross_gate_evidence() {
     let required = w17::required_artifact_presence(&[
         (
             "contracts_sot",
-            "target/ocl/w17/contracts/w17_contract_sot_report.json",
+            "target/ocp/w17/contracts/w17_contract_sot_report.json",
         ),
         (
             "trust_lifecycle",
-            "target/ocl/w17/contracts/trust_lifecycle_report.json",
+            "target/ocp/w17/contracts/trust_lifecycle_report.json",
         ),
         (
             "compat_v016_line",
-            "target/ocl/w17/compat/v016_line_compat_report.json",
+            "target/ocp/w17/compat/v016_line_compat_report.json",
         ),
         (
             "determinism_core",
-            "target/ocl/w17/determinism/determinism_core_report.json",
+            "target/ocp/w17/determinism/determinism_core_report.json",
         ),
         (
             "extension_governance",
-            "target/ocl/w17/ecosystem/extension_governance_report.json",
+            "target/ocp/w17/ecosystem/extension_governance_report.json",
         ),
         (
             "connector_baseline",
-            "target/ocl/w17/connectors/connector_baseline_report.json",
+            "target/ocp/w17/connectors/connector_baseline_report.json",
         ),
     ]);
 
-    let plan_path = PathBuf::from("docs/plans/history/OCP-OCL-MVP-PLAN-v0.17.md");
+    let plan_path = PathBuf::from("docs/plans/history/OCP-MVP-PLAN-v0.17.md");
     let plan_text = w17::read_utf8(&plan_path);
 
     let gate_statuses = ["17-A", "17-B", "17-C", "17-D", "17-E", "17-F"]
@@ -58,8 +58,8 @@ fn v017_adoption_readiness_collects_cross_gate_evidence() {
     let artifacts_ready = w17::all_present(&required);
 
     let report = json!({
-        "schema": "ocl.w17.adoption_readiness_report.v1",
-        "run_manifest_ref": "target/ocl/w17/meta/run_manifest.json",
+        "schema": "ocp.w17.adoption_readiness_report.v1",
+        "run_manifest_ref": "target/ocp/w17/meta/run_manifest.json",
         "artifacts": required,
         "gates": gate_statuses,
         "checks": {

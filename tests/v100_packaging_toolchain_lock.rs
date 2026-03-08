@@ -1,4 +1,4 @@
-use ocl_sdk::version_rule_matches_v19;
+use ocp_sdk::version_rule_matches_v19;
 use serde_json::{json, Value as JsonValue};
 
 #[path = "v100_gate_b_common.rs"]
@@ -14,7 +14,7 @@ fn v100_packaging_toolchain_lock() {
     let run_manifest = v100b::read_json(
         &v100b::repo_root()
             .join("target")
-            .join("ocl")
+            .join("ocp")
             .join("w100")
             .join("meta")
             .join("run_manifest.json"),
@@ -85,7 +85,7 @@ fn v100_packaging_toolchain_lock() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.release.packaging_toolchain_report.v1",
+        "schema": "ocp.w100.release.packaging_toolchain_report.v1",
         "status": "PASS",
         "toolchain": [
             {"tool": "node", "rule": node_rule, "actual": node_actual, "match": node_ok},
@@ -93,7 +93,7 @@ fn v100_packaging_toolchain_lock() {
             {"tool": "vsce", "rule": vsce_rule, "actual": vsce_actual, "match": vsce_ok},
             {"tool": "ovsx", "rule": ovsx_rule, "actual": ovsx_actual, "match": ovsx_ok}
         ],
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100b::run_manifest_sha256()
     });
     v100b::write_report("release/packaging_toolchain_report.json", &report);

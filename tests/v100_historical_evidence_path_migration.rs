@@ -65,11 +65,11 @@ fn v100_historical_evidence_path_migration() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.docs.historical_evidence_path_migration_report.v1",
+        "schema": "ocp.w100.docs.historical_evidence_path_migration_report.v1",
         "status": "PASS",
         "entries_verified": verified.len(),
         "paths_verified": verified,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
     v100d::write_report(

@@ -3,25 +3,25 @@ use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocp_ocl::ocp_ocl::{compile_with_cache, CompileCacheKeyInput};
+use ocp::ocp::{compile_with_cache, CompileCacheKeyInput};
 use serde_json::{json, Value as JsonValue};
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 fn assert_success(output: &Output) -> String {
@@ -40,7 +40,7 @@ fn compile_cache_root() -> PathBuf {
         .expect("clock")
         .as_nanos();
     PathBuf::from("target")
-        .join("ocl")
+        .join("ocp")
         .join("tests")
         .join("perf_baseline_v16")
         .join(format!("compile_{stamp}"))
@@ -49,7 +49,7 @@ fn compile_cache_root() -> PathBuf {
 fn base_key_input() -> CompileCacheKeyInput {
     CompileCacheKeyInput {
         compiler_version: "compiler-v16".to_string(),
-        ocl_version: "ocl-v0.16".to_string(),
+        ocp_version: "ocp-v0.16".to_string(),
         lane_literal: "locked_v071".to_string(),
         lock_hash: "lock_hash_v16_perf".to_string(),
         trust_hash: "trust_hash_v16_perf".to_string(),
@@ -58,7 +58,7 @@ fn base_key_input() -> CompileCacheKeyInput {
         schema_versions_of_packs: "schema_v16_perf".to_string(),
         entry_module_hash: "entry_hash_v16_perf".to_string(),
         source_bundle_hash: "source_hash_v16_perf".to_string(),
-        cache_toggle_inputs: vec!["OCL_CACHE_PROFILE=default".to_string()],
+        cache_toggle_inputs: vec!["OCP_CACHE_PROFILE=default".to_string()],
     }
 }
 
@@ -95,10 +95,10 @@ fn v16_perf_baseline_thresholds_hold_against_v015_sot() {
         "baseline id must be pinned to v0.15-line"
     );
 
-    let bench = run_ocl_cli(&[
+    let bench = run_ocp_cli(&[
         "cache",
         "bench",
-        "projects/ocp-ocl/apps/hello-cli",
+        "projects/ocp/apps/hello-cli",
         "--json",
     ]);
     let bench_json = assert_success(&bench);
@@ -161,12 +161,12 @@ observe("world.exists", "tier2", ctx("scene=v16"), budget(5)) -> r;
         hit_ratio_floor
     );
 
-    let out_dir = root.join("target").join("ocl").join("w16").join("perf");
+    let out_dir = root.join("target").join("ocp").join("w16").join("perf");
     fs::create_dir_all(&out_dir).expect("create w16 perf output dir");
 
     let perf_budget_report = json!({
-        "schema": "ocl.w16.perf.budget.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.perf.budget.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "baseline_ref": "baselines/v015/perf_budget_report.json",
         "baseline_id": "v0.15-line",
         "mode": "warm_cache",
@@ -189,8 +189,8 @@ observe("world.exists", "tier2", ctx("scene=v16"), budget(5)) -> r;
     .expect("write perf_budget_report.json");
 
     let perf_trend_report = json!({
-        "schema": "ocl.w16.perf.trend.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.perf.trend.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "baseline_ref": "baselines/v015/perf_budget_report.json",
         "baseline_id": "v0.15-line",
         "mode": "warm_cache",

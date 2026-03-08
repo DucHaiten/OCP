@@ -59,7 +59,7 @@ fn v100_governance_pack_presence() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.legal.governance_pack_report.v1",
+        "schema": "ocp.w100.legal.governance_pack_report.v1",
         "status": "PASS",
         "governance_file": governance_file,
         "codeowners_required": true,
@@ -67,7 +67,7 @@ fn v100_governance_pack_presence() {
             "docs/vi/legal/governance.md",
             "docs/en/legal/governance.md"
         ],
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100f::run_manifest_sha256()
     });
     v100f::write_report("legal/governance_pack_report.json", &report);

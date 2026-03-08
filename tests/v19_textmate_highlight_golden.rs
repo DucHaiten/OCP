@@ -11,7 +11,7 @@ fn v19_textmate_highlight_golden_inputs_are_locked() {
 
     let grammar_contract_path = v19::contracts_root()
         .join("editor")
-        .join("ocl_textmate_grammar.v1.json");
+        .join("ocp_textmate_grammar.v1.json");
     let grammar_contract = v19::read_json(&grammar_contract_path);
     let grammar_path = v19::repo_root().join(
         grammar_contract
@@ -26,7 +26,7 @@ fn v19_textmate_highlight_golden_inputs_are_locked() {
         .get("scopeName")
         .and_then(serde_json::Value::as_str)
         .expect("grammar scopeName");
-    assert_eq!(scope_name, "source.ocp-ocl");
+    assert_eq!(scope_name, "source.ocp");
 
     let golden_path = v19::contracts_root()
         .join("editor")
@@ -50,12 +50,12 @@ fn v19_textmate_highlight_golden_inputs_are_locked() {
     }
 
     let report = json!({
-        "schema": "ocl.w19.editor.highlight_golden_report.v1",
+        "schema": "ocp.w19.editor.highlight_golden_report.v1",
         "status": "PASS",
         "grammar_path": grammar_path.to_string_lossy().replace('\\', "/"),
         "grammar_sha256": v19::sha256_hex_bytes(&fs::read(&grammar_path).expect("read grammar")),
         "fixtures": fixtures,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("editor/highlight_golden_report.json", &report);

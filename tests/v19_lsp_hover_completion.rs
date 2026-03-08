@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::{lsp_completion_items_from_source_v19, lsp_hover_for_symbol_v19};
+use ocp_sdk::{lsp_completion_items_from_source_v19, lsp_hover_for_symbol_v19};
 use serde_json::json;
 
 #[path = "v19_gate_a_common.rs"]
@@ -22,7 +22,7 @@ fn v19_lsp_hover_completion_core() {
 
     let caps_path = v19::contracts_root()
         .join("editor")
-        .join("ocl_lsp_capabilities.v1.json");
+        .join("ocp_lsp_capabilities.v1.json");
     let caps = v19::read_json(&caps_path);
     let capabilities = caps
         .get("capabilities")
@@ -41,7 +41,7 @@ fn v19_lsp_hover_completion_core() {
         "completion capability must be declared"
     );
 
-    let source = fixture("navigation.ocl");
+    let source = fixture("navigation.ocp");
     let hover = lsp_hover_for_symbol_v19(&source, 19, "helper")
         .expect("hover parse")
         .expect("hover helper");
@@ -59,12 +59,12 @@ fn v19_lsp_hover_completion_core() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.lsp.navigation_report.v1",
+        "schema": "ocp.w19.lsp.navigation_report.v1",
         "status": "PASS",
         "phase": "hover_completion",
         "hover": hover,
         "completion_count": completions.len(),
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("lsp/navigation_report.json", &report);

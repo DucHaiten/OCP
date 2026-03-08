@@ -12,24 +12,24 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_cli_tool_http_e2e_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_cli_tool_http_e2e_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str], quarantine_env: Option<&str>) -> Output {
+fn run_ocp_cli(args: &[&str], quarantine_env: Option<&str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
-        .env_remove("OCL_QUARANTINE");
+        .env_remove("OCP_QUARANTINE");
     if let Some(value) = quarantine_env {
-        cmd.env("OCL_QUARANTINE", value);
+        cmd.env("OCP_QUARANTINE", value);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 fn list_dirs(path: &Path) -> Vec<PathBuf> {
@@ -50,32 +50,32 @@ fn cli_tool_http_template_run_record_replay_pass() {
     let root = temp_project_dir("record_replay");
     let root_str = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_str, "--template", "tool-http"], None);
+    let init = run_ocp_cli(&["init", &root_str, "--template", "tool-http"], None);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
         String::from_utf8_lossy(&init.stdout),
         String::from_utf8_lossy(&init.stderr)
     );
-    assert!(root.join("Ocl.toml").exists(), "missing Ocl.toml");
-    let manifest = fs::read_to_string(root.join("Ocl.toml")).expect("read Ocl.toml");
+    assert!(root.join("Ocp.toml").exists(), "missing Ocp.toml");
+    let manifest = fs::read_to_string(root.join("Ocp.toml")).expect("read Ocp.toml");
     assert!(
         manifest.contains("ctx_string = \"deny\""),
         "tool-http template must default compat.ctx_string=deny"
     );
     assert!(
-        root.join("src").join("main.ocl").exists(),
-        "missing src/main.ocl"
+        root.join("src").join("main.ocp").exists(),
+        "missing src/main.ocp"
     );
     assert!(root.join("README.md").exists(), "missing README.md");
 
-    let run_without = run_ocl_cli(&["run", &root_str], None);
+    let run_without = run_ocp_cli(&["run", &root_str], None);
     assert!(
         !run_without.status.success(),
-        "quarantine lane must fail without OCL_QUARANTINE=1"
+        "quarantine lane must fail without OCP_QUARANTINE=1"
     );
 
-    let run_with = run_ocl_cli(&["run", &root_str], Some("1"));
+    let run_with = run_ocp_cli(&["run", &root_str], Some("1"));
     assert!(
         run_with.status.success(),
         "run with env failed:\nstdout={}\nstderr={}",
@@ -87,7 +87,7 @@ fn cli_tool_http_template_run_record_replay_pass() {
         "template should materialize out/http.txt"
     );
 
-    let artifacts_root = root.join(".ocl_artifacts");
+    let artifacts_root = root.join(".ocp_artifacts");
     let run_dirs = list_dirs(&artifacts_root);
     assert!(!run_dirs.is_empty(), "missing run artifact dir");
     let run_dir = run_dirs.last().expect("latest run dir");
@@ -103,13 +103,13 @@ fn cli_tool_http_template_run_record_replay_pass() {
         "cassette net entry must include req_hash"
     );
 
-    let replay_without = run_ocl_cli(&["replay", &run_dir.to_string_lossy()], None);
+    let replay_without = run_ocp_cli(&["replay", &run_dir.to_string_lossy()], None);
     assert!(
         !replay_without.status.success(),
-        "replay must fail without OCL_QUARANTINE=1 for quarantine lane"
+        "replay must fail without OCP_QUARANTINE=1 for quarantine lane"
     );
 
-    let replay_with = run_ocl_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
+    let replay_with = run_ocp_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
     assert!(
         replay_with.status.success(),
         "replay with env failed:\nstdout={}\nstderr={}",

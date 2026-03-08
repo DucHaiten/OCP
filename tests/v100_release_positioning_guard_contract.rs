@@ -55,11 +55,11 @@ fn v100_release_positioning_guard_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.release_positioning_guard_report.v1",
+        "schema": "ocp.w100.release_positioning_guard_report.v1",
         "status": "PASS",
         "deterministic_supply_chain_replay_claim": deterministic_claim,
         "forbidden_claims": forbidden,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100::run_manifest_sha256()
     });
     v100::write_report("contracts/release_positioning_guard_report.json", &report);

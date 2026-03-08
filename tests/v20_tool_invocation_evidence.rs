@@ -34,7 +34,7 @@ fn v20_tool_invocation_evidence() {
 
         let args = match tool {
             "fuzz-harness" => vec!["--protocol", "contracts/v20/hardcore_test_protocol.v1.json"],
-            "mutation-runner" => vec!["--scope", "ocl-runtime-core,ocl-sdk,ocl-cli"],
+            "mutation-runner" => vec!["--scope", "ocp-runtime-core,ocp-sdk,ocp-cli"],
             "chaos-injector" => vec!["--fault-points", "filesystem,network,process,time,cassette"],
             _ => vec!["--help"],
         };
@@ -69,11 +69,11 @@ fn v20_tool_invocation_evidence() {
     }
 
     let report = json!({
-        "schema": "ocl.w20.hardcore_tool_invocation_report.v1",
+        "schema": "ocp.w20.hardcore_tool_invocation_report.v1",
         "status": "PASS",
         "tool_records": records,
         "tool_count": external.len(),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20c::run_manifest_sha256()
     });
     v20c::write_report("hardcore/tool_invocation_report.json", &report);

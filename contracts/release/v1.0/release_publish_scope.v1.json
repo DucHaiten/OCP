@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.release.publish_scope.v1",
+  "schema": "ocp.release.publish_scope.v1",
   "contract_id": "v1.release_publish_scope",
   "version": "v1",
   "signed_assets_scope": [

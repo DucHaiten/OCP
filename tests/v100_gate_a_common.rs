@@ -35,7 +35,7 @@ pub fn repo_root() -> PathBuf {
 }
 
 pub fn w100_target_root() -> PathBuf {
-    repo_root().join("target").join("ocl").join("w100")
+    repo_root().join("target").join("ocp").join("w100")
 }
 
 pub fn run_manifest_path() -> PathBuf {
@@ -265,16 +265,16 @@ fn parse_package_manager_version(editor_package_path: &Path, manager_name: &str)
 
 pub fn ensure_run_manifest() -> JsonValue {
     let allowed = vec![
-        "OCL_RELEASE_GRADE".to_string(),
-        "OCL_STRICT_PROFILE".to_string(),
-        "OCL_RELEASE_CHANNEL".to_string(),
-        "OCL_QUARANTINE".to_string(),
-        "OCL_UPDATE_V100_REQUIRED_CONTRACTS".to_string(),
-        "OCL_UPDATE_V100_SOT_SIG".to_string(),
+        "OCP_RELEASE_GRADE".to_string(),
+        "OCP_STRICT_PROFILE".to_string(),
+        "OCP_RELEASE_CHANNEL".to_string(),
+        "OCP_QUARANTINE".to_string(),
+        "OCP_UPDATE_V100_REQUIRED_CONTRACTS".to_string(),
+        "OCP_UPDATE_V100_SOT_SIG".to_string(),
     ];
     let observed = std::env::vars()
         .map(|(key, _)| key)
-        .filter(|key| key.starts_with("OCL_"))
+        .filter(|key| key.starts_with("OCP_"))
         .collect::<Vec<String>>();
     if let Err(err) = v16::enforce_run_manifest_allowlist(&allowed, &observed) {
         panic!("{err}");
@@ -282,7 +282,7 @@ pub fn ensure_run_manifest() -> JsonValue {
 
     let mut base = v16::build_run_manifest(&repo_root(), allowed, observed);
     let root = base.as_object_mut().expect("run manifest object");
-    let release_channel = std::env::var("OCL_RELEASE_CHANNEL")
+    let release_channel = std::env::var("OCP_RELEASE_CHANNEL")
         .ok()
         .filter(|v| !v.trim().is_empty())
         .unwrap_or_else(|| "github_release".to_string());
@@ -314,7 +314,7 @@ pub fn ensure_run_manifest() -> JsonValue {
     let editor_package = repo_root()
         .join("editor")
         .join("vscode")
-        .join("ocp-ocl")
+        .join("ocp")
         .join("package.json");
     let packaging_toolchain = repo_root()
         .join("contracts")

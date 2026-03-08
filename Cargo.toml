@@ -1,12 +1,12 @@
 [package]
-name = "ocp-ocl"
+name = "ocp"
 version = "0.1.0"
 edition = "2021"
 authors = ["DucHaiten"]
 license = "AGPL-3.0-only"
 
 [lib]
-name = "ocp_ocl"
+name = "ocp"
 path = "src/lib.rs"
 
 [features]
@@ -20,15 +20,15 @@ sha2 = "0.10"
 members = [
     ".",
     "xtask",
-    "projects/ocp-ocl/crates/ocl-runtime-core",
-    "projects/ocp-ocl/crates/ocl-sdk",
-    "projects/ocp-ocl/crates/ocl-cli",
-    "projects/ocp-ocl/crates/ocl-lsp",
-    "projects/ocp-ocl/crates/ocl-dap",
+    "projects/ocp/crates/ocp-runtime-core",
+    "projects/ocp/crates/ocp-sdk",
+    "projects/ocp/crates/ocp-cli",
+    "projects/ocp/crates/ocp-lsp",
+    "projects/ocp/crates/ocp-dap",
 ]
 resolver = "2"
 
 [dev-dependencies]
-ocl-sdk = { path = "projects/ocp-ocl/crates/ocl-sdk" }
+ocp-sdk = { path = "projects/ocp/crates/ocp-sdk" }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }

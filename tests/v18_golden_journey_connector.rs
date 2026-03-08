@@ -13,10 +13,10 @@ fn v18_golden_journey_connector_runs_quarantine_replay_with_perm_and_budget_chec
     let root_s = root.to_string_lossy().to_string();
     let empty = BTreeMap::new();
     let mut quarantine_env = BTreeMap::new();
-    quarantine_env.insert("OCL_QUARANTINE", "1");
+    quarantine_env.insert("OCP_QUARANTINE", "1");
     let mut steps = Vec::new();
 
-    let init = common::run_ocl_cli(&["init", &root_s, "--template", "tool-http"], &empty);
+    let init = common::run_ocp_cli(&["init", &root_s, "--template", "tool-http"], &empty);
     let _ = common::assert_ok(&init, "init tool-http");
     steps.push(json!({"name":"init_connector_template","ok":true}));
 
@@ -45,7 +45,7 @@ fn v18_golden_journey_connector_runs_quarantine_replay_with_perm_and_budget_chec
 
     let perm_dir = root.join("perm_connector");
     fs::create_dir_all(&perm_dir).expect("create perm dir");
-    let perm_out = common::run_ocl_cli(
+    let perm_out = common::run_ocp_cli(
         &[
             "perm",
             "snapshot",
@@ -58,14 +58,14 @@ fn v18_golden_journey_connector_runs_quarantine_replay_with_perm_and_budget_chec
     let _ = common::assert_ok(&perm_out, "perm snapshot");
     steps.push(json!({"name":"perm_snapshot","ok":true}));
 
-    let run_without = common::run_ocl_cli(&["run", &root_s], &empty);
+    let run_without = common::run_ocp_cli(&["run", &root_s], &empty);
     let _ = common::assert_fail(&run_without, "run without quarantine env");
 
-    let run_with = common::run_ocl_cli(&["run", &root_s], &quarantine_env);
+    let run_with = common::run_ocp_cli(&["run", &root_s], &quarantine_env);
     let _ = common::assert_ok(&run_with, "run with quarantine env");
     let artifact = common::latest_artifact_dir(&root);
 
-    let budget = common::run_ocl_cli(
+    let budget = common::run_ocp_cli(
         &["budget", "analyze", &artifact.to_string_lossy(), "--json"],
         &empty,
     );
@@ -81,16 +81,16 @@ fn v18_golden_journey_connector_runs_quarantine_replay_with_perm_and_budget_chec
     );
     steps.push(json!({"name":"budget_analyze","ok":true}));
 
-    let replay_without = common::run_ocl_cli(&["replay", &artifact.to_string_lossy()], &empty);
+    let replay_without = common::run_ocp_cli(&["replay", &artifact.to_string_lossy()], &empty);
     let _ = common::assert_fail(&replay_without, "replay without quarantine env");
     let replay_with =
-        common::run_ocl_cli(&["replay", &artifact.to_string_lossy()], &quarantine_env);
+        common::run_ocp_cli(&["replay", &artifact.to_string_lossy()], &quarantine_env);
     let _ = common::assert_ok(&replay_with, "replay with quarantine env");
     steps.push(json!({"name":"run_replay_quarantine","ok":true}));
 
     let report = json!({
-        "schema": "ocl.w18.rc.golden_journey_connector_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.rc.golden_journey_connector_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "project_root": root.to_string_lossy().replace('\\', "/"),
         "steps": steps,
         "artifacts": {

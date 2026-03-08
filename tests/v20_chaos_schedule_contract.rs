@@ -41,7 +41,7 @@ fn v20_chaos_schedule_contract() {
     };
 
     let report = json!({
-        "schema": "ocl.w20.chaos_schedule_report.v1",
+        "schema": "ocp.w20.chaos_schedule_report.v1",
         "status": "PASS",
         "feature_gate": "w20_chaos",
         "faults_per_run": faults_per_run,
@@ -49,7 +49,7 @@ fn v20_chaos_schedule_contract() {
         "schedule_length": schedule_a.len(),
         "schedule_digest": schedule_digest,
         "schedule_preview": schedule_a.iter().take(8).cloned().collect::<Vec<serde_json::Value>>(),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20d::run_manifest_sha256()
     });
 

@@ -15,7 +15,7 @@ fn v18_budget_analyze_path_outputs_machine_readable_path_and_report() {
     common::write_budget_analyze_fixture(&artifact);
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(
+    let out = common::run_ocp_cli(
         &["budget", "analyze", &artifact_s, "--json"],
         &BTreeMap::new(),
     );
@@ -46,8 +46,8 @@ fn v18_budget_analyze_path_outputs_machine_readable_path_and_report() {
     let out_dir = common::w18_ops_dir();
     fs::create_dir_all(&out_dir).expect("create w18 ops dir");
     let report = json!({
-        "schema": "ocl.w18.ops.budget_analyze_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.ops.budget_analyze_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "artifact_dir": artifact.to_string_lossy().replace('\\', "/"),
         "observe_events": parsed.get("observe_events").cloned().unwrap_or(JsonValue::from(0)),
         "budget_pressure_events": parsed.get("budget_pressure_events").cloned().unwrap_or(JsonValue::from(0)),

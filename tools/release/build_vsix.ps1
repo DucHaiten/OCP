@@ -2,9 +2,9 @@ param(
     [string]$BinarySource = "",
     [string]$LspSource = "",
     [string]$DapSource = "",
-    [string]$ExtensionRoot = "editor/vscode/ocp-ocl",
-    [string]$StageRoot = "target/ocl/w100/stage/vsix",
-    [string]$ReleaseRoot = "target/ocl/w100/release",
+    [string]$ExtensionRoot = "editor/vscode/ocp",
+    [string]$StageRoot = "target/ocp/w100/stage/vsix",
+    [string]$ReleaseRoot = "target/ocp/w100/release",
     [string]$Version = "1.0.0"
 )
 
@@ -16,7 +16,7 @@ $stageRootPath = Join-Path $repoRoot $StageRoot
 $releaseRootPath = Join-Path $repoRoot $ReleaseRoot
 $packageRoot = Join-Path $stageRootPath "package"
 $extensionStageRoot = Join-Path $packageRoot "extension"
-$vsixPath = Join-Path $releaseRootPath "ocp-ocl-vscode-v1.0.0.vsix"
+$vsixPath = Join-Path $releaseRootPath "ocp-vscode-v1.0.0.vsix"
 
 function Resolve-BinarySource {
     param(
@@ -52,17 +52,17 @@ if (-not (Test-Path $extensionRootPath)) {
     throw "Extension root not found: $extensionRootPath"
 }
 
-$cliBinaryPath = Resolve-BinarySource -InputPath $BinarySource -RepoRoot $repoRoot -FriendlyName "ocl.exe" -Fallbacks @(
-    "target\release\ocl-cli.exe",
-    "projects\ocp-ocl\crates\ocl-cli\target\release\ocl-cli.exe"
+$cliBinaryPath = Resolve-BinarySource -InputPath $BinarySource -RepoRoot $repoRoot -FriendlyName "ocp.exe" -Fallbacks @(
+    "target\release\ocp-cli.exe",
+    "projects\ocp\crates\ocp-cli\target\release\ocp-cli.exe"
 )
-$lspBinaryPath = Resolve-BinarySource -InputPath $LspSource -RepoRoot $repoRoot -FriendlyName "ocl-lsp.exe" -Fallbacks @(
-    "target\release\ocl-lsp.exe",
-    "projects\ocp-ocl\crates\ocl-lsp\target\release\ocl-lsp.exe"
+$lspBinaryPath = Resolve-BinarySource -InputPath $LspSource -RepoRoot $repoRoot -FriendlyName "ocp-lsp.exe" -Fallbacks @(
+    "target\release\ocp-lsp.exe",
+    "projects\ocp\crates\ocp-lsp\target\release\ocp-lsp.exe"
 )
-$dapBinaryPath = Resolve-BinarySource -InputPath $DapSource -RepoRoot $repoRoot -FriendlyName "ocl-dap.exe" -Fallbacks @(
-    "target\release\ocl-dap.exe",
-    "projects\ocp-ocl\crates\ocl-dap\target\release\ocl-dap.exe"
+$dapBinaryPath = Resolve-BinarySource -InputPath $DapSource -RepoRoot $repoRoot -FriendlyName "ocp-dap.exe" -Fallbacks @(
+    "target\release\ocp-dap.exe",
+    "projects\ocp\crates\ocp-dap\target\release\ocp-dap.exe"
 )
 
 $required = @(
@@ -73,10 +73,10 @@ $required = @(
     "dist\commands.js",
     "dist\lspClient.js",
     "dist\runtimePaths.js",
-    "syntaxes\ocp-ocl.tmLanguage.json",
-    "icons\ocp-ocl.svg",
-    "icons\ocp-ocl-icon-theme.json",
-    "snippets\ocp-ocl.json"
+    "syntaxes\ocp.tmLanguage.json",
+    "icons\ocp.svg",
+    "icons\ocp-icon-theme.json",
+    "snippets\ocp.json"
 )
 
 foreach ($rel in $required) {
@@ -112,9 +112,9 @@ foreach ($rel in $copyTargets) {
 
 $binStageRoot = Join-Path $extensionStageRoot "bin\win-x64"
 New-Item -ItemType Directory -Force -Path $binStageRoot | Out-Null
-Copy-Item $cliBinaryPath (Join-Path $binStageRoot "ocl.exe") -Force
-Copy-Item $lspBinaryPath (Join-Path $binStageRoot "ocl-lsp.exe") -Force
-Copy-Item $dapBinaryPath (Join-Path $binStageRoot "ocl-dap.exe") -Force
+Copy-Item $cliBinaryPath (Join-Path $binStageRoot "ocp.exe") -Force
+Copy-Item $lspBinaryPath (Join-Path $binStageRoot "ocp-lsp.exe") -Force
+Copy-Item $dapBinaryPath (Join-Path $binStageRoot "ocp-dap.exe") -Force
 
 $packageJsonPath = Join-Path $extensionRootPath "package.json"
 $packageJson = Get-Content -Path $packageJsonPath -Raw | ConvertFrom-Json
@@ -128,13 +128,13 @@ $packageJsonRendered = $packageJson | ConvertTo-Json -Depth 100
 )
 
 $readme = @(
-    "# OCP OCL VSCode Extension",
+    "# OCP VSCode Extension",
     "",
-    "Bundled with OCP-OCL v1.0.0 release installer.",
+    "Bundled with OCP v1.0.0 release installer.",
     "",
     "If auto-install did not run, install this file manually:",
     "- Extensions view -> ... -> Install from VSIX",
-    '- or `code --install-extension ocp-ocl-vscode-v1.0.0.vsix --force`'
+    '- or `code --install-extension ocp-vscode-v1.0.0.vsix --force`'
 ) -join [Environment]::NewLine
 [System.IO.File]::WriteAllText((Join-Path $extensionStageRoot "README.md"), $readme, [System.Text.Encoding]::UTF8)
 
@@ -156,10 +156,10 @@ $manifest = @'
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xml:lang="en-US">
   <Metadata>
-    <Identity Id="ocp-ocl" Version="1.0.0" Language="en-US" Publisher="ocp-ocl" />
-    <DisplayName>OCP OCL</DisplayName>
-    <Description xml:space="preserve">Observation Collapse Language support for VSCode.</Description>
-    <Tags>ocl,ocp-ocl</Tags>
+    <Identity Id="ocp" Version="1.0.0" Language="en-US" Publisher="ocp" />
+    <DisplayName>OCP</DisplayName>
+    <Description xml:space="preserve">OCP support for VSCode.</Description>
+    <Tags>ocp,ocp</Tags>
     <Categories>Programming Languages</Categories>
     <Properties>
       <Property Id="Microsoft.VisualStudio.Code.Engine" Value="^1.90.0" />

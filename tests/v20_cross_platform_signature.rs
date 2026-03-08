@@ -44,12 +44,12 @@ fn v20_cross_platform_signature() {
     );
 
     let current_report = json!({
-        "schema": "ocl.w20.cross_platform_signature_report.v1",
+        "schema": "ocp.w20.cross_platform_signature_report.v1",
         "status": "PASS",
         "os_profile": current_profile,
         "signature": canonical_signature,
         "source_seed_hash": v20b::sha256_hex_bytes(seed.as_bytes()),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20b::run_manifest_sha256()
     });
     let current_path = v20b::w20_target_root()
@@ -101,13 +101,13 @@ fn v20_cross_platform_signature() {
     }
 
     let aggregate = json!({
-        "schema": "ocl.w20.cross_platform_signature_aggregate_report.v1",
+        "schema": "ocp.w20.cross_platform_signature_aggregate_report.v1",
         "mode": mode,
         "status": if missing.is_empty() { "PASS" } else { "INCOMPLETE" },
         "required_profiles": v20b::expected_os_profiles(),
         "missing_profiles": missing,
         "items": seen,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20b::run_manifest_sha256()
     });
     v20b::write_report(

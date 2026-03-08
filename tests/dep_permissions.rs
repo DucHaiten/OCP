@@ -2,14 +2,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{check_project_with_lock, compute_effective_permissions_v10, init_project};
+use ocp_sdk::{check_project_with_lock, compute_effective_permissions_v10, init_project};
 
 fn temp_project_dir(tag: &str) -> PathBuf {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_nanos();
-    std::env::temp_dir().join(format!("ocl_v10_dep_permissions_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v10_dep_permissions_{tag}_{stamp}"))
 }
 
 fn write_text(path: &Path, content: &str) {
@@ -25,7 +25,7 @@ fn v10_effective_permissions_apply_bool_number_enum_and_glob_algebra() {
     init_project(&root).expect("init");
 
     write_text(
-        &root.join("Ocl.toml"),
+        &root.join("Ocp.toml"),
         concat!(
             "[package]\n",
             "name = \"perm_algebra_demo\"\n",
@@ -59,12 +59,12 @@ fn v10_effective_permissions_apply_bool_number_enum_and_glob_algebra() {
     );
 
     write_text(
-        &root.join("deps").join("toolkit").join("package.oclp"),
+        &root.join("deps").join("toolkit").join("package.ocpp"),
         concat!(
             "[package]\n",
             "name = \"toolkit\"\n",
             "version = \"1.0.0\"\n",
-            "entry = \"src/worker.ocl\"\n\n",
+            "entry = \"src/worker.ocp\"\n\n",
             "[exports]\n",
             "modules = [\"worker\"]\n\n",
             "[requested_permissions]\n",
@@ -124,7 +124,7 @@ fn v10_dependency_requested_permissions_can_block_even_if_project_grants() {
     init_project(&root).expect("init");
 
     write_text(
-        &root.join("Ocl.toml"),
+        &root.join("Ocp.toml"),
         concat!(
             "[package]\n",
             "name = \"perm_runtime_demo\"\n",
@@ -144,17 +144,17 @@ fn v10_dependency_requested_permissions_can_block_even_if_project_grants() {
         ),
     );
     write_text(
-        &root.join("src").join("main.ocl"),
+        &root.join("src").join("main.ocp"),
         "import toolkit.worker;\nlet ready = true;\ncondition(ready);\n",
     );
 
     write_text(
-        &root.join("deps").join("toolkit").join("package.oclp"),
+        &root.join("deps").join("toolkit").join("package.ocpp"),
         concat!(
             "[package]\n",
             "name = \"toolkit\"\n",
             "version = \"1.0.0\"\n",
-            "entry = \"src/worker.ocl\"\n\n",
+            "entry = \"src/worker.ocp\"\n\n",
             "[exports]\n",
             "modules = [\"worker\"]\n\n",
             "[requested_permissions]\n",
@@ -163,7 +163,7 @@ fn v10_dependency_requested_permissions_can_block_even_if_project_grants() {
         ),
     );
     write_text(
-        &root.join("deps").join("toolkit").join("src").join("worker.ocl"),
+        &root.join("deps").join("toolkit").join("src").join("worker.ocp"),
         "observe(\"std.proc.exec\", \"tier2\", ctx(\"bin=git;args=status\"), budget(5)) -> r;\nlet ok = true;\ncondition(ok);\n",
     );
 

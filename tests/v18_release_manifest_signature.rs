@@ -1,4 +1,4 @@
-use ocl_sdk::{verify_contract_json_signature_v18, W18_HASHER_VERSION};
+use ocp_sdk::{verify_contract_json_signature_v18, W18_HASHER_VERSION};
 use serde_json::json;
 
 #[path = "v18_gate_f_common.rs"]
@@ -16,8 +16,8 @@ fn v18_release_manifest_signature_verifies_with_trust_store() {
     assert_eq!(summary.trust_epoch, Some(1));
 
     let report = json!({
-        "schema": "ocl.w18.rc.release_manifest_signature_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.rc.release_manifest_signature_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "manifest_path": manifest_path.to_string_lossy().replace('\\', "/"),
         "canonical_signature_path": canonical_sig_path.to_string_lossy().replace('\\', "/"),
         "compat_signature_path": common::w18_rc_dir().join("release_artifact_manifest.sig").to_string_lossy().replace('\\', "/"),

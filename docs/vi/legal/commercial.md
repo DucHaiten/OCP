@@ -1,6 +1,6 @@
-# Commercial Terms OCP-OCL v1.0
+# Commercial Terms OCP v1.0
 
-Tài liệu này giải thích nhánh thương mại của OCP-OCL theo cách người dùng và tổ chức có thể đọc để ra quyết định ban đầu.
+Tài liệu này giải thích nhánh thương mại của OCP theo cách người dùng và tổ chức có thể đọc để ra quyết định ban đầu.
 
 Mục tiêu của file này không phải là thay thế hợp đồng thương mại cụ thể.  
 Mục tiêu của nó là làm rõ:
@@ -12,14 +12,14 @@ Mục tiêu của nó là làm rõ:
 
 Nếu bạn chỉ cần kết luận nhanh, đây là 4 điểm quan trọng nhất:
 
-1. OCP-OCL có mô hình `dual-license`.
+1. OCP có mô hình `dual-license`.
 2. Nhánh OSS vẫn là `AGPL-3.0-only`.
 3. Nhánh thương mại không tự phát sinh chỉ vì bạn là công ty hay dùng trong bối cảnh thương mại.
 4. Nếu bạn cần điều khoản khác với nhánh OSS, bạn phải đi qua một thỏa thuận thương mại riêng.
 
-## 1) Nhánh thương mại của OCP-OCL là gì?
+## 1) Nhánh thương mại của OCP là gì?
 
-Nhánh thương mại là con đường cấp quyền riêng cho các trường hợp không muốn hoặc không thể dùng OCP-OCL chỉ theo nhánh OSS.
+Nhánh thương mại là con đường cấp quyền riêng cho các trường hợp không muốn hoặc không thể dùng OCP chỉ theo nhánh OSS.
 
 Nói đơn giản:
 - nếu bạn dùng theo nhánh OSS, bạn đọc và tuân theo `LICENSE`;
@@ -34,7 +34,7 @@ Nói đơn giản:
 
 Bạn nên đi theo nhánh thương mại nếu rơi vào một hoặc nhiều trường hợp sau:
 
-- bạn muốn phân phối, embed, hoặc tích hợp OCP-OCL vào một sản phẩm proprietary;
+- bạn muốn phân phối, embed, hoặc tích hợp OCP vào một sản phẩm proprietary;
 - bạn cần điều khoản pháp lý riêng cho tổ chức, doanh nghiệp, hoặc procurement;
 - bạn cần support cam kết bằng văn bản;
 - bạn cần SLA, warranty, indemnity, hoặc các điều khoản enterprise tương tự;
@@ -73,7 +73,7 @@ Nhánh thương mại tồn tại để hỗ trợ các trường hợp cần:
 ### 4.2) Điều file này không tự động hứa
 
 File này không có nghĩa là:
-- mọi tổ chức dùng OCP-OCL đều bắt buộc phải mua;
+- mọi tổ chức dùng OCP đều bắt buộc phải mua;
 - mọi use-case enterprise đều tự động được cấp ngoại lệ;
 - có sẵn bảng giá, SLA, hoặc warranty mặc định cho mọi người;
 - chỉ cần đọc file này là bạn đã có commercial license hợp lệ.
@@ -105,7 +105,7 @@ Ba file này có vai trò khác nhau:
 
 ### `docs/vi/legal/licensing.md`
 - giải thích bức tranh tổng thể:
-  - OCP-OCL dùng license gì;
+  - OCP dùng license gì;
   - dual-license nghĩa là gì;
   - khi nào nên đọc theo nhánh OSS, khi nào nên đọc theo nhánh thương mại.
 
@@ -177,7 +177,7 @@ Nếu bạn đang đưa ra quyết định có ảnh hưởng pháp lý, tài ch
 ## 11) Kết luận
 
 Hiểu theo cách thực dụng nhất:
-- OCP-OCL có nhánh thương mại, nhưng nhánh này không tự động phát sinh;
+- OCP có nhánh thương mại, nhưng nhánh này không tự động phát sinh;
 - nhánh OSS vẫn là điểm mặc định nếu chưa có thỏa thuận riêng;
 - commercial path tồn tại để xử lý các nhu cầu không phù hợp với OSS side;
 - mọi ngoại lệ hoặc quyền thương mại riêng phải được xác nhận rõ, không tự suy diễn.

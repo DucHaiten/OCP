@@ -14,12 +14,12 @@ fn v18_privacy_no_secrets_gate_detects_sensitive_markers() {
     );
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&["cassette", "stats", &artifact_s]);
+    let out = common::run_ocp_cli(&["cassette", "stats", &artifact_s]);
     common::assert_failed_with(&out, "X-CASSETTE-PRIVACY-LEAK");
 
     let report = json!({
-        "schema": "ocl.w18.security.privacy_hygiene_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.security.privacy_hygiene_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "artifact_dir": artifact.to_string_lossy().replace('\\', "/"),
         "reason_code": "X-CASSETTE-PRIVACY-LEAK",
         "status": "PASS"

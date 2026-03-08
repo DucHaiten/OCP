@@ -1,7 +1,7 @@
 #[path = "w17_gate_c_common.rs"]
 mod w17;
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     canonical_round_robin_order, canonical_task_event_order, resolve_task_lifecycle,
     LogicalTaskEvent, TaskLifecycleDecision,
 };

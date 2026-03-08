@@ -1,10 +1,10 @@
 use std::sync::{Mutex, OnceLock};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, Cacheability, CapabilityRegistry, ExecConfig, Executor,
 };
 
-fn run_with_registry(src: &str, registry: CapabilityRegistry) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_with_registry(src: &str, registry: CapabilityRegistry) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::with_registry(
@@ -67,10 +67,10 @@ observe("engine.ui.run", "tier2", ctx("entry_module=app.main;phase=frame;tick=9;
         "expected at least one cached entry"
     );
 
-    let Some(ocp_ocl::ocp_ocl::Value::Result4(a)) = out.env.get("a") else {
+    let Some(ocp::ocp::Value::Result4(a)) = out.env.get("a") else {
         panic!("binding a must be Result4");
     };
-    let Some(ocp_ocl::ocp_ocl::Value::Result4(b)) = out.env.get("b") else {
+    let Some(ocp::ocp::Value::Result4(b)) = out.env.get("b") else {
         panic!("binding b must be Result4");
     };
     assert_eq!(a.kind, b.kind, "kind must stay identical");
@@ -86,10 +86,10 @@ fn game_incremental_cache_keeps_signature_equal_when_cache_disabled() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_GAME_ENABLED", "1");
-    let _seed = EnvVarGuard::set("OCL_STD_GAME_BASE_SEED", "321");
-    let _streams = EnvVarGuard::set("OCL_STD_GAME_RNG_STREAMS", "main,loot");
-    let _count_cap = EnvVarGuard::set("OCL_STD_GAME_RNG_MAX_COUNT", "8");
+    let _enabled = EnvVarGuard::set("OCP_STD_GAME_ENABLED", "1");
+    let _seed = EnvVarGuard::set("OCP_STD_GAME_BASE_SEED", "321");
+    let _streams = EnvVarGuard::set("OCP_STD_GAME_RNG_STREAMS", "main,loot");
+    let _count_cap = EnvVarGuard::set("OCP_STD_GAME_RNG_MAX_COUNT", "8");
 
     let src = r#"
 observe("engine.game.run", "tier2", ctx("entry_module=game.main;tick=4;stream=main;count=3;state_json={\"score\":2};draw_list=text:1,1,score,12"), budget(5)) -> a;

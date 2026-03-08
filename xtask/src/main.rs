@@ -73,15 +73,15 @@ fn write_editor_ci_report(
     steps: &[serde_json::Value],
 ) -> Result<(), String> {
     let report = json!({
-        "schema": "ocl.w19.community.editor_ci_entrypoint_report.v1",
+        "schema": "ocp.w19.community.editor_ci_entrypoint_report.v1",
         "status": status,
         "entrypoint": "cargo xtask editor-ci",
         "steps": steps,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json"
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json"
     });
     let out = repo_root
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w19")
         .join("community")
         .join("editor_ci_entrypoint_report.json");

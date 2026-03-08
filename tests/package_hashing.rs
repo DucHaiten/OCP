@@ -2,8 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{
-    build_oclpkg_with_lock, init_project, sync_deps_lock_v1, sync_deps_lock_v2,
+use ocp_sdk::{
+    build_ocppkg_with_lock, init_project, sync_deps_lock_v1, sync_deps_lock_v2,
     verify_supply_artifact,
 };
 
@@ -12,10 +12,10 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v10_pkg_hash_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v10_pkg_hash_{tag}_{stamp}"))
 }
 
-fn write_ocl_manifest(root: &Path, package_name: &str) {
+fn write_ocp_manifest(root: &Path, package_name: &str) {
     let manifest = format!(
         concat!(
             "[package]\n",
@@ -31,10 +31,10 @@ fn write_ocl_manifest(root: &Path, package_name: &str) {
         ),
         package_name
     );
-    fs::write(root.join("Ocl.toml"), manifest).expect("write Ocl.toml");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write Ocp.toml");
 }
 
-fn write_package_oclp(root: &Path, package_name: &str, version: &str, entry: &str) {
+fn write_package_ocpp(root: &Path, package_name: &str, version: &str, entry: &str) {
     let body = format!(
         concat!(
             "[package]\n",
@@ -48,20 +48,20 @@ fn write_package_oclp(root: &Path, package_name: &str, version: &str, entry: &st
         ),
         package_name, version, entry
     );
-    fs::write(root.join("package.oclp"), body).expect("write package.oclp");
+    fs::write(root.join("package.ocpp"), body).expect("write package.ocpp");
 }
 
 fn prepare_project_with_main_bytes(
     root: &Path,
-    ocl_package_name: &str,
-    package_oclp_name: &str,
-    package_oclp_version: &str,
+    ocp_package_name: &str,
+    package_ocpp_name: &str,
+    package_ocpp_version: &str,
     entry: &str,
     main_bytes: &[u8],
 ) {
     init_project(root).expect("init");
-    write_ocl_manifest(root, ocl_package_name);
-    write_package_oclp(root, package_oclp_name, package_oclp_version, entry);
+    write_ocp_manifest(root, ocp_package_name);
+    write_package_ocpp(root, package_ocpp_name, package_ocpp_version, entry);
 
     let entry_path = root.join(entry);
     if let Some(parent) = entry_path.parent() {
@@ -74,24 +74,24 @@ fn prepare_project_with_main_bytes(
 }
 
 #[test]
-fn v10_package_oclp_parser_overrides_legacy_manifest_identity() {
+fn v10_package_ocpp_parser_overrides_legacy_manifest_identity() {
     let root = temp_project_dir("parser_override");
     prepare_project_with_main_bytes(
         &root,
         "legacy_name",
         "pkg_parser_v10",
         "1.2.3",
-        "src/app/main.ocl",
+        "src/app/main.ocp",
         b"let ready = true;\ncondition(ready);\n",
     );
 
-    let build = build_oclpkg_with_lock(&root, false).expect("build");
+    let build = build_ocppkg_with_lock(&root, false).expect("build");
     let file_name = build
         .artifact_path
         .file_name()
         .and_then(|v| v.to_str())
         .unwrap_or_default();
-    assert_eq!(file_name, "pkg_parser_v10-1.2.3.oclpkg");
+    assert_eq!(file_name, "pkg_parser_v10-1.2.3.ocppkg");
 }
 
 #[test]
@@ -102,10 +102,10 @@ fn v10_content_hash_text_is_lf_normalized() {
         "legacy_text",
         "pkg_text_norm",
         "0.1.0",
-        "src/main.ocl",
+        "src/main.ocp",
         b"let a = true;\ncondition(a);\n",
     );
-    let build_lf = build_oclpkg_with_lock(&root_lf, false).expect("build lf");
+    let build_lf = build_ocppkg_with_lock(&root_lf, false).expect("build lf");
 
     let root_crlf = temp_project_dir("text_crlf");
     prepare_project_with_main_bytes(
@@ -113,10 +113,10 @@ fn v10_content_hash_text_is_lf_normalized() {
         "legacy_text",
         "pkg_text_norm",
         "0.1.0",
-        "src/main.ocl",
+        "src/main.ocp",
         b"let a = true;\r\ncondition(a);\r\n",
     );
-    let build_crlf = build_oclpkg_with_lock(&root_crlf, false).expect("build crlf");
+    let build_crlf = build_ocppkg_with_lock(&root_crlf, false).expect("build crlf");
 
     assert_eq!(
         build_lf.content_hash_sha256, build_crlf.content_hash_sha256,
@@ -136,7 +136,7 @@ fn v10_content_hash_binary_uses_raw_bytes_without_newline_normalization() {
         "legacy_bin",
         "pkg_bin_raw",
         "0.1.0",
-        "src/main.ocl",
+        "src/main.ocp",
         b"let a = true;\ncondition(a);\n",
     );
     fs::create_dir_all(root_a.join("assets")).expect("create assets");
@@ -145,7 +145,7 @@ fn v10_content_hash_binary_uses_raw_bytes_without_newline_normalization() {
         [0u8, b'A', b'\r', b'\n', b'B'],
     )
     .expect("write bin a");
-    let build_a = build_oclpkg_with_lock(&root_a, false).expect("build a");
+    let build_a = build_ocppkg_with_lock(&root_a, false).expect("build a");
 
     let root_b = temp_project_dir("bin_b");
     prepare_project_with_main_bytes(
@@ -153,7 +153,7 @@ fn v10_content_hash_binary_uses_raw_bytes_without_newline_normalization() {
         "legacy_bin",
         "pkg_bin_raw",
         "0.1.0",
-        "src/main.ocl",
+        "src/main.ocp",
         b"let a = true;\ncondition(a);\n",
     );
     fs::create_dir_all(root_b.join("assets")).expect("create assets");
@@ -162,7 +162,7 @@ fn v10_content_hash_binary_uses_raw_bytes_without_newline_normalization() {
         [0u8, b'A', b'\n', b'B'],
     )
     .expect("write bin b");
-    let build_b = build_oclpkg_with_lock(&root_b, false).expect("build b");
+    let build_b = build_ocppkg_with_lock(&root_b, false).expect("build b");
 
     assert_ne!(
         build_a.content_hash_sha256, build_b.content_hash_sha256,
@@ -178,10 +178,10 @@ fn v10_verify_supply_fails_when_content_hash_is_tampered() {
         "legacy_tamper",
         "pkg_tamper",
         "0.1.0",
-        "src/main.ocl",
+        "src/main.ocp",
         b"let ok = true;\ncondition(ok);\n",
     );
-    let build = build_oclpkg_with_lock(&root, false).expect("build");
+    let build = build_ocppkg_with_lock(&root, false).expect("build");
 
     let raw = fs::read_to_string(&build.artifact_path).expect("read artifact");
     let mut lines: Vec<String> = raw.lines().map(|v| v.to_string()).collect();

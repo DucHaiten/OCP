@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.redteam_attack_matrix.v1",
+  "schema": "ocp.v20.redteam_attack_matrix.v1",
   "contract_id": "v20.redteam_attack_matrix",
   "version": "v1",
   "vectors": [

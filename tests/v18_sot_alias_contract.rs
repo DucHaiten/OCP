@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::verify_sot_alias_contract_v18;
+use ocp_sdk::verify_sot_alias_contract_v18;
 use serde_json::json;
 
 #[path = "v18_gate_a_common.rs"]
@@ -19,8 +19,8 @@ fn v18_sot_alias_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w18.sot_alias_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.sot_alias_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "alias_count": summary.alias_count,
         "verified_count": summary.verified_count,
         "items": summary.items.iter().map(|item| json!({

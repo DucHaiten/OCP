@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.tooling_versions.v1",
+  "schema": "ocp.v20.tooling_versions.v1",
   "contract_id": "v20.tooling_versions",
   "version": "v1",
   "tooling_id": "w20-tooling-v1",

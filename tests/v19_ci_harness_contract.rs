@@ -12,7 +12,7 @@ fn v19_ci_harness_contract() {
         .get("schema")
         .and_then(|v| v.as_str())
         .expect("schema");
-    assert_eq!(schema, "ocl.editor.ci_harness.v1");
+    assert_eq!(schema, "ocp.editor.ci_harness.v1");
 
     let profiles = harness
         .get("os_profiles")
@@ -38,7 +38,7 @@ fn v19_ci_harness_contract() {
         .expect("commands");
     let has_integration = commands
         .iter()
-        .any(|item| item.as_str() == Some("pnpm --dir editor/vscode/ocp-ocl run test:integration"));
+        .any(|item| item.as_str() == Some("pnpm --dir editor/vscode/ocp run test:integration"));
     assert!(has_integration, "missing integration command contract");
 
     let required_fields = harness
@@ -53,12 +53,12 @@ fn v19_ci_harness_contract() {
     }
 
     let report = json!({
-        "schema": "ocl.w19.rc.ci_harness_report.v1",
+        "schema": "ocp.w19.rc.ci_harness_report.v1",
         "status": "PASS",
         "os_profiles": names,
         "commands": commands,
         "provenance_required_fields": required_fields,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19g::run_manifest_sha256()
     });
     v19g::write_report("rc/ci_harness_report.json", &report);

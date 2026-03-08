@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{
+use ocp_sdk::{
     init_project, resolve_deps_v3, sign_deps_lock_v3_v15, sync_deps_lock_v1,
     write_permission_snapshot_v15,
 };
@@ -13,18 +13,18 @@ fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 fn assert_success(output: &Output, step: &str) -> String {
@@ -94,14 +94,14 @@ fn write_manifest_for_lts(root: &Path) {
         "version = \"0.1.0\"\n\n",
         "[project]\n",
         "lane = \"locked_v071\"\n",
-        "entry = \"src/main.ocl\"\n\n",
+        "entry = \"src/main.ocp\"\n\n",
         "[dependencies]\n",
         "std = \"0.1.0\"\n\n",
         "[permissions.package]\n",
         "allow = [\"std.log.info\"]\n",
         "deny = []\n"
     );
-    fs::write(root.join("Ocl.toml"), manifest).expect("write Ocl.toml");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write Ocp.toml");
 }
 
 fn write_conformance_manifest(manifest_path: &Path, project_root: &Path) {
@@ -124,14 +124,14 @@ fn write_conformance_manifest(manifest_path: &Path, project_root: &Path) {
 fn write_w16_security_reports_from_lts(report: &JsonValue) {
     let out_dir = repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w16")
         .join("security");
     fs::create_dir_all(&out_dir).expect("create w16 security output dir");
 
     let lts_report = serde_json::json!({
-        "schema": "ocl.w16.security.lts_strict.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.security.lts_strict.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "source_schema": report.get("schema").cloned().unwrap_or(JsonValue::Null),
         "ok": report.get("ok").cloned().unwrap_or(JsonValue::Bool(false)),
         "gates": report.get("gates").cloned().unwrap_or(JsonValue::Null),
@@ -144,8 +144,8 @@ fn write_w16_security_reports_from_lts(report: &JsonValue) {
     .expect("write lts_strict_report.json");
 
     let security_chain = serde_json::json!({
-        "schema": "ocl.w16.security.chain.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.security.chain.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "lock_signature_ok": report
             .pointer("/gates/lock_signature/ok")
             .and_then(JsonValue::as_bool)
@@ -202,7 +202,7 @@ fn lts_check_passes_and_report_is_actionable() {
     let manifest_s = canonical_slash_path(&manifest_path);
     let report_s = canonical_slash_path(&report_path);
 
-    let out = run_ocl_cli(&[
+    let out = run_ocp_cli(&[
         "lts",
         "check",
         &project_s,
@@ -216,7 +216,7 @@ fn lts_check_passes_and_report_is_actionable() {
     let report: JsonValue = serde_json::from_str(&stdout).expect("parse lts report");
     assert_eq!(
         report.get("schema").and_then(JsonValue::as_str),
-        Some("ocl.lts_check.v1")
+        Some("ocp.lts_check.v1")
     );
     assert_eq!(report.get("ok").and_then(JsonValue::as_bool), Some(true));
     assert_eq!(
@@ -270,7 +270,7 @@ fn lts_check_passes_and_report_is_actionable() {
     assert!(report_path.exists(), "lts report file missing");
     write_w16_security_reports_from_lts(&report);
 
-    let report_view = run_ocl_cli(&["lts", "report", &report_s, "--json"]);
+    let report_view = run_ocp_cli(&["lts", "report", &report_s, "--json"]);
     let report_stdout = assert_success(&report_view, "lts report");
     let report_view_json: JsonValue =
         serde_json::from_str(&report_stdout).expect("parse lts report view");
@@ -286,7 +286,7 @@ fn lts_check_fails_when_permission_baseline_missing() {
     let manifest_s = canonical_slash_path(&manifest_path);
     let report_s = canonical_slash_path(&report_path);
 
-    let out = run_ocl_cli(&[
+    let out = run_ocp_cli(&[
         "lts",
         "check",
         &project_s,

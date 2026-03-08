@@ -16,9 +16,9 @@ fn v18_fix_plan_apply_generates_plan_patch_report_and_approval_record() {
     let root_s = root.to_string_lossy().to_string();
     let empty = BTreeMap::new();
 
-    let plan = common::run_ocl_cli(&["perm", "fix", "--plan", &root_s], &empty);
+    let plan = common::run_ocp_cli(&["perm", "fix", "--plan", &root_s], &empty);
     common::assert_ok(&plan, "perm fix --plan");
-    let apply = common::run_ocl_cli(
+    let apply = common::run_ocp_cli(
         &[
             "perm",
             "fix",
@@ -36,7 +36,7 @@ fn v18_fix_plan_apply_generates_plan_patch_report_and_approval_record() {
     );
     common::assert_ok(&apply, "perm fix --apply");
 
-    let dx_dir = root.join("target").join("ocl").join("w17").join("dx");
+    let dx_dir = root.join("target").join("ocp").join("w17").join("dx");
     let plan_file = dx_dir.join("permission_fix_plan.json");
     let patch_file = dx_dir.join("permission_fix.patch.toml");
     let safety_file = dx_dir.join("permission_fix_safety_report.json");
@@ -52,8 +52,8 @@ fn v18_fix_plan_apply_generates_plan_patch_report_and_approval_record() {
     let out_dir = common::w18_ops_dir();
     fs::create_dir_all(&out_dir).expect("create w18 ops dir");
     let report = json!({
-        "schema": "ocl.w18.ops.fix_plan_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.ops.fix_plan_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "project_root": root.to_string_lossy().replace('\\', "/"),
         "plan_path": plan_file.to_string_lossy().replace('\\', "/"),
         "patch_path": patch_file.to_string_lossy().replace('\\', "/"),

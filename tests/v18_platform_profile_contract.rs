@@ -46,8 +46,8 @@ fn v18_platform_profile_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w18.platform_profile_contract_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.platform_profile_contract_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "contract_path": "contracts/platform/supported_profile.v1.json",
         "status": "PASS",
         "profile_count": profiles.len()

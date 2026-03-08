@@ -114,11 +114,11 @@ fn v20_history_toolchain_matrix_contract() {
     }
 
     let report = json!({
-        "schema": "ocl.w20.history_toolchain_matrix_report.v1",
+        "schema": "ocp.w20.history_toolchain_matrix_report.v1",
         "status": "PASS",
         "profile_count": profiles.len(),
         "version_count": versions.len(),
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20::run_manifest_sha256()
     });
     v20::write_report("contracts/history_toolchain_matrix_report.json", &report);

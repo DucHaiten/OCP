@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.hardcore_test_protocol.v1",
+  "schema": "ocp.v20.hardcore_test_protocol.v1",
   "contract_id": "v20.hardcore_test_protocol",
   "version": "v1",
   "fuzz": {
@@ -15,9 +15,9 @@
   },
   "mutation": {
     "scope_modules": [
-      "ocl-runtime-core",
-      "ocl-sdk",
-      "ocl-cli"
+      "ocp-runtime-core",
+      "ocp-sdk",
+      "ocp-cli"
     ],
     "min_score": 0.75
   },

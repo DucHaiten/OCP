@@ -42,7 +42,7 @@ fn v100_release_required_contracts() {
         });
     }
 
-    let update = std::env::var("OCL_UPDATE_V100_REQUIRED_CONTRACTS")
+    let update = std::env::var("OCP_UPDATE_V100_REQUIRED_CONTRACTS")
         .ok()
         .as_deref()
         == Some("1");
@@ -98,11 +98,11 @@ fn v100_release_required_contracts() {
     let inventory_hash =
         v100::sha256_hex_bytes(v100::canonical_json_string(&inventory_value).as_bytes());
     let report = json!({
-        "schema": "ocl.w100.release_required_contracts_report.v1",
+        "schema": "ocp.w100.release_required_contracts_report.v1",
         "status": "PASS",
         "required_count": required.entries.len(),
         "inventory_hash_sha256": inventory_hash,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100::run_manifest_sha256()
     });
     v100::write_report("contracts/release_required_contracts_report.json", &report);

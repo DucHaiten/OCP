@@ -41,7 +41,7 @@ fn v100_legal_consistency() {
 
     let notice = v100f::read_text(&v100f::repo_root().join("NOTICE"));
     assert!(
-        notice.contains("OCP-OCL") && notice.contains("AGPL-3.0-only"),
+        notice.contains("OCP") && notice.contains("AGPL-3.0-only"),
         "NOTICE must identify project name and OSS side"
     );
 
@@ -57,11 +57,11 @@ fn v100_legal_consistency() {
     let en_commercial = v100f::read_text(&v100f::repo_root().join("docs/en/legal/commercial.md"));
     let cargo_manifests = [
         "Cargo.toml",
-        "projects/ocp-ocl/crates/ocl-runtime-core/Cargo.toml",
-        "projects/ocp-ocl/crates/ocl-sdk/Cargo.toml",
-        "projects/ocp-ocl/crates/ocl-cli/Cargo.toml",
-        "projects/ocp-ocl/crates/ocl-lsp/Cargo.toml",
-        "projects/ocp-ocl/crates/ocl-dap/Cargo.toml",
+        "projects/ocp/crates/ocp-runtime-core/Cargo.toml",
+        "projects/ocp/crates/ocp-sdk/Cargo.toml",
+        "projects/ocp/crates/ocp-cli/Cargo.toml",
+        "projects/ocp/crates/ocp-lsp/Cargo.toml",
+        "projects/ocp/crates/ocp-dap/Cargo.toml",
     ];
 
     for (label, content) in [
@@ -99,7 +99,7 @@ fn v100_legal_consistency() {
         &v100f::repo_root()
             .join("editor")
             .join("vscode")
-            .join("ocp-ocl")
+            .join("ocp")
             .join("package.json"),
     );
     assert_eq!(
@@ -118,7 +118,7 @@ fn v100_legal_consistency() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.legal.legal_consistency_report.v1",
+        "schema": "ocp.w100.legal.legal_consistency_report.v1",
         "status": "PASS",
         "oss_license_id": "AGPL-3.0-only",
         "licensing_model": "dual_license",
@@ -127,13 +127,13 @@ fn v100_legal_consistency() {
         "metadata_verified": {
             "cargo_manifests": [
                 "Cargo.toml",
-                "projects/ocp-ocl/crates/ocl-runtime-core/Cargo.toml",
-                "projects/ocp-ocl/crates/ocl-sdk/Cargo.toml",
-                "projects/ocp-ocl/crates/ocl-cli/Cargo.toml",
-                "projects/ocp-ocl/crates/ocl-lsp/Cargo.toml",
-                "projects/ocp-ocl/crates/ocl-dap/Cargo.toml"
+                "projects/ocp/crates/ocp-runtime-core/Cargo.toml",
+                "projects/ocp/crates/ocp-sdk/Cargo.toml",
+                "projects/ocp/crates/ocp-cli/Cargo.toml",
+                "projects/ocp/crates/ocp-lsp/Cargo.toml",
+                "projects/ocp/crates/ocp-dap/Cargo.toml"
             ],
-            "editor_package_json": "editor/vscode/ocp-ocl/package.json"
+            "editor_package_json": "editor/vscode/ocp/package.json"
         },
         "docs_verified": [
             "docs/vi/legal/licensing.md",
@@ -141,7 +141,7 @@ fn v100_legal_consistency() {
             "docs/vi/legal/commercial.md",
             "docs/en/legal/commercial.md"
         ],
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100f::run_manifest_sha256()
     });
     v100f::write_report("legal/legal_consistency_report.json", &report);

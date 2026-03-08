@@ -25,7 +25,7 @@ fn seed_and_upgrade(artifact: &std::path::Path) {
     .expect("write cassette_meta.toml");
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
+    let out = common::run_ocp_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
     common::assert_success(&out);
 }
 
@@ -56,6 +56,6 @@ fn cassette_upgrade_plan_detects_tampered_block_hash() {
     fs::write(&block_path, tampered).expect("write tampered block");
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&["cassette", "upgrade", &artifact_s, "--plan"]);
+    let out = common::run_ocp_cli(&["cassette", "upgrade", &artifact_s, "--plan"]);
     common::assert_failed_with(&out, "X-CASSETTE-UPGRADE-TAMPER");
 }

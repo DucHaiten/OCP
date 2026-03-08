@@ -67,7 +67,7 @@ fn budget_diamond_keeps_edge_scope_by_caller_package() {
     );
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let analyze = common::run_ocl_cli(&["budget", "analyze", &artifact_s, "--json"]);
+    let analyze = common::run_ocp_cli(&["budget", "analyze", &artifact_s, "--json"]);
     let analyze_out = common::assert_success(&analyze);
     let parsed: JsonValue = serde_json::from_str(&analyze_out).expect("parse analyze json");
     let edges = parsed
@@ -90,7 +90,7 @@ fn budget_diamond_keeps_edge_scope_by_caller_package() {
         "missing edge for pkg.B"
     );
 
-    let doctor = common::run_ocl_cli(&["budget", "doctor", &artifact_s, "--json"]);
+    let doctor = common::run_ocp_cli(&["budget", "doctor", &artifact_s, "--json"]);
     let doctor_out = common::assert_success(&doctor);
     let doctor_json: JsonValue = serde_json::from_str(&doctor_out).expect("parse doctor json");
     let issues = doctor_json

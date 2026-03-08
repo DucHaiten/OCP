@@ -12,21 +12,21 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_minimizer_v11_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_minimizer_v11_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 fn write_program_start(path: &PathBuf) {
@@ -178,7 +178,7 @@ fn minimize_error_code_reduces_trace_and_cassette() {
     )
     .expect("write cassette jsonl");
 
-    let cmd = run_ocl_cli(&[
+    let cmd = run_ocp_cli(&[
         "minimize",
         &source.to_string_lossy(),
         "--goal",
@@ -306,7 +306,7 @@ fn minimize_divergence_keeps_prefix_to_first_divergence() {
         &trace_event_line(4, 4, "stmt_exec", None, Some("ok"), None, None, "same-4"),
     );
 
-    let cmd = run_ocl_cli(&[
+    let cmd = run_ocp_cli(&[
         "minimize",
         &source.to_string_lossy(),
         "--goal",
@@ -383,7 +383,7 @@ fn minimize_reduces_fixture_manifest_by_trace_references() {
     )
     .expect("write fixture manifest");
 
-    let cmd = run_ocl_cli(&[
+    let cmd = run_ocp_cli(&[
         "minimize",
         &source.to_string_lossy(),
         "--goal",

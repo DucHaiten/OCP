@@ -48,12 +48,12 @@ fn v20_recovery_fail_honest() {
     }
 
     let report = json!({
-        "schema": "ocl.w20.fail_honest_recovery_report.v1",
+        "schema": "ocp.w20.fail_honest_recovery_report.v1",
         "status": "PASS",
         "feature_gate": "w20_chaos",
         "scenarios": scenarios,
         "bypass_detected": false,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20d::run_manifest_sha256()
     });
 

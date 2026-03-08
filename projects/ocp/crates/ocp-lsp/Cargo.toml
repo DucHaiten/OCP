@@ -1,0 +1,10 @@
+[package]
+name = "ocp-lsp"
+version = "0.1.0"
+edition = "2021"
+authors = ["DucHaiten"]
+license = "AGPL-3.0-only"
+
+[dependencies]
+ocp-sdk = { path = "../ocp-sdk" }
+serde_json = "1"

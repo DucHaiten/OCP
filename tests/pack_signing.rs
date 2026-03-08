@@ -2,14 +2,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{init_project, resolve_deps_v3, verify_deps_signing_and_trust_v10};
+use ocp_sdk::{init_project, resolve_deps_v3, verify_deps_signing_and_trust_v10};
 
 fn temp_project_dir(tag: &str) -> PathBuf {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v10_pack_signing_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v10_pack_signing_{tag}_{stamp}"))
 }
 
 fn write_manifest_with_registry_dep(root: &Path, lane: &str) {
@@ -29,7 +29,7 @@ fn write_manifest_with_registry_dep(root: &Path, lane: &str) {
         ),
         lane
     );
-    fs::write(root.join("Ocl.toml"), manifest).expect("write Ocl.toml");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write Ocp.toml");
 }
 
 fn tamper_non_builtin_signature(lock_path: &Path) {

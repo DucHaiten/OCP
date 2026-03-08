@@ -43,7 +43,7 @@ pub fn repo_root() -> PathBuf {
 }
 
 pub fn w19_target_root() -> PathBuf {
-    repo_root().join("target").join("ocl").join("w19")
+    repo_root().join("target").join("ocp").join("w19")
 }
 
 pub fn run_manifest_path() -> PathBuf {
@@ -143,7 +143,7 @@ fn editor_extension_version() -> String {
     let package_path = repo_root()
         .join("editor")
         .join("vscode")
-        .join("ocp-ocl")
+        .join("ocp")
         .join("package.json");
     if !package_path.exists() {
         return "unknown".to_string();
@@ -179,14 +179,14 @@ fn read_local_cargo_package_version(path: &Path) -> String {
 
 pub fn ensure_run_manifest() -> JsonValue {
     let allowed = vec![
-        "OCL_RELEASE_GRADE".to_string(),
-        "OCL_STRICT_PROFILE".to_string(),
-        "OCL_EDITOR_PROFILE".to_string(),
-        "OCL_EDITOR_TRUST_MODE".to_string(),
+        "OCP_RELEASE_GRADE".to_string(),
+        "OCP_STRICT_PROFILE".to_string(),
+        "OCP_EDITOR_PROFILE".to_string(),
+        "OCP_EDITOR_TRUST_MODE".to_string(),
     ];
     let observed = std::env::vars()
         .map(|(key, _)| key)
-        .filter(|key| key.starts_with("OCL_"))
+        .filter(|key| key.starts_with("OCP_"))
         .collect::<Vec<String>>();
     if let Err(err) = v16::enforce_run_manifest_allowlist(&allowed, &observed) {
         panic!("{err}");
@@ -207,7 +207,7 @@ pub fn ensure_run_manifest() -> JsonValue {
     let pnpm_lock_path = repo
         .join("editor")
         .join("vscode")
-        .join("ocp-ocl")
+        .join("ocp")
         .join("pnpm-lock.yaml");
     let pnpm_lock_hash = if pnpm_lock_path.exists() {
         let bytes = fs::read(&pnpm_lock_path)
@@ -238,13 +238,13 @@ pub fn ensure_run_manifest() -> JsonValue {
         JsonValue::String(editor_extension_version()),
     );
     obj.insert(
-        "ocl_cli_version".to_string(),
+        "ocp_cli_version".to_string(),
         JsonValue::String(read_local_cargo_package_version(
             &repo
                 .join("projects")
-                .join("ocp-ocl")
+                .join("ocp")
                 .join("crates")
-                .join("ocl-cli")
+                .join("ocp-cli")
                 .join("Cargo.toml"),
         )),
     );
@@ -274,7 +274,7 @@ pub fn editor_package_json() -> JsonValue {
         &repo_root()
             .join("editor")
             .join("vscode")
-            .join("ocp-ocl")
+            .join("ocp")
             .join("package.json"),
     )
 }

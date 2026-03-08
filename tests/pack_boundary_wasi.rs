@@ -1,7 +1,7 @@
 #[path = "w17_gate_e_common.rs"]
 mod w17;
 
-use ocl_sdk::{evaluate_pack_boundary_v17, W17_PACK_BOUNDARY_WASI_V1};
+use ocp_sdk::{evaluate_pack_boundary_v17, W17_PACK_BOUNDARY_WASI_V1};
 
 #[test]
 fn v17_pack_boundary_wasi_accepts_wasi_scoped_capabilities() {

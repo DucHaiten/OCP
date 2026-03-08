@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.dx_friction_budget.v1",
+  "schema": "ocp.v20.dx_friction_budget.v1",
   "contract_id": "v20.dx_friction_budget",
   "version": "v1",
   "max_interactions_to_unblock": 6,

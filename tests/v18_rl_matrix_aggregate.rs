@@ -1,4 +1,4 @@
-use ocl_sdk::verify_contract_json_signature_v18;
+use ocp_sdk::verify_contract_json_signature_v18;
 use serde_json::{json, Value as JsonValue};
 
 #[path = "v18_gate_f_common.rs"]
@@ -30,24 +30,24 @@ fn v18_rl_matrix_aggregate_is_complete_and_release_readiness_passes() {
     );
 
     let evidence_paths = vec![
-        "target/ocl/w18/contracts/sot_signature_report.json",
-        "target/ocl/w18/contracts/contract_inventory.json",
-        "target/ocl/w18/contracts/contract_inventory_completeness_report.json",
-        "target/ocl/w18/migration/cassette_upgrade_report.json",
-        "target/ocl/w18/migration/manifest_upgrade_report.json",
-        "target/ocl/w18/migration/pack_abi_upgrade_report.json",
-        "target/ocl/w18/migration/migration_noop_report.json",
-        "target/ocl/w18/ops/doctor_report.json",
-        "target/ocl/w18/ops/fix_plan_report.json",
-        "target/ocl/w18/ops/budget_analyze_report.json",
-        "target/ocl/w18/ops/doctor_fix_cases_report.json",
-        "target/ocl/w18/cassette/cassette_operability_report.json",
-        "target/ocl/w18/security/privacy_hygiene_report.json",
-        "target/ocl/w18/security/dos_caps_report.json",
-        "target/ocl/w18/security/fs_boundary_report.json",
-        "target/ocl/w18/packs/pack_shipproof_report.json",
-        "target/ocl/w18/packs/connector_baseline_report.json",
-        "target/ocl/w18/rc/release_positioning_guard_report.json",
+        "target/ocp/w18/contracts/sot_signature_report.json",
+        "target/ocp/w18/contracts/contract_inventory.json",
+        "target/ocp/w18/contracts/contract_inventory_completeness_report.json",
+        "target/ocp/w18/migration/cassette_upgrade_report.json",
+        "target/ocp/w18/migration/manifest_upgrade_report.json",
+        "target/ocp/w18/migration/pack_abi_upgrade_report.json",
+        "target/ocp/w18/migration/migration_noop_report.json",
+        "target/ocp/w18/ops/doctor_report.json",
+        "target/ocp/w18/ops/fix_plan_report.json",
+        "target/ocp/w18/ops/budget_analyze_report.json",
+        "target/ocp/w18/ops/doctor_fix_cases_report.json",
+        "target/ocp/w18/cassette/cassette_operability_report.json",
+        "target/ocp/w18/security/privacy_hygiene_report.json",
+        "target/ocp/w18/security/dos_caps_report.json",
+        "target/ocp/w18/security/fs_boundary_report.json",
+        "target/ocp/w18/packs/pack_shipproof_report.json",
+        "target/ocp/w18/packs/connector_baseline_report.json",
+        "target/ocp/w18/rc/release_positioning_guard_report.json",
     ];
     for rel in &evidence_paths {
         assert!(
@@ -72,8 +72,8 @@ fn v18_rl_matrix_aggregate_is_complete_and_release_readiness_passes() {
         .all(|entry| entry.get("status").and_then(JsonValue::as_str) == Some("PASS"));
 
     let rl_report = json!({
-        "schema": "ocl.w18.rc.rl_matrix_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.rc.rl_matrix_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "policy_ref": "contracts/policy/risk_locks_rl01_rl17.v1.json",
         "entries": rl_entries,
         "status": if rl_all_pass { "PASS" } else { "BLOCK" }
@@ -108,8 +108,8 @@ fn v18_rl_matrix_aggregate_is_complete_and_release_readiness_passes() {
         && rl_all_pass;
 
     let readiness = json!({
-        "schema": "ocl.w18.rc.release_readiness_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.rc.release_readiness_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "checks": [
             {"id":"release_artifact_manifest_exists","pass": manifest_path.exists()},
             {"id":"release_artifact_manifest_signature_exists","pass": canonical_sig_path.exists()},

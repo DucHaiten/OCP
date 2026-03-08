@@ -68,12 +68,12 @@ fn v100_installer_toolchain_contract() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.install.installer_toolchain_report.v1",
+        "schema": "ocp.w100.install.installer_toolchain_report.v1",
         "status": "PASS",
         "builder": builder,
         "code_signing_mode": signing_mode,
         "vscode_install_mode": vscode_install_mode,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100c::run_manifest_sha256()
     });
     v100c::write_report("install/installer_toolchain_report.json", &report);

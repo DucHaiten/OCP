@@ -1,4 +1,4 @@
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     execute_program, parse_program, typecheck_program, ErrorCode, ExecConfig, ReasonCode,
     ResultKind, Value,
 };

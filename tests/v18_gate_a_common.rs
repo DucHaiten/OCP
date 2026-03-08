@@ -32,7 +32,7 @@ pub fn repo_root() -> PathBuf {
 }
 
 pub fn w18_target_root() -> PathBuf {
-    repo_root().join("target").join("ocl").join("w18")
+    repo_root().join("target").join("ocp").join("w18")
 }
 
 pub fn run_manifest_path() -> PathBuf {
@@ -55,13 +55,13 @@ pub fn required_contracts_mirror_path() -> PathBuf {
 
 pub fn ensure_run_manifest() -> JsonValue {
     let allowed = vec![
-        "OCL_RELEASE_GRADE".to_string(),
-        "OCL_QUARANTINE".to_string(),
-        "OCL_STRICT_PROFILE".to_string(),
+        "OCP_RELEASE_GRADE".to_string(),
+        "OCP_QUARANTINE".to_string(),
+        "OCP_STRICT_PROFILE".to_string(),
     ];
     let observed = std::env::vars()
         .map(|(key, _)| key)
-        .filter(|key| key.starts_with("OCL_"))
+        .filter(|key| key.starts_with("OCP_"))
         .collect::<Vec<String>>();
     if let Err(err) = v16::enforce_run_manifest_allowlist(&allowed, &observed) {
         panic!("{err}");

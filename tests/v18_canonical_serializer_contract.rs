@@ -37,8 +37,8 @@ fn v18_canonical_serializer_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w18.canonical_serializer_contract_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.canonical_serializer_contract_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "contract_path": "contracts/serialization/canonical_serializer.v1.json",
         "status": "PASS"
     });

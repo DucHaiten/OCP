@@ -1,0 +1,166 @@
+{
+  "name": "ocp",
+  "displayName": "OCP",
+  "description": "OCP support for VSCode.",
+  "version": "0.19.0-dev",
+  "author": "DucHaiten",
+  "license": "AGPL-3.0-only",
+  "publisher": "ocp",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:ocp",
+    "onDebugResolve:ocp"
+  ],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "test:integration": "node ./scripts/test-integration.mjs"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "ocp",
+        "aliases": [
+          "OCP",
+          "ocp"
+        ],
+        "extensions": [
+          ".ocp",
+          ".ocpp",
+          ".ocpt"
+        ],
+        "icon": {
+          "light": "./icons/ocp.svg",
+          "dark": "./icons/ocp.svg"
+        },
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ocp",
+        "scopeName": "source.ocp",
+        "path": "./syntaxes/ocp.tmLanguage.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "ocp-icons",
+        "label": "OCP Icons",
+        "path": "./icons/ocp-icon-theme.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "ocp",
+        "path": "./snippets/ocp.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "ocp.formatDocument",
+        "title": "OCP: Format Document"
+      },
+      {
+        "command": "ocp.checkWorkspace",
+        "title": "OCP: Check Workspace"
+      },
+      {
+        "command": "ocp.openDoctorReport",
+        "title": "OCP: Open Doctor Report"
+      },
+      {
+        "command": "ocp.openFixPlan",
+        "title": "OCP: Open Fix Plan"
+      },
+      {
+        "command": "ocp.openDebugTrace",
+        "title": "OCP: Open Debug Trace"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "ocp",
+        "label": "OCP Replay Debug",
+        "languages": [
+          "ocp"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to the .ocp entry file to debug."
+              },
+              "workspaceFolder": {
+                "type": "string",
+                "description": "Workspace root used for replay-backed trace artifacts."
+              },
+              "workspaceHash": {
+                "type": "string",
+                "description": "Deterministic workspace hash used by the replay-backed debug adapter."
+              },
+              "runId": {
+                "type": "string",
+                "description": "Deterministic run identifier used for editor debug traces."
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "ocp",
+            "request": "launch",
+            "name": "OCP Replay Debug",
+            "program": "${file}",
+            "workspaceFolder": "${workspaceFolder}",
+            "runId": "editor-debug"
+          }
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "OCP",
+      "properties": {
+        "ocp.laneProfile": {
+          "type": "string",
+          "default": "locked_v071",
+          "enum": [
+            "locked_v071",
+            "locked_v06",
+            "quarantine"
+          ],
+          "description": "Lane profile used by OCP editor workflows."
+        },
+        "ocp.traceLevel": {
+          "type": "string",
+          "default": "errors",
+          "enum": [
+            "off",
+            "errors",
+            "info",
+            "debug"
+          ],
+          "description": "Trace verbosity for OCP editor features."
+        },
+        "ocp.enableSemanticTokens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable semantic tokens when workspace trust allows runtime features."
+        },
+        "ocp.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path override for bundled OCP language server binary."
+        }
+      }
+    }
+  }
+}

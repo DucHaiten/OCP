@@ -11,10 +11,10 @@ fn v17_perm_fix_apply_writes_patch_and_approval_without_bypassing_policy() {
     let root_s = root.to_string_lossy().to_string();
     let empty_env = BTreeMap::new();
 
-    let plan = w17_perm_common::run_ocl_cli(&["perm", "fix", "--plan", &root_s], &empty_env);
+    let plan = w17_perm_common::run_ocp_cli(&["perm", "fix", "--plan", &root_s], &empty_env);
     w17_perm_common::assert_ok(&plan, "perm fix --plan");
 
-    let apply = w17_perm_common::run_ocl_cli(
+    let apply = w17_perm_common::run_ocp_cli(
         &[
             "perm",
             "fix",
@@ -32,7 +32,7 @@ fn v17_perm_fix_apply_writes_patch_and_approval_without_bypassing_policy() {
     );
     w17_perm_common::assert_ok(&apply, "perm fix --apply");
 
-    let dx_dir = root.join("target").join("ocl").join("w17").join("dx");
+    let dx_dir = root.join("target").join("ocp").join("w17").join("dx");
     assert!(
         dx_dir.join("permission_fix_plan.json").exists(),
         "missing permission_fix_plan.json"
@@ -50,7 +50,7 @@ fn v17_perm_fix_apply_writes_patch_and_approval_without_bypassing_policy() {
         "missing permissions.approval.toml"
     );
 
-    let doctor_after = w17_perm_common::run_ocl_cli(&["perm", "doctor", &root_s], &empty_env);
+    let doctor_after = w17_perm_common::run_ocp_cli(&["perm", "doctor", &root_s], &empty_env);
     assert!(
         !doctor_after.status.success(),
         "perm fix apply must not bypass strict lane guard while manifest still has wildcard"

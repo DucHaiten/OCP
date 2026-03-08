@@ -46,11 +46,11 @@ fn v100_codeowners_policy() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.legal.codeowners_policy_report.v1",
+        "schema": "ocp.w100.legal.codeowners_policy_report.v1",
         "status": "PASS",
         "catch_all_owner": catch_all,
         "explicit_paths_verified": required_paths,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100f::run_manifest_sha256()
     });
     v100f::write_report("legal/codeowners_policy_report.json", &report);

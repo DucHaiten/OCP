@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.editor.perf_protocol.v1",
+  "schema": "ocp.editor.perf_protocol.v1",
   "contract_id": "editor.editor_perf_protocol",
   "version": "v1",
   "dataset_id": "editor_medium_workspace_v1",

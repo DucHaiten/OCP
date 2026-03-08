@@ -61,11 +61,11 @@ fn v19_editor_versioning_policy_is_locked_and_valid() {
     }
 
     let report = json!({
-        "schema": "ocl.w19.editor_versioning_policy_report.v1",
+        "schema": "ocp.w19.editor_versioning_policy_report.v1",
         "status": "PASS",
         "contract_path": path.to_string_lossy().replace('\\', "/"),
         "compat_window_releases": compat,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("contracts/editor_versioning_policy_report.json", &report);

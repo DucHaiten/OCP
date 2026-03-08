@@ -52,13 +52,13 @@ fn v20_redteam_policy_bypass() {
         .expect("threat_model_id");
 
     let report = json!({
-        "schema": "ocl.w20.security.redteam_report.v1",
+        "schema": "ocp.w20.security.redteam_report.v1",
         "status": "PASS",
         "threat_model_id": threat_model_id,
         "vectors_total": vectors.len(),
         "critical_high_blocked_count": blocked_critical_high,
         "results": results,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20f::run_manifest_sha256()
     });
     v20f::write_report("security/redteam_report.json", &report);

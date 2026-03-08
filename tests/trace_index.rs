@@ -12,21 +12,21 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_trace_index_v11_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_trace_index_v11_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 fn list_dirs(path: &Path) -> Vec<PathBuf> {
@@ -43,7 +43,7 @@ fn list_dirs(path: &Path) -> Vec<PathBuf> {
 }
 
 fn latest_artifact_dir(project_root: &Path) -> PathBuf {
-    let artifacts_root = project_root.join(".ocl_artifacts");
+    let artifacts_root = project_root.join(".ocp_artifacts");
     let mut dirs = list_dirs(&artifacts_root);
     assert!(!dirs.is_empty(), "missing artifact dir");
     dirs.pop().expect("latest artifact dir")
@@ -54,7 +54,7 @@ fn trace_index_is_written_and_trace_view_accepts_artifact_dir() {
     let root = temp_project_dir("index_written");
     let root_s = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_s, "--template", "mini-game"]);
+    let init = run_ocp_cli(&["init", &root_s, "--template", "mini-game"]);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
@@ -62,7 +62,7 @@ fn trace_index_is_written_and_trace_view_accepts_artifact_dir() {
         String::from_utf8_lossy(&init.stderr)
     );
 
-    let run = run_ocl_cli(&["run", &root_s]);
+    let run = run_ocp_cli(&["run", &root_s]);
     assert!(
         run.status.success(),
         "run failed:\nstdout={}\nstderr={}",
@@ -96,7 +96,7 @@ fn trace_index_is_written_and_trace_view_accepts_artifact_dir() {
         "trace_index must contain by_type section"
     );
 
-    let view = run_ocl_cli(&["trace", "view", &run_dir.to_string_lossy()]);
+    let view = run_ocp_cli(&["trace", "view", &run_dir.to_string_lossy()]);
     assert!(
         view.status.success(),
         "trace view by artifact_dir failed:\nstdout={}\nstderr={}",
@@ -112,7 +112,7 @@ fn trace_view_legacy_pipe_requires_explicit_flag() {
     let legacy_trace = root.join("legacy.trace");
     let legacy_trace_s = legacy_trace.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_s, "--template", "mini-game"]);
+    let init = run_ocp_cli(&["init", &root_s, "--template", "mini-game"]);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
@@ -120,7 +120,7 @@ fn trace_view_legacy_pipe_requires_explicit_flag() {
         String::from_utf8_lossy(&init.stderr)
     );
 
-    let trace_run = run_ocl_cli(&["trace", "run", &root_s, "--out", &legacy_trace_s]);
+    let trace_run = run_ocp_cli(&["trace", "run", &root_s, "--out", &legacy_trace_s]);
     assert!(
         trace_run.status.success(),
         "trace run failed:\nstdout={}\nstderr={}",
@@ -128,13 +128,13 @@ fn trace_view_legacy_pipe_requires_explicit_flag() {
         String::from_utf8_lossy(&trace_run.stderr)
     );
 
-    let view_without_flag = run_ocl_cli(&["trace", "view", &legacy_trace_s]);
+    let view_without_flag = run_ocp_cli(&["trace", "view", &legacy_trace_s]);
     assert!(
         !view_without_flag.status.success(),
         "trace view without --legacy-pipe must fail for legacy trace format"
     );
 
-    let view_with_flag = run_ocl_cli(&["trace", "view", &legacy_trace_s, "--legacy-pipe"]);
+    let view_with_flag = run_ocp_cli(&["trace", "view", &legacy_trace_s, "--legacy-pipe"]);
     assert!(
         view_with_flag.status.success(),
         "trace view with --legacy-pipe failed:\nstdout={}\nstderr={}",

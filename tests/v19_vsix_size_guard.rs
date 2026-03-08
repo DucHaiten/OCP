@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::vsix_size_limit_for_channel_v19;
+use ocp_sdk::vsix_size_limit_for_channel_v19;
 use serde_json::json;
 
 #[path = "v19_gate_f_common.rs"]
@@ -44,11 +44,11 @@ fn v19_vsix_size_guard_per_channel() {
     }
 
     let report = json!({
-        "schema": "ocl.w19.release.vsix_size_report.v1",
+        "schema": "ocp.w19.release.vsix_size_report.v1",
         "status": "PASS",
         "limits_path": limits_path.to_string_lossy().replace('\\', "/"),
         "checks": checks,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/vsix_size_report.json", &report);

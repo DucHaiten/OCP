@@ -3,7 +3,7 @@ mod w17;
 
 use std::path::PathBuf;
 
-use ocl_sdk::{
+use ocp_sdk::{
     inspect_pack_abi_spec_v17, W17_PACK_BOUNDARY_NATIVE_CAP_V1, W17_PACK_BOUNDARY_WASI_V1,
 };
 

@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.stability_repeat_policy.v1",
+  "schema": "ocp.v20.stability_repeat_policy.v1",
   "contract_id": "v20.stability_repeat_policy",
   "version": "v1",
   "repeat_suites": [

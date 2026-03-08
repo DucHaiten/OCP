@@ -12,21 +12,21 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_cli_trace_view_v11_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_cli_trace_view_v11_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str]) -> Output {
+fn run_ocp_cli(args: &[&str]) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     Command::new(cargo_bin)
         .current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
         .output()
-        .expect("run ocl-cli")
+        .expect("run ocp-cli")
 }
 
 fn list_dirs(path: &Path) -> Vec<PathBuf> {
@@ -43,7 +43,7 @@ fn list_dirs(path: &Path) -> Vec<PathBuf> {
 }
 
 fn latest_artifact_dir(project_root: &Path) -> PathBuf {
-    let artifacts_root = project_root.join(".ocl_artifacts");
+    let artifacts_root = project_root.join(".ocp_artifacts");
     let mut dirs = list_dirs(&artifacts_root);
     assert!(!dirs.is_empty(), "missing artifact dir");
     dirs.pop().expect("latest artifact dir")
@@ -76,7 +76,7 @@ fn trace_view_json_summary_and_filters_work() {
     let root = temp_project_dir("summary_filters");
     let root_s = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_s, "--template", "mini-game"]);
+    let init = run_ocp_cli(&["init", &root_s, "--template", "mini-game"]);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
@@ -84,7 +84,7 @@ fn trace_view_json_summary_and_filters_work() {
         String::from_utf8_lossy(&init.stderr)
     );
 
-    let run = run_ocl_cli(&["run", &root_s]);
+    let run = run_ocp_cli(&["run", &root_s]);
     assert!(
         run.status.success(),
         "run failed:\nstdout={}\nstderr={}",
@@ -95,7 +95,7 @@ fn trace_view_json_summary_and_filters_work() {
     let artifact = latest_artifact_dir(&root);
     let artifact_s = artifact.to_string_lossy().to_string();
 
-    let view_all = run_ocl_cli(&["trace", "view", &artifact_s, "--json"]);
+    let view_all = run_ocp_cli(&["trace", "view", &artifact_s, "--json"]);
     let json_all = output_stdout_text(&view_all);
     assert!(
         json_all.contains("\"trace_schema_version\": 2"),
@@ -109,7 +109,7 @@ fn trace_view_json_summary_and_filters_work() {
         "missing summary.by_reason"
     );
 
-    let view_text = run_ocl_cli(&["trace", "view", &artifact_s]);
+    let view_text = run_ocp_cli(&["trace", "view", &artifact_s]);
     let text_all = output_stdout_text(&view_text);
     let event_lines = trace_event_lines(&text_all);
     assert!(!event_lines.is_empty(), "trace view should return events");
@@ -119,7 +119,7 @@ fn trace_view_json_summary_and_filters_work() {
         .expect("event type token")
         .to_string();
 
-    let view_type = run_ocl_cli(&["trace", "view", &artifact_s, "--type", &selected_event_type]);
+    let view_type = run_ocp_cli(&["trace", "view", &artifact_s, "--type", &selected_event_type]);
     let text_type = output_stdout_text(&view_type);
     let events_type = trace_event_lines(&text_type);
     assert!(
@@ -139,7 +139,7 @@ fn trace_view_json_summary_and_filters_work() {
         .find_map(|line| extract_field(line, "key"))
         .filter(|key| *key != "-")
     {
-        let view_key = run_ocl_cli(&["trace", "view", &artifact_s, "--key", selected_key]);
+        let view_key = run_ocp_cli(&["trace", "view", &artifact_s, "--key", selected_key]);
         let text_key = output_stdout_text(&view_key);
         let events_key = trace_event_lines(&text_key);
         assert!(!events_key.is_empty(), "key filter should keep events");
@@ -160,7 +160,7 @@ fn trace_view_reads_span_snippet_and_module_filter() {
 
     let source_text = "let x = 1;\nlet y = x + 2;\n";
     fs::write(
-        artifact.join("sources").join("src").join("main.ocl"),
+        artifact.join("sources").join("src").join("main.ocp"),
         source_text,
     )
     .expect("write source");
@@ -169,7 +169,7 @@ fn trace_view_reads_span_snippet_and_module_filter() {
         "{\"t\":\"ProgramStart\",\"i\":0,\"tick\":0,\"seed\":0,\"call_id\":null,\"span\":null,\"data\":{\"trace_schema_version\":2,\"lane\":\"locked_v071\"}}";
     let trace_event = concat!(
         "{\"t\":\"TraceEvent\",\"i\":1,\"tick\":10,\"seed\":99,\"call_id\":null,",
-        "\"span\":{\"module_id\":\"src/main.ocl\",\"start_byte\":0,\"end_byte\":10},",
+        "\"span\":{\"module_id\":\"src/main.ocp\",\"start_byte\":0,\"end_byte\":10},",
         "\"data\":{",
         "\"seq\":1,",
         "\"run_id\":\"demo\",",
@@ -194,7 +194,7 @@ fn trace_view_reads_span_snippet_and_module_filter() {
     .expect("write audit");
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let view = run_ocl_cli(&["trace", "view", &artifact_s, "--module", "src/main.ocl"]);
+    let view = run_ocp_cli(&["trace", "view", &artifact_s, "--module", "src/main.ocp"]);
     let rendered = output_stdout_text(&view);
     let events = trace_event_lines(&rendered);
     assert_eq!(

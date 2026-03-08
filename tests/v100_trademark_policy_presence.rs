@@ -27,7 +27,7 @@ fn v100_trademark_policy_presence() {
         &v100f::repo_root()
             .join("editor")
             .join("vscode")
-            .join("ocp-ocl")
+            .join("ocp")
             .join("package.json"),
     );
     let publisher = package_json
@@ -45,14 +45,14 @@ fn v100_trademark_policy_presence() {
 
     let trademark = v100f::read_text(&trademark_root);
     assert!(
-        trademark.contains("Official OCL Build")
-            && trademark.contains("based on OCP-OCL")
-            && trademark.contains("publisher: `ocp-ocl`"),
+        trademark.contains("Official OCP Build")
+            && trademark.contains("based on OCP")
+            && trademark.contains("publisher: `ocp`"),
         "TRADEMARK.md must define official build, allow based-on wording, and pin official VSCode publisher"
     );
 
     let report = json!({
-        "schema": "ocl.w100.legal.trademark_policy_report.v1",
+        "schema": "ocp.w100.legal.trademark_policy_report.v1",
         "status": "PASS",
         "official_vscode_publisher": expected_publisher,
         "files_verified": [
@@ -60,7 +60,7 @@ fn v100_trademark_policy_presence() {
             "docs/vi/legal/trademark.md",
             "docs/en/legal/trademark.md"
         ],
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100f::run_manifest_sha256()
     });
     v100f::write_report("legal/trademark_policy_report.json", &report);

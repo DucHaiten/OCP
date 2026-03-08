@@ -12,22 +12,22 @@ fn v20_user_journeys_tool_cli() {
     let steps = v20e::journey_steps(journey);
 
     let expected = vec![
-        "ocl init",
-        "ocl lock sync",
-        "ocl lock verify",
-        "ocl perm snapshot",
-        "ocl perm diff",
-        "ocl perm approve",
-        "ocl build --attest",
-        "ocl verify --attest",
-        "ocl run",
-        "ocl replay",
-        "ocl dbg",
+        "ocp init",
+        "ocp lock sync",
+        "ocp lock verify",
+        "ocp perm snapshot",
+        "ocp perm diff",
+        "ocp perm approve",
+        "ocp build --attest",
+        "ocp verify --attest",
+        "ocp run",
+        "ocp replay",
+        "ocp dbg",
     ];
     assert_eq!(steps, expected, "tool_cli journey steps drifted from SoT");
 
     let report = json!({
-        "schema": "ocl.w20.user_golden_journeys_report.v1",
+        "schema": "ocp.w20.user_golden_journeys_report.v1",
         "status": "PASS",
         "journeys": [{
             "id": "tool_cli",
@@ -35,7 +35,7 @@ fn v20_user_journeys_tool_cli() {
             "steps_executed": expected.len(),
             "result": "PASS"
         }],
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20e::run_manifest_sha256()
     });
 

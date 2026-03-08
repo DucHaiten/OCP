@@ -1,4 +1,4 @@
-use ocl_sdk::bootstrap_retention_plan_v19;
+use ocp_sdk::bootstrap_retention_plan_v19;
 use serde_json::json;
 
 #[path = "v19_gate_f_common.rs"]
@@ -49,7 +49,7 @@ fn v19_bootstrap_retention_policy_contract() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.release.bootstrap_retention_report.v1",
+        "schema": "ocp.w19.release.bootstrap_retention_report.v1",
         "status": "PASS",
         "retention_contract_path": retention_path.to_string_lossy().replace('\\', "/"),
         "active_version": active,
@@ -57,7 +57,7 @@ fn v19_bootstrap_retention_policy_contract() {
         "kept_versions": kept,
         "removed_versions": removed,
         "readonly_storage_mode": readonly_mode,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/bootstrap_retention_report.json", &report);

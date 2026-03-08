@@ -1,0 +1,7 @@
+[replay]
+run_id = "conformance.replay"
+root = "."
+entry = "main.ocp"
+lane = "quarantine"
+engine = "dual"
+mode = "replay"

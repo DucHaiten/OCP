@@ -1,27 +1,27 @@
 {
   "assets": [
     {
-      "path": "editor/vscode/ocp-ocl/language-configuration.json",
+      "path": "editor/vscode/ocp/language-configuration.json",
       "sha256": "f0aebd520279cd6e62b0ecb1768a62f8d293cfc5defb31eca1c69677fa124ea7"
     },
     {
-      "path": "editor/vscode/ocp-ocl/syntaxes/ocp-ocl.tmLanguage.json",
+      "path": "editor/vscode/ocp/syntaxes/ocp.tmLanguage.json",
       "sha256": "a3f3e720071213f4f3b970ef32eeaccb2f5cb10a5e5561512bd36a4343f58487"
     },
     {
-      "path": "editor/vscode/ocp-ocl/snippets/ocp-ocl.json",
+      "path": "editor/vscode/ocp/snippets/ocp.json",
       "sha256": "9575e197a68e174a49347215527f082c2926bbed2a6cd59f444f01d73f618eb7"
     },
     {
-      "path": "editor/vscode/ocp-ocl/icons/ocp-ocl.svg",
+      "path": "editor/vscode/ocp/icons/ocp.svg",
       "sha256": "e091157b79f22df87fe08403da503c6b57f0048b38532fa98c5f340410cd8913"
     },
     {
-      "path": "editor/vscode/ocp-ocl/icons/ocp-ocl-icon-theme.json",
+      "path": "editor/vscode/ocp/icons/ocp-icon-theme.json",
       "sha256": "9e4330f79196dfb8f2eebd1046ae35dd498ec2fb6832dc178cdf69537622adcc"
     }
   ],
   "contract_id": "editor.editor_assets_manifest",
-  "schema": "ocl.editor.assets_manifest.v1",
+  "schema": "ocp.editor.assets_manifest.v1",
   "version": "v1"
 }

@@ -37,49 +37,49 @@ fn v100_docs_quickstart_flow() {
 
     let (label, content) = ("vi", &vi_guide);
     assert!(
-        content.contains("ocl init"),
+        content.contains("ocp init"),
         "{label} user guide must include init in quickstart flow"
     );
     assert!(
-        content.contains("ocl lock sync"),
+        content.contains("ocp lock sync"),
         "{label} user guide must include lock sync in quickstart flow"
     );
     assert!(
-        content.contains("ocl run"),
+        content.contains("ocp run"),
         "{label} user guide must include run in quickstart flow"
     );
     assert!(
-        content.contains("ocl replay"),
+        content.contains("ocp replay"),
         "{label} user guide must include replay in quickstart flow"
     );
     if let Some(en_guide) = en_guide.as_ref() {
         let (label, content) = ("en", en_guide);
         assert!(
-            content.contains("ocl init"),
+            content.contains("ocp init"),
             "{label} user guide must include init in quickstart flow"
         );
         assert!(
-            content.contains("ocl lock sync"),
+            content.contains("ocp lock sync"),
             "{label} user guide must include lock sync in quickstart flow"
         );
         assert!(
-            content.contains("ocl run"),
+            content.contains("ocp run"),
             "{label} user guide must include run in quickstart flow"
         );
         assert!(
-            content.contains("ocl replay"),
+            content.contains("ocp replay"),
             "{label} user guide must include replay in quickstart flow"
         );
     }
 
     let report = json!({
-        "schema": "ocl.w100.docs.quickstart_report.v1",
+        "schema": "ocp.w100.docs.quickstart_report.v1",
         "status": "PASS",
         "readme": "README.md",
         "vi_user_guide": "docs/vi/USER_GUIDE.md",
         "en_user_guide": if en_required { json!("docs/en/USER_GUIDE.md") } else { serde_json::Value::Null },
         "en_translation_required_for_current_gate": en_required,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
     v100d::write_report("docs/docs_quickstart_report.json", &report);

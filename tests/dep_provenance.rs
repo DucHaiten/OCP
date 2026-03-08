@@ -2,14 +2,14 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{read_trace_jsonl, write_trace_jsonl, TraceEventV1};
+use ocp_sdk::{read_trace_jsonl, write_trace_jsonl, TraceEventV1};
 
 fn temp_trace_file(tag: &str) -> PathBuf {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_nanos();
-    std::env::temp_dir().join(format!("ocl_v10_dep_provenance_{tag}_{stamp}.jsonl"))
+    std::env::temp_dir().join(format!("ocp_v10_dep_provenance_{tag}_{stamp}.jsonl"))
 }
 
 #[test]

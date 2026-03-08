@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$workspace = "projects/ocp-ocl/app-ocl"
+$workspace = "projects/ocp/app-ocp"
 if (-not (Test-Path $workspace)) {
     Write-Error "Workspace not found: $workspace"
     exit 1
@@ -11,7 +11,7 @@ $forbidden = @(Get-ChildItem -Path $workspace -Recurse -File | Where-Object {
 })
 
 if (@($forbidden).Count -gt 0) {
-    Write-Error "Boundary violation: host code detected in OCL app workspace."
+    Write-Error "Boundary violation: host code detected in OCP app workspace."
     $forbidden | ForEach-Object { Write-Host $_.FullName }
     exit 1
 }

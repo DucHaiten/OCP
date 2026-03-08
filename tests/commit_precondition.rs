@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ErrorCode, ExecConfig, Executor, ReasonCode, ResultKind,
     Value,
 };
@@ -44,7 +44,7 @@ fn temp_fs_root(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    std::env::temp_dir().join(format!("ocl_commit_precondition_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_commit_precondition_{tag}_{stamp}"))
 }
 
 fn write_text(path: &Path, content: &str) {
@@ -64,10 +64,10 @@ fn fs_commit_requires_observe_precondition_snapshot_match() {
     let target = root.join("data/out.txt");
     write_text(&target, "seed");
 
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_write = EnvVarGuard::set("OCL_STD_FS_ALLOW_WRITE", "./data/**");
-    let _allow_read = EnvVarGuard::set("OCL_STD_FS_ALLOW_READ", "./data/**");
-    let _max_write = EnvVarGuard::set("OCL_STD_FS_MAX_WRITE_BYTES", "4096");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_write = EnvVarGuard::set("OCP_STD_FS_ALLOW_WRITE", "./data/**");
+    let _allow_read = EnvVarGuard::set("OCP_STD_FS_ALLOW_READ", "./data/**");
+    let _max_write = EnvVarGuard::set("OCP_STD_FS_MAX_WRITE_BYTES", "4096");
 
     let src = r#"
 observe("std.fs.write_text", "tier2", ctx("path=./data/out.txt;text=first;overwrite=true"), budget(5)) -> w1;

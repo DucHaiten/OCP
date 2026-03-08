@@ -27,7 +27,7 @@ fn v19_editor_contract_inventory_complete() {
         });
     }
 
-    let update = std::env::var("OCL_UPDATE_V19_EDITOR_REQUIRED_CONTRACTS")
+    let update = std::env::var("OCP_UPDATE_V19_EDITOR_REQUIRED_CONTRACTS")
         .ok()
         .as_deref()
         == Some("1");
@@ -74,11 +74,11 @@ fn v19_editor_contract_inventory_complete() {
     let inventory_hash =
         v19::sha256_hex_bytes(v19::canonical_json_string(&inventory_value).as_bytes());
     let report = json!({
-        "schema": "ocl.w19.editor_contract_inventory_report.v1",
+        "schema": "ocp.w19.editor_contract_inventory_report.v1",
         "status": "PASS",
         "required_count": required.entries.len(),
         "inventory_hash_sha256": inventory_hash,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("contracts/editor_contract_inventory_report.json", &report);

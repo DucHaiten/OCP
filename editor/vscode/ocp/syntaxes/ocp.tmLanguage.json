@@ -1,0 +1,69 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "OCP",
+  "scopeName": "source.ocp",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.ocp",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.ocp",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.ocp",
+          "match": "\\b(fn|let|if|else|for|while|match|return|observe|commit)\\b"
+        },
+        {
+          "name": "storage.type.ocp",
+          "match": "\\b(i64|u64|bool|string|value|result4)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.ocp",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.ocp",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.ocp",
+          "match": "\\b[0-9]+\\b"
+        }
+      ]
+    }
+  }
+}

@@ -1,6 +1,6 @@
 use serde_json::{json, Value as JsonValue};
 
-use ocl_sdk::check_project_with_lock;
+use ocp_sdk::check_project_with_lock;
 
 #[path = "v18_gate_e_common.rs"]
 mod common;

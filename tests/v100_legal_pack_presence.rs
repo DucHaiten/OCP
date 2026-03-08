@@ -45,11 +45,11 @@ fn v100_legal_pack_presence() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.legal.legal_pack_report.v1",
+        "schema": "ocp.w100.legal.legal_pack_report.v1",
         "status": "PASS",
         "required_root_files_verified": root_verified,
         "required_docs_files_verified": docs_verified,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100f::run_manifest_sha256()
     });
     v100f::write_report("legal/legal_pack_report.json", &report);

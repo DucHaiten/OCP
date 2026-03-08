@@ -18,19 +18,19 @@ fn sha256_hex_file(path: &Path) -> String {
 #[test]
 fn release_artifact_manifest_is_complete_and_hashes_verify() {
     let root = repo_root();
-    let rc_dir = root.join("target").join("ocl").join("w16").join("rc");
+    let rc_dir = root.join("target").join("ocp").join("w16").join("rc");
     fs::create_dir_all(&rc_dir).expect("create w16 rc output dir");
 
     let required_files = vec![
-        "target/ocl/w16/meta/run_manifest.json",
-        "target/ocl/w16/contracts/contract_freeze_report.json",
-        "target/ocl/w16/conformance/unified_conformance_report.json",
-        "target/ocl/w16/determinism/determinism_soak_report.json",
-        "target/ocl/w16/compat/compat_rehearsal_report.json",
-        "target/ocl/w16/perf/perf_budget_report.json",
-        "target/ocl/w16/security/security_chain_report.json",
-        "target/ocl/w16/rc/rc_dryrun_report.json",
-        "target/ocl/w16/rc/golden_user_journey_report.json",
+        "target/ocp/w16/meta/run_manifest.json",
+        "target/ocp/w16/contracts/contract_freeze_report.json",
+        "target/ocp/w16/conformance/unified_conformance_report.json",
+        "target/ocp/w16/determinism/determinism_soak_report.json",
+        "target/ocp/w16/compat/compat_rehearsal_report.json",
+        "target/ocp/w16/perf/perf_budget_report.json",
+        "target/ocp/w16/security/security_chain_report.json",
+        "target/ocp/w16/rc/rc_dryrun_report.json",
+        "target/ocp/w16/rc/golden_user_journey_report.json",
     ];
 
     let mut artifacts = Vec::<JsonValue>::new();
@@ -51,8 +51,8 @@ fn release_artifact_manifest_is_complete_and_hashes_verify() {
     }
 
     let manifest = json!({
-        "schema": "ocl.w16.rc.release_artifact_manifest.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.rc.release_artifact_manifest.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "hasher": "sha256-v1",
         "artifacts": artifacts,
         "pass": true
@@ -94,8 +94,8 @@ fn release_artifact_manifest_is_complete_and_hashes_verify() {
     }
 
     let readiness = json!({
-        "schema": "ocl.w16.rc.release_readiness.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.rc.release_readiness.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "checks": [
             { "id": "required_artifacts_exist", "pass": true },
             { "id": "release_artifact_manifest_hash_verified", "pass": true },

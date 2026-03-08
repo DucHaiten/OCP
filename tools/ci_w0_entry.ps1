@@ -1,15 +1,15 @@
 param(
     [switch]$FullClean,
     [string]$SignerId = "dev-root-1",
-    [string]$SignKey = "projects/ocp-ocl/security/dev-root-1.signing.key.toml",
-    [string]$TrustStore = "projects/ocp-ocl/security/trust.store.toml"
+    [string]$SignKey = "projects/ocp/security/dev-root-1.signing.key.toml",
+    [string]$TrustStore = "projects/ocp/security/trust.store.toml"
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$ReportRoot = "target/ocl/v5/w0/reports"
-$ManifestPath = "projects/ocp-ocl/conformance/conformance.v1.toml"
+$ReportRoot = "target/ocp/v5/w0/reports"
+$ManifestPath = "projects/ocp/conformance/conformance.v1.toml"
 $DetRun1Report = Join-Path $ReportRoot "conformance.det.run1.json"
 $DetRun2Report = Join-Path $ReportRoot "conformance.det.run2.json"
 $FailManifest = Join-Path $ReportRoot "conformance.fail.intentional.toml"
@@ -90,7 +90,7 @@ function Run-Conformance {
     )
 
     Invoke-Native -Program "cargo" -Args @(
-        "run", "-p", "ocl-cli", "--",
+        "run", "-p", "ocp-cli", "--",
         "test", "--conformance",
         "--locked",
         "--runtime", "deterministic",
@@ -146,8 +146,8 @@ Invoke-Step "cargo_clippy_workspace" {
     Invoke-Native -Program "cargo" -Args @("clippy", "--workspace", "--all-targets", "--", "-D", "warnings")
 }
 
-Invoke-Step "ci_ocl_lane" {
-    & "$PSScriptRoot/ci_ocl_lane.ps1"
+Invoke-Step "ci_ocp_lane" {
+    & "$PSScriptRoot/ci_ocp_lane.ps1"
 }
 
 Invoke-Step "deterministic_conformance_run1" {
@@ -176,12 +176,12 @@ Invoke-Step "conformance_fail_intentional_report_written" {
         "",
         "[[scenario]]",
         "name = `"intentional-fail`"",
-        "path = `"projects/ocp-ocl/apps/__intentional_missing__`"",
+        "path = `"projects/ocp/apps/__intentional_missing__`"",
         "reactor_ticks = 0",
         "composer = false"
     ) | Set-Content -LiteralPath $FailManifest -Encoding ASCII
 
-    & cargo run -p ocl-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest $FailManifest --out $FailReport --trust-store $TrustStore --signer-id $SignerId --sign-key $SignKey --json
+    & cargo run -p ocp-cli -- test --conformance --locked --runtime deterministic --engine dual --manifest $FailManifest --out $FailReport --trust-store $TrustStore --signer-id $SignerId --sign-key $SignKey --json
     $failExit = [int]$LASTEXITCODE
     if ($failExit -eq 0) {
         throw "[w0-entry] intentional fail conformance unexpectedly passed."
@@ -191,14 +191,14 @@ Invoke-Step "conformance_fail_intentional_report_written" {
 }
 
 Invoke-Step "verify_supply_positive_and_negative" {
-    $project = "projects/ocp-ocl/apps/hello-cli"
-    $artifact = Join-Path $project ".oclpkg/hello_cli-0.1.0.oclpkg"
-    $tampered = Join-Path $project ".oclpkg/hello_cli-0.1.0.tampered.oclpkg"
+    $project = "projects/ocp/apps/hello-cli"
+    $artifact = Join-Path $project ".ocppkg/hello_cli-0.1.0.ocppkg"
+    $tampered = Join-Path $project ".ocppkg/hello_cli-0.1.0.tampered.ocppkg"
 
-    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocl-cli", "--", "build", $project, "--locked")
+    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocp-cli", "--", "build", $project, "--locked")
     Assert-FileExists -Path $artifact -Label "hello-cli artifact"
 
-    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocl-cli", "--", "verify-supply", $artifact)
+    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocp-cli", "--", "verify-supply", $artifact)
     [ordered]@{
         valid = $true
         artifact = $artifact
@@ -207,7 +207,7 @@ Invoke-Step "verify_supply_positive_and_negative" {
     Copy-Item -LiteralPath $artifact -Destination $tampered -Force
     Add-Content -LiteralPath $tampered -Value "`ntampered=1"
 
-    & cargo run -p ocl-cli -- verify-supply $tampered
+    & cargo run -p ocp-cli -- verify-supply $tampered
     $tamperedExit = [int]$LASTEXITCODE
     if ($tamperedExit -eq 0) {
         throw "[w0-entry] tampered artifact verify-supply unexpectedly passed."
@@ -221,15 +221,15 @@ Invoke-Step "verify_supply_positive_and_negative" {
 }
 
 Invoke-Step "plugin_sub_gate" {
-    $pluginProject = "projects/ocp-ocl/apps/plugin-demo"
-    $pluginArtifact = Join-Path $pluginProject ".oclpkg/plugin_demo-0.1.0.oclpkg"
+    $pluginProject = "projects/ocp/apps/plugin-demo"
+    $pluginArtifact = Join-Path $pluginProject ".ocppkg/plugin_demo-0.1.0.ocppkg"
 
-    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocl-cli", "--", "plugin", "lock", "sync", $pluginProject)
-    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocl-cli", "--", "plugin", "verify", $pluginProject)
-    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocl-cli", "--", "build", $pluginProject, "--locked")
+    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocp-cli", "--", "plugin", "lock", "sync", $pluginProject)
+    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocp-cli", "--", "plugin", "verify", $pluginProject)
+    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocp-cli", "--", "build", $pluginProject, "--locked")
     Assert-FileExists -Path $pluginArtifact -Label "plugin-demo artifact"
-    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocl-cli", "--", "verify-supply", $pluginArtifact)
-    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocl-cli", "--", "run", $pluginProject, "--locked", "--engine", "dual")
+    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocp-cli", "--", "verify-supply", $pluginArtifact)
+    Invoke-Native -Program "cargo" -Args @("run", "-p", "ocp-cli", "--", "run", $pluginProject, "--locked", "--engine", "dual")
 
     [ordered]@{
         valid = $true

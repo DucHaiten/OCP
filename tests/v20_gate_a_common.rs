@@ -53,7 +53,7 @@ pub fn repo_root() -> PathBuf {
 }
 
 pub fn w20_target_root() -> PathBuf {
-    repo_root().join("target").join("ocl").join("w20")
+    repo_root().join("target").join("ocp").join("w20")
 }
 
 pub fn run_manifest_path() -> PathBuf {
@@ -262,16 +262,16 @@ fn parse_trust_signing_info() -> (String, u64) {
 
 pub fn ensure_run_manifest() -> JsonValue {
     let allowed = vec![
-        "OCL_RELEASE_GRADE".to_string(),
-        "OCL_STRICT_PROFILE".to_string(),
-        "OCL_EDITOR_PROFILE".to_string(),
-        "OCL_QUARANTINE".to_string(),
-        "OCL_V20_AUDIT".to_string(),
-        "OCL_ALLOW_NETWORK_REPLAY".to_string(),
+        "OCP_RELEASE_GRADE".to_string(),
+        "OCP_STRICT_PROFILE".to_string(),
+        "OCP_EDITOR_PROFILE".to_string(),
+        "OCP_QUARANTINE".to_string(),
+        "OCP_V20_AUDIT".to_string(),
+        "OCP_ALLOW_NETWORK_REPLAY".to_string(),
     ];
     let observed = std::env::vars()
         .map(|(key, _)| key)
-        .filter(|key| key.starts_with("OCL_"))
+        .filter(|key| key.starts_with("OCP_"))
         .collect::<Vec<String>>();
     if let Err(err) = v16::enforce_run_manifest_allowlist(&allowed, &observed) {
         panic!("{err}");
@@ -320,7 +320,7 @@ pub fn ensure_run_manifest() -> JsonValue {
     let editor_package = repo
         .join("editor")
         .join("vscode")
-        .join("ocp-ocl")
+        .join("ocp")
         .join("package.json");
     let editor_extension_version = if editor_package.exists() {
         read_json(&editor_package)
@@ -334,7 +334,7 @@ pub fn ensure_run_manifest() -> JsonValue {
     let pnpm_lock = repo
         .join("editor")
         .join("vscode")
-        .join("ocp-ocl")
+        .join("ocp")
         .join("pnpm-lock.yaml");
     let pnpm_lock_hash = if pnpm_lock.exists() {
         sha256_hex_file(&pnpm_lock)
@@ -346,9 +346,9 @@ pub fn ensure_run_manifest() -> JsonValue {
     let cli_version = v19_like_read_cargo_version(
         &repo
             .join("projects")
-            .join("ocp-ocl")
+            .join("ocp")
             .join("crates")
-            .join("ocl-cli")
+            .join("ocp-cli")
             .join("Cargo.toml"),
     );
 
@@ -430,7 +430,7 @@ pub fn ensure_run_manifest() -> JsonValue {
         JsonValue::String(editor_extension_version),
     );
     obj.insert(
-        "ocl_cli_version".to_string(),
+        "ocp_cli_version".to_string(),
         JsonValue::String(cli_version),
     );
     obj.insert(

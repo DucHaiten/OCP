@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, validate_schema_value, CapabilityRegistry, ExecConfig,
     Executor, ReasonCode, ResultKind, Value,
 };
@@ -74,7 +74,7 @@ fn temp_record_file(tag: &str) -> String {
         .expect("clock drift")
         .as_millis();
     std::env::temp_dir()
-        .join(format!("ocl_schema_quarantine_{tag}_{stamp}.jsonl"))
+        .join(format!("ocp_schema_quarantine_{tag}_{stamp}.jsonl"))
         .to_string_lossy()
         .to_string()
 }
@@ -119,10 +119,10 @@ fn runtime_payload_schema_matches_std_time_wallclock_payload() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _lane = EnvVarGuard::set("OCL_PROJECT_LANE", "quarantine");
-    let _mode = EnvVarGuard::set("OCL_QUARANTINE_MODE", "record");
+    let _lane = EnvVarGuard::set("OCP_PROJECT_LANE", "quarantine");
+    let _mode = EnvVarGuard::set("OCP_QUARANTINE_MODE", "record");
     let record_path = temp_record_file("wallclock");
-    let _record = EnvVarGuard::set("OCL_V08_WALLCLOCK_RECORD_PATH", &record_path);
+    let _record = EnvVarGuard::set("OCP_V08_WALLCLOCK_RECORD_PATH", &record_path);
 
     let src = r#"
 observe("std.time.wallclock.now", "tier2", ctx("scope=tool"), budget(5)) -> r;
@@ -145,14 +145,14 @@ fn runtime_payload_schema_matches_std_proc_exec_payload() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _lane = EnvVarGuard::set("OCL_PROJECT_LANE", "quarantine");
-    let _mode = EnvVarGuard::set("OCL_QUARANTINE_MODE", "record");
-    let _allow = EnvVarGuard::set("OCL_STD_PROC_ALLOW_BINS", "mock.proc");
-    let _timeout = EnvVarGuard::set("OCL_STD_PROC_TIMEOUT_MS", "3000");
-    let _max_out = EnvVarGuard::set("OCL_STD_PROC_MAX_STDOUT_BYTES", "1024");
-    let _max_err = EnvVarGuard::set("OCL_STD_PROC_MAX_STDERR_BYTES", "1024");
+    let _lane = EnvVarGuard::set("OCP_PROJECT_LANE", "quarantine");
+    let _mode = EnvVarGuard::set("OCP_QUARANTINE_MODE", "record");
+    let _allow = EnvVarGuard::set("OCP_STD_PROC_ALLOW_BINS", "mock.proc");
+    let _timeout = EnvVarGuard::set("OCP_STD_PROC_TIMEOUT_MS", "3000");
+    let _max_out = EnvVarGuard::set("OCP_STD_PROC_MAX_STDOUT_BYTES", "1024");
+    let _max_err = EnvVarGuard::set("OCP_STD_PROC_MAX_STDERR_BYTES", "1024");
     let record_path = temp_record_file("proc");
-    let _record = EnvVarGuard::set("OCL_V08_PROC_RECORD_PATH", &record_path);
+    let _record = EnvVarGuard::set("OCP_V08_PROC_RECORD_PATH", &record_path);
 
     let src = r#"
 observe("std.proc.exec", "tier2", ctx("bin=mock.proc;args=--stdout=HELLO"), budget(5)) -> r;
@@ -174,14 +174,14 @@ fn runtime_payload_schema_matches_std_net_http_payload() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _lane = EnvVarGuard::set("OCL_PROJECT_LANE", "quarantine");
-    let _mode = EnvVarGuard::set("OCL_QUARANTINE_MODE", "record");
-    let _allow_hosts = EnvVarGuard::set("OCL_STD_NET_ALLOW_HOSTS", "mock.local");
-    let _allow_methods = EnvVarGuard::set("OCL_STD_NET_ALLOW_METHODS", "GET");
-    let _timeout = EnvVarGuard::set("OCL_STD_NET_TIMEOUT_MS", "3000");
-    let _body_cap = EnvVarGuard::set("OCL_STD_NET_MAX_BODY_BYTES", "256");
+    let _lane = EnvVarGuard::set("OCP_PROJECT_LANE", "quarantine");
+    let _mode = EnvVarGuard::set("OCP_QUARANTINE_MODE", "record");
+    let _allow_hosts = EnvVarGuard::set("OCP_STD_NET_ALLOW_HOSTS", "mock.local");
+    let _allow_methods = EnvVarGuard::set("OCP_STD_NET_ALLOW_METHODS", "GET");
+    let _timeout = EnvVarGuard::set("OCP_STD_NET_TIMEOUT_MS", "3000");
+    let _body_cap = EnvVarGuard::set("OCP_STD_NET_MAX_BODY_BYTES", "256");
     let record_path = temp_record_file("net");
-    let _record = EnvVarGuard::set("OCL_V08_NET_HTTP_RECORD_PATH", &record_path);
+    let _record = EnvVarGuard::set("OCP_V08_NET_HTTP_RECORD_PATH", &record_path);
 
     let src = r#"
 observe("std.net.http.request", "tier2", ctx("method=GET;url=http://mock.local/demo;max_body_bytes=16"), budget(5)) -> r;

@@ -1,7 +1,7 @@
 #[path = "w17_gate_f_common.rs"]
 mod w17;
 
-use ocl_sdk::check_project_with_lock;
+use ocp_sdk::check_project_with_lock;
 
 #[test]
 fn v17_connector_db_denies_without_std_db_policy() {

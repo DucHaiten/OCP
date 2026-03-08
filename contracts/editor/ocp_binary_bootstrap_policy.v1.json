@@ -1,0 +1,9 @@
+{
+  "schema": "ocp.editor.binary_bootstrap_policy.v1",
+  "contract_id": "editor.ocp_binary_bootstrap_policy",
+  "version": "v1",
+  "bootstrap_root": "globalStorage/ocp/<version>/<platform>/",
+  "verify_before_execute": true,
+  "tamper_recovery_source": "vsix_bundle",
+  "tamper_recovery_mode": "fail_honest_degraded"
+}

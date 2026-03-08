@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{
+use ocp_sdk::{
     check_project_with_lock, collect_deps_resolved_trace_events_v10, init_project, resolve_deps_v3,
     sync_deps_lock_v1,
 };
@@ -13,7 +13,7 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v10_trust_lane_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v10_trust_lane_{tag}_{stamp}"))
 }
 
 fn write_manifest_with_registry_dep(root: &Path, lane: &str) {
@@ -33,7 +33,7 @@ fn write_manifest_with_registry_dep(root: &Path, lane: &str) {
         ),
         lane
     );
-    fs::write(root.join("Ocl.toml"), manifest).expect("write Ocl.toml");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write Ocp.toml");
 }
 
 fn prepare_project_with_non_builtin_dep(root: &Path, lane: &str) -> PathBuf {
@@ -41,22 +41,22 @@ fn prepare_project_with_non_builtin_dep(root: &Path, lane: &str) -> PathBuf {
     write_manifest_with_registry_dep(root, lane);
     fs::create_dir_all(root.join("deps").join("widgets").join("src")).expect("create dep src");
     fs::write(
-        root.join("deps").join("widgets").join("package.oclp"),
+        root.join("deps").join("widgets").join("package.ocpp"),
         concat!(
             "[package]\n",
             "name = \"engine-ui-widgets\"\n",
             "version = \"0.3.0\"\n",
-            "entry = \"src/widget.ocl\"\n\n",
+            "entry = \"src/widget.ocp\"\n\n",
             "[exports]\n",
             "modules = [\"widget\"]\n"
         ),
     )
-    .expect("write dep package.oclp");
+    .expect("write dep package.ocpp");
     fs::write(
         root.join("deps")
             .join("widgets")
             .join("src")
-            .join("widget.ocl"),
+            .join("widget.ocp"),
         "let ok = true;\ncondition(ok);\n",
     )
     .expect("write dep src");
@@ -155,13 +155,13 @@ fn v16_trust_lane_policy_writes_compat_rehearsal_report() {
     );
 
     let out_dir = PathBuf::from("target")
-        .join("ocl")
+        .join("ocp")
         .join("w16")
         .join("compat");
     fs::create_dir_all(&out_dir).expect("create w16 compat output dir");
     let report = json!({
-        "schema": "ocl.w16.compat.rehearsal.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.compat.rehearsal.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "baseline": "v0.15-line",
         "lane_literals": ["locked_v071", "locked_v06", "quarantine"],
         "results": {

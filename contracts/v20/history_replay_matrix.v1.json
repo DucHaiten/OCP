@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.v20.history_replay_matrix.v1",
+  "schema": "ocp.v20.history_replay_matrix.v1",
   "contract_id": "v20.history_replay_matrix",
   "version": "v1",
   "strategy": "checkout_and_test",

@@ -1,10 +1,10 @@
 use std::sync::{Mutex, OnceLock};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, Value,
 };
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {
@@ -55,13 +55,13 @@ fn shadow_checkpoint_resume_digest_matches_full_digest() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_branches = EnvVarGuard::set("OCL_STD_SHADOW_MAX_BRANCHES", "8");
-    let _step_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_STEP_CAP", "5000");
-    let _budget_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
-    let _checkpoint_every = EnvVarGuard::set("OCL_STD_SHADOW_CHECKPOINT_EVERY", "5000");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_branches = EnvVarGuard::set("OCP_STD_SHADOW_MAX_BRANCHES", "8");
+    let _step_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_STEP_CAP", "5000");
+    let _budget_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
+    let _checkpoint_every = EnvVarGuard::set("OCP_STD_SHADOW_CHECKPOINT_EVERY", "5000");
     let _checkpoint_cache_cap =
-        EnvVarGuard::set("OCL_STD_SHADOW_CHECKPOINT_CACHE_MAX_ENTRIES", "64");
+        EnvVarGuard::set("OCP_STD_SHADOW_CHECKPOINT_CACHE_MAX_ENTRIES", "64");
 
     let src = r#"
 observe("std.shadow.run", "tier2", ctx("variants_json=[{\"x\":1},{\"x\":1}];checkpoint_every=5000"), budget(5)) -> s;
@@ -128,13 +128,13 @@ fn shadow_checkpoint_cache_is_bounded_and_truncated() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let _enabled = EnvVarGuard::set("OCL_STD_SHADOW_ENABLED", "1");
-    let _max_branches = EnvVarGuard::set("OCL_STD_SHADOW_MAX_BRANCHES", "8");
-    let _step_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_STEP_CAP", "5000");
-    let _budget_cap = EnvVarGuard::set("OCL_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
-    let _checkpoint_every = EnvVarGuard::set("OCL_STD_SHADOW_CHECKPOINT_EVERY", "1");
+    let _enabled = EnvVarGuard::set("OCP_STD_SHADOW_ENABLED", "1");
+    let _max_branches = EnvVarGuard::set("OCP_STD_SHADOW_MAX_BRANCHES", "8");
+    let _step_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_STEP_CAP", "5000");
+    let _budget_cap = EnvVarGuard::set("OCP_STD_SHADOW_BRANCH_BUDGET_CAP", "200000");
+    let _checkpoint_every = EnvVarGuard::set("OCP_STD_SHADOW_CHECKPOINT_EVERY", "1");
     let _checkpoint_cache_cap =
-        EnvVarGuard::set("OCL_STD_SHADOW_CHECKPOINT_CACHE_MAX_ENTRIES", "1");
+        EnvVarGuard::set("OCP_STD_SHADOW_CHECKPOINT_CACHE_MAX_ENTRIES", "1");
 
     let src = r#"
 observe("std.shadow.run", "tier2", ctx("variants_json=[{\"x\":1},{\"x\":2},{\"x\":3}];checkpoint_every=1"), budget(5)) -> s;

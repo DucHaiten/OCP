@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::{
+use ocp_sdk::{
     dap_step_sequence_v19, dap_trace_events_from_source_v19, dap_variables_for_event_v19,
 };
 use serde_json::json;
@@ -17,7 +17,7 @@ fn v19_dap_step_variables_follow_trace_order() {
         .join("fixtures")
         .join("v19")
         .join("dap")
-        .join("session.ocl");
+        .join("session.ocp");
     let source = fs::read_to_string(&source_path).expect("read dap fixture");
     let events = dap_trace_events_from_source_v19(&source, 1901).expect("trace events");
     assert!(!events.is_empty(), "events must not be empty");
@@ -44,13 +44,13 @@ fn v19_dap_step_variables_follow_trace_order() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.debug.dap_smoke_report.v1",
+        "schema": "ocp.w19.debug.dap_smoke_report.v1",
         "status": "PASS",
         "phase": "step_variables",
         "steps": steps,
         "sample_event_id": first_with_vars.trace_event_id,
         "sample_variables": vars,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report("debug/dap_smoke_report.json", &report);

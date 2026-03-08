@@ -1,4 +1,4 @@
-use ocl_sdk::workspace_semantic_tokens_allowed_v19;
+use ocp_sdk::workspace_semantic_tokens_allowed_v19;
 use serde_json::json;
 
 #[path = "v19_gate_a_common.rs"]
@@ -37,14 +37,14 @@ fn v19_workspace_trust_semantic_tokens_follow_policy() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.security.workspace_trust_semantic_tokens_report.v1",
+        "schema": "ocp.w19.security.workspace_trust_semantic_tokens_report.v1",
         "status": "PASS",
         "policy_path": policy_path.to_string_lossy().replace('\\', "/"),
         "trusted_semantic_tokens": trusted_semantic_tokens,
         "untrusted_semantic_tokens": untrusted_semantic_tokens,
         "request_issued_when_trusted": request_issued_when_trusted,
         "request_issued_when_untrusted": request_issued_when_untrusted,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19::run_manifest_sha256()
     });
     v19::write_report(

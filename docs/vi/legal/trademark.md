@@ -1,23 +1,23 @@
-# Trademark OCP-OCL v1.0
+# Trademark OCP v1.0
 
-Tài liệu này giải thích cách hiểu chính sách trademark/branding của OCP-OCL theo ngôn ngữ dễ đọc cho người dùng, contributor, và bên muốn phân phối build dẫn xuất.
+Tài liệu này giải thích cách hiểu chính sách trademark/branding của OCP theo ngôn ngữ dễ đọc cho người dùng, contributor, và bên muốn phân phối build dẫn xuất.
 
 Nó không thay thế file gốc ở root:
 - `TRADEMARK.md`
 
 File này chủ yếu giúp trả lời các câu hỏi thực tế:
-- Khi nào một build được coi là bản chính thức của OCP-OCL?
-- Fork có được nói là dựa trên OCP-OCL không?
-- Có được dùng tên hoặc logo của OCP-OCL để phát hành bản riêng không?
+- Khi nào một build được coi là bản chính thức của OCP?
+- Fork có được nói là dựa trên OCP không?
+- Có được dùng tên hoặc logo của OCP để phát hành bản riêng không?
 
 ## Tóm tắt ngắn
 
 Nếu chỉ cần hiểu rất nhanh:
 
-1. Không phải build nào dùng source OCP-OCL cũng là bản chính thức.
-2. Chỉ build nằm trong release chính thức và trust chain chính thức mới nên được gọi là `Official OCL Build`.
-3. Fork được phép nói rõ mình dựa trên OCP-OCL.
-4. Fork không được trình bày như thể đó là bản chính thức của OCP-OCL.
+1. Không phải build nào dùng source OCP cũng là bản chính thức.
+2. Chỉ build nằm trong release chính thức và trust chain chính thức mới nên được gọi là `Official OCP Build`.
+3. Fork được phép nói rõ mình dựa trên OCP.
+4. Fork không được trình bày như thể đó là bản chính thức của OCP.
 
 ## 1) Trademark policy này dùng để làm gì?
 
@@ -29,11 +29,11 @@ Trademark policy dùng để kiểm soát một chuyện khác:
 
 Nói đơn giản:
 - license trả lời câu hỏi “có được dùng code không?”;
-- trademark policy trả lời câu hỏi “có được gọi build đó là OCP-OCL chính thức không?”.
+- trademark policy trả lời câu hỏi “có được gọi build đó là OCP chính thức không?”.
 
 ## 2) Khi nào một build được coi là bản chính thức?
 
-Một build chỉ nên được coi là `Official OCL Build` khi:
+Một build chỉ nên được coi là `Official OCP Build` khi:
 - nó thuộc release chính thức của dự án;
 - nó nằm trong signed artifact scope của release đó;
 - nó xuất hiện trong release manifest chính thức;
@@ -56,19 +56,19 @@ Có.
 Fork hoặc community build được phép:
 - tồn tại;
 - phát hành bản riêng;
-- nói rõ rằng mình dựa trên OCP-OCL;
+- nói rõ rằng mình dựa trên OCP;
 - mô tả trung thực nguồn gốc của mình.
 
 Ví dụ các cách nói chấp nhận được:
-- `based on OCP-OCL`
-- `fork of OCP-OCL`
-- `community build derived from OCP-OCL`
+- `based on OCP`
+- `fork of OCP`
+- `community build derived from OCP`
 
 ## 4) Fork không được làm gì?
 
 Fork hoặc build dẫn xuất không nên:
-- tự gọi mình là `Official OCL Build`;
-- tự gọi mình là `Official OCP-OCL`;
+- tự gọi mình là `Official OCP Build`;
+- tự gọi mình là `Official OCP`;
 - trình bày như thể đó là bản phát hành chính thức của dự án;
 - dùng branding theo cách khiến người dùng bình thường khó phân biệt giữa fork và official build.
 
@@ -76,23 +76,23 @@ Nói ngắn gọn:
 - được phép nói rõ nguồn gốc;
 - không được phép mạo danh.
 
-## 5) Có được dùng tên “OCP-OCL” không?
+## 5) Có được dùng tên “OCP” không?
 
 Có, nhưng phải dùng đúng cách.
 
 Được phép:
-- nhắc tới OCP-OCL để nói về nguồn gốc dự án;
-- mô tả rằng sản phẩm của bạn dựa trên OCP-OCL;
+- nhắc tới OCP để nói về nguồn gốc dự án;
+- mô tả rằng sản phẩm của bạn dựa trên OCP;
 - nói rõ mối quan hệ giữa bản của bạn và dự án gốc.
 
 Không nên:
 - đặt tên hoặc quảng bá theo cách làm người dùng hiểu nhầm đó là bản chính thức;
-- dùng tên `OCP-OCL` như thương hiệu chính của một fork mà không làm rõ đó là fork/community build.
+- dùng tên `OCP` như thương hiệu chính của một fork mà không làm rõ đó là fork/community build.
 
-## 6) Có được dùng logo hoặc branding của OCP-OCL không?
+## 6) Có được dùng logo hoặc branding của OCP không?
 
 Cách hiểu an toàn hiện tại là:
-- không dùng logo/branding của OCP-OCL để làm cho fork hoặc build riêng trông như official;
+- không dùng logo/branding của OCP để làm cho fork hoặc build riêng trông như official;
 - không tái đóng gói build khác rồi trình bày bằng bộ nhận diện khiến người dùng tưởng đó là bản chính thức.
 
 Nếu bạn chỉ cần nói về nguồn gốc, cách an toàn nhất là:
@@ -107,14 +107,14 @@ Nếu bạn chỉ cần nói về nguồn gốc, cách an toàn nhất là:
 - publisher identity khớp với chuỗi phát hành chính thức.
 
 Trong public-facing docs hiện tại, identity chính thức được coi là:
-- publisher: `ocp-ocl`
+- publisher: `ocp`
 
 Điều đó có nghĩa:
-- extension do publisher khác phát hành không nên được trình bày như extension OCP-OCL chính thức, trừ khi thật sự thuộc chuỗi phát hành chính thức của dự án.
+- extension do publisher khác phát hành không nên được trình bày như extension OCP chính thức, trừ khi thật sự thuộc chuỗi phát hành chính thức của dự án.
 
 ## 8) Trademark policy liên quan gì tới trust chain?
 
-Trong OCP-OCL, trademark không đứng riêng khỏi release integrity.
+Trong OCP, trademark không đứng riêng khỏi release integrity.
 
 Một build được coi là official không chỉ vì:
 - tên file giống,
@@ -153,6 +153,6 @@ Nó chỉ làm một việc:
 ## 11) Kết luận
 
 Hiểu theo cách đơn giản nhất:
-- bạn có thể fork và phát triển từ OCP-OCL;
-- bạn có thể nói rõ bản của mình dựa trên OCP-OCL;
-- nhưng chỉ build thuộc release chính thức và trust chain chính thức mới nên được gọi là `Official OCL Build`.
+- bạn có thể fork và phát triển từ OCP;
+- bạn có thể nói rõ bản của mình dựa trên OCP;
+- nhưng chỉ build thuộc release chính thức và trust chain chính thức mới nên được gọi là `Official OCP Build`.

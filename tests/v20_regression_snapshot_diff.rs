@@ -71,13 +71,13 @@ fn v20_regression_snapshot_diff() {
         .collect::<Vec<String>>();
 
     let report = json!({
-        "schema": "ocl.w20.regression_diff_report.v1",
+        "schema": "ocp.w20.regression_diff_report.v1",
         "status": "PASS",
         "replay_versions_count": replay_versions.len(),
         "legacy_versions_count": legacy_versions.len(),
         "missing_in_legacy_index": missing_in_legacy,
         "snapshot_hashes": replay_hashes,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20b::run_manifest_sha256()
     });
     v20b::write_report("regression/regression_diff_report.json", &report);

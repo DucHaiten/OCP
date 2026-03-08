@@ -1,6 +1,6 @@
 use std::sync::{Mutex, OnceLock};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, ExecConfig, Executor, ReasonCode, ResultKind, Value,
 };
 use serde_json::json;
@@ -46,10 +46,10 @@ fn v18_fs_boundary_negative_blocks_parent_traversal() {
     let _guard = env_serial_guard()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let root = std::env::temp_dir().join("ocl_v18_fs_boundary_root");
+    let root = std::env::temp_dir().join("ocp_v18_fs_boundary_root");
     std::fs::create_dir_all(&root).expect("create fs boundary root");
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_read = EnvVarGuard::set("OCL_STD_FS_ALLOW_READ", "./**");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_read = EnvVarGuard::set("OCP_STD_FS_ALLOW_READ", "./**");
 
     let src = r#"
 observe("std.fs.read_text", "tier2", ctx("path=../escape.txt"), budget(5)) -> r;
@@ -70,8 +70,8 @@ observe("std.fs.read_text", "tier2", ctx("path=../escape.txt"), budget(5)) -> r;
     assert_eq!(result.reason, Some(ReasonCode::FsPathOutsideSandbox));
 
     let report = json!({
-        "schema": "ocl.w18.security.fs_boundary_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.security.fs_boundary_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "reason_code": "RC-FS-PATH-OUTSIDE-SANDBOX",
         "result_kind": "INSUFFICIENT",
         "status": "PASS"

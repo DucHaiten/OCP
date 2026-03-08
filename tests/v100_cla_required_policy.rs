@@ -27,12 +27,12 @@ fn v100_cla_required_policy() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.business.cla_policy_contract_report.v1",
+        "schema": "ocp.w100.business.cla_policy_contract_report.v1",
         "status": "PASS",
         "cla_required": true,
         "reject_contribution_without_cla": true,
         "contributing_verified": "CONTRIBUTING.md",
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100g::run_manifest_sha256()
     });
     v100g::write_report("business/cla_policy_contract_report.json", &report);

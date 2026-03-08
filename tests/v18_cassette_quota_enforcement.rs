@@ -17,7 +17,7 @@ fn v18_cassette_quota_enforcement_is_fail_honest_and_reported() {
     common::seed_v08_cassette_lines(&artifact, &[&line]);
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&[
+    let out = common::run_ocp_cli(&[
         "cassette",
         "upgrade",
         &artifact_s,

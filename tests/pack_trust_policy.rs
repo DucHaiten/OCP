@@ -1,7 +1,7 @@
 #[path = "w17_gate_e_common.rs"]
 mod w17;
 
-use ocl_sdk::evaluate_pack_trust_policy_v17;
+use ocp_sdk::evaluate_pack_trust_policy_v17;
 
 #[test]
 fn v17_pack_trust_policy_locked_v071_requires_full_chain() {

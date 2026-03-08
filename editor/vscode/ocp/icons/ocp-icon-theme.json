@@ -1,0 +1,16 @@
+{
+  "$schema": "vscode://schemas/icon-theme",
+  "iconDefinitions": {
+    "ocpFile": {
+      "iconPath": "./ocp.svg"
+    }
+  },
+  "languageIds": {
+    "ocp": "ocpFile"
+  },
+  "fileExtensions": {
+    "ocp": "ocpFile",
+    "ocpp": "ocpFile",
+    "ocpt": "ocpFile"
+  }
+}

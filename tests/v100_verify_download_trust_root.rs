@@ -65,7 +65,7 @@ fn v100_verify_download_trust_root() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.release.verify_download_trust_root_report.v1",
+        "schema": "ocp.w100.release.verify_download_trust_root_report.v1",
         "status": "PASS",
         "trust_root_path": trust_path,
         "key_ids": key_ids,
@@ -73,7 +73,7 @@ fn v100_verify_download_trust_root() {
             "docs/vi/security/verify-download.md",
             "docs/en/security/verify-download.md"
         ],
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100b::run_manifest_sha256()
     });
     v100b::write_report("release/verify_download_trust_root_report.json", &report);

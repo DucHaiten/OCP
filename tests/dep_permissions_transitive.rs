@@ -2,14 +2,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::{check_project_with_lock, init_project};
+use ocp_sdk::{check_project_with_lock, init_project};
 
 fn temp_project_dir(tag: &str) -> PathBuf {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_nanos();
-    std::env::temp_dir().join(format!("ocl_v10_dep_perm_transitive_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v10_dep_perm_transitive_{tag}_{stamp}"))
 }
 
 fn write_text(path: &Path, content: &str) {
@@ -21,7 +21,7 @@ fn write_text(path: &Path, content: &str) {
 
 fn write_manifest_with_b_and_c(root: &Path) {
     write_text(
-        &root.join("Ocl.toml"),
+        &root.join("Ocp.toml"),
         concat!(
             "[package]\n",
             "name = \"perm_transitive_demo\"\n",
@@ -41,7 +41,7 @@ fn write_manifest_with_b_and_c(root: &Path) {
         ),
     );
     write_text(
-        &root.join("src").join("main.ocl"),
+        &root.join("src").join("main.ocp"),
         "import b.bridge;\nlet ok = true;\ncondition(ok);\n",
     );
 }
@@ -53,12 +53,12 @@ fn v10_transitive_permissions_do_not_allow_borrowing_from_other_dependency() {
     write_manifest_with_b_and_c(&root);
 
     write_text(
-        &root.join("deps").join("b").join("package.oclp"),
+        &root.join("deps").join("b").join("package.ocpp"),
         concat!(
             "[package]\n",
             "name = \"b-pkg\"\n",
             "version = \"1.0.0\"\n",
-            "entry = \"src/bridge.ocl\"\n\n",
+            "entry = \"src/bridge.ocp\"\n\n",
             "[exports]\n",
             "modules = [\"bridge\"]\n\n",
             "[requested_permissions]\n",
@@ -69,7 +69,7 @@ fn v10_transitive_permissions_do_not_allow_borrowing_from_other_dependency() {
         ),
     );
     write_text(
-        &root.join("deps").join("b").join("src").join("bridge.ocl"),
+        &root.join("deps").join("b").join("src").join("bridge.ocp"),
         concat!(
             "import c.leaf;\n",
             "observe(\"std.kv.get\", \"tier2\", ctx(\"key=app.user\"), budget(5)) -> b_r;\n",
@@ -79,12 +79,12 @@ fn v10_transitive_permissions_do_not_allow_borrowing_from_other_dependency() {
     );
 
     write_text(
-        &root.join("deps").join("c").join("package.oclp"),
+        &root.join("deps").join("c").join("package.ocpp"),
         concat!(
             "[package]\n",
             "name = \"c-pkg\"\n",
             "version = \"1.0.0\"\n",
-            "entry = \"src/leaf.ocl\"\n\n",
+            "entry = \"src/leaf.ocp\"\n\n",
             "[exports]\n",
             "modules = [\"leaf\"]\n\n",
             "[requested_permissions]\n",
@@ -95,7 +95,7 @@ fn v10_transitive_permissions_do_not_allow_borrowing_from_other_dependency() {
         ),
     );
     write_text(
-        &root.join("deps").join("c").join("src").join("leaf.ocl"),
+        &root.join("deps").join("c").join("src").join("leaf.ocp"),
         "observe(\"std.kv.get\", \"tier2\", ctx(\"key=app.user\"), budget(5)) -> c_r;\nlet ok = true;\ncondition(ok);\n",
     );
 
@@ -112,12 +112,12 @@ fn v10_transitive_permissions_allow_callsite_with_its_own_grant() {
     write_manifest_with_b_and_c(&root);
 
     write_text(
-        &root.join("deps").join("b").join("package.oclp"),
+        &root.join("deps").join("b").join("package.ocpp"),
         concat!(
             "[package]\n",
             "name = \"b-pkg\"\n",
             "version = \"1.0.0\"\n",
-            "entry = \"src/bridge.ocl\"\n\n",
+            "entry = \"src/bridge.ocp\"\n\n",
             "[exports]\n",
             "modules = [\"bridge\"]\n\n",
             "[requested_permissions]\n",
@@ -128,17 +128,17 @@ fn v10_transitive_permissions_allow_callsite_with_its_own_grant() {
         ),
     );
     write_text(
-        &root.join("deps").join("b").join("src").join("bridge.ocl"),
+        &root.join("deps").join("b").join("src").join("bridge.ocp"),
         "import c.leaf;\nlet ok = true;\ncondition(ok);\n",
     );
 
     write_text(
-        &root.join("deps").join("c").join("package.oclp"),
+        &root.join("deps").join("c").join("package.ocpp"),
         concat!(
             "[package]\n",
             "name = \"c-pkg\"\n",
             "version = \"1.0.0\"\n",
-            "entry = \"src/leaf.ocl\"\n\n",
+            "entry = \"src/leaf.ocp\"\n\n",
             "[exports]\n",
             "modules = [\"leaf\"]\n\n",
             "[requested_permissions]\n",
@@ -149,7 +149,7 @@ fn v10_transitive_permissions_allow_callsite_with_its_own_grant() {
         ),
     );
     write_text(
-        &root.join("deps").join("c").join("src").join("leaf.ocl"),
+        &root.join("deps").join("c").join("src").join("leaf.ocp"),
         "observe(\"std.kv.get\", \"tier2\", ctx(\"key=app.user\"), budget(5)) -> c_r;\nlet ok = true;\ncondition(ok);\n",
     );
 

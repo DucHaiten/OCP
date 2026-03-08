@@ -35,10 +35,10 @@ fn v100_readme_licensing_consistency() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.business.readme_licensing_consistency_report.v1",
+        "schema": "ocp.w100.business.readme_licensing_consistency_report.v1",
         "status": "PASS",
         "readme_verified": "README.md",
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100g::run_manifest_sha256()
     });
     v100g::write_report("business/readme_licensing_consistency_report.json", &report);

@@ -87,13 +87,13 @@ fn v100_docs_link_redirect_policy() {
     );
 
     let report = json!({
-        "schema": "ocl.w100.docs.link_redirect_policy_report.v1",
+        "schema": "ocp.w100.docs.link_redirect_policy_report.v1",
         "status": "PASS",
         "links_checked": checked_links.len(),
         "broken_links": broken_links,
         "plans_index": plans_index.to_string_lossy().replace('\\', "/"),
         "historical_plans_root": historical.to_string_lossy().replace('\\', "/"),
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100d::run_manifest_sha256()
     });
     v100d::write_report("docs/docs_link_redirect_policy_report.json", &report);

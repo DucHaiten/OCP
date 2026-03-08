@@ -3,7 +3,7 @@ mod w17;
 
 use std::path::PathBuf;
 
-use ocl_sdk::{verify_w17_contract_set_v17, W17_REQUIRED_CONTRACT_FILES};
+use ocp_sdk::{verify_w17_contract_set_v17, W17_REQUIRED_CONTRACT_FILES};
 use serde_json::{json, Value as JsonValue};
 
 #[test]
@@ -55,8 +55,8 @@ fn v017_release_guard_verifies_risk_locks_and_contract_sot() {
     }
 
     let report = json!({
-        "schema": "ocl.w17.release_guard_report.v1",
-        "run_manifest_ref": "target/ocl/w17/meta/run_manifest.json",
+        "schema": "ocp.w17.release_guard_report.v1",
+        "run_manifest_ref": "target/ocp/w17/meta/run_manifest.json",
         "contract_set": {
             "required_count": set_summary.required_count,
             "verified_count": set_summary.verified_count

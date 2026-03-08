@@ -1,0 +1,14 @@
+{
+  "schema": "ocp.editor.version_compat_matrix.v1",
+  "contract_id": "editor.ocp_version_compat_matrix",
+  "version": "v1",
+  "rows": [
+    {
+      "extension": "0.19.x",
+      "lsp": "0.19.x",
+      "dap": "0.19.x",
+      "compat": "full"
+    }
+  ],
+  "on_mismatch": "fail_honest_disable_feature"
+}

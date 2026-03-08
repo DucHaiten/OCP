@@ -1,9 +1,9 @@
 # Quickstart 04 - Lock Trust Attest
 
 ```bash
-ocl lock sync
-ocl lock sign --key <keyid>
-ocl lock verify
-ocl build --attest
-ocl verify --attest
+ocp lock sync
+ocp lock sign --key <keyid>
+ocp lock verify
+ocp build --attest
+ocp verify --attest
 ```

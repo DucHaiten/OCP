@@ -1,7 +1,7 @@
 {
-  "schema": "ocl.w15.perf.run_manifest.v1",
+  "schema": "ocp.w15.perf.run_manifest.v1",
   "baseline_id": "v0.15-line",
-  "git_commit": "OCL-v0.15",
+  "git_commit": "OCP-v0.15",
   "rustc_version_verbose": "pinned-by-v015-baseline",
   "cargo_version": "pinned-by-v015-baseline",
   "target_triple": "x86_64-pc-windows-msvc",
@@ -9,10 +9,10 @@
   "arch": "x86_64",
   "lane_profile": "locked_v071",
   "allowed_env_flags": [
-    "OCL_CACHE_DISABLE",
-    "OCL_CACHE_PROFILE",
-    "OCL_QUARANTINE",
-    "OCL_ALLOW_OVERRIDES"
+    "OCP_CACHE_DISABLE",
+    "OCP_CACHE_PROFILE",
+    "OCP_QUARANTINE",
+    "OCP_ALLOW_OVERRIDES"
   ],
   "deps_lock_v3_hash": "pinned-by-v015-baseline",
   "cargo_lock_hash": "pinned-by-v015-baseline"

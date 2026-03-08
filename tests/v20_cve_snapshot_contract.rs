@@ -1,4 +1,4 @@
-use ocl_sdk::verify_contract_json_signature_v20;
+use ocp_sdk::verify_contract_json_signature_v20;
 use serde_json::json;
 
 #[path = "v20_gate_f_common.rs"]
@@ -25,7 +25,7 @@ fn v20_cve_snapshot_contract() {
             .get("schema")
             .and_then(serde_json::Value::as_str)
             .unwrap_or(""),
-        "ocl.v20.cve_snapshot.v1",
+        "ocp.v20.cve_snapshot.v1",
         "unexpected cve snapshot schema"
     );
     assert_eq!(
@@ -50,7 +50,7 @@ fn v20_cve_snapshot_contract() {
         .unwrap_or(0usize);
 
     let report = json!({
-        "schema": "ocl.w20.security.cve_snapshot_report.v1",
+        "schema": "ocp.w20.security.cve_snapshot_report.v1",
         "status": "PASS",
         "contract_path": contract_path.to_string_lossy().replace('\\', "/"),
         "signature_path": summary.signature_path.to_string_lossy().replace('\\', "/"),
@@ -60,7 +60,7 @@ fn v20_cve_snapshot_contract() {
         "deny_severities": deny_severities,
         "deny_packages_count": deny_packages,
         "allow_exceptions_count": allow_exceptions,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20f::run_manifest_sha256()
     });
     v20f::write_report("security/cve_snapshot_report.json", &report);

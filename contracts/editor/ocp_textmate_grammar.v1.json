@@ -1,0 +1,13 @@
+{
+  "schema": "ocp.editor.textmate_grammar.v1",
+  "contract_id": "editor.ocp_textmate_grammar",
+  "version": "v1",
+  "scope_name": "source.ocp",
+  "grammar_path": "editor/vscode/ocp/syntaxes/ocp.tmLanguage.json",
+  "required_rule_names": [
+    "comments",
+    "keywords",
+    "strings",
+    "numbers"
+  ]
+}

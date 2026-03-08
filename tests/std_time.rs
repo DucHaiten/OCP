@@ -1,6 +1,6 @@
-use ocp_ocl::ocp_ocl::{parse_program, typecheck_program, ExecConfig, Executor, ResultKind, Value};
+use ocp::ocp::{parse_program, typecheck_program, ExecConfig, Executor, ResultKind, Value};
 
-fn run_program(src: &str) -> ocp_ocl::ocp_ocl::ExecOutput {
+fn run_program(src: &str) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::new(ExecConfig {

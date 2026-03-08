@@ -42,11 +42,11 @@ fn v19_platform_matrix_provenance() {
     }
 
     let report = json!({
-        "schema": "ocl.w19.rc.platform_matrix_provenance_report.v1",
+        "schema": "ocp.w19.rc.platform_matrix_provenance_report.v1",
         "status": "PASS",
         "entries": entries,
         "required_fields": required_fields,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19g::run_manifest_sha256()
     });
     v19g::write_report("rc/platform_matrix_provenance_report.json", &report);

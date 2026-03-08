@@ -1,12 +1,12 @@
 use std::path::Path;
 
-use ocl_sdk::{
+use ocp_sdk::{
     parse_conformance_manifest_v1, run_conformance_v1, ConformanceManifestV1,
     ConformanceRunOptionsV1,
 };
 
 fn conformance_v5_path() -> &'static Path {
-    Path::new("projects/ocp-ocl/conformance/conformance.v5.toml")
+    Path::new("projects/ocp/conformance/conformance.v5.toml")
 }
 
 fn core_manifest_subset() -> ConformanceManifestV1 {

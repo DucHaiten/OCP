@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use ocp_ocl::ocp_ocl::{pretty_schema, CapabilityRegistry};
+use ocp::ocp::{pretty_schema, CapabilityRegistry};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -20,15 +20,15 @@ struct StabilityContractSnapshotV14 {
 }
 
 fn snapshot_path() -> PathBuf {
-    PathBuf::from("projects/ocp-ocl/conformance/expected/contracts/stability_contract_v14.json")
+    PathBuf::from("projects/ocp/conformance/expected/contracts/stability_contract_v14.json")
 }
 
 fn conformance_manifest_path() -> PathBuf {
-    PathBuf::from("projects/ocp-ocl/conformance/conformance.v5.toml")
+    PathBuf::from("projects/ocp/conformance/conformance.v5.toml")
 }
 
 fn cli_main_path() -> PathBuf {
-    PathBuf::from("projects/ocp-ocl/crates/ocl-cli/src/main.rs")
+    PathBuf::from("projects/ocp/crates/ocp-cli/src/main.rs")
 }
 
 fn sha256_hex(input: &str) -> String {
@@ -104,7 +104,7 @@ fn stability_contract_snapshot_v14_additive_only() {
     let current = current_snapshot_v14();
     let path = snapshot_path();
 
-    if std::env::var("OCL_UPDATE_V14_CONTRACT_SNAPSHOT")
+    if std::env::var("OCP_UPDATE_V14_CONTRACT_SNAPSHOT")
         .ok()
         .as_deref()
         == Some("1")
@@ -116,7 +116,7 @@ fn stability_contract_snapshot_v14_additive_only() {
         fs::write(&path, rendered).expect("write snapshot");
         // Snapshot update is an explicit maintainer action; force rerun without update flag.
         panic!(
-            "updated {}. Re-run test without OCL_UPDATE_V14_CONTRACT_SNAPSHOT=1",
+            "updated {}. Re-run test without OCP_UPDATE_V14_CONTRACT_SNAPSHOT=1",
             path.display()
         );
     }

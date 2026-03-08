@@ -1,6 +1,6 @@
 use std::fs;
 
-use ocl_sdk::{sign_contract_json_v18, verify_w18_contract_set_v18, W18_REQUIRED_CONTRACT_FILES};
+use ocp_sdk::{sign_contract_json_v18, verify_w18_contract_set_v18, W18_REQUIRED_CONTRACT_FILES};
 use serde_json::json;
 
 #[path = "v18_gate_a_common.rs"]
@@ -13,11 +13,11 @@ fn contracts_root() -> std::path::PathBuf {
 #[test]
 fn v18_sot_signature_verify() {
     v18::ensure_run_manifest();
-    let update = std::env::var("OCL_UPDATE_V18_SOT_SIG").ok().as_deref() == Some("1");
+    let update = std::env::var("OCP_UPDATE_V18_SOT_SIG").ok().as_deref() == Some("1");
     let mut generated = Vec::<String>::new();
     for rel in W18_REQUIRED_CONTRACT_FILES {
         let contract_path = contracts_root().join(rel);
-        let sig_path = ocl_sdk::contract_sig_path_v18(&contract_path);
+        let sig_path = ocp_sdk::contract_sig_path_v18(&contract_path);
         if update || !sig_path.exists() {
             sign_contract_json_v18(&contract_path, "w18-sot-root", 1)
                 .unwrap_or_else(|_| panic!("sign {}", contract_path.display()));
@@ -40,8 +40,8 @@ fn v18_sot_signature_verify() {
     );
 
     let report = json!({
-        "schema": "ocl.w18.sot_signature_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.sot_signature_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "required_count": summary.required_count,
         "verified_count": summary.verified_count,
         "contracts_root": summary.root.to_string_lossy().replace('\\', "/"),

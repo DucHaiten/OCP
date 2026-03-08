@@ -14,15 +14,15 @@ fn v18_golden_journey_tool_cli_runs_end_to_end() {
     let empty_env = BTreeMap::new();
     let mut steps = Vec::new();
 
-    let init = common::run_ocl_cli(&["init", &root_s, "--template", "tool-cli"], &empty_env);
+    let init = common::run_ocp_cli(&["init", &root_s, "--template", "tool-cli"], &empty_env);
     let _ = common::assert_ok(&init, "init tool-cli");
     steps.push(json!({"name":"init","ok":true}));
 
-    let lock_sync = common::run_ocl_cli(&["lock", "sync", &root_s], &empty_env);
+    let lock_sync = common::run_ocp_cli(&["lock", "sync", &root_s], &empty_env);
     let _ = common::assert_ok(&lock_sync, "lock sync");
-    let lock_sign = common::run_ocl_cli(&["lock", "sign", &root_s, "--key", "ci-rc"], &empty_env);
+    let lock_sign = common::run_ocp_cli(&["lock", "sign", &root_s, "--key", "ci-rc"], &empty_env);
     let _ = common::assert_ok(&lock_sign, "lock sign");
-    let lock_verify = common::run_ocl_cli(&["lock", "verify", &root_s], &empty_env);
+    let lock_verify = common::run_ocp_cli(&["lock", "verify", &root_s], &empty_env);
     let _ = common::assert_ok(&lock_verify, "lock verify");
     steps.push(json!({"name":"lock_chain","ok":true}));
 
@@ -33,7 +33,7 @@ fn v18_golden_journey_tool_cli_runs_end_to_end() {
     let perm_old_s = perm_old_dir.to_string_lossy().to_string();
     let perm_new_s = perm_new_dir.to_string_lossy().to_string();
 
-    let snapshot_old = common::run_ocl_cli(
+    let snapshot_old = common::run_ocp_cli(
         &["perm", "snapshot", &root_s, "--out-dir", &perm_old_s],
         &empty_env,
     );
@@ -41,7 +41,7 @@ fn v18_golden_journey_tool_cli_runs_end_to_end() {
 
     common::patch_manifest_for_permission_delta(&root);
 
-    let snapshot_new = common::run_ocl_cli(
+    let snapshot_new = common::run_ocp_cli(
         &["perm", "snapshot", &root_s, "--out-dir", &perm_new_s],
         &empty_env,
     );
@@ -56,7 +56,7 @@ fn v18_golden_journey_tool_cli_runs_end_to_end() {
     let diff_report_s = diff_report.to_string_lossy().to_string();
     let approval_file_s = approval_file.to_string_lossy().to_string();
 
-    let diff_before = common::run_ocl_cli(
+    let diff_before = common::run_ocp_cli(
         &[
             "perm",
             "diff",
@@ -75,7 +75,7 @@ fn v18_golden_journey_tool_cli_runs_end_to_end() {
         "perm diff before approval must fail with RC-PERMISSION-UNAPPROVED"
     );
 
-    let approve = common::run_ocl_cli(
+    let approve = common::run_ocp_cli(
         &[
             "perm",
             "approve",
@@ -93,7 +93,7 @@ fn v18_golden_journey_tool_cli_runs_end_to_end() {
     );
     let _ = common::assert_ok(&approve, "perm approve");
 
-    let diff_after = common::run_ocl_cli(
+    let diff_after = common::run_ocp_cli(
         &[
             "perm",
             "diff",
@@ -110,24 +110,24 @@ fn v18_golden_journey_tool_cli_runs_end_to_end() {
     steps.push(json!({"name":"perm_review","ok":true}));
 
     let build_attest =
-        common::run_ocl_cli(&["build", &root_s, "--source-only", "--attest"], &empty_env);
+        common::run_ocp_cli(&["build", &root_s, "--source-only", "--attest"], &empty_env);
     let _ = common::assert_ok(&build_attest, "build --attest");
-    let attest_dir = root.join("target").join("ocl").join("attestation");
+    let attest_dir = root.join("target").join("ocp").join("attestation");
     let attest_dir_s = attest_dir.to_string_lossy().to_string();
-    let verify_attest = common::run_ocl_cli(&["verify", "--attest", &attest_dir_s], &empty_env);
+    let verify_attest = common::run_ocp_cli(&["verify", "--attest", &attest_dir_s], &empty_env);
     let _ = common::assert_ok(&verify_attest, "verify --attest");
     steps.push(json!({"name":"attestation_chain","ok":true}));
 
-    let run = common::run_ocl_cli(&["run", &root_s], &empty_env);
+    let run = common::run_ocp_cli(&["run", &root_s], &empty_env);
     let _ = common::assert_ok(&run, "run");
     let artifact = common::latest_artifact_dir(&root);
-    let replay = common::run_ocl_cli(&["replay", &artifact.to_string_lossy()], &empty_env);
+    let replay = common::run_ocp_cli(&["replay", &artifact.to_string_lossy()], &empty_env);
     let _ = common::assert_ok(&replay, "replay");
     steps.push(json!({"name":"run_replay","ok":true}));
 
     let dbg_script = root.join("dbg.script.txt");
     fs::write(&dbg_script, "where\nstep\nlocals\nlast\n").expect("write dbg script");
-    let dbg = common::run_ocl_cli(
+    let dbg = common::run_ocp_cli(
         &[
             "dbg",
             &artifact.to_string_lossy(),
@@ -141,8 +141,8 @@ fn v18_golden_journey_tool_cli_runs_end_to_end() {
     steps.push(json!({"name":"dbg_smoke","ok":true}));
 
     let report = json!({
-        "schema": "ocl.w18.rc.golden_journey_tool_cli_report.v1",
-        "run_manifest_ref": "target/ocl/w18/meta/run_manifest.json",
+        "schema": "ocp.w18.rc.golden_journey_tool_cli_report.v1",
+        "run_manifest_ref": "target/ocp/w18/meta/run_manifest.json",
         "project_root": root.to_string_lossy().replace('\\', "/"),
         "steps": steps,
         "artifacts": {

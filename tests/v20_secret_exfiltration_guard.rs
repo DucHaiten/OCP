@@ -42,13 +42,13 @@ fn v20_secret_exfiltration_guard() {
     assert_eq!(leak_count, 0, "secret marker leak detected after redaction");
 
     let report = json!({
-        "schema": "ocl.w20.security.secrets_hygiene_report.v1",
+        "schema": "ocp.w20.security.secrets_hygiene_report.v1",
         "status": "PASS",
         "samples_checked": events.len(),
         "redaction_count": redaction_count,
         "leak_count": leak_count,
         "events": events,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20f::run_manifest_sha256()
     });
     v20f::write_report("security/secrets_hygiene_report.json", &report);

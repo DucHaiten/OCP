@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.legal.governance_policy.v1",
+  "schema": "ocp.legal.governance_policy.v1",
   "contract_id": "v1.governance_policy",
   "version": "v1",
   "release_authority": [

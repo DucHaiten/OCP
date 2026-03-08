@@ -12,14 +12,14 @@ fn v19_binary_bootstrap_recovery_from_tamper() {
 
     let target = fixture
         .binaries
-        .get("ocl-lsp")
-        .expect("ocl-lsp path")
+        .get("ocp-lsp")
+        .expect("ocp-lsp path")
         .to_path_buf();
     let original = fs::read(&target).expect("read original binary");
     let expected_hash = fixture
         .binary_hashes
-        .get("ocl-lsp")
-        .expect("ocl-lsp hash")
+        .get("ocp-lsp")
+        .expect("ocp-lsp hash")
         .to_string();
 
     fs::write(&target, b"TAMPERED\n").expect("tamper binary");
@@ -36,13 +36,13 @@ fn v19_binary_bootstrap_recovery_from_tamper() {
     );
 
     let report = json!({
-        "schema": "ocl.w19.release.binary_recovery_report.v1",
+        "schema": "ocp.w19.release.binary_recovery_report.v1",
         "status": "PASS",
         "policy_mode": "fail_honest_degraded",
         "tampered_hash": tampered_hash,
         "recovered_hash": recovered_hash,
         "expected_hash": expected_hash,
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": f19::run_manifest_sha256()
     });
     f19::write_report("release/binary_recovery_report.json", &report);

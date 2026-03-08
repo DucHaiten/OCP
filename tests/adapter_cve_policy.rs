@@ -1,7 +1,7 @@
 #[path = "w17_gate_e_common.rs"]
 mod w17;
 
-use ocl_sdk::{evaluate_adapter_cve_policy_v17, AdapterCveSeverityV17};
+use ocp_sdk::{evaluate_adapter_cve_policy_v17, AdapterCveSeverityV17};
 
 #[test]
 fn v17_adapter_cve_policy_locked_v071_blocks_unpatched_critical() {

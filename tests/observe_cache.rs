@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocp_ocl::ocp_ocl::{
+use ocp::ocp::{
     parse_program, typecheck_program, Cacheability, CapabilityRegistry, DeterminismClass,
     ExecConfig, Executor, Value,
 };
@@ -11,7 +11,7 @@ use ocp_ocl::ocp_ocl::{
 fn run_program_with_registry(
     src: &str,
     registry: CapabilityRegistry,
-) -> ocp_ocl::ocp_ocl::ExecOutput {
+) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::with_registry(
@@ -69,7 +69,7 @@ fn temp_fs_root(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    std::env::temp_dir().join(format!("ocl_observe_cache_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_observe_cache_{tag}_{stamp}"))
 }
 
 fn write_text(path: &Path, content: &str) {
@@ -113,9 +113,9 @@ fn observe_cache_fs_generation_invalidation_prevents_stale_read() {
     let root = temp_fs_root("fs_generation");
     write_text(&root.join("data/in.txt"), "one");
 
-    let _root_guard = EnvVarGuard::set("OCL_STD_FS_ROOT", &root.to_string_lossy());
-    let _allow_read_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_READ", "./data/**");
-    let _allow_write_guard = EnvVarGuard::set("OCL_STD_FS_ALLOW_WRITE", "./data/**");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_read_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_READ", "./data/**");
+    let _allow_write_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_WRITE", "./data/**");
 
     let src = r#"
 observe("std.fs.read_text", "tier2", ctx("path=./data/in.txt"), budget(5)) -> r1;

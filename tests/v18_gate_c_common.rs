@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ocl_sdk::init_project;
+use ocp_sdk::init_project;
 use serde_json::{json, Value as JsonValue};
 
 #[path = "v18_gate_a_common.rs"]
@@ -19,7 +19,7 @@ pub fn repo_root() -> PathBuf {
 pub fn w18_ops_dir() -> PathBuf {
     repo_root()
         .join("target")
-        .join("ocl")
+        .join("ocp")
         .join("w18")
         .join("ops")
 }
@@ -33,23 +33,23 @@ pub fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v18_gate_c_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v18_gate_c_{tag}_{stamp}"))
 }
 
-pub fn run_ocl_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
+pub fn run_ocp_cli(args: &[&str], envs: &BTreeMap<&str, &str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args);
     for (k, v) in envs {
         cmd.env(k, v);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 pub fn assert_ok(output: &Output, step: &str) {
@@ -92,7 +92,7 @@ pub fn write_manifest_with_fs_rule(root: &Path, lane: &str, read_rule: &str) {
         ),
         lane, read_rule
     );
-    fs::write(root.join("Ocl.toml"), manifest).expect("write Ocl.toml");
+    fs::write(root.join("Ocp.toml"), manifest).expect("write Ocp.toml");
 }
 
 pub fn write_json_pretty(path: &Path, value: &JsonValue) {

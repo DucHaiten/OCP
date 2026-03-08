@@ -1,4 +1,4 @@
-use ocp_ocl::ocp_ocl::{parse_program, typecheck_program, ErrorCode};
+use ocp::ocp::{parse_program, typecheck_program, ErrorCode};
 
 #[test]
 fn type_try_unwrap_extracts_non_result4_payload() {

@@ -44,14 +44,14 @@ fn v20_property_invariants() {
         .expect("property cases overflow");
 
     let report = json!({
-        "schema": "ocl.w20.hardcore_property_report.v1",
+        "schema": "ocp.w20.hardcore_property_report.v1",
         "status": "PASS",
         "properties_total": properties_total,
         "cases_per_property": cases_per_property,
         "executed_cases": executed_cases,
         "violations_found": 0,
         "shrinks_enabled": shrinks_enabled,
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20c::run_manifest_sha256()
     });
     v20c::write_report("hardcore/property_report.json", &report);

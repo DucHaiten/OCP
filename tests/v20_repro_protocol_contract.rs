@@ -1,4 +1,4 @@
-use ocl_sdk::verify_contract_json_signature_v20;
+use ocp_sdk::verify_contract_json_signature_v20;
 use serde_json::json;
 
 #[path = "v20_gate_g_common.rs"]
@@ -42,7 +42,7 @@ fn v20_repro_protocol_contract() {
     assert!(artifact_sha256_equal, "artifact_sha256_equal must be true");
 
     let report = json!({
-        "schema": "ocl.w20.release.repro_protocol_report.v1",
+        "schema": "ocp.w20.release.repro_protocol_report.v1",
         "status": "PASS",
         "contract_path": contract_path.to_string_lossy().replace('\\', "/"),
         "signature_path": summary.signature_path.to_string_lossy().replace('\\', "/"),
@@ -51,7 +51,7 @@ fn v20_repro_protocol_contract() {
             "manifest_byte_equal": manifest_byte_equal,
             "artifact_sha256_equal": artifact_sha256_equal
         },
-        "run_manifest_ref": "target/ocl/w20/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w20/meta/run_manifest.json",
         "run_manifest_sha256": v20g::run_manifest_sha256()
     });
     v20g::write_report("release/repro_protocol_report.json", &report);

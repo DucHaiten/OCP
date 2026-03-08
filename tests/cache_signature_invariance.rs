@@ -1,4 +1,4 @@
-use ocp_ocl::ocp_ocl::{execute_program, parse_program, typecheck_program, ExecConfig};
+use ocp::ocp::{execute_program, parse_program, typecheck_program, ExecConfig};
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
@@ -55,7 +55,7 @@ match r {
     typecheck_program(&program).expect("typecheck should pass");
 
     let with_cache = {
-        let _cache_guard = EnvVarGuard::set("OCL_CACHE_DISABLE", "0");
+        let _cache_guard = EnvVarGuard::set("OCP_CACHE_DISABLE", "0");
         execute_program(
             &program,
             ExecConfig {
@@ -68,7 +68,7 @@ match r {
     };
 
     let without_cache = {
-        let _cache_guard = EnvVarGuard::set("OCL_CACHE_DISABLE", "1");
+        let _cache_guard = EnvVarGuard::set("OCP_CACHE_DISABLE", "1");
         execute_program(
             &program,
             ExecConfig {
@@ -98,13 +98,13 @@ match r {
     );
 
     let out_dir = PathBuf::from("target")
-        .join("ocl")
+        .join("ocp")
         .join("w16")
         .join("determinism");
     fs::create_dir_all(&out_dir).expect("create w16 determinism output dir");
     let report = json!({
-        "schema": "ocl.w16.determinism.cache_signature_invariance.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.determinism.cache_signature_invariance.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "lane": "locked_v071",
         "signature_equal": with_cache.signature == without_cache.signature,
         "trace_equal": with_cache.trace.events == without_cache.trace.events,

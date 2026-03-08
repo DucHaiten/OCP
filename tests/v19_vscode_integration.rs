@@ -7,9 +7,9 @@ mod v19g;
 fn v19_vscode_integration() {
     v19g::ensure_run_manifest();
 
-    let package = v19g::read_json("editor/vscode/ocp-ocl/package.json");
+    let package = v19g::read_json("editor/vscode/ocp/package.json");
     let surface = v19g::read_json("contracts/editor/editor_public_surface.v1.json");
-    let lsp_caps = v19g::read_json("contracts/editor/ocl_lsp_capabilities.v1.json");
+    let lsp_caps = v19g::read_json("contracts/editor/ocp_lsp_capabilities.v1.json");
 
     let language = package
         .get("contributes")
@@ -84,16 +84,16 @@ fn v19_vscode_integration() {
     }
 
     let required_paths = [
-        "editor/vscode/ocp-ocl/src/extension.ts",
-        "editor/vscode/ocp-ocl/src/lspClient.ts",
-        "editor/vscode/ocp-ocl/src/commands.ts",
-        "editor/vscode/ocp-ocl/dist/extension.js",
-        "editor/vscode/ocp-ocl/dist/lspClient.js",
-        "editor/vscode/ocp-ocl/dist/commands.js",
-        "editor/vscode/ocp-ocl/icons/ocp-ocl-icon-theme.json",
-        "editor/vscode/ocp-ocl/syntaxes/ocp-ocl.tmLanguage.json",
-        "editor/vscode/ocp-ocl/snippets/ocp-ocl.json",
-        "editor/vscode/ocp-ocl/language-configuration.json",
+        "editor/vscode/ocp/src/extension.ts",
+        "editor/vscode/ocp/src/lspClient.ts",
+        "editor/vscode/ocp/src/commands.ts",
+        "editor/vscode/ocp/dist/extension.js",
+        "editor/vscode/ocp/dist/lspClient.js",
+        "editor/vscode/ocp/dist/commands.js",
+        "editor/vscode/ocp/icons/ocp-icon-theme.json",
+        "editor/vscode/ocp/syntaxes/ocp.tmLanguage.json",
+        "editor/vscode/ocp/snippets/ocp.json",
+        "editor/vscode/ocp/language-configuration.json",
     ];
     for rel in required_paths {
         let full = v19g::repo_root().join(rel);
@@ -109,20 +109,20 @@ fn v19_vscode_integration() {
         .and_then(|v| v.get("iconThemes"))
         .and_then(|v| v.as_array())
         .expect("package iconThemes");
-    let has_ocl_theme = icon_themes.iter().any(|item| {
-        item.get("id").and_then(|v| v.as_str()) == Some("ocp-ocl-icons")
-            && item.get("path").and_then(|v| v.as_str()) == Some("./icons/ocp-ocl-icon-theme.json")
+    let has_ocp_theme = icon_themes.iter().any(|item| {
+        item.get("id").and_then(|v| v.as_str()) == Some("ocp-icons")
+            && item.get("path").and_then(|v| v.as_str()) == Some("./icons/ocp-icon-theme.json")
     });
-    assert!(has_ocl_theme, "missing ocp-ocl icon theme contribution");
+    assert!(has_ocp_theme, "missing ocp icon theme contribution");
 
     let report = json!({
-        "schema": "ocl.w19.rc.golden_user_journey_editor_report.v1",
+        "schema": "ocp.w19.rc.golden_user_journey_editor_report.v1",
         "status": "PASS",
         "journeys": [
             {
                 "id": "tool-cli",
                 "steps": [
-                    "open .ocl workspace",
+                    "open .ocp workspace",
                     "diagnostics realtime",
                     "format on save",
                     "run governed code actions",
@@ -140,7 +140,7 @@ fn v19_vscode_integration() {
                 "status": "PASS"
             }
         ],
-        "run_manifest_ref": "target/ocl/w19/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w19/meta/run_manifest.json",
         "run_manifest_sha256": v19g::run_manifest_sha256()
     });
     v19g::write_report("rc/golden_user_journey_editor_report.json", &report);

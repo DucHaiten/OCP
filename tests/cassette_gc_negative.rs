@@ -25,7 +25,7 @@ fn seed_and_upgrade(artifact: &std::path::Path) -> String {
     .expect("write cassette_meta.toml");
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
+    let out = common::run_ocp_cli(&["cassette", "upgrade", &artifact_s, "--apply", "--json"]);
     let stdout = common::assert_success(&out);
     let parsed: JsonValue = serde_json::from_str(&stdout).expect("upgrade json");
     parsed
@@ -59,6 +59,6 @@ fn cassette_gc_fails_when_referenced_block_is_missing() {
     fs::remove_file(&block_path).expect("remove referenced block");
 
     let artifact_s = artifact.to_string_lossy().to_string();
-    let out = common::run_ocl_cli(&["cassette", "gc", &artifact_s]);
+    let out = common::run_ocp_cli(&["cassette", "gc", &artifact_s]);
     common::assert_failed_with(&out, "X-CASSETTE-MISSING-BLOCK");
 }

@@ -1,0 +1,10 @@
+[package]
+name = "app_ocp"
+version = "0.1.0"
+
+[targets]
+default = "main"
+
+[permissions.package]
+allow = ["*"]
+deny = []

@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.release.supported_platform_profile.v1",
+  "schema": "ocp.release.supported_platform_profile.v1",
   "contract_id": "v1.supported_platform_profile",
   "version": "v1",
   "runtime_support": [

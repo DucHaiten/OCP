@@ -1,5 +1,5 @@
 {
-  "schema": "ocl.business.community_contribution_policy.v1",
+  "schema": "ocp.business.community_contribution_policy.v1",
   "contract_id": "v1.community_contribution_policy",
   "version": "v1",
   "cla_type": "license_grant",

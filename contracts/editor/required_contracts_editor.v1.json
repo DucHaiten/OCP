@@ -4,88 +4,88 @@
     {
       "allowed_diffs_v018": "none",
       "consumer": "tests/v19_editor_language_profile.rs",
-      "contract_id": "editor.ocl_language_profile",
-      "producer": "contracts/editor/ocl_language_profile.v1.json",
+      "contract_id": "editor.ocp_language_profile",
+      "producer": "contracts/editor/ocp_language_profile.v1.json",
       "schema_hash": "f4f208b1ba2272c9235de30baa36a0de3efed002a7d3da168056b83a72249caa",
       "version": "v1"
     },
     {
       "allowed_diffs_v018": "none",
       "consumer": "tests/v19_textmate_highlight_golden.rs",
-      "contract_id": "editor.ocl_textmate_grammar",
-      "producer": "contracts/editor/ocl_textmate_grammar.v1.json",
+      "contract_id": "editor.ocp_textmate_grammar",
+      "producer": "contracts/editor/ocp_textmate_grammar.v1.json",
       "schema_hash": "bec8c081becbca8e92f5460898a1224c879ffd15541b444ed432f5fc5e9ae492",
       "version": "v1"
     },
     {
       "allowed_diffs_v018": "none",
       "consumer": "tests/v19_semantic_tokens_golden.rs",
-      "contract_id": "editor.ocl_semantic_tokens",
-      "producer": "contracts/editor/ocl_semantic_tokens.v1.json",
+      "contract_id": "editor.ocp_semantic_tokens",
+      "producer": "contracts/editor/ocp_semantic_tokens.v1.json",
       "schema_hash": "bfabd4327444fac1331922e396263caa7ee4f7ec9eb380d641c5860cfaaabd76",
       "version": "v1"
     },
     {
       "allowed_diffs_v018": "none",
       "consumer": "tests/v19_lsp_diagnostics.rs",
-      "contract_id": "editor.ocl_lsp_capabilities",
-      "producer": "contracts/editor/ocl_lsp_capabilities.v1.json",
+      "contract_id": "editor.ocp_lsp_capabilities",
+      "producer": "contracts/editor/ocp_lsp_capabilities.v1.json",
       "schema_hash": "5c6d9aac672ab9e9443a33745dab17d354d2b76001d158e7ef0b21fd06ee3afa",
       "version": "v1"
     },
     {
       "allowed_diffs_v018": "none",
       "consumer": "tests/v19_diagnostics_taxonomy_mapping.rs",
-      "contract_id": "editor.ocl_diagnostics_mapping",
-      "producer": "contracts/editor/ocl_diagnostics_mapping.v1.json",
+      "contract_id": "editor.ocp_diagnostics_mapping",
+      "producer": "contracts/editor/ocp_diagnostics_mapping.v1.json",
       "schema_hash": "07f0d465e8b0a95ced5fac20b2b7900b4bce796f01ed6fb938406e824f1736fe",
       "version": "v1"
     },
     {
       "allowed_diffs_v018": "none",
       "consumer": "tests/v19_formatting_unified.rs",
-      "contract_id": "editor.ocl_formatting_contract",
-      "producer": "contracts/editor/ocl_formatting_contract.v1.json",
+      "contract_id": "editor.ocp_formatting_contract",
+      "producer": "contracts/editor/ocp_formatting_contract.v1.json",
       "schema_hash": "62d05e1a9feeb3cfdd1aed346b1ef6706fcae8589a19a7bc5d7004a3a370f034",
       "version": "v1"
     },
     {
       "allowed_diffs_v018": "none",
       "consumer": "tests/v19_code_actions_governed.rs",
-      "contract_id": "editor.ocl_code_actions_contract",
-      "producer": "contracts/editor/ocl_code_actions_contract.v1.json",
+      "contract_id": "editor.ocp_code_actions_contract",
+      "producer": "contracts/editor/ocp_code_actions_contract.v1.json",
       "schema_hash": "56b4c48f60c532ab91f89512b441f16de6c9216ee975a9dcfb5c9d7910d6f534",
       "version": "v1"
     },
     {
       "allowed_diffs_v018": "none",
       "consumer": "tests/v19_dap_trace_mapping.rs",
-      "contract_id": "editor.ocl_debug_contract",
-      "producer": "contracts/editor/ocl_debug_contract.v1.json",
+      "contract_id": "editor.ocp_debug_contract",
+      "producer": "contracts/editor/ocp_debug_contract.v1.json",
       "schema_hash": "6dc738de9849c4c4b75b39663ca83afdc970cddc07ebad7bf06b1d012c8f9a5a",
       "version": "v1"
     },
     {
       "allowed_diffs_v018": "none",
       "consumer": "tests/v19_settings_schema_contract.rs",
-      "contract_id": "editor.ocl_settings_schema",
-      "producer": "contracts/editor/ocl_settings_schema.v1.json",
+      "contract_id": "editor.ocp_settings_schema",
+      "producer": "contracts/editor/ocp_settings_schema.v1.json",
       "schema_hash": "695ceb4495a2dbf02bbbc675bed3e39f867e101cf9a306e2f2276f895ac7a6ef",
       "version": "v1"
     },
     {
       "allowed_diffs_v018": "none",
       "consumer": "tests/v19_lsp_version_handshake.rs",
-      "contract_id": "editor.ocl_version_compat_matrix",
-      "producer": "contracts/editor/ocl_version_compat_matrix.v1.json",
+      "contract_id": "editor.ocp_version_compat_matrix",
+      "producer": "contracts/editor/ocp_version_compat_matrix.v1.json",
       "schema_hash": "3efa5ec1d126015234b9823638cd728b613fa28730f13d2e35ad6a1ba62b7740",
       "version": "v1"
     },
     {
       "allowed_diffs_v018": "none",
       "consumer": "tests/v19_binary_bootstrap_verify.rs",
-      "contract_id": "editor.ocl_binary_bootstrap_policy",
-      "producer": "contracts/editor/ocl_binary_bootstrap_policy.v1.json",
+      "contract_id": "editor.ocp_binary_bootstrap_policy",
+      "producer": "contracts/editor/ocp_binary_bootstrap_policy.v1.json",
       "schema_hash": "815fc1a67cb750a07732a048017171fb0289c46e599f092774d3b1974675d396",
       "version": "v1"
     },
@@ -258,6 +258,6 @@
       "version": "v1"
     }
   ],
-  "schema": "ocl.contracts.required_editor.v1",
+  "schema": "ocp.contracts.required_editor.v1",
   "version": "v1"
 }

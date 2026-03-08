@@ -13,29 +13,29 @@ fn temp_project_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("clock drift")
         .as_millis();
-    std::env::temp_dir().join(format!("ocl_v16_cassette_replay_{tag}_{stamp}"))
+    std::env::temp_dir().join(format!("ocp_v16_cassette_replay_{tag}_{stamp}"))
 }
 
-fn run_ocl_cli(args: &[&str], quarantine_env: Option<&str>) -> Output {
+fn run_ocp_cli(args: &[&str], quarantine_env: Option<&str>) -> Output {
     let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let mut cmd = Command::new(cargo_bin);
     cmd.current_dir(repo_root())
         .arg("run")
         .arg("-p")
-        .arg("ocl-cli")
+        .arg("ocp-cli")
         .arg("--quiet")
         .arg("--")
         .args(args)
-        .env_remove("OCL_QUARANTINE");
+        .env_remove("OCP_QUARANTINE");
     if let Some(value) = quarantine_env {
-        cmd.env("OCL_QUARANTINE", value);
+        cmd.env("OCP_QUARANTINE", value);
     }
-    cmd.output().expect("run ocl-cli")
+    cmd.output().expect("run ocp-cli")
 }
 
 fn set_project_lane(root: &Path, lane: &str) {
-    let manifest = root.join("Ocl.toml");
-    let raw = fs::read_to_string(&manifest).expect("read Ocl.toml");
+    let manifest = root.join("Ocp.toml");
+    let raw = fs::read_to_string(&manifest).expect("read Ocp.toml");
     let mut in_project = false;
     let mut replaced = false;
     let mut patched = String::new();
@@ -55,12 +55,12 @@ fn set_project_lane(root: &Path, lane: &str) {
     }
 
     assert!(replaced, "manifest missing [project].lane");
-    fs::write(&manifest, patched).expect("write Ocl.toml");
+    fs::write(&manifest, patched).expect("write Ocp.toml");
 }
 
 fn latest_artifact_dir(root: &Path) -> PathBuf {
-    let artifacts_root = root.join(".ocl_artifacts");
-    let read = fs::read_dir(&artifacts_root).expect("read .ocl_artifacts");
+    let artifacts_root = root.join(".ocp_artifacts");
+    let read = fs::read_dir(&artifacts_root).expect("read .ocp_artifacts");
     let mut dirs = Vec::new();
     for entry in read {
         let path = entry.expect("entry").path();
@@ -100,7 +100,7 @@ fn quarantine_record_replay_offline_signature_is_stable() {
     let root = temp_project_dir("wallclock");
     let root_s = root.to_string_lossy().to_string();
 
-    let init = run_ocl_cli(&["init", &root_s, "--template", "tool-cli"], None);
+    let init = run_ocp_cli(&["init", &root_s, "--template", "tool-cli"], None);
     assert!(
         init.status.success(),
         "init failed:\nstdout={}\nstderr={}",
@@ -118,9 +118,9 @@ match now_res {
 }
 condition(true);
 "#;
-    fs::write(root.join("src").join("main.ocl"), source).expect("write source");
+    fs::write(root.join("src").join("main.ocp"), source).expect("write source");
 
-    let record = run_ocl_cli(&["run", &root_s], Some("1"));
+    let record = run_ocp_cli(&["run", &root_s], Some("1"));
     assert!(
         record.status.success(),
         "record run failed:\nstdout={}\nstderr={}",
@@ -156,7 +156,7 @@ condition(true);
         "missing cassette_meta.toml in artifact"
     );
 
-    let replay = run_ocl_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
+    let replay = run_ocp_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
     assert!(
         replay.status.success(),
         "replay failed:\nstdout={}\nstderr={}",
@@ -164,7 +164,7 @@ condition(true);
         String::from_utf8_lossy(&replay.stderr)
     );
 
-    let replay_again = run_ocl_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
+    let replay_again = run_ocp_cli(&["replay", &run_dir.to_string_lossy()], Some("1"));
     assert!(
         replay_again.status.success(),
         "second replay failed:\nstdout={}\nstderr={}",
@@ -182,14 +182,14 @@ condition(true);
     );
 
     let out_dir = PathBuf::from("target")
-        .join("ocl")
+        .join("ocp")
         .join("w16")
         .join("determinism");
     fs::create_dir_all(&out_dir).expect("create w16 determinism output dir");
 
     let cassette_report = json!({
-        "schema": "ocl.w16.determinism.cassette_offline_invariance.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.determinism.cassette_offline_invariance.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "lane": "quarantine",
         "record_signature": signature_record,
         "replay_signature": replay_signature,
@@ -205,8 +205,8 @@ condition(true);
     .expect("write cassette_offline_invariance_report.json");
 
     let replay_report = json!({
-        "schema": "ocl.w16.determinism.replay_invariant.v1",
-        "run_manifest_ref": "target/ocl/w16/meta/run_manifest.json",
+        "schema": "ocp.w16.determinism.replay_invariant.v1",
+        "run_manifest_ref": "target/ocp/w16/meta/run_manifest.json",
         "invariants": {
             "quarantine_record_replay_signature_equal": true,
             "quarantine_replay_repeatable": true

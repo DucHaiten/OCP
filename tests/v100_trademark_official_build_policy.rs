@@ -49,19 +49,19 @@ fn v100_trademark_official_build_policy() {
             "{label} trademark text must mention trust chain"
         );
         assert!(
-            content.contains("Official OCL Build") || content.contains("bản chính thức"),
+            content.contains("Official OCP Build") || content.contains("bản chính thức"),
             "{label} trademark text must define official build"
         );
     }
 
     let report = json!({
-        "schema": "ocl.w100.legal.trademark_official_build_policy_report.v1",
+        "schema": "ocp.w100.legal.trademark_official_build_policy_report.v1",
         "status": "PASS",
         "required_signer_ref": signer_ref,
         "required_release_manifest": manifest_ref,
         "required_release_signature": signature_ref,
         "official_build_definition_verified": true,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100f::run_manifest_sha256()
     });
     v100f::write_report("legal/trademark_official_build_policy_report.json", &report);

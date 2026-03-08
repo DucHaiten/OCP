@@ -38,11 +38,11 @@ fn v100_release_sbom_status_policy() {
     }
 
     let report = json!({
-        "schema": "ocl.w100.release.release_sbom_status_report.v1",
+        "schema": "ocp.w100.release.release_sbom_status_report.v1",
         "status": "PASS",
         "installer_sbom_status": status,
         "installer_sbom_exists": installer_exists,
-        "run_manifest_ref": "target/ocl/w100/meta/run_manifest.json",
+        "run_manifest_ref": "target/ocp/w100/meta/run_manifest.json",
         "run_manifest_sha256": v100b::run_manifest_sha256()
     });
     v100b::write_report("release/release_sbom_status_report.json", &report);
