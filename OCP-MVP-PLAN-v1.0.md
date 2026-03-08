@@ -3374,38 +3374,38 @@ v1.0 chỉ `DONE` khi:
 ---
 
 ## 13) Checklist khóa trước khi đóng gate
-- [ ] Gate status đã cập nhật đúng (`TODO/IN_PROGRESS/PARTIAL/DONE`).
-- [ ] Có đủ cặp `Planning Freeze` + `Implementation Closeout` cho gate đang đóng.
-- [ ] `Files changed` khớp code delta thực tế.
-- [ ] `Commands run` là lệnh đã chạy thật.
-- [ ] `Targeted tests` pass đúng phạm vi.
-- [ ] `Regression tests` chỉ đóng vai trò phụ trợ.
-- [ ] Mọi report JSON có `run_manifest_ref` + `run_manifest_sha256` hợp lệ.
-- [ ] `run_manifest.json` giữ đủ chain-critical fields (`deps_lock_v3_hash`, `required_contracts_hash`, `dependency_mode`).
-- [ ] Release asset matrix đủ theo contract, không thiếu artifact bắt buộc.
-- [ ] SoT namespace/alias policy đã pass (canonical roots + `contracts/sot_aliases.v1.json` đồng bộ).
-- [ ] Trust-root publication đã pass (fingerprints/key refs + trust epoch policy + verify guide).
-- [ ] SBOM đã đủ tách lớp (`SBOM-rust`, `SBOM-vscode`, installer theo `installer_sbom.status`).
-- [ ] Publish signed-assets scope/source trust scope đã khai báo rõ và nhất quán với release docs.
-- [ ] Verification precedence đã khóa đúng (`manifest.sig` là primary, mismatch không fallback).
-- [ ] Release dependency policy đã pass (`github_release|staging_rehearsal` không dùng `allow_network`).
-- [ ] Docs coverage + feature matrix sync đã pass.
-- [ ] Policy ngôn ngữ docs đã pass (`README` song ngữ chung, docs người dùng tách `vi/en`, `vi` là SoT trước `en`).
-- [ ] Bilingual docs structural parity + manual review record đã pass.
-- [ ] Docs repo layout đã pass (mọi tài liệu chi tiết nằm dưới `docs/`, chỉ giữ ngoại lệ root theo policy).
-- [ ] MVP PLAN archive layout đã pass (root chỉ giữ plan hiện hành, lịch sử nằm trong `docs/plans/history` + `docs/plans/INDEX.md`).
-- [ ] Redirect/link-map cho archive docs đã pass, không còn broken links trong plan index.
-- [ ] Legal/governance pack đủ và nhất quán.
-- [ ] Trademark policy (`TRADEMARK.md` + docs/legal/trademark) đã pass.
-- [ ] Commercial/community policy không mơ hồ và nhất quán với license.
-- [ ] Licensing model khóa cứng `dual_license` + `cla_required=true` đã pass.
-- [ ] `oss_license_id=AGPL-3.0-only` khớp file LICENSE đã pass.
-- [ ] `commercial_terms_pointer` trỏ nội bộ repo + CLA `cla_type/cla_required_for/inbound/outbound` đã pass.
-- [ ] `commercial_terms_pointer` đã bao phủ đủ bản vi/en trong `docs/*/legal/commercial.md`.
-- [ ] Installer signing identity policy đã pass (authenticode subject/thumbprint hoặc warning path khi `none`).
-- [ ] Naming artifact GO/NO-GO đã thống nhất `v1_0_release_go_no_go.json`.
-- [ ] Không còn marker `FAIL`/placeholder `PASS/FAIL` trong closeout `DONE`.
-- [ ] Không có lỗi mã hóa tiếng Việt theo hiển thị IDE.
+- [x] Gate status đã cập nhật đúng (`TODO/IN_PROGRESS/PARTIAL/DONE`).
+- [x] Có đủ cặp `Planning Freeze` + `Implementation Closeout` cho gate đang đóng.
+- [x] `Files changed` khớp code delta thực tế.
+- [x] `Commands run` là lệnh đã chạy thật.
+- [x] `Targeted tests` pass đúng phạm vi.
+- [x] `Regression tests` chỉ đóng vai trò phụ trợ.
+- [x] Mọi report JSON có `run_manifest_ref` + `run_manifest_sha256` hợp lệ.
+- [x] `run_manifest.json` giữ đủ chain-critical fields (`deps_lock_v3_hash`, `required_contracts_hash`, `dependency_mode`).
+- [x] Release asset matrix đủ theo contract, không thiếu artifact bắt buộc.
+- [x] SoT namespace/alias policy đã pass (canonical roots + `contracts/sot_aliases.v1.json` đồng bộ).
+- [x] Trust-root publication đã pass (fingerprints/key refs + trust epoch policy + verify guide).
+- [x] SBOM đã đủ tách lớp (`SBOM-rust`, `SBOM-vscode`, installer theo `installer_sbom.status`).
+- [x] Publish signed-assets scope/source trust scope đã khai báo rõ và nhất quán với release docs.
+- [x] Verification precedence đã khóa đúng (`manifest.sig` là primary, mismatch không fallback).
+- [x] Release dependency policy đã pass (`github_release|staging_rehearsal` không dùng `allow_network`).
+- [x] Docs coverage + feature matrix sync đã pass.
+- [x] Policy ngôn ngữ docs đã pass (`README` song ngữ chung, docs người dùng tách `vi/en`, `vi` là SoT trước `en`).
+- [x] Bilingual docs structural parity + manual review record đã pass.
+- [x] Docs repo layout đã pass (mọi tài liệu chi tiết nằm dưới `docs/`, chỉ giữ ngoại lệ root theo policy).
+- [x] MVP PLAN archive layout đã pass (root chỉ giữ plan hiện hành, lịch sử nằm trong `docs/plans/history` + `docs/plans/INDEX.md`).
+- [x] Redirect/link-map cho archive docs đã pass, không còn broken links trong plan index.
+- [x] Legal/governance pack đủ và nhất quán.
+- [x] Trademark policy (`TRADEMARK.md` + docs/legal/trademark) đã pass.
+- [x] Commercial/community policy không mơ hồ và nhất quán với license.
+- [x] Licensing model khóa cứng `dual_license` + `cla_required=true` đã pass.
+- [x] `oss_license_id=AGPL-3.0-only` khớp file LICENSE đã pass.
+- [x] `commercial_terms_pointer` trỏ nội bộ repo + CLA `cla_type/cla_required_for/inbound/outbound` đã pass.
+- [x] `commercial_terms_pointer` đã bao phủ đủ bản vi/en trong `docs/*/legal/commercial.md`.
+- [x] Installer signing identity policy đã pass (authenticode subject/thumbprint hoặc warning path khi `none`).
+- [x] Naming artifact GO/NO-GO đã thống nhất `v1_0_release_go_no_go.json`.
+- [x] Không còn marker `FAIL`/placeholder `PASS/FAIL` trong closeout `DONE`.
+- [x] Không có lỗi mã hóa tiếng Việt theo hiển thị IDE.
 
 ---
 
