@@ -27,7 +27,7 @@
                         "evidence_files":  [
                                                {
                                                    "path":  "docs/plans/history/OCP-MVP-PLAN-v0.3.md",
-                                                   "sha256":  "a0c07c841c00a059378fab7ed52ca5da7b3a2a9c32918b5f98460783ac3e6b09"
+                                                   "sha256":  "73e1f07c38a348a0bc8b7358beebcdde9680137c916804a5d4dcb3902c990280"
                                                }
                                            ],
                         "schema_version":  "v1",
@@ -38,7 +38,7 @@
                         "evidence_files":  [
                                                {
                                                    "path":  "docs/plans/history/OCP-MVP-PLAN-v0.4.md",
-                                                   "sha256":  "6cba3b4f771876f424489a219f0668929e080bc100a950b1477c08072d8f420e"
+                                                   "sha256":  "a6bfc8472eed2492f7a211556545ae1c531601c124a08c17c228f763c8574fcd"
                                                }
                                            ],
                         "schema_version":  "v1",
@@ -49,7 +49,7 @@
                         "evidence_files":  [
                                                {
                                                    "path":  "docs/plans/history/OCP-MVP-PLAN-v0.5.md",
-                                                   "sha256":  "5f4d7d118ce5f3471053a7adbb0c02d613267c40cf2e96aa2d832dc2fcd3b143"
+                                                   "sha256":  "ef605681df49905399ea49d42d21a4f348a93eb754a1fafad8b8d3ad3dfd5a43"
                                                }
                                            ],
                         "schema_version":  "v1",
@@ -82,7 +82,7 @@
                         "evidence_files":  [
                                                {
                                                    "path":  "docs/plans/history/OCP-MVP-PLAN-v0.8.md",
-                                                   "sha256":  "d4c119c468b105138c0c44646d6307ef9b3a58f4923e751bace4b9ac31ca4147"
+                                                   "sha256":  "b240adbab90bd510f55bf72b7cdd13d6e5dfcb928030c892902515e08d596b03"
                                                }
                                            ],
                         "schema_version":  "v1",
@@ -148,7 +148,7 @@
                         "evidence_files":  [
                                                {
                                                    "path":  "docs/plans/history/OCP-MVP-PLAN-v0.14.md",
-                                                   "sha256":  "beb1dce173909712c8228160877f03257a3a256135a6e6f5c3c23ea6608c8b1a"
+                                                   "sha256":  "e97fadefcb18ac681b34fbfb7b1195b4c5e0ffe2b290fac668f80c3efdacb361"
                                                }
                                            ],
                         "schema_version":  "v1",

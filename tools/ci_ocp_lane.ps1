@@ -31,6 +31,8 @@ function New-IsolatedAppCopy {
     return $dest
 }
 
+$realOpsGateScript = Quote-PS (Join-Path $PSScriptRoot "ci_ocp_real_ops_gate.ps1")
+
 Invoke-Step "cargo test -p ocp-runtime-core"
 Invoke-Step "cargo test -p ocp-sdk"
 Invoke-Step "cargo test -p ocp-cli"
@@ -42,6 +44,7 @@ Invoke-Step "cargo test -p ocp-sdk --test w2_audit"
 Invoke-Step "cargo test -p ocp-sdk --test w3_engine"
 Invoke-Step "cargo test -p ocp-sdk --test w4_supply"
 Invoke-Step "cargo test --test v100_ocp_extension_guard"
+Invoke-Step "& $realOpsGateScript"
 
 $canaryPath = New-IsolatedAppCopy "projects/ocp/app-ocp"
 $canaryArg = Quote-PS $canaryPath

@@ -16,6 +16,7 @@ $releaseRootPath = Join-Path $repoRoot $ReleaseRoot
 $installerScript = Join-Path $repoRoot "installer\windows\ocp-win-x64.iss"
 $installerIconPath = Join-Path $repoRoot "installer\windows\ocp-installer.ico"
 $installerIconScript = Join-Path $repoRoot "tools\release\render_installer_icon.py"
+$installerBrandingCheckScript = Join-Path $repoRoot "tools\release\check_win_installer_branding.ps1"
 $vsixBuildScript = Join-Path $repoRoot "tools\release\build_vsix.ps1"
 
 function Resolve-BinarySource {
@@ -180,6 +181,12 @@ $nextSteps = @(
 & $iscc "/DStageRoot=$stageRootPath" "/DReleaseRoot=$releaseRootPath" $installerScript
 if ($LASTEXITCODE -ne 0) {
     throw "ISCC.exe failed with exit code $LASTEXITCODE"
+}
+
+$installerOutputPath = Join-Path $releaseRootPath "ocp-v1.0.0-setup-win-x64.exe"
+& powershell -ExecutionPolicy Bypass -File $installerBrandingCheckScript -InstallerPath $installerOutputPath
+if ($LASTEXITCODE -ne 0) {
+    throw "Installer branding check failed with exit code $LASTEXITCODE"
 }
 
 Write-Host "Installer built at $releaseRootPath\ocp-v1.0.0-setup-win-x64.exe"

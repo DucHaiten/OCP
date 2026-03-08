@@ -1,0 +1,12 @@
+[replay]
+run_id = "098a10c8d17a12c3"
+root = "projects/ocp/apps/hello-cli"
+entry = "src/main.ocp"
+lane = "locked_v071"
+engine = "dual"
+signature = "97b6e9b85b56ddff"
+mode = "record"
+io_mode = "fixtures"
+fixtures_manifest_path = "io/fixtures_manifest.json"
+kv_start_snapshot_path = "state/kv_start.json"
+kv_start_hash = "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"

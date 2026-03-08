@@ -1,0 +1,44 @@
+name: ocp-real-command-flow-gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/ocp-real-command-flow-gate.yml"
+      - "tools/ci_ocp_real_ops_gate.ps1"
+      - "tools/ci_ocp_lane.ps1"
+      - "tests/cli_real_shadow_hive_ops_e2e.rs"
+      - "tests/cli_shadow_preview_v2_e2e.rs"
+      - "tests/v1_user_journey_smoke.rs"
+      - "projects/ocp/crates/ocp-cli/**"
+      - "projects/ocp/crates/ocp-sdk/**"
+      - "projects/ocp/crates/ocp-runtime-core/**"
+      - "src/ocp/**"
+      - "projects/ocp/apps/**"
+  push:
+    paths:
+      - ".github/workflows/ocp-real-command-flow-gate.yml"
+      - "tools/ci_ocp_real_ops_gate.ps1"
+      - "tools/ci_ocp_lane.ps1"
+      - "tests/cli_real_shadow_hive_ops_e2e.rs"
+      - "tests/cli_shadow_preview_v2_e2e.rs"
+      - "tests/v1_user_journey_smoke.rs"
+      - "projects/ocp/crates/ocp-cli/**"
+      - "projects/ocp/crates/ocp-sdk/**"
+      - "projects/ocp/crates/ocp-runtime-core/**"
+      - "src/ocp/**"
+      - "projects/ocp/apps/**"
+
+jobs:
+  real_command_flow_gate:
+    name: real command-flow gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run practical OCP gate
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File tools/ci_ocp_real_ops_gate.ps1

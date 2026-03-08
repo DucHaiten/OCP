@@ -30,5 +30,6 @@ resolver = "2"
 
 [dev-dependencies]
 ocp-sdk = { path = "projects/ocp/crates/ocp-sdk" }
+ocp-runtime-core = { path = "projects/ocp/crates/ocp-runtime-core" }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }

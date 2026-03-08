@@ -1,5 +1,5 @@
 {
   "hasher": "sha256-v1",
   "schema": "ocp.history.evidence.sig.v1",
-  "signature": "118cd90b4a9e3cc7fc08874d55ca2716109885c2ab90ee00ce597b2daa3c353e"
+  "signature": "9347c3b9a9d2b934ba8f4f83cd8a1c7ff4350f448be7ca8a097a2adb94417d86"
 }
