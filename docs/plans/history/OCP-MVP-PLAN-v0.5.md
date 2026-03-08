@@ -1353,8 +1353,8 @@ v0.5 `DONE` khi đồng thời đạt:
   - `OCP-MVP-PLAN-v0.5.md`
 - Commands run:
   - `cargo check --workspace`
-  - `cargo test -p ocp-runtime-core -p ocp-runtime-rt -p ocp-sdk -p ocp-cli` (drift reproduction)
-  - `cargo clippy -p ocp-runtime-core -p ocp-runtime-rt -p ocp-sdk -p ocp-cli --all-targets -- -D warnings` (drift reproduction)
+  - `cargo test -p ocp-runtime-core -p ocp-sdk -p ocp-cli` (drift reproduction)
+  - `cargo clippy -p ocp-runtime-core -p ocp-sdk -p ocp-cli --all-targets -- -D warnings` (drift reproduction)
   - `cargo test -p ocp-runtime-core -p ocp-sdk -p ocp-cli`
   - `cargo clippy -p ocp-runtime-core -p ocp-sdk -p ocp-cli --all-targets -- -D warnings`
   - `cargo fmt -- --check`

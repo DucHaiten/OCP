@@ -1,0 +1,3 @@
+{"t":"ProgramStart","i":0,"tick":0,"seed":0,"call_id":null,"span":null,"data":{"trace_schema_version":2,"lane":"locked_v071"}}
+{"t":"Lane","i":0,"tick":0,"seed":0,"call_id":null,"span":null,"data":{"lane":"locked_v071"}}
+{"t":"Error","i":1,"tick":0,"seed":0,"call_id":null,"span":null,"data":{"code":"CLI-ERROR","phase":"runtime","message":"V-PERMISSION-DENIED: key `std.db.query_int` is denied for file `\\\\?\\E:\\OCP-OCL\\projects\\ocp\\apps\\sqlite-app\\src\\main.ocp` (module `apps.sqlite_app.main`); reason=`RC-DB-DSN-DENIED`; missing section `[permissions.std_db]`. Hint: add `[permissions.std_db]` with `enabled = true`, `allow_dsn`, and `allow_modes`.","hint":null,"root_reason":null}}

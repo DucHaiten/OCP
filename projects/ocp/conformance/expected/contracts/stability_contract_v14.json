@@ -78,6 +78,14 @@
       "ctx_schema_hash": "d70e75ada929e19e6d68079ddcbafce6f97284ce19eacada0c5322a9491a6fa7",
       "payload_schema_hash": "7f8a900a4ce84b4b1a1520c57b7870f76fe7f26815096ef83d33242da6ad987f"
     },
+    "std.http.client.get": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098"
+    },
+    "std.http.client.post": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098"
+    },
     "std.http.get": {
       "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
       "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098"
@@ -137,6 +145,14 @@
     "std.proc.exec": {
       "ctx_schema_hash": "ae32b50be3d8fbcdd9e5688ec9e2026345ec497f825cfb117cdb5f2c2669521b",
       "payload_schema_hash": "2d5c59711ed72dc9b45ee61cbd68a9b05835bce20aec55d78d47909d85df9a5f"
+    },
+    "std.queue.bus.consume": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098"
+    },
+    "std.queue.bus.publish": {
+      "ctx_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098",
+      "payload_schema_hash": "a683c5c5349f6f7fb903ba8a9e7e55d0ba1b8f03579f95be83f4954c33e81098"
     },
     "std.shadow.compare": {
       "ctx_schema_hash": "d7eb51ef351c1d7f1630f0ed7a403dd50b40a73cbf81cba606dd5de299448abd",

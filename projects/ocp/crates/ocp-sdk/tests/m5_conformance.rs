@@ -40,6 +40,36 @@ fn copy_tree(src: &Path, dst: &Path) {
     }
 }
 
+fn write_dep_package(root: &Path, alias: &str, version: &str) {
+    let dep_root = root.join("deps").join(alias);
+    fs::create_dir_all(dep_root.join("src")).expect("create dep src");
+    let module = alias.replace('-', "_");
+    let manifest = format!(
+        concat!(
+            "[package]\n",
+            "name = \"{}\"\n",
+            "version = \"{}\"\n",
+            "entry = \"src/main.ocp\"\n\n",
+            "[exports]\n",
+            "modules = [\"{}\"]\n"
+        ),
+        alias, version, module
+    );
+    fs::write(dep_root.join("package.ocpp"), manifest).expect("write dep manifest");
+    fs::write(
+        dep_root.join("src").join("main.ocp"),
+        format!("module {};\nlet ready = true;\ncondition(ready);\n", module),
+    )
+    .expect("write dep source");
+}
+
+fn seed_app_local_deps(root: &Path, app_name: &str) {
+    if app_name == "web-fetch" {
+        write_dep_package(root, "http", "0.1.0");
+        write_dep_package(root, "json", "0.1.0");
+    }
+}
+
 fn run_app_end_to_end(
     app_name: &str,
     reactor_ticks: Option<u32>,
@@ -54,6 +84,7 @@ fn run_app_end_to_end(
 
     let temp_root = temp_project_dir(&app_name.replace('-', "_"));
     copy_tree(&source_root, &temp_root);
+    seed_app_local_deps(&temp_root, app_name);
 
     let lock = sync_deps_lock_v1(&temp_root).expect("sync lock");
     assert!(lock.deps_synced >= 1);

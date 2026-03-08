@@ -563,7 +563,7 @@ fn percent_decode(raw: &str) -> String {
             let hi = (bytes[idx + 1] as char).to_digit(16);
             let lo = (bytes[idx + 2] as char).to_digit(16);
             if let (Some(hi), Some(lo)) = (hi, lo) {
-                out.push(char::from_u32((hi * 16 + lo) as u32).unwrap_or('%'));
+                out.push(char::from_u32(hi * 16 + lo).unwrap_or('%'));
                 idx += 3;
                 continue;
             }

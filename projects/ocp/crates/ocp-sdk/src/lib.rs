@@ -3714,15 +3714,8 @@ pub fn verify_dependency_exports_and_collect_provenance_v10(
                 }
                 let mut candidate_ocp = candidate.clone();
                 candidate_ocp.set_extension("ocp");
-                let mut candidate_ocp = candidate.clone();
-                candidate_ocp.set_extension("ocp");
-                let candidate = if candidate_ocp.exists() {
-                    candidate_ocp
-                } else {
-                    candidate_ocp
-                };
                 let child_path = canonicalize_path_under(
-                    &candidate,
+                    &candidate_ocp,
                     &dep_pkg.src_root,
                     "failed to resolve dependency import module",
                 )?;
@@ -3744,15 +3737,8 @@ pub fn verify_dependency_exports_and_collect_provenance_v10(
                 }
                 let mut candidate_ocp = candidate.clone();
                 candidate_ocp.set_extension("ocp");
-                let mut candidate_ocp = candidate.clone();
-                candidate_ocp.set_extension("ocp");
-                let candidate = if candidate_ocp.exists() {
-                    candidate_ocp
-                } else {
-                    candidate_ocp
-                };
                 let child_path = canonicalize_path_under(
-                    &candidate,
+                    &candidate_ocp,
                     src_root,
                     "failed to resolve local import module",
                 )?;

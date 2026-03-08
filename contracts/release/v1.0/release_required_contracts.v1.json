@@ -6,7 +6,7 @@
       "consumer": "tests/v100_release_asset_matrix_contract.rs",
       "contract_id": "v1.release_asset_matrix",
       "producer": "contracts/release/v1.0/release_asset_matrix.v1.json",
-      "schema_hash": "a3e426d482dce55faddb22020cce552e38aa3021d331b6964cf3f408d94f59dd",
+      "schema_hash": "fc8dc4257cde08cde8c915925edec5dcb3857018cdc8f2b4149d55ca750e22fa",
       "version": "v1"
     },
     {
@@ -14,7 +14,7 @@
       "consumer": "tests/v100_release_required_contracts.rs",
       "contract_id": "v1.release_manifest_schema",
       "producer": "contracts/release/v1.0/release_manifest_schema.v1.json",
-      "schema_hash": "4f12bb3a9d1895edb82f6fabf7a4363d24aab55e0af574fdae1df2fb70a787ae",
+      "schema_hash": "cbb28a611249ab0412208cd546cc763829f83a4c3eb9c808d33654f4e7541714",
       "version": "v1"
     },
     {
@@ -22,7 +22,7 @@
       "consumer": "tests/v100_release_positioning_guard_contract.rs",
       "contract_id": "v1.release_positioning_guard",
       "producer": "contracts/release/v1.0/release_positioning_guard.v1.json",
-      "schema_hash": "ad86869c2d55bfd42a160990922eed9ac78d082bc45e725e6309ac23104bffb0",
+      "schema_hash": "307ce030211d75b83c6b9ec8e455215ef145e3bf2baac54109005f264ab664a9",
       "version": "v1"
     },
     {
@@ -30,7 +30,7 @@
       "consumer": "tests/v100_release_positioning_guard_contract.rs",
       "contract_id": "v1.release_publish_scope",
       "producer": "contracts/release/v1.0/release_publish_scope.v1.json",
-      "schema_hash": "ea5a023748d2998471a6f60ec205865f3cc7f7b19420c07e96dce548c6f43c0d",
+      "schema_hash": "efe07ca817079853859e25c16375df4be9ac8c1b96e007d9376dfaafca6d0eed",
       "version": "v1"
     },
     {
@@ -38,7 +38,7 @@
       "consumer": "tests/v100_release_asset_matrix_contract.rs",
       "contract_id": "v1.release_dependency_policy",
       "producer": "contracts/release/v1.0/release_dependency_policy.v1.json",
-      "schema_hash": "74c608969ee81bdb192928e13e766ee5a6d869285d9203846605d1539df6c9de",
+      "schema_hash": "aaaca6a9b2d60e8190a6b1fd89ede7ab37226e475184af23789460c38533f4b6",
       "version": "v1"
     },
     {
@@ -46,7 +46,7 @@
       "consumer": "tests/v100_release_asset_matrix_contract.rs",
       "contract_id": "v1.installer_contract_win",
       "producer": "contracts/release/v1.0/installer_contract_win.v1.json",
-      "schema_hash": "37468d83a1ef8ec164245374455e49a099e938fd0da5a9f772bb5476159eab52",
+      "schema_hash": "65217d9f608ceae68f35b0a25c6e7ca33029346e6d74a751cf650848972c1093",
       "version": "v1"
     },
     {
@@ -54,7 +54,7 @@
       "consumer": "tests/v100_release_asset_matrix_contract.rs",
       "contract_id": "v1.installer_toolchain_win",
       "producer": "contracts/release/v1.0/installer_toolchain_win.v1.json",
-      "schema_hash": "0c665d11112200325c32db0e2a7aecadbad5548867bf66930140cc498a43c0b7",
+      "schema_hash": "1f2f8821703971f36ad6c76f42f106b5e5a3bfa86c9816b6b0f221b2577de8f3",
       "version": "v1"
     },
     {
@@ -62,7 +62,7 @@
       "consumer": "tests/v100_release_asset_matrix_contract.rs",
       "contract_id": "v1.portable_install_contract",
       "producer": "contracts/release/v1.0/portable_install_contract.v1.json",
-      "schema_hash": "86c401f5301cfaafea24915544c50c2dac581f384b8f9eec74147eda0a2772ab",
+      "schema_hash": "73fb8274902ed8dc90a737fe98103f3b5542b71ce2fd13d5abbafd9c89da5894",
       "version": "v1"
     },
     {
@@ -70,7 +70,7 @@
       "consumer": "tests/v100_release_asset_matrix_contract.rs",
       "contract_id": "v1.supported_platform_profile",
       "producer": "contracts/release/v1.0/supported_platform_profile.v1.json",
-      "schema_hash": "6e2858d155e907892d3c10ba86674c029cffbf93459d26be1ebad7162b07b3e8",
+      "schema_hash": "3b5a1651106570196903d2d66dda216c17d0d0acf52c4359be7ec08c279a6f35",
       "version": "v1"
     },
     {
@@ -78,7 +78,7 @@
       "consumer": "tests/v100_release_required_contracts.rs",
       "contract_id": "v1.docs_required_sections",
       "producer": "contracts/docs/v1.0/docs_required_sections.v1.json",
-      "schema_hash": "fba2015a47275b172153bf3bd072f35298d08f180bdc7d1dd25fe8760252861d",
+      "schema_hash": "26fa9b69425ac291772b54044a5edf8428bdf260f47ef855f5dee9186aefc633",
       "version": "v1"
     },
     {
@@ -86,7 +86,7 @@
       "consumer": "tests/v100_release_required_contracts.rs",
       "contract_id": "v1.docs_feature_matrix",
       "producer": "contracts/docs/v1.0/docs_feature_matrix.v1.json",
-      "schema_hash": "8aee1de097bf71b2e007b64479a5a6af6a90f10e9d61d8d3681276a0d0102348",
+      "schema_hash": "e394413413224b4ed68034d5864bb56f9f28b002a307ea8bfd08d32f89970b8a",
       "version": "v1"
     },
     {
@@ -94,7 +94,7 @@
       "consumer": "tests/v100_release_required_contracts.rs",
       "contract_id": "v1.docs_cli_surface",
       "producer": "contracts/docs/v1.0/docs_cli_surface.v1.json",
-      "schema_hash": "458085d6020479c0c5c218d1271c122a61ece269a0cc4875f8e28c0aef91362f",
+      "schema_hash": "23e68196e2b478ba849677d66326ece9b723f47815f692beb8a1cefdd0236df4",
       "version": "v1"
     },
     {
@@ -102,7 +102,7 @@
       "consumer": "tests/v100_release_required_contracts.rs",
       "contract_id": "v1.docs_language_parity_policy",
       "producer": "contracts/docs/v1.0/docs_language_parity_policy.v1.json",
-      "schema_hash": "26db766c27da3c4ccfec573c76863c338e91f5a13419e838d601b32fcf8b3018",
+      "schema_hash": "02d1f7ac678cdf89085beaa7e821e9900cbcc347d7d290850b881d2328483cb4",
       "version": "v1"
     },
     {
@@ -110,7 +110,7 @@
       "consumer": "tests/v100_release_required_contracts.rs",
       "contract_id": "v1.docs_link_redirect_policy",
       "producer": "contracts/docs/v1.0/docs_link_redirect_policy.v1.json",
-      "schema_hash": "3a0e9deaac732e824dcb934d1388c59eb8118487fc7c724382b9953fe643a6d1",
+      "schema_hash": "11467ea53590d2da0a25fa79cd03f1140be6c749bb53944bbdc1edaa78e745b1",
       "version": "v1"
     },
     {
@@ -118,7 +118,7 @@
       "consumer": "tests/v100_release_required_contracts.rs",
       "contract_id": "v1.legal_pack_required",
       "producer": "contracts/legal/v1.0/legal_pack_required.v1.json",
-      "schema_hash": "4f23cdaca27b2ae4c1e4731ce69775929fbc1bcc15c4d3f9713dfc534f41f6eb",
+      "schema_hash": "d7074e36a7fb90d68b04152600ba12c5f241748f82c574b8287ad9d032feebea",
       "version": "v1"
     },
     {
@@ -126,7 +126,7 @@
       "consumer": "tests/v100_release_required_contracts.rs",
       "contract_id": "v1.governance_policy",
       "producer": "contracts/legal/v1.0/governance_policy.v1.json",
-      "schema_hash": "1fa90c8ddb49b5e51f35fefa7b7304b1e3c09dc56940b866ac6110e45423e0bd",
+      "schema_hash": "563ad020e666bd530dc67989868b8b03437e5113ee2754dc90a0191f47fceda6",
       "version": "v1"
     },
     {
@@ -134,7 +134,7 @@
       "consumer": "tests/v100_release_required_contracts.rs",
       "contract_id": "v1.trademark_policy",
       "producer": "contracts/legal/v1.0/trademark_policy.v1.json",
-      "schema_hash": "1cb542e9c06840239a4a9f997d63bdea70fb0593c847cb95b23c5a81a91de855",
+      "schema_hash": "6a64d4f1800b2828f4d14f4bacbc9d365f3a5ffc085c52b3a45bdb97916bc229",
       "version": "v1"
     },
     {
@@ -142,7 +142,7 @@
       "consumer": "tests/v100_release_required_contracts.rs",
       "contract_id": "v1.licensing_model",
       "producer": "contracts/business/v1.0/licensing_model.v1.json",
-      "schema_hash": "12d954154a9297ee955a642ccb6a01a4fb9f07e55fc1a30b7261e9e4d59ae358",
+      "schema_hash": "0168215af9666c1a766ce9e33e3fc64a80f47e52906e81a111918e42863d4587",
       "version": "v1"
     },
     {
@@ -150,7 +150,7 @@
       "consumer": "tests/v100_release_required_contracts.rs",
       "contract_id": "v1.community_contribution_policy",
       "producer": "contracts/business/v1.0/community_contribution_policy.v1.json",
-      "schema_hash": "2c9ebc8a61d41ef17c2c66c5f0bd5677800e2fa11ccf60fad199885263fbcfab",
+      "schema_hash": "e8986da92398a3f8f8e8933fa1ec90b1cca08dcedbb40e37872daa3318b443cc",
       "version": "v1"
     },
     {
@@ -158,7 +158,7 @@
       "consumer": "tests/v100_signing_trust_root_contract.rs",
       "contract_id": "v1.signing_trust_root",
       "producer": "contracts/security/v1.0/signing_trust_root.v1.json",
-      "schema_hash": "5f4029b4f3067f8b113cbdb3b9555184e8de766eb4c6b543fbb39af5c8058e85",
+      "schema_hash": "f0b5b3f9469fe6aa1a0f42516e2e365e373e5d0efee608e7f4b1e8b44e9ca603",
       "version": "v1"
     },
     {
@@ -166,7 +166,7 @@
       "consumer": "tests/v100_sot_namespace_alias_contract.rs",
       "contract_id": "v1.sot_aliases",
       "producer": "contracts/sot_aliases.v1.json",
-      "schema_hash": "c1dffc774d858d8393124a5e6fc567e32cf838b0e7e3a92821659c0040941d42",
+      "schema_hash": "101fa52b74581a2a227fe51b8ff6ecd0ef6193ec8d934187aefbba827835bec4",
       "version": "v1"
     }
   ],

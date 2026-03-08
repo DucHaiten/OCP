@@ -1,0 +1,12 @@
+[replay]
+run_id = "d0500b7d71154555"
+root = "projects/ocp/apps/plugin-demo"
+entry = "src/main.ocp"
+lane = "locked_v071"
+engine = "dual"
+signature = "2a0f66508b9eb378"
+mode = "record"
+io_mode = "fixtures"
+fixtures_manifest_path = "io/fixtures_manifest.json"
+kv_start_snapshot_path = "state/kv_start.json"
+kv_start_hash = "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"

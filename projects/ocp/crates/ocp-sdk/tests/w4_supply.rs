@@ -39,6 +39,30 @@ deny = ["std.net.poll"]
         "let ready = true;\ncondition(ready);\n",
     )
     .expect("write main");
+    write_dep_package(root, "http", "1.2.3");
+}
+
+fn write_dep_package(root: &Path, alias: &str, version: &str) {
+    let dep_root = root.join("deps").join(alias);
+    fs::create_dir_all(dep_root.join("src")).expect("create dep src");
+    let module = alias.replace('-', "_");
+    let manifest = format!(
+        concat!(
+            "[package]\n",
+            "name = \"{}\"\n",
+            "version = \"{}\"\n",
+            "entry = \"src/main.ocp\"\n\n",
+            "[exports]\n",
+            "modules = [\"{}\"]\n"
+        ),
+        alias, version, module
+    );
+    fs::write(dep_root.join("package.ocpp"), manifest).expect("write dep manifest");
+    fs::write(
+        dep_root.join("src").join("main.ocp"),
+        format!("module {};\nlet ready = true;\ncondition(ready);\n", module),
+    )
+    .expect("write dep source");
 }
 
 #[test]

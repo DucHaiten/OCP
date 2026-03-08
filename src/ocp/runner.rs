@@ -156,33 +156,26 @@ impl ModuleLoader {
         import_path: &[String],
         span: Span,
     ) -> Result<PathBuf, FixtureRunnerError> {
-        let mut candidate_ocp = self.root_canon.clone();
+        let mut candidate = self.root_canon.clone();
         for seg in import_path {
-            candidate_ocp.push(seg);
+            candidate.push(seg);
         }
-        candidate_ocp.set_extension("ocp");
-        let mut candidate_ocp = candidate_ocp.clone();
-        candidate_ocp.set_extension("ocp");
-        let candidate = if candidate_ocp.exists() {
-            candidate_ocp
-        } else if candidate_ocp.exists() {
-            candidate_ocp
-        } else {
+        candidate.set_extension("ocp");
+        if !candidate.exists() {
             return Err(FixtureRunnerError::Diag(
                 Diagnostic::new(
                     ErrorCode::TImportNotFound,
                     DiagPhase::Typecheck,
                     span,
                     format!(
-                        "import module `{}` not found at '{}' or '{}'",
+                        "import module `{}` not found at '{}'",
                         module_id_from_import_path(import_path),
-                        candidate_ocp.display(),
-                        candidate_ocp.display()
+                        candidate.display()
                     ),
                 )
                 .with_hint("create missing module file or fix import path"),
             ));
-        };
+        }
 
         let canonical = candidate.canonicalize().map_err(|e| {
             FixtureRunnerError::Io(format!(
@@ -241,8 +234,6 @@ fn module_id_from_path(root: &Path, file_path: &Path) -> Result<String, FixtureR
     }
     if let Some(last) = segs.last_mut() {
         if let Some(stripped) = last.strip_suffix(".ocp") {
-            *last = stripped.to_string();
-        } else if let Some(stripped) = last.strip_suffix(".ocp") {
             *last = stripped.to_string();
         }
     }

@@ -80,7 +80,7 @@ fn w9_v5_manifest_expected_fail_contract_passes() {
     let manifest = parse_conformance_manifest_v1(&manifest_path).expect("parse conformance v5");
 
     assert_eq!(manifest.schema, "ocp.conformance.manifest.v5");
-    assert_eq!(manifest.scenarios.len(), 5);
+    assert_eq!(manifest.scenarios.len(), 15);
 
     let report = run_conformance_v1(
         &root,

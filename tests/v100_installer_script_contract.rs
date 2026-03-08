@@ -101,8 +101,7 @@ fn v100_installer_script_contract() {
         .filter_map(|v| v.as_str().map(|s| s.to_string()))
         .collect::<Vec<String>>();
     assert!(
-        default_install_path.contains("OCP")
-            && iss.contains("DefaultDirName={autopf}\\OCP"),
+        default_install_path.contains("OCP") && iss.contains("DefaultDirName={autopf}\\OCP"),
         "installer script must align with default install directory contract"
     );
     let icon_path = repo_root().join(icon_asset.replace('/', "\\"));

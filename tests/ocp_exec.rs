@@ -1,6 +1,4 @@
-use ocp::ocp::{
-    execute_program, parse_program, typecheck_program, ErrorCode, ExecConfig, Value,
-};
+use ocp::ocp::{execute_program, parse_program, typecheck_program, ErrorCode, ExecConfig, Value};
 
 fn deep_payload_field_expr(depth: usize) -> String {
     let mut expr = String::from("payload()");

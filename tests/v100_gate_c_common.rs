@@ -119,16 +119,10 @@ fn ensure_simulated_win_installation() -> JsonValue {
 
     let program_dir = simulated_program_files_dir();
     fs::create_dir_all(&program_dir).expect("create simulated program files dir");
-    fs::write(
-        simulated_cli_path(),
-        "OCP CLI simulated binary v1.0.0\n",
-    )
-    .expect("write simulated ocp.exe");
-    fs::write(
-        simulated_uninstaller_path(),
-        "OCP simulated uninstaller\n",
-    )
-    .expect("write simulated uninstall.exe");
+    fs::write(simulated_cli_path(), "OCP CLI simulated binary v1.0.0\n")
+        .expect("write simulated ocp.exe");
+    fs::write(simulated_uninstaller_path(), "OCP simulated uninstaller\n")
+        .expect("write simulated uninstall.exe");
 
     let post_checks = installer
         .get("post_install_checks")
@@ -230,11 +224,8 @@ pub fn ensure_portable_install_report() -> JsonValue {
             .join("portable")
             .join(asset.replace(['.', '-'], "_"));
         fs::create_dir_all(&extract_dir).expect("create portable extract dir");
-        fs::write(
-            extract_dir.join("ocp"),
-            "OCP portable simulated binary\n",
-        )
-        .expect("write portable simulated binary");
+        fs::write(extract_dir.join("ocp"), "OCP portable simulated binary\n")
+            .expect("write portable simulated binary");
         extracted.push(json!({
             "asset": asset,
             "extract_dir": extract_dir.to_string_lossy().replace('\\', "/"),

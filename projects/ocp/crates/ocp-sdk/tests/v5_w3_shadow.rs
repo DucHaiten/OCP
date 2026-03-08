@@ -187,6 +187,7 @@ condition(ready);
         ExecConfig {
             step_cap: 4096,
             commit_policy: CommitPolicyMode::Normal,
+            ..ExecConfig::default()
         },
     )
     .expect("main trace");
@@ -197,6 +198,7 @@ condition(ready);
         ExecConfig {
             step_cap: 4096,
             commit_policy: CommitPolicyMode::ForbidCommit,
+            ..ExecConfig::default()
         },
     )
     .expect("shadow trace");

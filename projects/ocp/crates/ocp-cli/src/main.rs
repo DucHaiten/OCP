@@ -43,9 +43,7 @@ const PRIMARY_CLI_COMMAND: &str = "ocp";
 fn main() {
     let argv0 = std::env::args().next().unwrap_or_default();
     if is_legacy_ocp_cli_invocation(&argv0) {
-        eprintln!(
-            "W-CLI-ALIAS-DEPRECATED: `ocp` alias is deprecated; use `ocp`."
-        );
+        eprintln!("W-CLI-ALIAS-DEPRECATED: `ocp` alias is deprecated; use `ocp`.");
     }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let code = run_cli(&args);
@@ -53,12 +51,8 @@ fn main() {
 }
 
 fn is_legacy_ocp_cli_invocation(argv0: &str) -> bool {
-    let stem = Path::new(argv0)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    stem == "ocp"
+    let _ = argv0;
+    false
 }
 
 fn run_cli(args: &[String]) -> i32 {
@@ -6990,21 +6984,18 @@ fn write_cassette_signature_v15(
     Ok(())
 }
 
-fn parse_cassette_signature_v15(
-    path: &Path,
-) -> Result<
-    (
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    ),
-    SdkError,
-> {
+type CassetteSignatureV15 = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+);
+
+fn parse_cassette_signature_v15(path: &Path) -> Result<CassetteSignatureV15, SdkError> {
     let raw = fs::read_to_string(path)?;
     let mut schema_version = None::<String>;
     let mut hasher_version = None::<String>;
@@ -7541,6 +7532,7 @@ enum CassetteRecordRowV08 {
     NetHttp(NetHttpRecordV08),
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_quarantine_cassette_bundle_v08(
     project_root: &Path,
     artifact_dir: &Path,
@@ -8091,7 +8083,7 @@ fn build_replay_checkpoint_bundle_v11(
         push_checkpoint_key_v11(&mut selected_keys, event.key.as_deref());
 
         let event_i = (idx as u64).saturating_add(1);
-        if event_i % checkpoint_stride == 0 || event_i == events.len() as u64 {
+        if event_i.is_multiple_of(checkpoint_stride) || event_i == events.len() as u64 {
             checkpoints.push(ReplayCheckpointV11 {
                 event_i,
                 replay_cursor: event_i,
@@ -9321,7 +9313,7 @@ fn ddmin_events_v11(
     let mut granularity = 2usize;
     while current.len() >= 2 {
         let len = current.len();
-        let chunk_size = (len + granularity - 1) / granularity;
+        let chunk_size = len.div_ceil(granularity);
         let mut reduced = false;
         let mut start = 0usize;
         while start < len {
@@ -9842,10 +9834,10 @@ fn read_dbg_checkpoint_bundle_v11(
     }))
 }
 
-fn nearest_checkpoint_for_event_v11<'a>(
-    checkpoints: &'a [ReplayCheckpointV11],
+fn nearest_checkpoint_for_event_v11(
+    checkpoints: &[ReplayCheckpointV11],
     target_event_i: u64,
-) -> Option<&'a ReplayCheckpointV11> {
+) -> Option<&ReplayCheckpointV11> {
     checkpoints
         .iter()
         .filter(|cp| cp.event_i <= target_event_i)
@@ -10296,13 +10288,13 @@ fn run_dbg_command_v11(
                     .collect();
             let added: Vec<String> = right_keys
                 .difference(&left_keys)
-                .cloned()
                 .take(DBG_LOCALS_MAX_KEYS_V11)
+                .cloned()
                 .collect();
             let removed: Vec<String> = left_keys
                 .difference(&right_keys)
-                .cloned()
                 .take(DBG_LOCALS_MAX_KEYS_V11)
+                .cloned()
                 .collect();
             out.push_str(&format!(
                 "diffenv left={} right={} same={} left_digest={} right_digest={} added_keys={:?} removed_keys={:?}\n",
@@ -10924,9 +10916,11 @@ fn run_cache_benchmark_v13(
     })?;
     let no_cache =
         with_runtime_env_v08(vec![("OCP_CACHE_DISABLE", Some("1".to_string()))], || {
-            let mut config = ExecConfig::default();
-            config.step_cap = 4096;
-            config.enable_exec_cache = false;
+            let config = ExecConfig {
+                step_cap: 4096,
+                enable_exec_cache: false,
+                ..ExecConfig::default()
+            };
             run_project_with_trace_engine_config_and_lock(project_root, run_engine, locked, config)
         })?;
 
@@ -11026,6 +11020,7 @@ fn run_cache_benchmark_v13(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_v071_replay_toml(
     root: &Path,
     run_id: &str,
@@ -11678,7 +11673,7 @@ mod tests {
         sync_deps_lock_v1, sync_policy_lock_v1, trace_required_digest,
     };
 
-    use super::run_cli;
+    use super::{manifest_path_for_v071, run_cli};
 
     fn temp_project_dir(tag: &str) -> PathBuf {
         let stamp = SystemTime::now()
@@ -11934,6 +11929,9 @@ default = "main"
 [dependencies]
 std = "0.1.0"
 
+[policy]
+budget_profile = "default"
+
 [permissions.package]
 allow = ["*"]
 deny = []
@@ -11947,6 +11945,7 @@ condition(ok);
 "#;
         fs::write(root.join("src").join("main.ocp"), source).expect("write source");
         sync_deps_lock_v1(root).expect("sync deps lock");
+        sync_policy_lock_v1(root).expect("sync policy lock");
 
         let cosmos = r#"version = 1
 
@@ -11978,13 +11977,14 @@ universe_id = "ci_locked"
 domain_id = "default"
 renderer = "text"
 
-[[view]]
+        [[view]]
 id = "ops"
 universe_id = "ci_locked"
 domain_id = "side"
 renderer = "tree"
 "#;
         fs::write(root.join("cosmos.toml"), cosmos).expect("write cosmos");
+        sync_cosmos_lock_v1(root, false, None, None, None).expect("sync cosmos lock");
     }
 
     fn prepare_w4_project(root: &Path) {
@@ -12000,6 +12000,9 @@ default = "main"
 std = "0.1.0"
 http = "1.2.3"
 
+[policy]
+budget_profile = "ci_default"
+
 [permissions.package]
 allow = ["*"]
 deny = ["std.net.poll"]
@@ -12010,7 +12013,26 @@ deny = ["std.net.poll"]
             "let ok = true;\ncondition(ok);\n",
         )
         .expect("write source");
+
+        let dep_dir = root.join("deps").join("http");
+        fs::create_dir_all(dep_dir.join("src")).expect("create deps/http/src");
+        let dep_manifest = r#"[package]
+name = "http"
+version = "1.2.3"
+entry = "src/http.ocp"
+
+[exports]
+modules = ["http"]
+"#;
+        fs::write(dep_dir.join("package.ocpp"), dep_manifest).expect("write dep manifest");
+        fs::write(
+            dep_dir.join("src").join("http.ocp"),
+            "module http;\nlet ready = true;\ncondition(ready);\n",
+        )
+        .expect("write dep source");
+
         sync_deps_lock_v1(root).expect("sync lock");
+        sync_policy_lock_v1(root).expect("sync policy lock");
     }
 
     fn prepare_w6_project(root: &Path, with_plugin_index: bool) {
@@ -12214,6 +12236,11 @@ std = "0.1.0"
 [permissions.package]
 allow = ["*"]
 deny = ["std.net.poll"]
+
+[permissions.std_db]
+enabled = true
+allow_dsn = ["file:demo.db"]
+allow_modes = ["read_query", "write_exec"]
 "#;
         fs::write(manifest_path_for_v071(root), manifest).expect("write manifest");
         let source = r#"module tests.w7.sqlite;
@@ -13037,7 +13064,7 @@ match query_res {
             "workflow_basic".to_string(),
         ];
         assert_eq!(run_cli(&init_args), 0);
-        assert!(manifest_path_for_v071(root).exists(), "missing Ocp.toml");
+        assert!(manifest_path_for_v071(&root).exists(), "missing Ocp.toml");
         assert!(root.join("cosmos.toml").exists(), "missing cosmos.toml");
         assert!(root.join("deps.lock").exists(), "missing deps.lock");
         assert!(root.join("policy.lock.v1").exists(), "missing policy lock");

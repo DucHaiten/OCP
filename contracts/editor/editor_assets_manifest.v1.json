@@ -6,11 +6,11 @@
     },
     {
       "path": "editor/vscode/ocp/syntaxes/ocp.tmLanguage.json",
-      "sha256": "a3f3e720071213f4f3b970ef32eeaccb2f5cb10a5e5561512bd36a4343f58487"
+      "sha256": "2e07ea152f5f30a8fd34d814281520e0fcec5b2d35081b590e60e6bb80ba7e8d"
     },
     {
       "path": "editor/vscode/ocp/snippets/ocp.json",
-      "sha256": "9575e197a68e174a49347215527f082c2926bbed2a6cd59f444f01d73f618eb7"
+      "sha256": "93113ffff20aa3c0dae01b57f70cf7eafb7bf5aa0a1ceae7019d95e4a04ec685"
     },
     {
       "path": "editor/vscode/ocp/icons/ocp.svg",
@@ -18,7 +18,7 @@
     },
     {
       "path": "editor/vscode/ocp/icons/ocp-icon-theme.json",
-      "sha256": "9e4330f79196dfb8f2eebd1046ae35dd498ec2fb6832dc178cdf69537622adcc"
+      "sha256": "d9ece1eaddc5584116bf38571d74c68057b7c830f836eb60120123e0c4976305"
     }
   ],
   "contract_id": "editor.editor_assets_manifest",

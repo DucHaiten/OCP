@@ -1,10 +1,10 @@
 {
   "algorithm": "sha256-v1",
-  "contract_hash_sha256": "695ceb4495a2dbf02bbbc675bed3e39f867e101cf9a306e2f2276f895ac7a6ef",
+  "contract_hash_sha256": "f2bfce8ffcdb5dabf05773d0152c2b1385dfeaaf72ed4492939b489a3a20d135",
   "contract_id": "editor.ocp_settings_schema",
   "pubkey_id": "w18-sot-root",
   "schema": "ocp.contract.sig.v1",
-  "signature": "72e1b03ca291a2977368b2fe7908b260e81646851b8a7988df9b6e430a73a05c",
+  "signature": "4e2e6fcb6781f37a45eb55b7928d07ed29c4f42cdf1dd0b4b5cd367ad1e27cfb",
   "signature_schema_version": "1",
   "trust_epoch": 1
 }

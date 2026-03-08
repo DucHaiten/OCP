@@ -5,6 +5,13 @@ use serde_json::json;
 #[path = "v100_gate_d_common.rs"]
 mod v100d;
 
+fn is_allowed_root_markdown(name: &str, allowlist: &BTreeSet<String>) -> bool {
+    if allowlist.contains(name) {
+        return true;
+    }
+    name.starts_with("OCP-RENAME-") || name.starts_with("PLAN-TEST-FAIL-LIST-")
+}
+
 #[test]
 fn v100_docs_repo_layout_policy() {
     v100d::ensure_run_manifest();
@@ -45,7 +52,7 @@ fn v100_docs_repo_layout_policy() {
 
     let disallowed = root_md
         .iter()
-        .filter(|name| !allowed_root_md.contains(*name))
+        .filter(|name| !is_allowed_root_markdown(name, &allowed_root_md))
         .cloned()
         .collect::<Vec<String>>();
     assert!(

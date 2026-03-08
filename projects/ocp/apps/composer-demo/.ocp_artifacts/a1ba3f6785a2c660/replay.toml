@@ -1,0 +1,12 @@
+[replay]
+run_id = "a1ba3f6785a2c660"
+root = "projects/ocp/apps/composer-demo"
+entry = "src/main.ocp"
+lane = "locked_v071"
+engine = "dual"
+signature = "33b3076ed2108fbf"
+mode = "record"
+io_mode = "fixtures"
+fixtures_manifest_path = "io/fixtures_manifest.json"
+kv_start_snapshot_path = "state/kv_start.json"
+kv_start_hash = "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"

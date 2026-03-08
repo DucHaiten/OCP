@@ -6,7 +6,7 @@
       "consumer": "tests/v20_contract_chain.rs",
       "contract_id": "v20.final_audit_scope",
       "producer": "contracts/v20/final_audit_scope.v1.json",
-      "schema_hash": "98d38b34999c7d7cb53253e1c5de03886df96a6b1cdae4a37b9eb8a907ed963d",
+      "schema_hash": "5b00e5a12526fef89c1891b69079bd739d666b28172e3147189db9c9a6c3f95f",
       "version": "v1"
     },
     {
@@ -14,7 +14,7 @@
       "consumer": "tests/v20_threat_model_contract.rs",
       "contract_id": "v20.threat_model",
       "producer": "contracts/v20/threat_model.v1.json",
-      "schema_hash": "6002861a96f0f30005c025cf33003791ac2fb30a5e1c1162e244e14e36e5ac66",
+      "schema_hash": "44bb6188338dc1298c4caf48a646bbe2aeaf4729ad33b78466b8e3e3738a8047",
       "version": "v1"
     },
     {
@@ -22,7 +22,7 @@
       "consumer": "tests/v20_test_catalog_contract.rs",
       "contract_id": "v20.test_catalog",
       "producer": "contracts/v20/test_catalog.v1.json",
-      "schema_hash": "3a836ff59b7686309e4b8df66988464fdd48180cc493a9e114e787d7c1f12b70",
+      "schema_hash": "fcb3bbcc1e8fe5b2f2fc2973541d452d1ac003acdbb0d659e17ef4fe77d8737e",
       "version": "v1"
     },
     {
@@ -30,7 +30,7 @@
       "consumer": "tests/v20_fuzz_harness.rs",
       "contract_id": "v20.fuzz_seed_suite",
       "producer": "contracts/v20/fuzz_seed_suite.v1.json",
-      "schema_hash": "de344531a072e99ccf9bcc9eaeb03edbf383ae55536e9ccece7fa00b60e51909",
+      "schema_hash": "a14e27cf93b0d2b99abf80585ba2d210ec983e8519798a9a5130eddfbbbc0dfd",
       "version": "v1"
     },
     {
@@ -38,7 +38,7 @@
       "consumer": "tests/v20_tooling_versions_contract.rs",
       "contract_id": "v20.tooling_versions",
       "producer": "contracts/v20/tooling_versions.v1.json",
-      "schema_hash": "0634d85aeff4246e588b27434c329760c87be6800624a019d890a12d62dadce3",
+      "schema_hash": "54f804482ab3f89488f2203a22bece234bc07e8469f7e625894a6233c50a8258",
       "version": "v1"
     },
     {
@@ -46,7 +46,7 @@
       "consumer": "tests/v20_history_replay_matrix.rs",
       "contract_id": "v20.history_replay_matrix",
       "producer": "contracts/v20/history_replay_matrix.v1.json",
-      "schema_hash": "e71416426c6c36e4f515e89fa46c18f3f88ba42b04106b82f3b12d29edddf9b7",
+      "schema_hash": "3878a19c288ca2319e01944b6fe8823571efadee6b9f6b78d07b424e8d06056d",
       "version": "v1"
     },
     {
@@ -54,7 +54,7 @@
       "consumer": "tests/v20_history_toolchain_matrix_contract.rs",
       "contract_id": "v20.history_toolchain_matrix",
       "producer": "contracts/v20/history_toolchain_matrix.v1.json",
-      "schema_hash": "aba974252daefb42d7ceb495712c12f4c1d3ffe27e0f36667b37f1b93236b4d0",
+      "schema_hash": "0f3b4e8ccec5ed997c56cfaaa5da5a629615f09633425ead9c5162965eddb71d",
       "version": "v1"
     },
     {
@@ -62,7 +62,7 @@
       "consumer": "tests/v20_property_invariants.rs",
       "contract_id": "v20.hardcore_test_protocol",
       "producer": "contracts/v20/hardcore_test_protocol.v1.json",
-      "schema_hash": "96b6ae22e681e99099d920d50ecc55a4a76dc6678e3d0c882a2a230de1ff2995",
+      "schema_hash": "3006498effef367f7692fd9316549c982f5a5ebb6c78334ae72403592ff67080",
       "version": "v1"
     },
     {
@@ -70,7 +70,7 @@
       "consumer": "tests/v20_repro_protocol_contract.rs",
       "contract_id": "v20.repro_protocol",
       "producer": "contracts/v20/repro_protocol.v1.json",
-      "schema_hash": "9553b41c9ffcdc21886c84b3b5e19fd39cc35a1f1c3d97e66b183f099df3a5d0",
+      "schema_hash": "4cfc73a7d8ea9954c339e13333b3184eb6f2b32865aa80c73c526b5e4e8d6367",
       "version": "v1"
     },
     {
@@ -78,7 +78,7 @@
       "consumer": "tests/v20_dx_friction_budget.rs",
       "contract_id": "v20.dx_friction_budget",
       "producer": "contracts/v20/dx_friction_budget.v1.json",
-      "schema_hash": "80cc6871ca1d65c36390237b57749455c40bcdabd530507372be520151ab8e4a",
+      "schema_hash": "8ed195b6b1cc7d43b89073103d630c967e7a8a959d4815e19f43badbd66f75be",
       "version": "v1"
     },
     {
@@ -86,7 +86,7 @@
       "consumer": "tests/v20_user_journeys_tool_cli.rs",
       "contract_id": "v20.user_journey_matrix",
       "producer": "contracts/v20/user_journey_matrix.v1.json",
-      "schema_hash": "802bc1367c8e6119204662a6a2f8c9510a0250d964661b20b79412e210455a7f",
+      "schema_hash": "c3426f428dee2e75a6d01f6179f9fe1a9d9881a794df2a49b7e70a724fab1b82",
       "version": "v1"
     },
     {
@@ -94,7 +94,7 @@
       "consumer": "tests/v20_redteam_policy_bypass.rs",
       "contract_id": "v20.redteam_attack_matrix",
       "producer": "contracts/v20/redteam_attack_matrix.v1.json",
-      "schema_hash": "d3c7bcb98ebdf5724f1915af31a67fa08f456c87edf1868973e6636834846407",
+      "schema_hash": "29f4e90222f444fa34514b18513b8f92acdf80a8164183bc84679d9dec6c7cfa",
       "version": "v1"
     },
     {
@@ -102,7 +102,7 @@
       "consumer": "tests/v20_cve_snapshot_contract.rs",
       "contract_id": "v20.cve_snapshot",
       "producer": "contracts/v20/cve_snapshot.v1.json",
-      "schema_hash": "6b8386ad34cc75038c515ddec4fea99f5b5a55326cc7ee4f786e07d99d9166a2",
+      "schema_hash": "b349fe36fea539d6b478291b157ed671d32d20526c5ecc6387784f266bb0045b",
       "version": "v1"
     },
     {
@@ -110,7 +110,7 @@
       "consumer": "tests/v20_finding_schema_contract.rs",
       "contract_id": "v20.finding_schema",
       "producer": "contracts/v20/finding_schema.v1.json",
-      "schema_hash": "ef93e91332c381d4ebf25910f1484ae8ca755ff689a533db07705c34544e95ca",
+      "schema_hash": "0b73f05e3e9d2881106a400940f363babdb7c4ab926ebb402a0af3b112d7a0b8",
       "version": "v1"
     },
     {
@@ -118,7 +118,7 @@
       "consumer": "tests/v20_release_package_manifest.rs",
       "contract_id": "v20.release_gate_v1_0",
       "producer": "contracts/v20/release_gate_v1_0.v1.json",
-      "schema_hash": "244a8490aa69faaca4132a6403372e788b70824d6345180494c341618c1ff50c",
+      "schema_hash": "71e0632fa3af9900b72bf017b4a1252a7e1cf32714fe9773f2e9446924622053",
       "version": "v1"
     },
     {
@@ -126,7 +126,7 @@
       "consumer": "tests/v20_zero_open_findings.rs",
       "contract_id": "v20.zero_open_findings_policy",
       "producer": "contracts/v20/zero_open_findings_policy.v1.json",
-      "schema_hash": "a3cfda0220249ae4d243a2325360872195ebcb54f26eca104b85b5b2ea73881e",
+      "schema_hash": "e2b72e5ab1ac0a9befb5333d94da53d5a73e7e823d2444838855466ac4a80ebc",
       "version": "v1"
     },
     {
@@ -134,7 +134,7 @@
       "consumer": "tests/v20_signoff_required_artifacts.rs",
       "contract_id": "v20.signoff_required_artifacts",
       "producer": "contracts/v20/signoff_required_artifacts.v1.json",
-      "schema_hash": "affbffebb6cde223c1ea07d3f17d943b2dbda11f368a02db666477af7cfa90bf",
+      "schema_hash": "f186cb99fbabbc5dc47defe34747e7354b9f4cd4a41c1ea812417a46111ae24c",
       "version": "v1"
     },
     {
@@ -142,7 +142,7 @@
       "consumer": "tests/v20_stability_repeat_policy.rs",
       "contract_id": "v20.stability_repeat_policy",
       "producer": "contracts/v20/stability_repeat_policy.v1.json",
-      "schema_hash": "f43749a9f4b0e293978770cf6d81b59a59c9d8125715020add8dbec71222128a",
+      "schema_hash": "b248311621565d4f37104e2f13cc44b45fe26548938c2f5f2e00182785e8d201",
       "version": "v1"
     }
   ],

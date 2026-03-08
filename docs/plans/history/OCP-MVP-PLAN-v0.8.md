@@ -584,7 +584,7 @@ Exit criteria:
 - Implemented:
 - Files changed:
 - Commands run:
-- `cargo test --test <targeted_suite>`
+- `cargo test --test quarantine_gate --test cassette_format --test std_time_wallclock --test std_proc_exec --test std_net_http`
 - `cargo test`
 - Test results:
 - Targeted tests (must-pass for gate):

@@ -1,5 +1,5 @@
 {
   "schema": "ocp.w16.perf.baseline_manifest.sig.v1",
   "hasher": "sha256-v1",
-  "signature": "e6c9578fc52774fc0606f8c4e6b29ebf68f70778b4b12d820abf28ef03de9bed"
+  "signature": "d7b0f2248e32dc8e751643cfb394016c720f0cbc7bd01652e784e284c50ce0da"
 }

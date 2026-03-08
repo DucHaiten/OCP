@@ -325,7 +325,7 @@ fn handle_launch(state: &mut DapState, arguments: &JsonValue) -> Result<(), Stri
     state.events = events;
     state.breakpoints.clear();
     state.breakpoint_map.clear();
-    state.trace_path = trace_path.or_else(|| Some(summary.trace_path));
+    state.trace_path = trace_path.or(Some(summary.trace_path));
     state.terminated = false;
 
     Ok(())

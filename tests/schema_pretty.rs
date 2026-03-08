@@ -1,8 +1,6 @@
 use std::collections::BTreeMap;
 
-use ocp::ocp::{
-    pretty_schema, schema_skeleton, FieldConstraints, FieldSpec, SchemaType, Value,
-};
+use ocp::ocp::{pretty_schema, schema_skeleton, FieldConstraints, FieldSpec, SchemaType, Value};
 
 #[test]
 fn pretty_schema_is_stable_for_record() {

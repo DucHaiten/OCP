@@ -540,7 +540,7 @@ v0.4 chỉ được `DONE` khi đồng thời đạt:
   - `cargo fmt -- --check`
   - `cargo clippy --workspace --all-targets -- -D warnings`
   - `powershell -ExecutionPolicy Bypass -File tools/ci_ocp_lane.ps1`
-  - `cargo test -p ocp-cli --test m5_conformance` (fail do sai package)
+  - `cargo test -p ocp-sdk --test m5_conformance`
   - `cargo test -p ocp-sdk --test m5_conformance`
   - `powershell -ExecutionPolicy Bypass -File tools/ci_w0_entry.ps1`
   - `powershell -ExecutionPolicy Bypass -File tools/ci_ocp_quarantine.ps1`

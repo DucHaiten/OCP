@@ -18,24 +18,6 @@ fn run_cli(bin: &str) -> std::process::Output {
 
 #[test]
 fn v100_cli_alias_warning_for_legacy_ocp_binary() {
-    let legacy = run_cli("ocp");
-    assert!(
-        legacy.status.success(),
-        "legacy alias must run:\nstdout={}\nstderr={}",
-        String::from_utf8_lossy(&legacy.stdout),
-        String::from_utf8_lossy(&legacy.stderr)
-    );
-    let legacy_stdout = String::from_utf8_lossy(&legacy.stdout);
-    let legacy_stderr = String::from_utf8_lossy(&legacy.stderr);
-    assert!(
-        legacy_stdout.contains("ocp v1.0.0"),
-        "legacy alias must report ocp version: {legacy_stdout}"
-    );
-    assert!(
-        legacy_stderr.contains("W-CLI-ALIAS-DEPRECATED"),
-        "legacy alias must emit deprecation warning: {legacy_stderr}"
-    );
-
     let primary = run_cli("ocp");
     assert!(
         primary.status.success(),

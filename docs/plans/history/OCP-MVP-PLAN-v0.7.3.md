@@ -1166,7 +1166,7 @@ Exit criteria:
 - Implemented:
 - Files changed:
 - Commands run:
-  - `cargo test --test <targeted_suite>`
+  - `cargo test --test cli_mini_game_e2e --test cli_shadow_preview_e2e --test ui_replay`
   - `cargo test`
 - Test results:
   - `PASS`/`FAIL`

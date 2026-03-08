@@ -173,8 +173,11 @@ fn cli_cache_replay_supports_legacy_main_ocp_with_warning() {
     let init = run_ocp_cli(&["init", &root_s, "--template", "mini-game"]);
     assert_success(&init);
 
-    fs::rename(root.join("src").join("main.ocp"), root.join("src").join("main.ocp"))
-        .expect("rename main.ocp -> main.ocp");
+    fs::rename(
+        root.join("src").join("main.ocp"),
+        root.join("src").join("main.ocp"),
+    )
+    .expect("rename main.ocp -> main.ocp");
 
     let run = run_ocp_cli(&["run", &root_s]);
     assert_success(&run);

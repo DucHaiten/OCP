@@ -1,6 +1,4 @@
-use ocp::ocp::{
-    execute_program, parse_program, typecheck_program, ErrorCode, ExecConfig, Value,
-};
+use ocp::ocp::{execute_program, parse_program, typecheck_program, ErrorCode, ExecConfig, Value};
 
 #[test]
 fn loops_repeat_and_for_cap_exec_ok() {

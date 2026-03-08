@@ -58,6 +58,8 @@ pub fn ensure_run_manifest() -> JsonValue {
         "OCP_RELEASE_GRADE".to_string(),
         "OCP_QUARANTINE".to_string(),
         "OCP_STRICT_PROFILE".to_string(),
+        "OCP_UPDATE_V18_SOT_SIG".to_string(),
+        "OCP_UPDATE_V18_REQUIRED_CONTRACTS".to_string(),
     ];
     let observed = std::env::vars()
         .map(|(key, _)| key)

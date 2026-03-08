@@ -11,3 +11,8 @@ std = "0.1.0"
 [permissions.package]
 allow = ["*"]
 deny = ["std.net.poll"]
+
+[permissions.std_db]
+enabled = true
+allow_dsn = ["file:demo.db"]
+allow_modes = ["read_query", "write_exec"]

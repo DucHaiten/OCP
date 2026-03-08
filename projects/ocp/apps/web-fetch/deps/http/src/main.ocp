@@ -1,0 +1,4 @@
+module http;
+
+let ready = true;
+condition(ready);

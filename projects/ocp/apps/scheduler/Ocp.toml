@@ -11,3 +11,6 @@ std = "0.1.0"
 [permissions.package]
 allow = ["*"]
 deny = ["std.net.poll"]
+
+[permissions.std_time]
+enabled = true

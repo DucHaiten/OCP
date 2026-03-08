@@ -135,13 +135,11 @@ fn v100_ocp_extension_guard_zero_legacy_tokens() {
     let forbidden_untracked_legacy_paths = untracked_files
         .iter()
         .filter(|path| {
-            in_include_roots(path)
-                && !is_excluded(path)
-                && {
-                    let lower = path.to_ascii_lowercase();
-                    let (marker, _, _, _, _) = legacy_markers();
-                    lower.contains(&marker)
-                }
+            in_include_roots(path) && !is_excluded(path) && {
+                let lower = path.to_ascii_lowercase();
+                let (marker, _, _, _, _) = legacy_markers();
+                lower.contains(&marker)
+            }
         })
         .cloned()
         .collect::<Vec<_>>();

@@ -1,0 +1,4 @@
+version=1
+source=deps.lock.v3
+lock_hash=40867702547853e1073706b708fe586716d85d5b7f6163a65467c8cc57db0820
+dep=std|std|0.1.0|builtin|500ca4accd55156fc4ed529ef4879bedc6aaaceaea4477fa65081f40e45a0466|builtin-unsigned

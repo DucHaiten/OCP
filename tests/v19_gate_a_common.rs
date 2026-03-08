@@ -183,6 +183,7 @@ pub fn ensure_run_manifest() -> JsonValue {
         "OCP_STRICT_PROFILE".to_string(),
         "OCP_EDITOR_PROFILE".to_string(),
         "OCP_EDITOR_TRUST_MODE".to_string(),
+        "OCP_UPDATE_V19_ASSETS_MANIFEST".to_string(),
     ];
     let observed = std::env::vars()
         .map(|(key, _)| key)

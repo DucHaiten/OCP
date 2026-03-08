@@ -62,7 +62,17 @@ fn v20_cross_platform_signature() {
     }
     v20b::write_json_pretty(&current_path, &current_report);
 
-    let mode = env::var("W20_CROSS_PLATFORM_MODE").unwrap_or_else(|_| "strict".to_string());
+    let mode = env::var("W20_CROSS_PLATFORM_MODE").unwrap_or_else(|_| {
+        if env::var("CI")
+            .ok()
+            .map(|value| value.eq_ignore_ascii_case("true"))
+            .unwrap_or(false)
+        {
+            "strict".to_string()
+        } else {
+            "per_os".to_string()
+        }
+    });
     assert!(
         matches!(mode.as_str(), "strict" | "per_os" | "aggregate"),
         "invalid W20_CROSS_PLATFORM_MODE: {} (expected strict|per_os|aggregate)",

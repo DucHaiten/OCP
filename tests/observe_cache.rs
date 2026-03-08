@@ -8,10 +8,7 @@ use ocp::ocp::{
     ExecConfig, Executor, Value,
 };
 
-fn run_program_with_registry(
-    src: &str,
-    registry: CapabilityRegistry,
-) -> ocp::ocp::ExecOutput {
+fn run_program_with_registry(src: &str, registry: CapabilityRegistry) -> ocp::ocp::ExecOutput {
     let program = parse_program(src, 1).expect("parse should pass");
     typecheck_program(&program).expect("typecheck should pass");
     Executor::with_registry(

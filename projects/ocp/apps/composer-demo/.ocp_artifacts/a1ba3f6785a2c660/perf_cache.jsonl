@@ -1,0 +1,6 @@
+{"call_id":null,"data":{"count":0},"i":0,"seed":0,"span":null,"t":"CacheCompileHit","tick":0}
+{"call_id":null,"data":{"count":0},"i":1,"seed":0,"span":null,"t":"CacheCompileMiss","tick":0}
+{"call_id":null,"data":{"count":1},"i":2,"seed":0,"span":null,"t":"CacheExecHit","tick":0}
+{"call_id":null,"data":{"count":7},"i":3,"seed":0,"span":null,"t":"CacheExecMiss","tick":0}
+{"call_id":null,"data":{"count":0},"i":4,"seed":0,"span":null,"t":"CacheObserveHit","tick":0}
+{"call_id":null,"data":{"count":0},"i":5,"seed":0,"span":null,"t":"CacheObserveMiss","tick":0}

@@ -2,6 +2,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use ocp_runtime_core::RunEngine;
 use sha2::{Digest, Sha256};
@@ -1327,12 +1328,16 @@ fn copy_runtime_registry(runtime_root: &Path, workspace_root: &Path) -> Result<P
 }
 
 fn conformance_runtime_root_v16(workspace_root: &Path) -> PathBuf {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
     workspace_root
         .join("target")
         .join("ocp")
         .join("w9")
         .join("runtime")
-        .join(std::process::id().to_string())
+        .join(format!("{}-{}", std::process::id(), stamp))
 }
 
 fn copy_tree(src: &Path, dst: &Path) -> Result<(), SdkError> {

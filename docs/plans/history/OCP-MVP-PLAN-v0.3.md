@@ -498,7 +498,7 @@ Trạng thái: `PASS`.
   - `cargo test -p ocp-cli`
 - M1:
   - `cargo test --workspace`
-  - `cargo clippy ... -D warnings`
+  - `cargo clippy -p ocp-runtime-core -p ocp-sdk -p ocp-cli --all-targets -- -D warnings`
   - lane canary pass
 - M2:
   - `cargo test --test ocp_stdlib --test ocp_registry --test ocp_exec --test ocp_commit_policy`

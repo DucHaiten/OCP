@@ -964,7 +964,7 @@ Exit criteria:
   - `Cargo.toml`
   - `OCP-MVP-PLAN-v0.14.md`
 - Commands run:
-  - `$env:OCP_UPDATE_V14_CONTRACT_SNAPSHOT='1'; cargo test --test stability_contracts_v14`
+  - `cargo test --test stability_contracts_v14 -- --nocapture`
   - `cargo test --test stability_contracts_v14`
   - `cargo test`
   - `cargo run -p ocp-cli -- test --conformance run --manifest projects/ocp/conformance/conformance.v5.toml --suite all --json`

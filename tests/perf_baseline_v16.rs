@@ -95,12 +95,7 @@ fn v16_perf_baseline_thresholds_hold_against_v015_sot() {
         "baseline id must be pinned to v0.15-line"
     );
 
-    let bench = run_ocp_cli(&[
-        "cache",
-        "bench",
-        "projects/ocp/apps/hello-cli",
-        "--json",
-    ]);
+    let bench = run_ocp_cli(&["cache", "bench", "projects/ocp/apps/hello-cli", "--json"]);
     let bench_json = assert_success(&bench);
     let bench_value: JsonValue = serde_json::from_str(&bench_json).expect("parse cache bench json");
     assert!(
