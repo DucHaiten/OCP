@@ -66,7 +66,7 @@ Official install and verification:
 - VI verify download: [docs/vi/security/verify-download.md](docs/vi/security/verify-download.md)
 
 Windows setup package:
-- [Download `ocp-v1.0.0-setup-win-x64.exe`](https://github.com/DucHaiten/OCP/blob/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe?raw=1)
+- [Download `ocp-v1.0.0-setup-win-x64.exe`](https://github.com/DucHaiten/OCP/raw/refs/heads/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe)
 - [All releases](https://github.com/DucHaiten/OCP/releases)
 
 Install from source (git):

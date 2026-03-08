@@ -99,7 +99,8 @@ Read in this order:
 
 ### 2) Install on Windows (installer)
 1. Download `ocp-v1.0.0-setup-win-x64.exe` directly from:
-   - `https://github.com/DucHaiten/OCP/blob/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe?raw=1`
+   - `https://github.com/DucHaiten/OCP/raw/refs/heads/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe`
+   - fallback: `https://github.com/DucHaiten/OCP/releases`
 2. Run the installer and choose:
    - the install directory on the drive you want;
    - whether to add `ocp` to `PATH`;
