@@ -49,6 +49,15 @@ function Resolve-BinarySource {
     throw "Could not find built Windows binary: $FriendlyName"
 }
 
+function Assert-CliBinaryBrand {
+    param([string]$BinaryPath)
+
+    $versionOutput = (& $BinaryPath --version 2>&1 | Out-String).Trim()
+    if (-not $versionOutput.StartsWith("ocp v")) {
+        throw "Invalid CLI binary branding at $BinaryPath (expected 'ocp v...', got '$versionOutput')"
+    }
+}
+
 function Resolve-IsccPath {
     param([string]$InputPath)
 
@@ -122,6 +131,8 @@ function Ensure-InstallerIcon {
 }
 
 $cliBinaryPath = Resolve-BinarySource -InputPath $BinarySource -RepoRoot $repoRoot -FriendlyName "ocp.exe" -Fallbacks @(
+    "target\release\ocp.exe",
+    "projects\ocp\crates\ocp-cli\target\release\ocp.exe",
     "target\release\ocp-cli.exe",
     "projects\ocp\crates\ocp-cli\target\release\ocp-cli.exe"
 )
@@ -136,6 +147,7 @@ $dapBinaryPath = Resolve-BinarySource -InputPath $DapSource -RepoRoot $repoRoot 
 $iscc = Resolve-IsccPath -InputPath $IsccPath
 $vsixPath = Resolve-VsixSource -InputPath $VsixSource -RepoRoot $repoRoot -ReleaseRootPath $releaseRootPath -VsixBuildScriptPath $vsixBuildScript
 Ensure-InstallerIcon -IconPath $installerIconPath -ScriptPath $installerIconScript
+Assert-CliBinaryBrand -BinaryPath $cliBinaryPath
 
 New-Item -ItemType Directory -Force -Path $stageRootPath | Out-Null
 New-Item -ItemType Directory -Force -Path $releaseRootPath | Out-Null

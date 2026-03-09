@@ -48,11 +48,22 @@ function Resolve-BinarySource {
     throw "Could not find built Windows binary for VSIX bundle: $FriendlyName"
 }
 
+function Assert-CliBinaryBrand {
+    param([string]$BinaryPath)
+
+    $versionOutput = (& $BinaryPath --version 2>&1 | Out-String).Trim()
+    if (-not $versionOutput.StartsWith("ocp v")) {
+        throw "Invalid CLI binary branding at $BinaryPath (expected 'ocp v...', got '$versionOutput')"
+    }
+}
+
 if (-not (Test-Path $extensionRootPath)) {
     throw "Extension root not found: $extensionRootPath"
 }
 
 $cliBinaryPath = Resolve-BinarySource -InputPath $BinarySource -RepoRoot $repoRoot -FriendlyName "ocp.exe" -Fallbacks @(
+    "target\release\ocp.exe",
+    "projects\ocp\crates\ocp-cli\target\release\ocp.exe",
     "target\release\ocp-cli.exe",
     "projects\ocp\crates\ocp-cli\target\release\ocp-cli.exe"
 )
@@ -64,6 +75,7 @@ $dapBinaryPath = Resolve-BinarySource -InputPath $DapSource -RepoRoot $repoRoot 
     "target\release\ocp-dap.exe",
     "projects\ocp\crates\ocp-dap\target\release\ocp-dap.exe"
 )
+Assert-CliBinaryBrand -BinaryPath $cliBinaryPath
 
 $required = @(
     "package.json",

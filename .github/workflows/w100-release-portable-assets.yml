@@ -35,7 +35,7 @@ jobs:
           set -euo pipefail
           mkdir -p target/ocp/w100/release
           mkdir -p target/ocp/w100/ci/linux-x64
-          cp target/x86_64-unknown-linux-musl/release/ocp-cli target/ocp/w100/ci/linux-x64/ocp
+          cp target/x86_64-unknown-linux-musl/release/ocp target/ocp/w100/ci/linux-x64/ocp
           cp target/x86_64-unknown-linux-musl/release/ocp-lsp target/ocp/w100/ci/linux-x64/ocp-lsp
           cp target/x86_64-unknown-linux-musl/release/ocp-dap target/ocp/w100/ci/linux-x64/ocp-dap
           tar -czf target/ocp/w100/release/ocp-v1.0.0-linux-x64.tar.gz -C target/ocp/w100/ci/linux-x64 .
@@ -67,7 +67,7 @@ jobs:
           set -euo pipefail
           mkdir -p target/ocp/w100/release
           mkdir -p target/ocp/w100/ci/macos-arm64
-          cp target/aarch64-apple-darwin/release/ocp-cli target/ocp/w100/ci/macos-arm64/ocp
+          cp target/aarch64-apple-darwin/release/ocp target/ocp/w100/ci/macos-arm64/ocp
           cp target/aarch64-apple-darwin/release/ocp-lsp target/ocp/w100/ci/macos-arm64/ocp-lsp
           cp target/aarch64-apple-darwin/release/ocp-dap target/ocp/w100/ci/macos-arm64/ocp-dap
           tar -czf target/ocp/w100/release/ocp-v1.0.0-macos-arm64.tar.gz -C target/ocp/w100/ci/macos-arm64 .
