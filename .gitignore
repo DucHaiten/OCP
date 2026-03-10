@@ -12,3 +12,7 @@ Rules/guard/__pycache__/
 --help/
 --project/
 debug.log
+
+# OCP app runtime artifacts (generated locally)
+projects/ocp/apps/*/.ocp_artifacts/
+projects/ocp/apps/*/.ocp_cache/

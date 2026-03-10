@@ -166,25 +166,30 @@ fn cli_cache_bench_writes_machine_checkable_report() {
 }
 
 #[test]
-fn cli_cache_replay_supports_legacy_main_ocp_with_warning() {
-    let root = temp_project_dir("legacy_main_ocp");
+fn cli_cache_replay_supports_legacy_main_oc_with_warning() {
+    let root = temp_project_dir("legacy_main_oc");
     let root_s = root.to_string_lossy().to_string();
 
     let init = run_ocp_cli(&["init", &root_s, "--template", "mini-game"]);
     assert_success(&init);
 
+    let manifest_path = root.join("Ocp.toml");
+    let mut manifest = fs::read_to_string(&manifest_path).expect("read manifest");
+    manifest.push_str("\n[project]\nentry = \"src/main.oc\"\n");
+    fs::write(&manifest_path, manifest).expect("write manifest entry");
+
     fs::rename(
         root.join("src").join("main.ocp"),
-        root.join("src").join("main.ocp"),
+        root.join("src").join("main.oc"),
     )
-    .expect("rename main.ocp -> main.ocp");
+    .expect("rename main.ocp -> main.oc");
 
     let run = run_ocp_cli(&["run", &root_s]);
     assert_success(&run);
     let run_stderr = String::from_utf8_lossy(&run.stderr);
     assert!(
         run_stderr.contains("W-LEGACY-OCP-EXTENSION"),
-        "legacy .ocp run must emit deprecation warning, got: {run_stderr}"
+        "legacy .oc run must emit deprecation warning, got: {run_stderr}"
     );
 
     let run_dir = first_artifact_run_dir(&root);

@@ -3,6 +3,8 @@ use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine as _;
@@ -852,6 +854,118 @@ impl Default for ProfileViewOptions {
     }
 }
 
+const SOURCE_EXT_CANONICAL_V1: &str = "ocp";
+const SOURCE_EXT_LEGACY_V1: &str = "oc";
+const DEFAULT_ENTRY_REL_V1: &str = "src/main.ocp";
+const LEGACY_SOURCE_WARNING_CODE: &str = "W-LEGACY-OCP-EXTENSION";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SdkWarningV1 {
+    pub code: String,
+    pub message: String,
+}
+
+fn warning_buffer_v1() -> &'static Mutex<Vec<SdkWarningV1>> {
+    static BUFFER: OnceLock<Mutex<Vec<SdkWarningV1>>> = OnceLock::new();
+    BUFFER.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn warning_seen_keys_v1() -> &'static Mutex<HashSet<String>> {
+    static SEEN: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    SEEN.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+fn warning_stderr_enabled_v1() -> &'static AtomicBool {
+    static ENABLED: OnceLock<AtomicBool> = OnceLock::new();
+    ENABLED.get_or_init(|| AtomicBool::new(true))
+}
+
+fn lock_or_recover_v1<T>(mutex: &'static Mutex<T>) -> std::sync::MutexGuard<'static, T> {
+    match mutex.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+pub fn reset_warning_state_v1() {
+    lock_or_recover_v1(warning_buffer_v1()).clear();
+    lock_or_recover_v1(warning_seen_keys_v1()).clear();
+    warning_stderr_enabled_v1().store(true, Ordering::Relaxed);
+}
+
+pub fn set_warning_stderr_enabled_v1(enabled: bool) {
+    warning_stderr_enabled_v1().store(enabled, Ordering::Relaxed);
+}
+
+pub fn take_warnings_v1() -> Vec<SdkWarningV1> {
+    let mut warnings = lock_or_recover_v1(warning_buffer_v1());
+    std::mem::take(&mut *warnings)
+}
+
+fn emit_warning_once_v1(code: &str, cause: &str, message: String) {
+    let dedup_key = format!("{code}|{cause}");
+    {
+        let mut seen = lock_or_recover_v1(warning_seen_keys_v1());
+        if !seen.insert(dedup_key) {
+            return;
+        }
+    }
+    lock_or_recover_v1(warning_buffer_v1()).push(SdkWarningV1 {
+        code: code.to_string(),
+        message: message.clone(),
+    });
+    if warning_stderr_enabled_v1().load(Ordering::Relaxed) {
+        eprintln!("{message}");
+    }
+}
+
+fn path_has_extension_v1(path: &Path, expected: &str) -> bool {
+    path.extension()
+        .and_then(|v| v.to_str())
+        .map(|v| v.eq_ignore_ascii_case(expected))
+        .unwrap_or(false)
+}
+
+fn is_legacy_source_path_v1(path: &Path) -> bool {
+    path_has_extension_v1(path, SOURCE_EXT_LEGACY_V1)
+}
+
+fn is_supported_source_path_v1(path: &Path) -> bool {
+    path_has_extension_v1(path, SOURCE_EXT_CANONICAL_V1) || is_legacy_source_path_v1(path)
+}
+
+fn parse_project_entry_from_manifest_v1(manifest_text: &str) -> String {
+    let mut entry = DEFAULT_ENTRY_REL_V1.to_string();
+    let mut section = String::new();
+    for raw_line in manifest_text.lines() {
+        let line = raw_line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            section = line[1..line.len() - 1].trim().to_string();
+            continue;
+        }
+        let Some((key_raw, value_raw)) = line.split_once('=') else {
+            continue;
+        };
+        let key = key_raw.trim();
+        let value = value_raw.trim().trim_matches('"');
+        if section == "project" && key == "entry" && !value.is_empty() {
+            entry = value.to_string();
+            continue;
+        }
+        if section == "targets"
+            && key == "default"
+            && !value.is_empty()
+            && entry == DEFAULT_ENTRY_REL_V1
+        {
+            entry = format!("src/{value}.{SOURCE_EXT_CANONICAL_V1}");
+        }
+    }
+    entry
+}
+
 pub fn project_layout(root: &Path) -> ProjectLayout {
     let manifest_upper_new = root.join("Ocp.toml");
     let manifest_lower_new = root.join("ocp.toml");
@@ -863,7 +977,10 @@ pub fn project_layout(root: &Path) -> ProjectLayout {
         root.join("Ocp.toml")
     };
 
-    let src_main = root.join("src").join("main.ocp");
+    let entry_rel = fs::read_to_string(&manifest)
+        .map(|raw| parse_project_entry_from_manifest_v1(&raw))
+        .unwrap_or_else(|_| DEFAULT_ENTRY_REL_V1.to_string());
+    let src_main = root.join(Path::new(&entry_rel));
     ProjectLayout {
         root: root.to_path_buf(),
         manifest,
@@ -3170,6 +3287,14 @@ fn verify_project_exists(layout: &ProjectLayout) -> Result<(), SdkError> {
             layout.manifest.display()
         )));
     }
+    if !is_supported_source_path_v1(&layout.src_main) {
+        return Err(SdkError::MissingProject(format!(
+            "unsupported entry source extension: {} (expected .{} or .{})",
+            layout.src_main.display(),
+            SOURCE_EXT_CANONICAL_V1,
+            SOURCE_EXT_LEGACY_V1
+        )));
+    }
     if !layout.src_main.exists() {
         return Err(SdkError::MissingProject(format!(
             "missing entry source: {}",
@@ -3200,11 +3325,22 @@ fn warn_legacy_ocp_sources(layout: &ProjectLayout) {
         .collect::<Vec<_>>()
         .join(", ");
 
-    eprintln!(
-        "W-LEGACY-OCP-EXTENSION: detected {} legacy .ocp source file(s) (sample: {}). Rename to .ocp before PHASE_2 removal.",
+    let cause = legacy_files
+        .iter()
+        .map(|path| {
+            path.strip_prefix(&layout.root)
+                .unwrap_or(path)
+                .display()
+                .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("|");
+    let message = format!(
+        "W-LEGACY-OCP-EXTENSION: detected {} legacy .oc source file(s) (sample: {}). Rename to .ocp (canonical in v1.0.x).",
         legacy_files.len(),
         preview
     );
+    emit_warning_once_v1(LEGACY_SOURCE_WARNING_CODE, &cause, message);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -5281,12 +5417,7 @@ fn collect_ocp_files(base: &Path, out: &mut Vec<PathBuf>) -> Result<(), SdkError
         let path = entry.path();
         if path.is_dir() {
             collect_ocp_files(&path, out)?;
-        } else if path
-            .extension()
-            .and_then(|s| s.to_str())
-            .map(|ext| ext.eq_ignore_ascii_case("ocp") || ext.eq_ignore_ascii_case("ocp"))
-            .unwrap_or(false)
-        {
+        } else if is_supported_source_path_v1(&path) {
             out.push(path);
         }
     }
@@ -5302,12 +5433,7 @@ fn collect_legacy_ocp_files(base: &Path, out: &mut Vec<PathBuf>) -> Result<(), S
         let path = entry.path();
         if path.is_dir() {
             collect_legacy_ocp_files(&path, out)?;
-        } else if path
-            .extension()
-            .and_then(|s| s.to_str())
-            .map(|ext| ext.eq_ignore_ascii_case("ocp"))
-            .unwrap_or(false)
-        {
+        } else if is_legacy_source_path_v1(&path) {
             out.push(path);
         }
     }
@@ -5326,7 +5452,11 @@ fn gather_project_ocp_files(layout: &ProjectLayout) -> Result<Vec<PathBuf>, SdkE
     let mut files = Vec::new();
     collect_ocp_files(&layout.root.join("src"), &mut files)?;
     collect_ocp_files(&layout.tests_dir, &mut files)?;
+    if layout.src_main.exists() && is_supported_source_path_v1(&layout.src_main) {
+        files.push(layout.src_main.clone());
+    }
     files.sort();
+    files.dedup();
     Ok(files)
 }
 
@@ -5468,7 +5598,7 @@ pub fn check_project_with_lock(root: &Path, locked: bool) -> Result<CheckSummary
     let files = gather_project_ocp_files(&layout)?;
     if files.is_empty() {
         return Err(SdkError::MissingProject(
-            "project has no .ocp/.ocp sources under src/ or tests/".to_string(),
+            "project has no .ocp/.oc sources under src/ or tests/".to_string(),
         ));
     }
     for (idx, path) in files.iter().enumerate() {
@@ -5793,7 +5923,7 @@ pub fn run_reactor_service_with_lock(
     let source = fs::read_to_string(&layout.src_main)?;
     if !source.contains("on_event") {
         return Err(SdkError::MissingProject(
-            "reactor mode requires `fn on_event(...)` in src/main.ocp (or src/main.ocp in legacy mode)".to_string(),
+            "reactor mode requires `fn on_event(...)` in src/main.ocp (or src/main.oc in legacy mode)".to_string(),
         ));
     }
 
@@ -6415,7 +6545,7 @@ fn parse_package_manifest_v10(raw: &str) -> Result<PackageManifestV10, SdkError>
             "package.ocpp missing [package].version".to_string(),
         ));
     };
-    let entry = entry.unwrap_or_else(|| "src/main.ocp".to_string());
+    let entry = entry.unwrap_or_else(|| DEFAULT_ENTRY_REL_V1.to_string());
     if entry.trim().is_empty() {
         return Err(SdkError::MissingProject(
             "package.ocpp has empty [package].entry".to_string(),
@@ -6441,7 +6571,7 @@ fn load_package_manifest_v10(layout: &ProjectLayout) -> Result<PackageManifestV1
     Ok(PackageManifestV10 {
         name,
         version,
-        entry: "src/main.ocp".to_string(),
+        entry: parse_project_entry_from_manifest_v1(&manifest),
     })
 }
 
@@ -7094,7 +7224,7 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
     let source = fs::read_to_string(&layout.src_main)?;
     if !source.contains("on_event") {
         return Err(SdkError::MissingProject(
-            "reactor mode requires `fn on_event(...)` in src/main.ocp (or src/main.ocp in legacy mode)".to_string(),
+            "reactor mode requires `fn on_event(...)` in src/main.ocp (or src/main.oc in legacy mode)".to_string(),
         ));
     }
 

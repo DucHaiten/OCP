@@ -1,8 +1,0 @@
-[replay]
-run_id = "520f90201546293b"
-root = "projects/ocp/apps/tls-client"
-entry = "src/main.ocp"
-lane = "locked_v071"
-engine = "interpreter"
-signature = "46d251c82c31bb19"
-mode = "record"

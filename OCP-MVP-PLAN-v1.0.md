@@ -1,7 +1,7 @@
 # OCP v1.0 - Public Release Packaging + Documentation + Licensing/Commercial Lock
 
 Ngày tạo: 2026-03-07  
-Trạng thái: `DONE (Gate 1.0-A..1.0-H DONE)`  
+Trạng thái: `DONE (Gate 1.0-A..1.0-I DONE)`  
 Phạm vi: **OCP-only**  
 Tiền đề: v0.1..v0.20 đã hoàn tất chuỗi gate kỹ thuật, conformance, hardening, editor productization, và final signoff machine-checkable.
 
@@ -53,11 +53,11 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 - Mục tiêu phiên bản:
   - đưa OCP lên bản phát hành công khai v1.0 với đóng gói + docs + legal + commercial model đầy đủ.
 - Trạng thái tổng quan:
-  - `DONE (Gate 1.0-A..1.0-H DONE)`.
+  - `DONE (Gate 1.0-A..1.0-I DONE)`.
 - Gate đang làm/đã xong/chưa làm:
-  - `1.0-A..1.0-H` đã `DONE`.
+  - `1.0-A..1.0-I` đều `DONE`.
 - Bước kế tiếp ngay:
-  - chốt release notes/tag theo `GO` từ `target/ocp/w100/signoff/v1_0_release_go_no_go.json`.
+  - theo dõi adoption + mở rộng ecosystem theo governance đã khóa; chỉ mở `v1.1` khi có mục tiêu mới ngoài maintenance.
 - Lệnh kiểm chứng chuẩn:
   - xem `11) Operational commands (v1.0)`.
 - File code/tài liệu trọng yếu dự kiến thay đổi:
@@ -67,6 +67,8 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
   - `docs/vi/security/verify-download.md`
   - `docs/en/security/verify-download.md`
   - `editor/vscode/ocp/*`
+  - `projects/ocp/crates/ocp-cli/src/*`
+  - `projects/ocp/crates/ocp-runtime-core/src/*`
   - `contracts/release/v1.0/*`
   - `contracts/docs/v1.0/*`
   - `contracts/legal/v1.0/*`
@@ -74,6 +76,8 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
   - `contracts/security/v1.0/*`
   - `.github/workflows/*`
   - `LICENSE`, `NOTICE`, `COPYRIGHT`, `AUTHORS`, `GOVERNANCE.md`, `CODEOWNERS`
+  - `tests/v100_ocp_extension_guard.rs`
+  - `tests/v100_cli_*`
   - `OCP-MVP-PLAN-v1.0.md`
 
 ### 0.3 Trạng thái Workstreams/Gates v1.0 (tracking)
@@ -85,8 +89,9 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 - WS-LG (legal/authorship/governance pack): `DONE`
 - WS-BZ (commercial/monetization model lock): `DONE`
 - WS-PR (publish rehearsal + final signoff): `DONE`
+- WS-ECO (ecosystem unblock: warning/json UX cho developer): `DONE`
 
-#### Gate status (1.0-A .. 1.0-H)
+#### Gate status (1.0-A .. 1.0-I)
 - Gate 1.0-A - Release Contract Freeze + Distribution Matrix: `DONE`
 - Gate 1.0-B - GitHub Release Assets + Integrity Bundle: `DONE`
 - Gate 1.0-C - Windows EXE Installer + Portable Install Paths: `DONE`
@@ -95,6 +100,7 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 - Gate 1.0-F - Legal/Authorship/Governance Lock: `DONE`
 - Gate 1.0-G - Commercial Model + Community Policy Lock: `DONE`
 - Gate 1.0-H - Final Publish Rehearsal + GO/NO-GO: `DONE`
+- Gate 1.0-I - Ecosystem Unblock: Extension Warning + JSON Hygiene (v1.0.x): `DONE`
 
 ### 0.4 Rule mở code v1.0 (LOCKED)
 - Chỉ mở code khi đã có:
@@ -272,7 +278,7 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 
 ### KPI-8: Final publish rehearsal GO/NO-GO
 - PASS khi:
-  - toàn bộ gate `1.0-A..1.0-H` DONE.
+  - toàn bộ gate `1.0-A..1.0-I` DONE.
   - publish rehearsal pass.
   - không còn finding critical/high mở.
   - artifact GO/NO-GO giữ đúng tên chuẩn `v1_0_release_go_no_go.json`.
@@ -295,15 +301,17 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 - F) Legal/authorship/governance pack.
 - G) Commercial/community policy lock.
 - H) Final publish rehearsal + signoff.
+- I) Ecosystem unblock hotfix cho CLI warning/json behavior trên nhánh `v1.0.x`.
 
 ### 3.2 Out-of-scope (defer)
 - Không mở semantics lõi mới.
 - Không thêm pack/runtime feature mới ngoài scope đóng gói/document/legal.
 - Không đổi kiến trúc lõi đã khóa ở v0.20.
+- Không mở migration canonical extension mới trong `v1.0.x` nếu chưa có full toolchain path + migration command chính thức.
 
 ### 3.3 Core vs stretch (LOCKED)
 - Core bắt buộc để đóng v1.0:
-  - `1.0-A`, `1.0-B`, `1.0-C`, `1.0-D`, `1.0-E`, `1.0-F`, `1.0-G`, `1.0-H`.
+  - `1.0-A`, `1.0-B`, `1.0-C`, `1.0-D`, `1.0-E`, `1.0-F`, `1.0-G`, `1.0-H`, `1.0-I`.
 - Stretch không chặn core done:
   - channel release bổ sung ngoài matrix tối thiểu.
   - tài liệu bản địa hóa nhiều ngôn ngữ ngoài EN/VI.
@@ -733,11 +741,45 @@ Exit criteria:
 - source artifacts ngoài scope bị lẫn vào signed-asset claims => FAIL
 - tên artifact GO/NO-GO lệch chuẩn `v1_0_release_go_no_go.json` => FAIL
 
+### Gate 1.0-I - Ecosystem Unblock: Extension Warning + JSON Hygiene (v1.0.x)
+Scope:
+- khóa canonical extension của nhánh `v1.0.x` là `.ocp`; warning legacy chỉ được emit khi phát hiện extension legacy thật.
+- sửa wording + logic của `W-LEGACY-OCP-EXTENSION` để message không tự mâu thuẫn và chỉ rõ migration path đúng.
+- đảm bảo `ocp init` (template mặc định) không tự dính warning legacy ngay sau khi khởi tạo project.
+- đảm bảo parser/entry resolution không hard-code trái với canonical extension contract:
+  - khi người dùng cấu hình extension không hỗ trợ, phải báo lỗi rõ ràng theo code lỗi tương ứng,
+  - không được fallback ngầm khiến user không thể đoán đường migrate.
+- khóa output machine-readable:
+  - `--json` chỉ in JSON payload,
+  - warnings phải nằm trong payload JSON, không in plain text ngoài payload.
+- deduplicate warnings trong cùng command run theo `warning_code + cause`.
+- cập nhật docs/release note v1.0.x để nêu rõ policy extension hiện hành và giới hạn migration.
+Tests:
+- `tests/v100_ocp_extension_guard.rs`
+- `tests/v100_cli_legacy_extension_warning_contract.rs`
+- `tests/v100_cli_init_template_no_legacy_warning.rs`
+- `tests/v100_cli_json_output_purity.rs`
+- `tests/v100_cli_warning_dedup_contract.rs`
+- `tests/v100_cli_entry_resolution_extension_contract.rs`
+Artifacts:
+- `target/ocp/w100/ecosystem/legacy_extension_warning_report.json`
+- `target/ocp/w100/ecosystem/init_template_warning_report.json`
+- `target/ocp/w100/ecosystem/json_output_purity_report.json`
+- `target/ocp/w100/ecosystem/warning_dedup_report.json`
+- `target/ocp/w100/ecosystem/entry_resolution_extension_report.json`
+- `target/ocp/w100/ecosystem/ecosystem_hotfix_summary.json`
+Exit criteria:
+- template mặc định từ `ocp init` vẫn phát `W-LEGACY-OCP-EXTENSION` => FAIL
+- message warning còn tự mâu thuẫn hoặc không chỉ rõ migration path thật => FAIL
+- `ocp check --json` còn in warning plain text ngoài JSON payload => FAIL
+- warning bị in lặp cho cùng `warning_code + cause` trong một command run => FAIL
+- targeted tests của Gate `1.0-I` không pass đầy đủ trên Windows lane => FAIL
+
 ---
 
 ## 7) Exit Contract v1.0 (LOCKED)
 v1.0 chỉ `DONE` khi:
-- Gates `1.0-A..1.0-H` đều `DONE`.
+- Gates `1.0-A..1.0-I` đều `DONE`.
 - Không còn finding critical/high mở.
 - Release assets đầy đủ theo matrix + verify pass.
 - Docs self-contained + coverage pass.
@@ -1017,6 +1059,12 @@ v1.0 chỉ `DONE` khi:
 - `cargo test --test v100_final_signoff_bundle`
 - `cargo test --test v100_zero_open_findings`
 - `cargo test --test v100_release_go_no_go`
+- `cargo test --test v100_ocp_extension_guard`
+- `cargo test --test v100_cli_legacy_extension_warning_contract`
+- `cargo test --test v100_cli_init_template_no_legacy_warning`
+- `cargo test --test v100_cli_json_output_purity`
+- `cargo test --test v100_cli_warning_dedup_contract`
+- `cargo test --test v100_cli_entry_resolution_extension_contract`
 
 ---
 
@@ -3371,6 +3419,204 @@ v1.0 chỉ `DONE` khi:
 - Notes/risks:
   - Baseline hygiene pass yêu cầu một đợt format đồng loạt trên các file Rust đang drift; đây là thay đổi không đổi semantics nhưng làm code delta lớn.
 
+### 2026-03-10 - 1.0-I Planning Freeze (ecosystem warning/json unblock)
+- Date: 2026-03-10
+- Gate/Step: 1.0-I
+- Why:
+  - Người dùng ecosystem bị chặn strict zero-warning do bug warning/JSON output trong CLI `ocp v1.0.0`.
+  - Cần xử lý ngay trong `v1.0.x` để unblock adoption, không đẩy sang plan `v1.1`.
+- Scope:
+  - Mở Gate `1.0-I` để xử lý 4 nhóm lỗi: warning logic/wording mâu thuẫn, warning duplicate, `init` template tự dính warning, `--json` không thuần machine-readable.
+  - Giữ khóa thiết kế `v1.0.x`: canonical extension vẫn là `.ocp`; không mở migration extension mới nếu chưa có toolchain path chính thức.
+  - Chuẩn bị targeted tests + artifacts riêng cho lane ecosystem dưới `target/ocp/w100/ecosystem/*`.
+- Expected tests:
+  - `cargo test --test v100_ocp_extension_guard`
+  - `cargo test --test v100_cli_legacy_extension_warning_contract`
+  - `cargo test --test v100_cli_init_template_no_legacy_warning`
+  - `cargo test --test v100_cli_json_output_purity`
+  - `cargo test --test v100_cli_warning_dedup_contract`
+  - `cargo test --test v100_cli_entry_resolution_extension_contract`
+- Exit criteria:
+  - warning `W-LEGACY-OCP-EXTENSION` chỉ xuất hiện khi có legacy extension thật và message không còn mâu thuẫn.
+  - `ocp init` template mặc định không phát warning legacy.
+  - `--json` trả output thuần JSON, parse được bằng strict parser.
+  - warning dedup đúng theo `warning_code + cause` trong một lần chạy lệnh.
+
+### 2026-03-10 - 1.0-I Implementation Closeout (planning/doc initialization)
+- Date: 2026-03-10
+- Gate/Step: 1.0-I
+- Implemented:
+  - Mở chính thức Gate `1.0-I` trong kế hoạch v1.0 với scope/targeted tests/artifacts/exit criteria cho bug ecosystem warning/json.
+  - Đồng bộ các phần tracking/contract để tránh DONE giả:
+    - cập nhật `0.2` + `0.3` sang trạng thái `IN_PROGRESS` cho gate mới,
+    - cập nhật scope core, execution gate, operational commands, exit contract và handoff condition theo phạm vi `1.0-I`.
+  - Khóa rõ quyết định thiết kế cho nhánh hotfix `v1.0.x`:
+    - giữ canonical extension `.ocp`,
+    - không mở migration extension mới trong gate này.
+- Files changed:
+  - `OCP-MVP-PLAN-v1.0.md`
+- Commands run:
+  - `rg --line-number "^### 0\.3|^## |^### |planning freeze|implementation closeout|Gate|Workstream|Verification Snapshot" OCP-MVP-PLAN-v1.0.md`
+  - `Get-Content -Path OCP-MVP-PLAN-v1.0.md -TotalCount 260`
+  - `Select-String -Path OCP-MVP-PLAN-v1.0.md -Pattern "^### 0\.2 Quick Snapshot|^### 0\.3 Trạng thái Workstreams/Gates v1\.0 \(tracking\)|^### 0\.4 Rule mở code v1\.0" -Context 0,30`
+  - `Get-Content -Path tests/v100_ocp_extension_guard.rs -TotalCount 260`
+  - `Select-String -Path OCP-MVP-PLAN-v1.0.md -Pattern "^## 6\) Execution Gates v1\.0|^### Gate 1\.0-H|^## 7\) Exit Contract v1\.0" -Context 0,140`
+  - `Select-String -Path OCP-MVP-PLAN-v1.0.md -Pattern "^## 11\) Operational commands \(v1\.0\)|^## 12\) Execution Log \(full-log standard\)" -Context 0,120`
+  - `Select-String -Path OCP-MVP-PLAN-v1.0.md -Pattern "^## 3\) Scope v1\.0|^### 3\.1 In-scope \(ship\)|^### 3\.3 Core vs stretch \(LOCKED\)|^## 4\)" -Context 0,30`
+  - `Select-String -Path OCP-MVP-PLAN-v1.0.md -Pattern "^## 14\) Handoff v1\.0 -> v1\.1" -Context 0,20`
+- Test results:
+  - Targeted tests (must-pass for gate):
+    - `CHƯA_CHẠY`: bước hiện tại chỉ mở gate + khóa thiết kế triển khai trong plan, chưa có code delta runtime/CLI.
+  - Regression tests (supporting only):
+    - `CHƯA_CHẠY`: chưa chạy regression vì chưa bước vào implementation code.
+- Kết luận gate:
+  - `IN_PROGRESS`
+- Design alignment:
+  - `FULL`
+- Notes/risks:
+  - Đây là closeout cho bước mở gate trong tài liệu, không phải closeout triển khai runtime.
+  - Blocker strict zero-warning của ecosystem vẫn còn mở cho tới khi code delta Gate `1.0-I` được triển khai và targeted tests pass.
+
+### 2026-03-10 - 1.0-I Implementation Closeout (runtime/CLI fix + targeted tests)
+- Date: 2026-03-10
+- Gate/Step: 1.0-I
+- Implemented:
+  - Vá logic warning extension ở SDK/CLI để loại mâu thuẫn `W-LEGACY-OCP-EXTENSION`:
+    - chỉ cảnh báo khi phát hiện legacy extension thật (`.oc`),
+    - message thống nhất migration path về `.ocp` (canonical của `v1.0.x`),
+    - dedup warning theo `warning_code + cause` trong cùng command run.
+  - Bổ sung warning state cho SDK để phục vụ JSON hygiene:
+    - tắt in plain-text warning ngoài JSON khi chạy `--json`,
+    - thu warnings vào payload JSON cho `ocp check --json` và `ocp init --json`.
+  - Gỡ hard-code entry source:
+    - parser/entry resolution đọc `entry` từ manifest thay vì luôn ép `src/main.ocp`,
+    - báo lỗi rõ khi entry extension không hỗ trợ, tránh fallback ngầm.
+  - Bổ sung targeted tests cho toàn bộ contract Gate `1.0-I`:
+    - warning contract,
+    - init template no-warning,
+    - JSON output purity,
+    - warning dedup,
+    - entry resolution theo manifest.
+  - Cập nhật guard tương thích để suite `v100_ocp_extension_guard` phản ánh đúng baseline sau đổi contract warning extension.
+- Files changed:
+  - `projects/ocp/crates/ocp-sdk/src/lib.rs`
+  - `projects/ocp/crates/ocp-cli/src/main.rs`
+  - `tests/cli_cache.rs`
+  - `tests/v100_cli_extension_common.rs`
+  - `tests/v100_cli_init_template_no_legacy_warning.rs`
+  - `tests/v100_cli_legacy_extension_warning_contract.rs`
+  - `tests/v100_cli_json_output_purity.rs`
+  - `tests/v100_cli_warning_dedup_contract.rs`
+  - `tests/v100_cli_entry_resolution_extension_contract.rs`
+  - `tools/release/check_win_installer_branding.ps1`
+  - `OCP-MVP-PLAN-v1.0.md`
+- Commands run:
+  - `cargo test --test v100_ocp_extension_guard --test v100_cli_init_template_no_legacy_warning --test v100_cli_legacy_extension_warning_contract --test v100_cli_json_output_purity --test v100_cli_warning_dedup_contract --test v100_cli_entry_resolution_extension_contract --test cli_cache`
+- Test results:
+  - Targeted tests (must-pass for gate):
+    - `PASS`: `v100_ocp_extension_guard`
+    - `PASS`: `v100_cli_init_template_no_legacy_warning`
+    - `PASS`: `v100_cli_legacy_extension_warning_contract`
+    - `PASS`: `v100_cli_json_output_purity`
+    - `PASS`: `v100_cli_warning_dedup_contract`
+    - `PASS`: `v100_cli_entry_resolution_extension_contract`
+  - Regression tests (supporting only):
+    - `PASS`: `cli_cache`
+- Kết luận gate:
+  - `IN_PROGRESS`
+- Design alignment:
+  - `PARTIAL (đã hoàn tất runtime/CLI delta và targeted tests; còn hạng mục docs/release-note của Gate 1.0-I chưa cập nhật xong nên chưa đủ điều kiện DONE)`
+- Notes/risks:
+  - Hành vi warning/JSON cho strict parser đã được khóa bằng test contract, nhưng tài liệu migration/release-note hiện hành vẫn cần cập nhật để không mâu thuẫn với canonical extension policy mới.
+  - Giữ gate ở `IN_PROGRESS` để tránh `DONE giả` trước khi đóng phần docs/release-note.
+
+### 2026-03-10 - 1.0-I Final Implementation Closeout (docs sync + validation lane)
+- Date: 2026-03-10
+- Gate/Step: 1.0-I
+- Implemented:
+  - Đồng bộ tài liệu migration policy cho extension:
+    - `docs/vi/migration/ocp-to-ocp-phase1.md`
+    - `docs/en/migration/ocp-to-ocp-phase1.md`
+    - khóa rõ canonical `.ocp`, legacy `.oc`, và timeline warning `W-LEGACY-OCP-EXTENSION`.
+  - Bổ sung note trực tiếp trong user guide `vi/en` cho hành vi `ocp check --json`:
+    - warning legacy chỉ áp dụng cho `.oc`,
+    - `--json` trả warnings trong payload JSON,
+    - extension không hỗ trợ ở `entry` phải trả lỗi tường minh.
+  - Rerun lane kiểm chứng kết hợp CLI + docs policy/parity để chốt Gate `1.0-I`.
+  - Đồng bộ inventory hash của `v16` sau khi cập nhật evidence index:
+    - cập nhật `schema_hash` cho `history.evidence_index`,
+    - cập nhật `schema_hash` cho `history.evidence_index_signature`.
+  - Vá regression test `v16_perf_baseline_thresholds_hold_against_v015_sot` để benchmark trên bản copy tạm dưới `target/` thay vì chạm trực tiếp `projects/ocp/apps/hello-cli`, tránh lặp lại việc mutation/xóa artifact tracked trong source tree.
+  - Dọn tracked artifacts dưới `projects/ocp/apps/*/.ocp_artifacts/*` để đóng blocker `repo_hygiene` và giữ source tree sạch cho cộng đồng.
+  - Bổ sung guard ignore cho app-local runtime artifacts trong `.gitignore`.
+  - Siết thêm contract entry-resolution cho DX:
+    - `verify_project_exists` kiểm tra extension support trước khi kiểm tra file tồn tại để trả lỗi nhất quán cho `entry` extension không hỗ trợ,
+    - thêm targeted test cho case unsupported extension + missing file.
+- Files changed:
+  - `.gitignore`
+  - `contracts/v16/required_contracts.v1.json`
+  - `projects/ocp/crates/ocp-sdk/src/lib.rs`
+  - `projects/ocp/apps/*/.ocp_artifacts/*` (31 file tracked artifacts được dọn khỏi repo)
+  - `docs/vi/migration/ocp-to-ocp-phase1.md`
+  - `docs/en/migration/ocp-to-ocp-phase1.md`
+  - `docs/vi/USER_GUIDE.md`
+  - `docs/en/USER_GUIDE.md`
+  - `tests/v100_cli_entry_resolution_extension_contract.rs`
+  - `tests/perf_baseline_v16.rs`
+  - `OCP-MVP-PLAN-v1.0.md`
+- Commands run:
+  - `cargo test --test v100_ocp_extension_guard --test cli_cache --test v100_cli_alias_warning --test v100_cli_version_flag --test v100_cli_init_template_no_legacy_warning --test v100_cli_legacy_extension_warning_contract --test v100_cli_json_output_purity --test v100_cli_warning_dedup_contract --test v100_cli_entry_resolution_extension_contract --test v100_docs_bilingual_structure_parity --test v100_docs_language_policy --test v100_docs_link_redirect_policy --test v100_docs_required_sections`
+  - `cargo test --test contract_inventory_complete`
+  - `cargo test`
+  - `rustfmt tests/perf_baseline_v16.rs`
+  - `git restore -- projects/ocp/apps/hello-cli/.ocp_artifacts/098a10c8d17a12c3`
+  - `cargo test --test perf_baseline_v16`
+  - `cargo test --test v100_ocp_extension_guard --test v100_cli_alias_warning --test v100_cli_version_flag --test v100_cli_init_template_no_legacy_warning --test v100_cli_legacy_extension_warning_contract --test v100_cli_json_output_purity --test v100_cli_warning_dedup_contract --test v100_cli_entry_resolution_extension_contract --test v100_docs_bilingual_structure_parity --test v100_docs_language_policy --test v100_docs_link_redirect_policy --test v100_docs_required_sections --test perf_baseline_v16`
+  - `cargo test --test v100_cli_entry_resolution_extension_contract --test v100_cli_init_template_no_legacy_warning --test v100_cli_legacy_extension_warning_contract --test v100_cli_json_output_purity --test v100_cli_warning_dedup_contract --test v100_ocp_extension_guard`
+  - `cargo run -p ocp-cli --quiet -- init target/ocp/repro_v100 --template tool-cli`
+  - `cargo run -p ocp-cli --quiet -- check target/ocp/repro_v100 --locked`
+  - `cargo run -p ocp-cli --quiet -- check target/ocp/repro_v100 --json --locked`
+  - `cargo run -p ocp-cli --quiet -- init target/ocp/repro_json --template tool-cli --json`
+  - `cargo run -p ocp-cli --quiet -- check target/ocp/repro_v100 --locked`
+  - `git add -u projects/ocp/apps`
+  - `cargo test --test repo_hygiene`
+  - `cargo test`
+- Test results:
+  - Targeted tests (must-pass for gate):
+    - `PASS`: `v100_ocp_extension_guard`
+    - `PASS`: `v100_cli_alias_warning`
+    - `PASS`: `v100_cli_version_flag`
+    - `PASS`: `v100_cli_init_template_no_legacy_warning`
+    - `PASS`: `v100_cli_legacy_extension_warning_contract`
+    - `PASS`: `v100_cli_json_output_purity`
+    - `PASS`: `v100_cli_warning_dedup_contract`
+    - `PASS`: `v100_cli_entry_resolution_extension_contract`
+    - `PASS`: `v100_cli_entry_resolution_rejects_unsupported_extension_even_when_missing_file`
+    - `PASS`: `v16_perf_baseline_thresholds_hold_against_v015_sot`
+  - Regression tests (supporting only):
+    - `PASS`: `cli_cache`
+    - `PASS`: `v100_docs_bilingual_structure_parity`
+    - `PASS`: `v100_docs_language_policy`
+    - `PASS`: `v100_docs_link_redirect_policy`
+    - `PASS`: `v100_docs_required_sections`
+    - `PASS`: `contract_inventory_complete`
+    - `PASS`: `repo_hygiene`
+    - `PASS`: `cargo test` toàn workspace
+- Kết luận gate:
+  - `DONE`
+- Design alignment:
+  - `FULL`
+- Notes/risks:
+  - Gate `1.0-I` được đóng sau khi đủ cả code delta thật, docs sync, và test evidence trong cùng lane kiểm chứng.
+  - Riêng mutation vào `projects/ocp/apps/hello-cli/.ocp_artifacts/*` đã được xử lý bằng cả hai lớp:
+    - khôi phục các file tracked đã bị tác động trong phiên làm việc,
+    - khóa test perf v16 chạy trên bản copy tạm để không tái diễn trên source tree.
+  - Baseline hygiene blocker `repo_hygiene` đã được đóng trong cùng phiên bằng cleanup tracked artifacts + full regression rerun pass.
+  - Repro thủ công theo bug report đã xác nhận:
+    - `init` template không phát warning legacy tự mâu thuẫn,
+    - `check --locked` tôn trọng `entry` từ manifest, không hard-require `src/main.ocp`,
+    - `check --json` trả payload JSON thuần với `warnings` nằm trong JSON.
+
 ---
 
 ## 13) Checklist khóa trước khi đóng gate
@@ -3411,7 +3657,7 @@ v1.0 chỉ `DONE` khi:
 
 ## 14) Handoff v1.0 -> v1.1
 - Chỉ mở v1.1 khi:
-  - toàn bộ gate core `1.0-A..1.0-H` đã `DONE`,
+  - toàn bộ gate core `1.0-A..1.0-I` đã `DONE`,
   - `target/ocp/w100/signoff/v1_0_release_go_no_go.json` = `GO`,
   - không còn finding critical/high mở.
 - v1.1 ưu tiên:

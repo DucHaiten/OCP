@@ -1941,6 +1941,10 @@ Không được “âm thầm fallback” sang IO thật.
 
 #### 1) Thực thi, kiểm tra, và profiling nâng cao
 - `ocp check <project_dir> [--json] [--locked] [--universe <id>]`
+- Ghi chú `v1.0.x` cho extension + JSON output:
+  - Canonical extension là `.ocp`; warning `W-LEGACY-OCP-EXTENSION` chỉ áp dụng cho file legacy `.oc`.
+  - Khi dùng `--json`, warnings phải nằm trong payload JSON (không có warning plain text ngoài JSON).
+  - `entry` dùng extension không hỗ trợ sẽ báo lỗi rõ ràng, không fallback ngầm về `src/main.ocp`.
 - `ocp run <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
 - `ocp fmt <project_dir> [--check]`
 - `ocp test <project_dir> [--locked] [--universe <id>] [--domain <id>] [...]`

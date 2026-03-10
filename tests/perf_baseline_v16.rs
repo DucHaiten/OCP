@@ -46,6 +46,40 @@ fn compile_cache_root() -> PathBuf {
         .join(format!("compile_{stamp}"))
 }
 
+fn bench_project_root() -> PathBuf {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    PathBuf::from("target")
+        .join("ocp")
+        .join("tests")
+        .join("perf_baseline_v16")
+        .join(format!("bench_{stamp}"))
+}
+
+fn copy_dir_all_excluding_artifacts(src: &PathBuf, dst: &PathBuf) {
+    fs::create_dir_all(dst).expect("create destination dir");
+    for entry in fs::read_dir(src).expect("read source dir") {
+        let entry = entry.expect("read source entry");
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        let file_type = entry.file_type().expect("read file type");
+        if file_type.is_dir() {
+            let name = src_path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default();
+            if name == ".ocp_artifacts" || name == ".ocp_cache" {
+                continue;
+            }
+            copy_dir_all_excluding_artifacts(&src_path, &dst_path);
+        } else if file_type.is_file() {
+            fs::copy(&src_path, &dst_path).expect("copy file");
+        }
+    }
+}
+
 fn base_key_input() -> CompileCacheKeyInput {
     CompileCacheKeyInput {
         compiler_version: "compiler-v16".to_string(),
@@ -95,7 +129,15 @@ fn v16_perf_baseline_thresholds_hold_against_v015_sot() {
         "baseline id must be pinned to v0.15-line"
     );
 
-    let bench = run_ocp_cli(&["cache", "bench", "projects/ocp/apps/hello-cli", "--json"]);
+    let source_project = root
+        .join("projects")
+        .join("ocp")
+        .join("apps")
+        .join("hello-cli");
+    let bench_project = bench_project_root();
+    copy_dir_all_excluding_artifacts(&source_project, &bench_project);
+    let bench_project_arg = bench_project.to_string_lossy().to_string();
+    let bench = run_ocp_cli(&["cache", "bench", &bench_project_arg, "--json"]);
     let bench_json = assert_success(&bench);
     let bench_value: JsonValue = serde_json::from_str(&bench_json).expect("parse cache bench json");
     assert!(

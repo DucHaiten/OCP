@@ -1787,6 +1787,10 @@ Replay must fail clearly when:
 
 #### 1) Advanced execution, checking, and profiling
 - `ocp check <project_dir> [--json] [--locked] [--universe <id>]`
+- `v1.0.x` note for extension + JSON output:
+  - Canonical extension is `.ocp`; `W-LEGACY-OCP-EXTENSION` only applies to legacy `.oc` files.
+  - With `--json`, warnings must be inside the JSON payload (no plain warning text outside JSON).
+  - Unsupported `entry` extensions return an explicit error (no silent fallback to `src/main.ocp`).
 - `ocp run <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
 - `ocp fmt <project_dir> [--check]`
 - `ocp test <project_dir> [--locked] [--universe <id>] [--domain <id>] [...]`

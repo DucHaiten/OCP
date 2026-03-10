@@ -1,8 +1,0 @@
-[replay]
-run_id = "0f88405a8057e27a"
-root = "projects/ocp/apps/sqlite-app"
-entry = "src/main.ocp"
-lane = "locked_v071"
-engine = "interpreter"
-signature = "bd2f2a8296bdf852"
-mode = "record"

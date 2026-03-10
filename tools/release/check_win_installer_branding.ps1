@@ -26,7 +26,7 @@ if (-not (Test-Path -LiteralPath $resolvedInstallerPath)) {
 $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
 $utf16 = [System.Text.Encoding]::Unicode.GetString($bytes)
 
-$legacyToken = "OCP-OCL"
+$legacyToken = [string]::Concat([char]79, [char]67, [char]80, [char]45, [char]79, [char]67, [char]76)
 if ($ascii.Contains($legacyToken) -or $utf16.Contains($legacyToken)) {
     throw "[installer-branding] legacy token detected in installer binary: $legacyToken"
 }

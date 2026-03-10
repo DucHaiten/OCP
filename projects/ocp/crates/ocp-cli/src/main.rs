@@ -15,24 +15,25 @@ use ocp_sdk::{
     fetch_artifact, fmt_project, init_cosmos_v1, init_project, inspect_contract_json_v17,
     install_organs_v1, list_kits_from_cosmos_v1, parse_conformance_manifest_v1,
     parse_shadow_policy_v1, publish_artifact, read_profile_json, read_trace_jsonl,
-    render_conformance_report_json, render_profile_view, resolve_deps_v3,
+    render_conformance_report_json, render_profile_view, reset_warning_state_v1, resolve_deps_v3,
     resolve_domain_selection_v1, resolve_universe_v1, resolve_view_selection_v1, run_artifact,
     run_conformance_v1, run_kit_doctor_v1, run_project_with_engine_and_lock,
     run_project_with_shadow_compare, run_project_with_trace_engine_and_lock,
     run_project_with_trace_engine_config_and_lock, run_reactor_service_with_lock,
     run_reactor_service_with_shadow_compare, run_reactor_service_with_trace_engine_and_lock,
-    sign_contract_json_v17, sign_deps_lock_v3_v15, sign_ocppkg, sync_cosmos_lock_v1,
-    sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1, sync_policy_lock_v1,
-    test_project_with_lock, trace_required_digest, verify_assembly, verify_build_attestation_v15,
-    verify_build_repro_v15, verify_contract_json_signature_v17, verify_contract_signature_file_v17,
-    verify_deps_lock_v3, verify_deps_lock_v3_signature_v15, verify_deps_signing_and_trust_v10,
-    verify_organs_lock_v1, verify_plugin_lock_v1, verify_supply_artifact,
-    write_conformance_report_json, write_permission_diff_report_v15,
-    write_permission_doctor_report_v17, write_permission_fix_plan_v17,
-    write_permission_snapshot_v15, write_profile_json, write_shadow_compare_artifacts_v1,
-    write_trace_jsonl, ConformanceManifestV1, ConformanceRunOptionsV1, InputEnvelopeV1,
-    PermissionFixApplyOptionsV17, ProfileViewOptions, ReactorRuntimeMode, ReactorServiceOptions,
-    SdkError, ShadowOptionsV1, TraceEventV1, TraceRunSummary,
+    set_warning_stderr_enabled_v1, sign_contract_json_v17, sign_deps_lock_v3_v15, sign_ocppkg,
+    sync_cosmos_lock_v1, sync_deps_lock_v1, sync_organs_lock_v1, sync_plugin_lock_v1,
+    sync_policy_lock_v1, take_warnings_v1, test_project_with_lock, trace_required_digest,
+    verify_assembly, verify_build_attestation_v15, verify_build_repro_v15,
+    verify_contract_json_signature_v17, verify_contract_signature_file_v17, verify_deps_lock_v3,
+    verify_deps_lock_v3_signature_v15, verify_deps_signing_and_trust_v10, verify_organs_lock_v1,
+    verify_plugin_lock_v1, verify_supply_artifact, write_conformance_report_json,
+    write_permission_diff_report_v15, write_permission_doctor_report_v17,
+    write_permission_fix_plan_v17, write_permission_snapshot_v15, write_profile_json,
+    write_shadow_compare_artifacts_v1, write_trace_jsonl, ConformanceManifestV1,
+    ConformanceRunOptionsV1, InputEnvelopeV1, PermissionFixApplyOptionsV17, ProfileViewOptions,
+    ReactorRuntimeMode, ReactorServiceOptions, SdkError, SdkWarningV1, ShadowOptionsV1,
+    TraceEventV1, TraceRunSummary,
 };
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
@@ -75,6 +76,8 @@ fn run_cli(args: &[String]) -> i32 {
                 return 2;
             };
             let json_mode = args.iter().any(|a| a == "--json");
+            reset_warning_state_v1();
+            set_warning_stderr_enabled_v1(!json_mode);
             let template = parse_string_flag(args, "--template");
             let preset = parse_string_flag(args, "--preset");
             if template.is_some() && preset.is_some() {
@@ -187,26 +190,23 @@ fn run_cli(args: &[String]) -> i32 {
                     }
                     if json_mode {
                         println!(
-                            "{{\"ok\":true,\"root\":\"{}\",\"template\":{},\"preset\":{},\"locked\":{}}}",
-                            json_escape(&layout.root.to_string_lossy()),
-                            template
-                                .as_ref()
-                                .map(|v| format!("\"{}\"", json_escape(v)))
-                                .unwrap_or_else(|| "null".to_string()),
-                            preset
-                                .as_ref()
-                                .map(|v| format!("\"{}\"", json_escape(v)))
-                                .unwrap_or_else(|| "null".to_string()),
-                            if locked { "true" } else { "false" }
+                            "{}",
+                            json_with_warnings(json!({
+                                "ok": true,
+                                "root": layout.root.to_string_lossy().to_string(),
+                                "template": template.as_deref(),
+                                "preset": preset.as_deref(),
+                                "locked": locked
+                            }))
                         );
-                    } else if let Some(template_id) = template {
+                    } else if let Some(template_id) = template.as_deref() {
                         println!(
                             "initialized {} (template={}, locked={})",
                             layout.root.display(),
                             template_id,
                             locked
                         );
-                    } else if let Some(preset_id) = preset {
+                    } else if let Some(preset_id) = preset.as_deref() {
                         println!(
                             "initialized {} (preset={}, locked={})",
                             layout.root.display(),
@@ -234,6 +234,8 @@ fn run_cli(args: &[String]) -> i32 {
                 return 2;
             };
             let json_mode = args.iter().any(|a| a == "--json");
+            reset_warning_state_v1();
+            set_warning_stderr_enabled_v1(!json_mode);
             let locked = args.iter().any(|a| a == "--locked");
             let universe_id = parse_string_flag(args, "--universe");
             if let Err(err) = resolve_universe_v1(Path::new(path), locked, universe_id.as_deref()) {
@@ -248,8 +250,11 @@ fn run_cli(args: &[String]) -> i32 {
                 Ok(summary) => {
                     if json_mode {
                         println!(
-                            "{{\"ok\":true,\"files_checked\":{}}}",
-                            summary.files_checked
+                            "{}",
+                            json_with_warnings(json!({
+                                "ok": true,
+                                "files_checked": summary.files_checked
+                            }))
                         );
                     } else {
                         println!("check ok (files_checked={})", summary.files_checked);
@@ -11502,47 +11507,61 @@ fn exit_code_for_sdk_error(err: &SdkError) -> i32 {
     }
 }
 
-fn error_to_json(err: &SdkError) -> String {
+fn take_warnings_json_value() -> JsonValue {
+    JsonValue::Array(
+        take_warnings_v1()
+            .into_iter()
+            .map(|warning: SdkWarningV1| {
+                json!({
+                    "code": warning.code,
+                    "message": warning.message
+                })
+            })
+            .collect(),
+    )
+}
+
+fn json_with_warnings(mut payload: JsonValue) -> String {
+    payload["warnings"] = take_warnings_json_value();
+    serde_json::to_string(&payload).unwrap_or_else(|_| "{\"ok\":false}".to_string())
+}
+
+fn error_to_json_payload(err: &SdkError) -> JsonValue {
     match err {
-        SdkError::Runtime(RuntimeCoreError::Diagnostic(diag)) => {
-            let hint = match &diag.hint {
-                Some(v) => format!("\"{}\"", json_escape(v)),
-                None => "null".to_string(),
-            };
-            let reason = match diag.root_reason {
-                Some(v) => format!("\"{}\"", v.as_str()),
-                None => "null".to_string(),
-            };
-            format!(
-                concat!(
-                    "{{\"ok\":false,\"error\":{{",
-                    "\"code\":\"{}\",",
-                    "\"phase\":\"{}\",",
-                    "\"span\":{{\"file_id\":{},\"start\":{},\"end\":{},\"line\":{},\"column\":{}}},",
-                    "\"message\":\"{}\",",
-                    "\"hint\":{},",
-                    "\"expected\":null,",
-                    "\"got\":null,",
-                    "\"root_reason\":{}",
-                    "}}}}"
-                ),
-                diag.code.as_str(),
-                phase_to_str(diag.phase),
-                diag.span.file_id,
-                diag.span.start,
-                diag.span.end,
-                diag.span.line,
-                diag.span.column,
-                json_escape(&diag.message),
-                hint,
-                reason
-            )
-        }
-        _ => format!(
-            "{{\"ok\":false,\"error\":{{\"code\":\"CLI-ERROR\",\"message\":\"{}\"}}}}",
-            json_escape(&err.to_string())
-        ),
+        SdkError::Runtime(RuntimeCoreError::Diagnostic(diag)) => json!({
+            "ok": false,
+            "error": {
+                "code": diag.code.as_str(),
+                "phase": phase_to_str(diag.phase),
+                "span": {
+                    "file_id": diag.span.file_id,
+                    "start": diag.span.start,
+                    "end": diag.span.end,
+                    "line": diag.span.line,
+                    "column": diag.span.column
+                },
+                "message": diag.message,
+                "hint": diag.hint,
+                "expected": JsonValue::Null,
+                "got": JsonValue::Null,
+                "root_reason": diag
+                    .root_reason
+                    .as_ref()
+                    .map(|v| v.as_str().to_string())
+            }
+        }),
+        _ => json!({
+            "ok": false,
+            "error": {
+                "code": "CLI-ERROR",
+                "message": err.to_string()
+            }
+        }),
     }
+}
+
+fn error_to_json(err: &SdkError) -> String {
+    json_with_warnings(error_to_json_payload(err))
 }
 
 fn phase_to_str(phase: ocp_runtime_core::DiagPhase) -> &'static str {

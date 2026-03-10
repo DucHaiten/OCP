@@ -4,7 +4,7 @@
     {
       "contract_id": "history.evidence_index",
       "version": "v1",
-      "schema_hash": "e1320e4f1e97424e4ab0528a4bc271675106a07a09d9e991f9e8f02b211b505d",
+      "schema_hash": "140a0fb331ffa6d4693dba03e6211a326db329b139bdc6c225d1e9f161d242cb",
       "producer": "contracts/history/evidence_index.v1.json",
       "consumer": "tests/historical_evidence.rs",
       "allowed_diffs_v016": "none"
@@ -12,7 +12,7 @@
     {
       "contract_id": "history.evidence_index_signature",
       "version": "v1",
-      "schema_hash": "68fc95f9d9ac3042ecbd297df7a886283ab1ce80ad56d7af16a800ea56c52837",
+      "schema_hash": "ea68759ed47cd7767d6d2c7442f892e6ad437643bff65f414a3beeabcb5fa3ef",
       "producer": "contracts/history/evidence_index.v1.sig",
       "consumer": "tests/historical_evidence_signature.rs",
       "allowed_diffs_v016": "none"
