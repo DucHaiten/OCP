@@ -34,10 +34,11 @@ pub use m4::{
     AssemblyProofV1, ComponentSpecV1, ComposeSummary, PhenotypeSpecV1, VerifySummary,
 };
 use ocp_runtime_core::{
-    check_file_with_compat, normalize_text, parse_program, run_file_with_engine_config_and_compat,
-    run_source_with_engine, CommitPolicyMode, CompatMode, DiagPhase, Diagnostic, ErrorCode,
-    ExecCacheStats, ExecConfig, Expr, GuardMode, ObserveCacheStats, RunEngine, RuntimeCoreError,
-    Span, Stmt, TraceEvent, TypecheckCompatConfig,
+    check_source_with_compat, normalize_text, parse_program,
+    run_source_with_engine, run_source_with_engine_config_and_compat, CommitPolicyMode,
+    CompatMode, DiagPhase, Diagnostic, ErrorCode, ExecCacheStats, ExecConfig, Expr, GuardMode,
+    ObserveCacheStats, RunEngine, RuntimeCoreError, Span, Stmt, TraceEvent,
+    TypecheckCompatConfig,
 };
 pub use perm_v15::{
     apply_permission_fix_plan_v17, approve_permission_diff_v15, write_permission_diff_report_v15,
@@ -3596,7 +3597,7 @@ fn module_id_from_file_under_root(root: &Path, file: &Path) -> Result<String, Sd
     if let Some(last) = parts.last_mut() {
         if let Some(stripped) = last.strip_suffix(".ocp") {
             *last = stripped.to_string();
-        } else if let Some(stripped) = last.strip_suffix(".ocp") {
+        } else if let Some(stripped) = last.strip_suffix(".oc") {
             *last = stripped.to_string();
         }
     }
@@ -3686,6 +3687,224 @@ fn load_dependency_package_index_v10(
     })
 }
 
+fn build_dependency_index_v10(
+    layout: &ProjectLayout,
+) -> Result<HashMap<String, DependencyPackageIndexV10>, SdkError> {
+    let manifest_raw = fs::read_to_string(&layout.manifest)?;
+    let deps = parse_manifest_dependencies(&manifest_raw)?;
+    let mut dep_index = HashMap::<String, DependencyPackageIndexV10>::new();
+    for dep in deps {
+        if dep.source == "builtin" {
+            continue;
+        }
+        dep_index.insert(
+            dep.alias.clone(),
+            load_dependency_package_index_v10(layout, &dep)?,
+        );
+    }
+    Ok(dep_index)
+}
+
+fn resolve_module_file_under_root_v10(
+    src_root: &Path,
+    path_segments: &[String],
+    span: Span,
+    context: &str,
+) -> Result<PathBuf, SdkError> {
+    let mut base = src_root.to_path_buf();
+    for seg in path_segments {
+        base.push(seg);
+    }
+
+    let mut canonical_candidate = base.clone();
+    canonical_candidate.set_extension(SOURCE_EXT_CANONICAL_V1);
+    if canonical_candidate.exists() {
+        return canonicalize_path_under(&canonical_candidate, src_root, context);
+    }
+
+    let mut legacy_candidate = base;
+    legacy_candidate.set_extension(SOURCE_EXT_LEGACY_V1);
+    if legacy_candidate.exists() {
+        return canonicalize_path_under(&legacy_candidate, src_root, context);
+    }
+
+    let module_id = path_segments.join(".");
+    Err(SdkError::Runtime(RuntimeCoreError::from(
+        Diagnostic::new(
+            ErrorCode::TImportNotFound,
+            DiagPhase::Typecheck,
+            span,
+            format!("import module `{module_id}` not found under '{}'", src_root.display()),
+        )
+        .with_hint("create missing module file or fix import path"),
+    )))
+}
+
+fn load_entry_source_with_imports_v10(
+    layout: &ProjectLayout,
+    dep_index: &HashMap<String, DependencyPackageIndexV10>,
+    entry_path: &Path,
+) -> Result<String, SdkError> {
+    let project_package_id = project_package_id_v10(layout)?;
+    let project_src_root = canonicalize_path(&layout.root.join("src"), "failed to canonicalize src")?;
+    let tests_root = canonicalize_path(&layout.tests_dir, "failed to canonicalize tests root").ok();
+    let entry_canon = canonicalize_path(entry_path, "failed to canonicalize entry module")?;
+
+    let (entry_root, entry_package_id) = if entry_canon.starts_with(&project_src_root) {
+        (project_src_root.clone(), project_package_id.clone())
+    } else if let Some(root) = tests_root.as_ref() {
+        if entry_canon.starts_with(root) {
+            (root.clone(), project_package_id.clone())
+        } else {
+            return Err(SdkError::MissingProject(format!(
+                "entry module '{}' is outside src/tests roots",
+                entry_canon.display()
+            )));
+        }
+    } else {
+        return Err(SdkError::MissingProject(format!(
+            "entry module '{}' is outside src root '{}'",
+            entry_canon.display(),
+            project_src_root.display()
+        )));
+    };
+
+    #[allow(clippy::too_many_arguments)]
+    fn visit_module(
+        package_id: &str,
+        src_root: &Path,
+        module_id: String,
+        file_path: PathBuf,
+        dep_index: &HashMap<String, DependencyPackageIndexV10>,
+        loaded: &mut HashSet<String>,
+        visiting: &mut HashSet<String>,
+        merged_sources: &mut Vec<String>,
+    ) -> Result<(), SdkError> {
+        let key = format!("{package_id}::{module_id}");
+        if loaded.contains(&key) {
+            return Ok(());
+        }
+        if visiting.contains(&key) {
+            return Err(SdkError::Runtime(RuntimeCoreError::from(
+                Diagnostic::new(
+                    ErrorCode::TImportCycle,
+                    DiagPhase::Typecheck,
+                    Span::new(0, 0, 0, 0, 0),
+                    format!("import cycle detected at `{module_id}`"),
+                )
+                .with_hint("break circular imports by extracting shared modules"),
+            )));
+        }
+        visiting.insert(key.clone());
+
+        let source = fs::read_to_string(&file_path)?;
+        let program = parse_program(&source, 1).map_err(RuntimeCoreError::from)?;
+        for stmt in &program.statements {
+            let Stmt::ImportDecl { path, span } = stmt else {
+                continue;
+            };
+            if matches!(path.first().map(String::as_str), Some("std")) {
+                continue;
+            }
+
+            let Some(first) = path.first() else {
+                continue;
+            };
+            if let Some(dep_pkg) = dep_index.get(first) {
+                if path.len() < 2 {
+                    return Err(SdkError::Runtime(RuntimeCoreError::from(
+                        Diagnostic::new(
+                            ErrorCode::TImportNotFound,
+                            DiagPhase::Typecheck,
+                            *span,
+                            format!("import `{first}` must include module path under dependency"),
+                        )
+                        .with_hint("use form `import <dep_alias>.<exported_module>;`"),
+                    )));
+                }
+                let target_module = path[1..].join(".");
+                if !dep_pkg.exports.contains(&target_module) {
+                    return Err(SdkError::Runtime(RuntimeCoreError::from(
+                        Diagnostic::new(
+                            ErrorCode::TImportNotFound,
+                            DiagPhase::Typecheck,
+                            *span,
+                            format!(
+                                "module `{target_module}` is not exported by dependency alias `{first}`"
+                            ),
+                        )
+                        .with_hint("add module to `[exports].modules` in dependency package.ocpp"),
+                    )));
+                }
+                let child_path = resolve_module_file_under_root_v10(
+                    &dep_pkg.src_root,
+                    &path[1..],
+                    *span,
+                    "failed to resolve dependency import module",
+                )?;
+                visit_module(
+                    &dep_pkg.package_id,
+                    &dep_pkg.src_root,
+                    target_module,
+                    child_path,
+                    dep_index,
+                    loaded,
+                    visiting,
+                    merged_sources,
+                )?;
+            } else {
+                let target_module = path.join(".");
+                let child_path = resolve_module_file_under_root_v10(
+                    src_root,
+                    path,
+                    *span,
+                    "failed to resolve local import module",
+                )?;
+                visit_module(
+                    package_id,
+                    src_root,
+                    target_module,
+                    child_path,
+                    dep_index,
+                    loaded,
+                    visiting,
+                    merged_sources,
+                )?;
+            }
+        }
+
+        merged_sources.push(source);
+        visiting.remove(&key);
+        loaded.insert(key);
+        Ok(())
+    }
+
+    let entry_module = module_id_from_file_under_root(&entry_root, &entry_canon)?;
+    let mut loaded = HashSet::<String>::new();
+    let mut visiting = HashSet::<String>::new();
+    let mut merged_sources = Vec::<String>::new();
+    visit_module(
+        &entry_package_id,
+        &entry_root,
+        entry_module,
+        entry_canon,
+        dep_index,
+        &mut loaded,
+        &mut visiting,
+        &mut merged_sources,
+    )?;
+
+    let mut merged = String::new();
+    for source in merged_sources {
+        merged.push_str(&source);
+        if !source.ends_with('\n') {
+            merged.push('\n');
+        }
+        merged.push('\n');
+    }
+    Ok(merged)
+}
+
 fn encode_lock_v1(lock_deps: &[LockDep]) -> String {
     let mut out = String::from("version=1\n");
     for dep in lock_deps {
@@ -3757,22 +3976,10 @@ pub fn verify_dependency_exports_and_collect_provenance_v10(
     let layout = project_layout(root);
     verify_project_exists(&layout)?;
 
-    let manifest_raw = fs::read_to_string(&layout.manifest)?;
-    let deps = parse_manifest_dependencies(&manifest_raw)?;
     let project_src_root =
         canonicalize_path(&layout.root.join("src"), "failed to canonicalize src")?;
     let project_package_id = project_package_id_v10(&layout)?;
-
-    let mut dep_index = HashMap::<String, DependencyPackageIndexV10>::new();
-    for dep in deps {
-        if dep.source == "builtin" {
-            continue;
-        }
-        dep_index.insert(
-            dep.alias.clone(),
-            load_dependency_package_index_v10(&layout, &dep)?,
-        );
-    }
+    let dep_index = build_dependency_index_v10(&layout)?;
 
     let mut out = Vec::<ImportProvenanceV10>::new();
     let mut loaded = HashSet::<String>::new();
@@ -3809,7 +4016,7 @@ pub fn verify_dependency_exports_and_collect_provenance_v10(
         let source = fs::read_to_string(&file_path)?;
         let program = parse_program(&source, 1).map_err(RuntimeCoreError::from)?;
         for stmt in &program.statements {
-            let Stmt::ImportDecl { path, .. } = stmt else {
+            let Stmt::ImportDecl { path, span } = stmt else {
                 continue;
             };
             if matches!(path.first().map(String::as_str), Some("std")) {
@@ -3824,7 +4031,7 @@ pub fn verify_dependency_exports_and_collect_provenance_v10(
                         Diagnostic::new(
                             ErrorCode::TImportNotFound,
                             DiagPhase::Typecheck,
-                            Span::new(0, 0, 0, 0, 0),
+                            *span,
                             format!("import `{first}` must include module path under dependency"),
                         )
                         .with_hint("use form `import <dep_alias>.<exported_module>;`"),
@@ -3836,7 +4043,7 @@ pub fn verify_dependency_exports_and_collect_provenance_v10(
                         Diagnostic::new(
                             ErrorCode::TImportNotFound,
                             DiagPhase::Typecheck,
-                            Span::new(0, 0, 0, 0, 0),
+                            *span,
                             format!(
                                 "module `{target_module}` is not exported by dependency alias `{first}`"
                             ),
@@ -3844,15 +4051,10 @@ pub fn verify_dependency_exports_and_collect_provenance_v10(
                         .with_hint("add module to `[exports].modules` in dependency package.ocpp"),
                     )));
                 }
-                let mut candidate = dep_pkg.src_root.clone();
-                for seg in &path[1..] {
-                    candidate.push(seg);
-                }
-                let mut candidate_ocp = candidate.clone();
-                candidate_ocp.set_extension("ocp");
-                let child_path = canonicalize_path_under(
-                    &candidate_ocp,
+                let child_path = resolve_module_file_under_root_v10(
                     &dep_pkg.src_root,
+                    &path[1..],
+                    *span,
                     "failed to resolve dependency import module",
                 )?;
                 visit_module(
@@ -3867,15 +4069,10 @@ pub fn verify_dependency_exports_and_collect_provenance_v10(
                 )?;
             } else {
                 let target_module = path.join(".");
-                let mut candidate = src_root.to_path_buf();
-                for seg in path {
-                    candidate.push(seg);
-                }
-                let mut candidate_ocp = candidate.clone();
-                candidate_ocp.set_extension("ocp");
-                let child_path = canonicalize_path_under(
-                    &candidate_ocp,
+                let child_path = resolve_module_file_under_root_v10(
                     src_root,
+                    path,
+                    *span,
                     "failed to resolve local import module",
                 )?;
                 visit_module(
@@ -5601,9 +5798,12 @@ pub fn check_project_with_lock(root: &Path, locked: bool) -> Result<CheckSummary
             "project has no .ocp/.oc sources under src/ or tests/".to_string(),
         ));
     }
+    let dep_index = build_dependency_index_v10(&layout)?;
     for (idx, path) in files.iter().enumerate() {
         verify_permissions_for_file(path, idx as u32 + 1, &permissions, None)?;
-        check_file_with_compat(path, idx as u32 + 1, compat)?;
+        let merged_source = load_entry_source_with_imports_v10(&layout, &dep_index, path)?;
+        check_source_with_compat(&merged_source, idx as u32 + 1, compat)
+            .map_err(RuntimeCoreError::from)?;
     }
     Ok(CheckSummary {
         files_checked: files.len(),
@@ -5639,8 +5839,10 @@ pub fn run_project_with_engine_and_lock(
     let language_cfg = load_project_language_config_for_layout(&layout)?;
     let compat = language_cfg.typecheck_compat();
     let config = default_exec_config_for_layout(&layout)?;
-    let out =
-        run_file_with_engine_config_and_compat(&layout.src_main, 1, config, run_engine, compat)?;
+    let dep_index = build_dependency_index_v10(&layout)?;
+    let merged_source = load_entry_source_with_imports_v10(&layout, &dep_index, &layout.src_main)?;
+    let out = run_source_with_engine_config_and_compat(&merged_source, 1, config, run_engine, compat)
+        .map_err(RuntimeCoreError::from)?;
     Ok(RunSummary {
         steps: out.steps,
         exec_cache: out.exec_cache,
@@ -5926,6 +6128,8 @@ pub fn run_reactor_service_with_lock(
             "reactor mode requires `fn on_event(...)` in src/main.ocp (or src/main.oc in legacy mode)".to_string(),
         ));
     }
+    let dep_index = build_dependency_index_v10(&layout)?;
+    let merged_source = load_entry_source_with_imports_v10(&layout, &dep_index, &layout.src_main)?;
 
     let manifest = fs::read_to_string(&layout.manifest)?;
     let runtime_budget = parse_runtime_budget_from_manifest(&manifest);
@@ -6032,13 +6236,14 @@ pub fn run_reactor_service_with_lock(
                     }
                     event_count = event_count.saturating_add(1);
                     event_id = event_id.saturating_add(1);
-                    let out = run_file_with_engine_config_and_compat(
-                        &layout.src_main,
+                    let out = run_source_with_engine_config_and_compat(
+                        &merged_source,
                         1,
                         exec_config,
                         RunEngine::Interpreter,
                         compat,
-                    )?;
+                    )
+                    .map_err(RuntimeCoreError::from)?;
                     total_steps = total_steps.saturating_add(out.steps);
                     signatures.push(out.signature.clone());
 
@@ -6101,13 +6306,14 @@ pub fn run_reactor_service_with_lock(
                     }
                     event_count = event_count.saturating_add(1);
                     event_id = event_id.saturating_add(1);
-                    let out = run_file_with_engine_config_and_compat(
-                        &layout.src_main,
+                    let out = run_source_with_engine_config_and_compat(
+                        &merged_source,
                         1,
                         exec_config,
                         RunEngine::Interpreter,
                         compat,
-                    )?;
+                    )
+                    .map_err(RuntimeCoreError::from)?;
                     total_steps = total_steps.saturating_add(out.steps);
                     signatures.push(out.signature.clone());
 
@@ -6347,18 +6553,21 @@ pub fn test_project_with_lock(root: &Path, locked: bool) -> Result<TestSummary, 
     let language_cfg = load_project_language_config_for_layout(&layout)?;
     let compat = language_cfg.typecheck_compat();
     let exec_config = default_exec_config_for_layout(&layout)?;
+    let dep_index = build_dependency_index_v10(&layout)?;
     let mut tests = Vec::new();
     collect_ocp_files(&layout.tests_dir, &mut tests)?;
     tests.sort();
     for (idx, test_file) in tests.iter().enumerate() {
         verify_permissions_for_file(test_file, idx as u32 + 100, &permissions, None)?;
-        run_file_with_engine_config_and_compat(
-            test_file,
+        let merged_source = load_entry_source_with_imports_v10(&layout, &dep_index, test_file)?;
+        run_source_with_engine_config_and_compat(
+            &merged_source,
             idx as u32 + 100,
             exec_config,
             RunEngine::Interpreter,
             compat,
-        )?;
+        )
+        .map_err(RuntimeCoreError::from)?;
     }
     Ok(TestSummary {
         tests_run: tests.len(),
@@ -7140,14 +7349,17 @@ pub fn run_project_with_trace_engine_config_and_lock(
     let compat = language_cfg.typecheck_compat();
     let mut runtime_config = config;
     runtime_config.guard_mode = language_cfg.guard_mode;
+    let dep_index = build_dependency_index_v10(&layout)?;
+    let merged_source = load_entry_source_with_imports_v10(&layout, &dep_index, &layout.src_main)?;
 
-    let out = run_file_with_engine_config_and_compat(
-        &layout.src_main,
+    let out = run_source_with_engine_config_and_compat(
+        &merged_source,
         1,
         runtime_config,
         run_engine,
         compat,
-    )?;
+    )
+    .map_err(RuntimeCoreError::from)?;
     let run_id = build_run_id_deterministic("project", root, run_engine, None, None);
     let mut seq = 1u64;
     let mut events = Vec::new();
@@ -7227,6 +7439,8 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
             "reactor mode requires `fn on_event(...)` in src/main.ocp (or src/main.oc in legacy mode)".to_string(),
         ));
     }
+    let dep_index = build_dependency_index_v10(&layout)?;
+    let merged_source = load_entry_source_with_imports_v10(&layout, &dep_index, &layout.src_main)?;
 
     let manifest = fs::read_to_string(&layout.manifest)?;
     let runtime_budget = parse_runtime_budget_from_manifest(&manifest);
@@ -7313,13 +7527,14 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
                     if tape_entry.tick != tick || tape_entry.domain_id != *domain_id {
                         break;
                     }
-                    let out = run_file_with_engine_config_and_compat(
-                        &layout.src_main,
+                    let out = run_source_with_engine_config_and_compat(
+                        &merged_source,
                         1,
                         runtime_config,
                         run_engine,
                         compat,
-                    )?;
+                    )
+                    .map_err(RuntimeCoreError::from)?;
                     total_steps = total_steps.saturating_add(out.steps);
                     exec_cache_enabled = exec_cache_enabled || out.exec_cache.enabled;
                     exec_cache_entries = exec_cache_entries.max(out.exec_cache.entries);
@@ -7354,13 +7569,14 @@ pub fn run_reactor_service_with_trace_engine_config_and_lock(
                 }
             } else {
                 for _ in 0..events_per_tick {
-                    let out = run_file_with_engine_config_and_compat(
-                        &layout.src_main,
+                    let out = run_source_with_engine_config_and_compat(
+                        &merged_source,
                         1,
                         runtime_config,
                         run_engine,
                         compat,
-                    )?;
+                    )
+                    .map_err(RuntimeCoreError::from)?;
                     total_steps = total_steps.saturating_add(out.steps);
                     exec_cache_enabled = exec_cache_enabled || out.exec_cache.enabled;
                     exec_cache_entries = exec_cache_entries.max(out.exec_cache.entries);
