@@ -99,7 +99,7 @@ ocp replay <artifact_dir>
 
 ### 2) Cài đặt trên Windows (installer)
 1. Tải trực tiếp file `ocp-v1.0.0-setup-win-x64.exe` tại:
-   - `https://github.com/DucHaiten/OCP/raw/refs/heads/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe`
+   - `https://github.com/DucHaiten/OCP/raw/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe`
    - dự phòng: `https://github.com/DucHaiten/OCP/releases`
 2. Chạy installer và chọn:
    - Thư mục cài đặt trên ổ bạn muốn dùng.
