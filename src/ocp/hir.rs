@@ -672,6 +672,7 @@ impl HirLowerer {
             "keys" => Type::List(Box::new(Type::String)),
             "merge" => Type::Map(Box::new(Type::String), Box::new(Type::Unknown)),
             "std.json.parse" => Type::Result4(Box::new(Type::Unknown)),
+            "std.hash.sha256" => Type::String,
             "std.json.stringify" => Type::String,
             "ctx" => Type::Ctx,
             "payload" => Type::Payload,

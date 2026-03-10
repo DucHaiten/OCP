@@ -8,6 +8,8 @@ use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use sha2::{Digest, Sha256};
+
 use crate::ocp::ast::{Expr, LetPattern, MatchStmt, Program, Stmt};
 use crate::ocp::audit::{TraceEvent, TraceLog};
 use crate::ocp::budget::{BudgetMeter, CommitPolicyMode, ExecConfig, GuardMode};
@@ -428,48 +430,72 @@ impl Executor {
                 let tier_value = self.eval_expr(tier)?;
                 let ctx_value = self.eval_expr(ctx)?;
                 let budget_value = self.eval_expr(budget)?;
+                let key_preview = runtime_value_preview(&key_value);
+                let tier_preview = runtime_value_preview(&tier_value);
 
                 let key_lit = as_string_runtime(&key_value).ok_or_else(|| {
-                    Diagnostic::new(
-                        ErrorCode::RCapabilityDenied,
-                        DiagPhase::Exec,
-                        key.span(),
-                        "observe key must evaluate to string",
+                    append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::RCapabilityDenied,
+                            DiagPhase::Exec,
+                            key.span(),
+                            "observe key must evaluate to string",
+                        ),
+                        observe_callsite_hint(bind, &key_preview, &tier_preview, key.span()),
                     )
                 })?;
                 let tier_lit = as_string_runtime(&tier_value).ok_or_else(|| {
-                    Diagnostic::new(
-                        ErrorCode::RCapabilityDenied,
-                        DiagPhase::Exec,
-                        tier.span(),
-                        "observe tier must evaluate to string",
+                    append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::RCapabilityDenied,
+                            DiagPhase::Exec,
+                            tier.span(),
+                            "observe tier must evaluate to string",
+                        ),
+                        observe_callsite_hint(bind, &key_preview, &tier_preview, tier.span()),
                     )
                 })?;
                 let ctx_lit = as_ctx_runtime(&ctx_value).ok_or_else(|| {
-                    Diagnostic::new(
-                        ErrorCode::RCapabilityDenied,
-                        DiagPhase::Exec,
-                        ctx.span(),
-                        "observe ctx must evaluate to ctx(...)/record/map-compatible value",
+                    append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::RCapabilityDenied,
+                            DiagPhase::Exec,
+                            ctx.span(),
+                            format!(
+                                "observe ctx must evaluate to ctx(...)/record/map-compatible value; got {}",
+                                runtime_value_shape(&ctx_value)
+                            ),
+                        )
+                        .with_hint(format!(
+                            "observe callsite bind `{}` with key `{}` and tier `{}`",
+                            bind, key_preview, tier_preview
+                        )),
+                        observe_callsite_hint(bind, &key_preview, &tier_preview, ctx.span()),
                     )
                 })?;
                 let budget_units = as_budget_runtime(&budget_value).ok_or_else(|| {
-                    Diagnostic::new(
-                        ErrorCode::RCapabilityDenied,
-                        DiagPhase::Exec,
-                        budget.span(),
-                        "observe budget must evaluate to budget(...) value",
+                    append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::RCapabilityDenied,
+                            DiagPhase::Exec,
+                            budget.span(),
+                            "observe budget must evaluate to budget(...) value",
+                        ),
+                        observe_callsite_hint(bind, &key_preview, &tier_preview, budget.span()),
                     )
                 })?;
 
                 validate_ctx_literal(&ctx_lit).map_err(|message| {
-                    Diagnostic::new(
-                        ErrorCode::RCtxInvalid,
-                        DiagPhase::Runtime,
-                        ctx.span(),
-                        message,
+                    append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::RCtxInvalid,
+                            DiagPhase::Runtime,
+                            ctx.span(),
+                            message,
+                        )
+                        .with_root_reason(ReasonCode::CtxInvalid),
+                        observe_callsite_hint(bind, &key_preview, &tier_preview, ctx.span()),
                     )
-                    .with_root_reason(ReasonCode::CtxInvalid)
                 })?;
 
                 self.trace.push(TraceEvent::ObserveStart {
@@ -1809,19 +1835,26 @@ impl Executor {
                             .map(|rc| rc.as_str().to_string())
                             .unwrap_or_default(),
                     )),
+                    Value::Result4(r) if field == "payload" => Ok(r.payload.unwrap_or(Value::Unit)),
                     Value::Result4(_) if field == "audit" => Ok(Value::Map(BTreeMap::new())),
                     Value::Result4(r) => match r.payload {
+                        Some(Value::Map(map)) => {
+                            Ok(map.get(field).cloned().unwrap_or(Value::Unknown))
+                        }
                         Some(Value::Payload(map)) => Ok(map
                             .get(field)
                             .map(|v| Value::String(v.clone()))
                             .unwrap_or(Value::Unknown)),
                         _ => Ok(Value::Unknown),
                     },
-                    _ => Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        *span,
-                        "field access is not supported on this runtime value",
+                    _ => Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            *span,
+                            "field access is not supported on this runtime value",
+                        ),
+                        runtime_eval_callsite_hint("field_access", *span, 1),
                     )),
                 }
             }
@@ -1829,34 +1862,44 @@ impl Executor {
     }
 
     fn eval_call(&mut self, callee: &str, args: &[Expr], span: Span) -> Result<Value, Diagnostic> {
+        let callsite_hint = runtime_eval_callsite_hint(callee, span, args.len());
         match callee {
             "budget" => {
                 if args.len() != 1 {
-                    return Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "budget(...) expects 1 argument",
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "budget(...) expects 1 argument",
+                        ),
+                        callsite_hint.clone(),
                     ));
                 }
                 let arg = self.eval_expr(&args[0])?;
                 match arg {
                     Value::Int(v) if v >= 0 => Ok(Value::Budget(v as u32)),
-                    _ => Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "budget(...) expects non-negative int",
+                    _ => Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "budget(...) expects non-negative int",
+                        ),
+                        callsite_hint.clone(),
                     )),
                 }
             }
             "len" => {
                 if args.len() != 1 {
-                    return Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "len(...) expects 1 argument",
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "len(...) expects 1 argument",
+                        ),
+                        callsite_hint.clone(),
                     ));
                 }
                 let arg = self.eval_expr(&args[0])?;
@@ -1866,11 +1909,14 @@ impl Executor {
                     Value::Payload(map) => map.len(),
                     Value::String(s) => s.chars().count(),
                     _ => {
-                        return Err(Diagnostic::new(
-                            ErrorCode::XCommitForbidden,
-                            DiagPhase::Exec,
-                            span,
-                            "len(...) expects list/map/payload/string",
+                        return Err(append_diag_hint(
+                            Diagnostic::new(
+                                ErrorCode::XCommitForbidden,
+                                DiagPhase::Exec,
+                                span,
+                                "len(...) expects list/map/payload/string",
+                            ),
+                            callsite_hint.clone(),
                         ))
                     }
                 };
@@ -1878,30 +1924,37 @@ impl Executor {
             }
             "keys" => {
                 if args.len() != 2 {
-                    return Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "keys(...) expects 2 arguments",
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "keys(...) expects 2 arguments",
+                        ),
+                        callsite_hint.clone(),
                     ));
                 }
                 let map_value = self.eval_expr(&args[0])?;
                 let cap_value = self.eval_expr(&args[1])?;
                 let cap = as_non_negative_int_runtime(&cap_value).ok_or_else(|| {
-                    Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "keys(...) cap must be non-negative int",
+                    append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "keys(...) cap must be non-negative int",
+                        ),
+                        callsite_hint.clone(),
                     )
                 })?;
                 if cap as usize > VALUE_KEYS_CAP {
-                    return Err(value_keys_cap_exceeded(
-                        span,
-                        "keys(...) cap exceeds value_keys_cap",
+                    return Err(append_diag_hint(
+                        value_keys_cap_exceeded(span, "keys(...) cap exceeds value_keys_cap"),
+                        callsite_hint.clone(),
                     ));
                 }
-                let map = into_mapish_runtime(map_value, "keys(...)", span)?;
+                let map = into_mapish_runtime(map_value, "keys(...)", span)
+                    .map_err(|diag| append_diag_hint(diag, callsite_hint.clone()))?;
                 let mut out = Vec::new();
                 for key in map.keys().take(cap as usize) {
                     out.push(Value::String(key.clone()));
@@ -1910,60 +1963,168 @@ impl Executor {
             }
             "merge" => {
                 if args.len() != 3 {
-                    return Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "merge(...) expects 3 arguments",
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "merge(...) expects 3 arguments",
+                        ),
+                        callsite_hint.clone(),
                     ));
                 }
                 let left = self.eval_expr(&args[0])?;
                 let right = self.eval_expr(&args[1])?;
                 let cap_value = self.eval_expr(&args[2])?;
                 let cap = as_non_negative_int_runtime(&cap_value).ok_or_else(|| {
-                    Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "merge(...) cap must be non-negative int",
+                    append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "merge(...) cap must be non-negative int",
+                        ),
+                        callsite_hint.clone(),
                     )
                 })?;
                 if cap as usize > VALUE_KEYS_CAP {
-                    return Err(value_keys_cap_exceeded(
-                        span,
-                        "merge(...) cap exceeds value_keys_cap",
+                    return Err(append_diag_hint(
+                        value_keys_cap_exceeded(span, "merge(...) cap exceeds value_keys_cap"),
+                        callsite_hint.clone(),
                     ));
                 }
 
-                let mut merged = into_mapish_runtime(left, "merge(...)", span)?;
-                let right_map = into_mapish_runtime(right, "merge(...)", span)?;
+                let mut merged = into_mapish_runtime(left, "merge(...)", span)
+                    .map_err(|diag| append_diag_hint(diag, callsite_hint.clone()))?;
+                let right_map = into_mapish_runtime(right, "merge(...)", span)
+                    .map_err(|diag| append_diag_hint(diag, callsite_hint.clone()))?;
                 for (k, v) in right_map {
                     merged.insert(k, v);
                 }
                 if merged.len() > cap as usize {
-                    return Err(value_keys_cap_exceeded(
-                        span,
-                        "merge(...) result key count exceeds cap",
+                    return Err(append_diag_hint(
+                        value_keys_cap_exceeded(span, "merge(...) result key count exceeds cap"),
+                        callsite_hint.clone(),
                     ));
                 }
                 Ok(Value::Map(merged))
             }
+            "concat" => {
+                if args.is_empty() {
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "concat(...) expects at least 1 argument",
+                        ),
+                        callsite_hint.clone(),
+                    ));
+                }
+                let mut out = String::new();
+                for arg in args {
+                    let value = self.eval_expr(arg)?;
+                    if matches!(value, Value::Unknown) {
+                        return Err(append_diag_hint(
+                            Diagnostic::new(
+                                ErrorCode::XCommitForbidden,
+                                DiagPhase::Exec,
+                                span,
+                                "concat(...) does not accept unknown runtime value",
+                            ),
+                            callsite_hint.clone(),
+                        ));
+                    }
+                    out.push_str(&runtime_value_preview(&value));
+                }
+                Ok(Value::String(out))
+            }
+            "eq" | "ne" => {
+                if args.len() != 2 {
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            format!("{callee}(...) expects exactly 2 arguments"),
+                        ),
+                        callsite_hint.clone(),
+                    ));
+                }
+                let left = self.eval_expr(&args[0])?;
+                let right = self.eval_expr(&args[1])?;
+                let is_equal = left == right;
+                Ok(Value::Bool(if callee == "eq" {
+                    is_equal
+                } else {
+                    !is_equal
+                }))
+            }
+            "lt" | "le" | "gt" | "ge" => {
+                if args.len() != 2 {
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            format!("{callee}(...) expects exactly 2 arguments"),
+                        ),
+                        callsite_hint.clone(),
+                    ));
+                }
+                let left = self.eval_expr(&args[0])?;
+                let right = self.eval_expr(&args[1])?;
+                let ordering = match (&left, &right) {
+                    (Value::Int(a), Value::Int(b)) => Some(a.cmp(b)),
+                    (Value::String(a), Value::String(b)) => Some(a.cmp(b)),
+                    _ => None,
+                };
+                let Some(ordering) = ordering else {
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            format!(
+                                "{callee}(...) expects both arguments to be int or string, got {} and {}",
+                                runtime_value_shape(&left),
+                                runtime_value_shape(&right)
+                            ),
+                        ),
+                        callsite_hint.clone(),
+                    ));
+                };
+                let ok = match callee {
+                    "lt" => ordering == std::cmp::Ordering::Less,
+                    "le" => ordering != std::cmp::Ordering::Greater,
+                    "gt" => ordering == std::cmp::Ordering::Greater,
+                    "ge" => ordering != std::cmp::Ordering::Less,
+                    _ => false,
+                };
+                Ok(Value::Bool(ok))
+            }
             "std.json.parse" => {
                 if args.len() != 1 {
-                    return Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "std.json.parse(...) expects 1 argument",
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "std.json.parse(...) expects 1 argument",
+                        ),
+                        callsite_hint.clone(),
                     ));
                 }
                 let arg = self.eval_expr(&args[0])?;
                 let raw = as_string_runtime(&arg).ok_or_else(|| {
-                    Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "std.json.parse(...) argument must evaluate to string",
+                    append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "std.json.parse(...) argument must evaluate to string",
+                        ),
+                        callsite_hint.clone(),
                     )
                 })?;
                 let result = match parse_json_value(raw) {
@@ -1972,13 +2133,42 @@ impl Executor {
                 };
                 Ok(Value::Result4(Box::new(result)))
             }
+            "std.hash.sha256" => {
+                if args.len() != 1 {
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "std.hash.sha256(...) expects 1 argument",
+                        ),
+                        callsite_hint.clone(),
+                    ));
+                }
+                let arg = self.eval_expr(&args[0])?;
+                let input = as_string_runtime(&arg).ok_or_else(|| {
+                    append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "std.hash.sha256(...) argument must evaluate to string",
+                        ),
+                        callsite_hint.clone(),
+                    )
+                })?;
+                Ok(Value::String(sha256_hex(input.as_bytes())))
+            }
             "std.json.stringify" => {
                 if args.len() != 1 {
-                    return Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "std.json.stringify(...) expects 1 argument",
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "std.json.stringify(...) expects 1 argument",
+                        ),
+                        callsite_hint.clone(),
                     ));
                 }
                 let arg = self.eval_expr(&args[0])?;
@@ -1986,21 +2176,27 @@ impl Executor {
             }
             "ctx" => {
                 if args.len() != 1 {
-                    return Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "ctx(...) expects 1 argument",
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "ctx(...) expects 1 argument",
+                        ),
+                        callsite_hint.clone(),
                     ));
                 }
                 let arg = self.eval_expr(&args[0])?;
                 match arg {
                     Value::String(v) => Ok(Value::Ctx(v)),
-                    _ => Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "ctx(...) expects string",
+                    _ => Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "ctx(...) expects string",
+                        ),
+                        callsite_hint.clone(),
                     )),
                 }
             }
@@ -2008,36 +2204,47 @@ impl Executor {
                 if args.is_empty() {
                     return Ok(Value::Payload(BTreeMap::new()));
                 }
-                Err(Diagnostic::new(
-                    ErrorCode::XCommitForbidden,
-                    DiagPhase::Exec,
-                    span,
-                    "payload() in V1-D accepts 0 args only",
+                Err(append_diag_hint(
+                    Diagnostic::new(
+                        ErrorCode::XCommitForbidden,
+                        DiagPhase::Exec,
+                        span,
+                        "payload() in V1-D accepts 0 args only",
+                    ),
+                    callsite_hint.clone(),
                 ))
             }
             "list" => {
                 if !args.is_empty() {
-                    return Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "list() expects 0 arguments",
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "list() expects 0 arguments",
+                        ),
+                        callsite_hint.clone(),
                     ));
                 }
                 Ok(Value::List(Vec::new()))
             }
             "map" => {
                 if !args.is_empty() {
-                    return Err(Diagnostic::new(
-                        ErrorCode::XCommitForbidden,
-                        DiagPhase::Exec,
-                        span,
-                        "map() expects 0 arguments",
+                    return Err(append_diag_hint(
+                        Diagnostic::new(
+                            ErrorCode::XCommitForbidden,
+                            DiagPhase::Exec,
+                            span,
+                            "map() expects 0 arguments",
+                        ),
+                        callsite_hint.clone(),
                     ));
                 }
                 Ok(Value::Map(BTreeMap::new()))
             }
-            _ => self.eval_user_function_call(callee, args, span),
+            _ => self
+                .eval_user_function_call(callee, args, span)
+                .map_err(|diag| append_diag_hint(diag, callsite_hint.clone())),
         }
     }
 
@@ -2796,19 +3003,13 @@ fn as_ctx_runtime(value: &Value) -> Option<String> {
         Value::Map(map) => {
             let mut pairs = Vec::with_capacity(map.len());
             for (key, raw_value) in map {
-                let rendered = match raw_value {
-                    Value::String(v) => v.clone(),
-                    Value::Int(v) => v.to_string(),
-                    Value::Bool(v) => {
-                        if *v {
-                            "true".to_string()
-                        } else {
-                            "false".to_string()
-                        }
-                    }
-                    _ => return None,
-                };
-                if key.contains('=') || key.contains(';') || rendered.contains(';') {
+                let rendered = ctx_value_literal(raw_value)?;
+                if key.is_empty()
+                    || key.contains('=')
+                    || key.contains(';')
+                    || rendered.is_empty()
+                    || rendered.contains(';')
+                {
                     return None;
                 }
                 pairs.push(format!("{key}={rendered}"));
@@ -2817,6 +3018,93 @@ fn as_ctx_runtime(value: &Value) -> Option<String> {
         }
         _ => None,
     }
+}
+
+fn ctx_value_literal(value: &Value) -> Option<String> {
+    match value {
+        Value::String(v) => Some(v.clone()),
+        Value::Int(v) => Some(v.to_string()),
+        Value::Bool(v) => Some(if *v {
+            "true".to_string()
+        } else {
+            "false".to_string()
+        }),
+        Value::List(_) | Value::Map(_) | Value::Payload(_) => Some(stringify_json_value(value)),
+        Value::Budget(v) => Some(v.to_string()),
+        Value::Ctx(v) => Some(v.clone()),
+        Value::Result4(r) => r.payload.as_ref().and_then(ctx_value_literal),
+        Value::Unit => Some("null".to_string()),
+        Value::Unknown => None,
+    }
+}
+
+fn runtime_value_shape(value: &Value) -> &'static str {
+    match value {
+        Value::Int(_) => "int",
+        Value::Bool(_) => "bool",
+        Value::String(_) => "string",
+        Value::List(_) => "list",
+        Value::Map(_) => "map",
+        Value::Budget(_) => "budget",
+        Value::Ctx(_) => "ctx",
+        Value::Payload(_) => "payload",
+        Value::Result4(_) => "result4",
+        Value::Unit => "unit",
+        Value::Unknown => "unknown",
+    }
+}
+
+fn runtime_value_preview(value: &Value) -> String {
+    match value {
+        Value::String(v) => v.clone(),
+        Value::Int(v) => v.to_string(),
+        Value::Bool(v) => {
+            if *v {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
+        }
+        Value::Budget(v) => v.to_string(),
+        Value::Ctx(v) => v.clone(),
+        Value::Unknown => "<unknown>".to_string(),
+        Value::Unit => "null".to_string(),
+        _ => stringify_json_value(value),
+    }
+}
+
+fn append_diag_hint(diag: Diagnostic, hint_suffix: String) -> Diagnostic {
+    if hint_suffix.trim().is_empty() {
+        return diag;
+    }
+    let existing_hint = diag.hint.clone();
+    match existing_hint.as_deref() {
+        Some(existing) if !existing.trim().is_empty() => {
+            diag.with_hint(format!("{existing}; {hint_suffix}"))
+        }
+        _ => diag.with_hint(hint_suffix),
+    }
+}
+
+fn span_callsite_location(span: Span) -> String {
+    format!(
+        "module file_id={} line={} column={}",
+        span.file_id, span.line, span.column
+    )
+}
+
+fn observe_callsite_hint(bind: &str, key_preview: &str, tier_preview: &str, span: Span) -> String {
+    format!(
+        "observe callsite bind `{bind}` with key `{key_preview}` and tier `{tier_preview}` at {}",
+        span_callsite_location(span)
+    )
+}
+
+fn runtime_eval_callsite_hint(callee: &str, span: Span, arg_count: usize) -> String {
+    format!(
+        "callsite `{callee}` at {} (args={arg_count})",
+        span_callsite_location(span)
+    )
 }
 
 fn as_budget_runtime(value: &Value) -> Option<u32> {
@@ -5841,11 +6129,15 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
             Result4::degraded(Value::Payload(map), ReasonCode::AdapterFailed)
         }
         "std.json.parse" => {
-            let mut map = BTreeMap::new();
-            let raw = ctx.get("raw").cloned().unwrap_or_default();
-            map.insert("raw".to_string(), raw);
-            map.insert("parsed".to_string(), "true".to_string());
-            Result4::ok(Value::Payload(map))
+            let raw = ctx
+                .get("raw")
+                .or_else(|| ctx.get("text"))
+                .cloned()
+                .unwrap_or_default();
+            match parse_json_value(&raw) {
+                Ok(parsed) => Result4::ok(parsed),
+                Err(()) => Result4::insufficient(ReasonCode::JsonInvalid),
+            }
         }
         "std.json.emit" => {
             let mut map = BTreeMap::new();
@@ -7930,6 +8222,23 @@ fn stable_hash256_hex(input: &str) -> String {
 
 fn stable_hash64_hex(input: &str) -> String {
     format!("{:016x}", fnv1a64_bytes(input.as_bytes()))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    let digest = hasher.finalize();
+    bytes_to_hex(digest.as_slice())
+}
+
+fn bytes_to_hex(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for byte in bytes {
+        out.push(HEX[(byte >> 4) as usize] as char);
+        out.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    out
 }
 
 fn stub_payload(key: &str) -> Value {

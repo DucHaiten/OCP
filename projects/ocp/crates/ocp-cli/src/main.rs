@@ -3591,6 +3591,28 @@ fn render_doc_packs_text_v09() -> String {
         out.push_str(&indent_block_v09(&ctx_skeleton, "      "));
         out.push('\n');
     }
+    for builtin in doc_builtin_packs_v09() {
+        out.push_str("- key: ");
+        out.push_str(builtin.key);
+        out.push('\n');
+        out.push_str("  key_kind: ");
+        out.push_str(builtin.key_kind);
+        out.push('\n');
+        out.push_str("  permission_class: ");
+        out.push_str(builtin.permission_class);
+        out.push('\n');
+        out.push_str("  ctx_required: []\n");
+        out.push_str("  ctx_schema:\n");
+        out.push_str("    n/a\n");
+        out.push_str("  payload_schema:\n");
+        out.push_str("    n/a\n");
+        out.push_str("  example:\n");
+        out.push_str("    ");
+        out.push_str(builtin.example);
+        out.push('\n');
+        out.push_str("    ctx_skeleton:\n");
+        out.push_str("      {}\n\n");
+    }
     out
 }
 
@@ -3598,6 +3620,7 @@ fn render_doc_packs_json_v09() -> String {
     let registry = CapabilityRegistry::v1_baseline();
     let mut out = String::from("{\"packs\":[");
     let keys = registry.documented_keys();
+    let builtin_packs = doc_builtin_packs_v09();
     for (idx, key) in keys.iter().enumerate() {
         if idx > 0 {
             out.push(',');
@@ -3645,8 +3668,44 @@ fn render_doc_packs_json_v09() -> String {
         out.push_str(&json_escape(&ctx_skeleton));
         out.push_str("\"}");
     }
+    if !keys.is_empty() && !builtin_packs.is_empty() {
+        out.push(',');
+    }
+    for (idx, builtin) in builtin_packs.iter().enumerate() {
+        if idx > 0 {
+            out.push(',');
+        }
+        out.push_str("{\"key\":\"");
+        out.push_str(&json_escape(builtin.key));
+        out.push_str("\",\"key_kind\":\"");
+        out.push_str(builtin.key_kind);
+        out.push_str("\",\"permission_class\":\"");
+        out.push_str(builtin.permission_class);
+        out.push_str("\",\"ctx_required\":[]");
+        out.push_str(",\"ctx_schema\":\"n/a\"");
+        out.push_str(",\"payload_schema\":\"n/a\"");
+        out.push_str(",\"example\":\"");
+        out.push_str(&json_escape(builtin.example));
+        out.push_str("\",\"ctx_skeleton\":\"{}\"}");
+    }
     out.push_str("]}");
     out
+}
+
+struct DocBuiltinPackV09 {
+    key: &'static str,
+    key_kind: &'static str,
+    permission_class: &'static str,
+    example: &'static str,
+}
+
+fn doc_builtin_packs_v09() -> Vec<DocBuiltinPackV09> {
+    vec![DocBuiltinPackV09 {
+        key: "std.hash.sha256",
+        key_kind: "pure_builtin",
+        permission_class: "permissions.none",
+        example: "let digest = std.hash.sha256(\"abc\");",
+    }]
 }
 
 fn key_kind_label_v09(kind: KeyCapabilityKind) -> &'static str {
@@ -11537,6 +11596,11 @@ fn error_to_json_payload(err: &SdkError) -> JsonValue {
                     "file_id": diag.span.file_id,
                     "start": diag.span.start,
                     "end": diag.span.end,
+                    "line": diag.span.line,
+                    "column": diag.span.column
+                },
+                "callsite": {
+                    "module": format!("file_id:{}", diag.span.file_id),
                     "line": diag.span.line,
                     "column": diag.span.column
                 },

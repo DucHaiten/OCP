@@ -1674,6 +1674,9 @@ impl CapabilityRegistry {
 
     fn ctx_matches_required(&self, key: &str, ctx_literal: &str) -> bool {
         let ctx = parse_ctx_pairs(ctx_literal);
+        if key == "std.json.parse" {
+            return ctx.contains_key("raw") || ctx.contains_key("text");
+        }
         for (pattern, required) in &self.ctx_required {
             let kp = KeyPattern::from_pattern(pattern);
             if kp.matches(key) {

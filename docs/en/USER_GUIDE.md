@@ -476,6 +476,12 @@ match wr {
 }
 ```
 
+Comment styles supported by OCP:
+- single-line: `// ...`
+- single-line: `# ...`
+- block: `/* ... */` (non-nesting)
+- if a block comment is not closed, parser returns `unterminated block comment`
+
 ### From examples to your own code (checklist)
 1. Choose the capability key.
 2. Write the matching request record.
@@ -516,7 +522,7 @@ Only for compatibility with older scripts or currently shipped templates.
 ### Result4 sugar and field access (from beginner to practical)
 
 ```ocp
-observe("std.json.parse", "tier2", { text: "{\"ok\":true}" }, budget(5)) -> rs;
+observe("std.json.parse", "tier2", { raw: "{\"ok\":true}" }, budget(5)) -> rs;
 let parsed = try rs else { 0 };
 let reason = try rs else { r.reason_code };
 
@@ -529,10 +535,46 @@ condition(true);
 
 Rules:
 - Sugar must preserve canonical `match` semantics.
-- `std.json.parse` here is only a sugar example key; inspect `ocp doc packs --json` for exact schema.
+- `observe("std.json.parse", ...)` returns parsed JSON payload as typed `Value`; you can read fields directly via `rs.<field>` or `let v = try rs else { ... }`.
+- `raw` is the canonical JSON input field; `text` is still accepted as a compatibility alias.
+- For reusable module wiring, use `concat(...)` and comparators `eq/ne/lt/le/gt/ge(...)` instead of hardcoded literals.
+- For canonical runtime digests in locked lanes, use `std.hash.sha256(...)` (UTF-8 input, lowercase hex output).
 - Inside `try r else { ... }`, the implicit `r` refers to the original `Result4`; it is valid syntax, not a typo.
 - The `r` inside `else` is a local implicit binding, not the outer-scope `r`.
 - After refactoring to sugar, rerun `ocp check --locked` and `ocp replay`.
+
+#### Reusable module end-to-end sample (ecosystem-grade)
+Goal of this sample:
+- consume dynamic JSON input;
+- parse typed payload via `std.json.parse`;
+- derive dynamic artifact path via `concat`;
+- verify business condition via comparator;
+- keep replay deterministic without project-specific hardcoding.
+
+```ocp
+observe("std.json.parse", "tier2", ctx("raw={\"run_id\":\"r42\",\"path\":\"./out/r42.txt\",\"text\":\"hello\",\"expected\":\"hello-r42\"}"), budget(5)) -> parsed;
+observe("std.fs.write_text", "tier2", { path: parsed.path, text: concat(parsed.text, "-", parsed.run_id), overwrite: true }, budget(5)) -> wr;
+commit(wr);
+observe("std.fs.read_text", "tier2", { path: parsed.path }, budget(5)) -> rd;
+condition(eq(rd.text, parsed.expected));
+```
+
+Verification checklist:
+1. `ocp check . --locked`
+2. `ocp run .`
+3. `ocp replay <artifact_dir>`
+4. `ocp trace view <artifact_dir> --json --tail 20`
+5. `ocp doc packs --json`
+
+#### Migration note: surrogate hash -> canonical hash
+- Replace surrogate patterns such as `statehash-v1:*` and `state_hash_algo=chain-surrogate-v1` with `std.hash.sha256(...)`.
+- Avoid `std.proc.exec` shell hashing workarounds in locked lanes.
+- Canonical state-hash pattern:
+
+```ocp
+let canonical = concat(events, views, s1, s2, s3);
+let state_hash = std.hash.sha256(canonical);
+```
 
 ### 15-minute practice path
 1. `ocp init hello-ocp --template tool-cli`
@@ -799,7 +841,7 @@ match kvp {
 observe("std.fs.read_text", "tier2", { path: "./fixtures/in/sample.json" }, budget(5)) -> r;
 guard r;
 
-observe("std.json.parse", "tier2", { text: "{\"ok\":true}" }, budget(5)) -> rs;
+observe("std.json.parse", "tier2", { raw: "{\"ok\":true}" }, budget(5)) -> rs;
 let parsed = try rs else { 0 };
 let reason = try rs else { r.reason_code };
 condition(true);
@@ -1236,7 +1278,7 @@ module app.sugar;
 observe("std.fs.read_text", "tier2", { path: "./fixtures/in/sample.json" }, budget(5)) -> r;
 guard r;
 
-observe("std.json.parse", "tier2", { text: "{\"ok\":true}" }, budget(5)) -> rs;
+observe("std.json.parse", "tier2", { raw: "{\"ok\":true}" }, budget(5)) -> rs;
 let parsed = try rs else { 0 };
 let reason = try rs else { r.reason_code };
 condition(true);
@@ -1791,6 +1833,10 @@ Replay must fail clearly when:
   - Canonical extension is `.ocp`; `W-LEGACY-OCP-EXTENSION` only applies to legacy `.oc` files.
   - With `--json`, warnings must be inside the JSON payload (no plain warning text outside JSON).
   - Unsupported `entry` extensions return an explicit error (no silent fallback to `src/main.ocp`).
+  - Warning policy for strict gates:
+    - `BLOCK`: any warning code other than `W-LEGACY-OCP-EXTENSION`.
+    - `TEMPORARY WAIVER`: only `W-LEGACY-OCP-EXTENSION` remains, migration issue is tracked, and no other warning code appears.
+    - `MANDATORY MIGRATION`: rename `.oc` sources to `.ocp`, update manifest `entry`, then rerun `ocp check --json` to confirm clean warnings.
 - `ocp run <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
 - `ocp fmt <project_dir> [--check]`
 - `ocp test <project_dir> [--locked] [--universe <id>] [--domain <id>] [...]`

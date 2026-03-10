@@ -1,7 +1,7 @@
 # OCP v1.0 - Public Release Packaging + Documentation + Licensing/Commercial Lock
 
 Ngày tạo: 2026-03-07  
-Trạng thái: `DONE (Gate 1.0-A..1.0-I DONE)`  
+Trạng thái: `DONE (Gate 1.0-J ecosystem module unblock closed)`  
 Phạm vi: **OCP-only**  
 Tiền đề: v0.1..v0.20 đã hoàn tất chuỗi gate kỹ thuật, conformance, hardening, editor productization, và final signoff machine-checkable.
 
@@ -53,11 +53,11 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 - Mục tiêu phiên bản:
   - đưa OCP lên bản phát hành công khai v1.0 với đóng gói + docs + legal + commercial model đầy đủ.
 - Trạng thái tổng quan:
-  - `DONE (Gate 1.0-A..1.0-I DONE)`.
+  - `DONE (toàn bộ gate 1.0-A..1.0-J đã đóng)`.
 - Gate đang làm/đã xong/chưa làm:
-  - `1.0-A..1.0-I` đều `DONE`.
+  - `1.0-A..1.0-J` đều `DONE`.
 - Bước kế tiếp ngay:
-  - theo dõi adoption + mở rộng ecosystem theo governance đã khóa; chỉ mở `v1.1` khi có mục tiêu mới ngoài maintenance.
+  - giữ release lane ổn định, theo dõi adoption; chỉ mở `v1.1` theo điều kiện handoff đã khóa.
 - Lệnh kiểm chứng chuẩn:
   - xem `11) Operational commands (v1.0)`.
 - File code/tài liệu trọng yếu dự kiến thay đổi:
@@ -78,6 +78,10 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
   - `LICENSE`, `NOTICE`, `COPYRIGHT`, `AUTHORS`, `GOVERNANCE.md`, `CODEOWNERS`
   - `tests/v100_ocp_extension_guard.rs`
   - `tests/v100_cli_*`
+  - `tests/v100_expression_module_primitives.rs`
+  - `tests/v100_module_runtime_dx_unblock_report.rs`
+  - `tests/v100_cli_json_error_callsite_context.rs`
+  - `tests/runtime_core_diag_display.rs`
   - `OCP-MVP-PLAN-v1.0.md`
 
 ### 0.3 Trạng thái Workstreams/Gates v1.0 (tracking)
@@ -90,8 +94,9 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 - WS-BZ (commercial/monetization model lock): `DONE`
 - WS-PR (publish rehearsal + final signoff): `DONE`
 - WS-ECO (ecosystem unblock: warning/json UX cho developer): `DONE`
+- WS-ECO-MOD (ecosystem module/library reusable unblock): `DONE`
 
-#### Gate status (1.0-A .. 1.0-I)
+#### Gate status (1.0-A .. 1.0-J)
 - Gate 1.0-A - Release Contract Freeze + Distribution Matrix: `DONE`
 - Gate 1.0-B - GitHub Release Assets + Integrity Bundle: `DONE`
 - Gate 1.0-C - Windows EXE Installer + Portable Install Paths: `DONE`
@@ -101,6 +106,7 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 - Gate 1.0-G - Commercial Model + Community Policy Lock: `DONE`
 - Gate 1.0-H - Final Publish Rehearsal + GO/NO-GO: `DONE`
 - Gate 1.0-I - Ecosystem Unblock: Extension Warning + JSON Hygiene (v1.0.x): `DONE`
+- Gate 1.0-J - Ecosystem Module Reusable Runtime/DX Unblock (v1.0.x): `DONE`
 
 ### 0.4 Rule mở code v1.0 (LOCKED)
 - Chỉ mở code khi đã có:
@@ -278,7 +284,7 @@ Mục tiêu v1.0: **không mở semantics lõi mới**; tập trung phát hành 
 
 ### KPI-8: Final publish rehearsal GO/NO-GO
 - PASS khi:
-  - toàn bộ gate `1.0-A..1.0-I` DONE.
+  - toàn bộ gate `1.0-A..1.0-J` DONE.
   - publish rehearsal pass.
   - không còn finding critical/high mở.
   - artifact GO/NO-GO giữ đúng tên chuẩn `v1_0_release_go_no_go.json`.
@@ -775,11 +781,37 @@ Exit criteria:
 - warning bị in lặp cho cùng `warning_code + cause` trong một command run => FAIL
 - targeted tests của Gate `1.0-I` không pass đầy đủ trên Windows lane => FAIL
 
+### Gate 1.0-J - Ecosystem Module Reusable Runtime/DX Unblock (v1.0.x)
+Scope:
+- chuẩn hóa runtime path `observe("std.json.parse", ...)` để trả payload JSON đã parse (typed `Value`) thay vì metadata giả.
+- đảm bảo pipeline dữ liệu động giữa các bước `observe` hoạt động ổn định cho ctx record/map, không choke vô cớ ở `R-CAPABILITY-DENIED`.
+- bổ sung expression primitives tối thiểu cho module hóa thực dụng:
+  - `concat(...)`,
+  - `eq/ne/lt/le/gt/ge(...)`.
+- tăng ngữ cảnh chẩn đoán runtime cho lỗi ctx-shape ở callsite observe.
+- đồng bộ tài liệu user guide theo hành vi runtime thật + thêm pattern reusable end-to-end.
+Tests:
+- `tests/ocp_stdlib.rs`:
+  - `exec_std_json_parse_returns_ok_payload`
+  - `exec_std_json_parse_payload_supports_dynamic_observe_ctx_pipeline`
+  - `exec_std_json_parse_accepts_text_ctx_alias_for_docs_compat`
+- `tests/v100_expression_module_primitives.rs`
+- `tests/std_json.rs`
+Artifacts:
+- `target/ocp/w100/ecosystem/module_runtime_dx_unblock_report.json`
+- `target/ocp/w100/ecosystem/module_runtime_dx_targeted_tests_report.json`
+Exit criteria:
+- `observe("std.json.parse", ...)` còn trả metadata stub (`raw`/`parsed=true`) thay vì payload JSON đã parse => FAIL
+- dùng field từ JSON parse để build ctx record cho `observe` kế tiếp còn rơi `R-CAPABILITY-DENIED` không hợp lệ => FAIL
+- thiếu expression primitive để compose path + condition cơ bản trong lane module reusable => FAIL
+- docs ví dụ parse/runtime còn mâu thuẫn với hành vi runtime thực tế => FAIL
+- targeted tests Gate `1.0-J` không pass => FAIL
+
 ---
 
 ## 7) Exit Contract v1.0 (LOCKED)
 v1.0 chỉ `DONE` khi:
-- Gates `1.0-A..1.0-I` đều `DONE`.
+- Gates `1.0-A..1.0-J` đều `DONE`.
 - Không còn finding critical/high mở.
 - Release assets đầy đủ theo matrix + verify pass.
 - Docs self-contained + coverage pass.
@@ -3617,6 +3649,154 @@ v1.0 chỉ `DONE` khi:
     - `check --locked` tôn trọng `entry` từ manifest, không hard-require `src/main.ocp`,
     - `check --json` trả payload JSON thuần với `warnings` nằm trong JSON.
 
+### 2026-03-10 - 1.0-J Planning Freeze (ecosystem module reusable unblock)
+- Date: 2026-03-10
+- Gate/Step: 1.0-J
+- Why:
+  - Community feedback ghi nhận blocker chung khi xây module/library reusable: parse payload không usable, pipeline ctx động gãy, thiếu primitives compose/compare, docs lệch hành vi runtime.
+  - Cần xử lý ngay trong `v1.0.x` để không chặn hệ sinh thái plugin/module, không mở plan `v1.1` cho lỗi vận hành lõi này.
+- Scope:
+  - Sửa runtime `observe("std.json.parse", ...)` trả payload JSON đã parse (typed `Value`).
+  - Mở rộng runtime field access + ctx conversion để pipeline record/map từ bước trước sang observe kế tiếp hoạt động ổn định.
+  - Thêm expression primitives tối thiểu cho module hóa: `concat`, `eq/ne/lt/le/gt/ge`.
+  - Đồng bộ user guide `vi/en` theo hành vi runtime thật và pattern module reusable.
+- Expected tests:
+  - `cargo test --test ocp_stdlib exec_std_json_parse_returns_ok_payload`
+  - `cargo test --test ocp_stdlib exec_std_json_parse_payload_supports_dynamic_observe_ctx_pipeline`
+  - `cargo test --test ocp_stdlib exec_std_json_parse_accepts_text_ctx_alias_for_docs_compat`
+  - `cargo test --test v100_expression_module_primitives`
+  - `cargo test --test ocp_stdlib`
+  - `cargo test --test std_json`
+- Exit criteria:
+  - parse observe còn trả metadata `raw/parsed=true` thay vì payload JSON typed => FAIL
+  - dynamic ctx pipeline từ parse sang observe kế tiếp còn rơi `R-CAPABILITY-DENIED` không hợp lệ => FAIL
+  - thiếu primitives compose/compare cho workflow module reusable => FAIL
+  - docs `vi/en` còn mismatch với hành vi runtime mới => FAIL
+
+### 2026-03-10 - 1.0-J Implementation Closeout (runtime+DX unblock core, phase-1)
+- Date: 2026-03-10
+- Gate/Step: 1.0-J
+- Implemented:
+  - Runtime parse path:
+    - sửa `observe("std.json.parse", ...)` để parse JSON thật và trả `Result4<Value>` với payload typed.
+    - trả `INSUFFICIENT + RC-JSON-INVALID` khi JSON không hợp lệ.
+    - chấp nhận `text` như alias tương thích cho `raw` trong ctx check.
+  - Dynamic pipeline:
+    - mở field access trên `Result4` cho payload dạng `Map` (không chỉ `Payload` chuỗi).
+    - mở rộng `as_ctx_runtime` để serialize được thêm runtime values dùng cho ctx record/map.
+    - bổ sung runtime hint rõ hơn khi observe ctx shape không hợp lệ.
+  - Expression primitives:
+    - thêm builtins `concat`, `eq`, `ne`, `lt`, `le`, `gt`, `ge` ở cả typecheck + exec.
+  - Docs sync:
+    - cập nhật `USER_GUIDE` `vi/en` sang flow `std.json.parse` trả payload typed và mẫu `raw` canonical.
+    - thêm guidance dùng `concat` + comparators cho module reusable.
+  - Tests:
+    - cập nhật regression test cũ theo contract mới của `std.json.parse`.
+    - thêm test mới khóa pipeline động và expression primitives.
+- Files changed:
+  - `src/ocp/exec.rs`
+  - `src/ocp/typecheck.rs`
+  - `src/ocp/registry.rs`
+  - `tests/ocp_stdlib.rs`
+  - `tests/v100_expression_module_primitives.rs`
+  - `docs/vi/USER_GUIDE.md`
+  - `docs/en/USER_GUIDE.md`
+  - `OCP-MVP-PLAN-v1.0.md`
+- Commands run:
+  - `cargo test --test ocp_stdlib exec_std_json_parse_returns_ok_payload`
+  - `cargo test --test ocp_stdlib exec_std_json_parse_payload_supports_dynamic_observe_ctx_pipeline`
+  - `cargo test --test ocp_stdlib exec_std_json_parse_accepts_text_ctx_alias_for_docs_compat`
+  - `cargo test --test v100_expression_module_primitives`
+  - `cargo test --test ocp_stdlib`
+  - `cargo test --test std_json`
+- Test results:
+  - Targeted tests (must-pass for gate):
+    - `PASS`: `exec_std_json_parse_returns_ok_payload`
+    - `PASS`: `exec_std_json_parse_payload_supports_dynamic_observe_ctx_pipeline`
+    - `PASS`: `exec_std_json_parse_accepts_text_ctx_alias_for_docs_compat`
+    - `PASS`: `v100_concat_and_comparators_support_module_wiring`
+    - `PASS`: `v100_lt_typecheck_rejects_mixed_types`
+  - Regression tests (supporting only):
+    - `PASS`: `cargo test --test ocp_stdlib`
+    - `PASS`: `cargo test --test std_json`
+- Kết luận gate:
+  - `IN_PROGRESS`
+- Design alignment:
+  - `PARTIAL (đã đóng A/B/C/F và một phần D/E trong báo cáo community; còn thiếu phase-2 cho diagnostics sâu callsite/module/span coverage toàn bộ runtime errors + policy artifacts machine-report cho gate 1.0-J)`
+- Notes/risks:
+  - Đã giải blocker lõi cho module reusable theo runtime flow thực tế, nhưng gate chưa đủ điều kiện `DONE` do phần diagnostics toàn diện và evidence artifacts riêng của gate chưa hoàn tất.
+  - Giữ trạng thái `IN_PROGRESS` để tránh `DONE giả`; phase tiếp theo sẽ đóng phần diagnostics + reporting contracts.
+
+### 2026-03-10 - 1.0-J Implementation Closeout (phase-2: diagnostics context + ecosystem-grade evidence)
+- Date: 2026-03-10
+- Gate/Step: 1.0-J
+- Implemented:
+  - Runtime diagnostics context:
+    - chuẩn hóa hint callsite cho lỗi capability/type/ctx-shape ở `observe` và runtime call path (`callee`, `bind`, `module=file_id`, `line`, `column`).
+    - mở rộng text-mode runtime error (`RuntimeCoreError::Diagnostic`) để luôn in location + `root_reason` + `hint`.
+  - JSON diagnostics contract:
+    - bổ sung `error.callsite` trong CLI `--json` error payload (`module`, `line`, `column`) để parser CI lấy ngữ cảnh trực tiếp.
+  - Ecosystem-grade sample + policy sync:
+    - thêm mẫu end-to-end reusable trong `USER_GUIDE` `vi/en`: dynamic JSON input -> dynamic path -> `commit` -> read-back verify.
+    - bổ sung policy warning rõ ràng cho strict gate: block/waiver/migration của `W-LEGACY-OCP-EXTENSION`.
+  - Evidence artifacts:
+    - thêm gate-j report test sinh:
+      - `target/ocp/w100/ecosystem/module_runtime_dx_unblock_report.json`
+      - `target/ocp/w100/ecosystem/module_runtime_dx_targeted_tests_report.json`
+- Files changed:
+  - `src/ocp/exec.rs`
+  - `projects/ocp/crates/ocp-runtime-core/src/lib.rs`
+  - `projects/ocp/crates/ocp-cli/src/main.rs`
+  - `tests/ocp_exec.rs`
+  - `tests/runtime_core_diag_display.rs`
+  - `tests/v100_cli_json_error_callsite_context.rs`
+  - `tests/v100_gate_j_common.rs`
+  - `tests/v100_module_runtime_dx_unblock_report.rs`
+  - `docs/vi/USER_GUIDE.md`
+  - `docs/en/USER_GUIDE.md`
+  - `OCP-MVP-PLAN-v1.0.md`
+- Commands run:
+  - `cargo fmt -- src/ocp/exec.rs projects/ocp/crates/ocp-runtime-core/src/lib.rs projects/ocp/crates/ocp-cli/src/main.rs tests/ocp_exec.rs tests/v100_gate_j_common.rs tests/v100_module_runtime_dx_unblock_report.rs`
+  - `cargo test --test ocp_exec exec_observe_ctx_shape_error_includes_callsite_module_and_span`
+  - `cargo test --test ocp_exec exec_runtime_call_type_error_includes_callsite_module_and_span`
+  - `cargo test --test v100_module_runtime_dx_unblock_report`
+  - `cargo test --test ocp_stdlib exec_std_json_parse_returns_ok_payload`
+  - `cargo test --test ocp_stdlib exec_std_json_parse_payload_supports_dynamic_observe_ctx_pipeline`
+  - `cargo test --test ocp_stdlib exec_std_json_parse_accepts_text_ctx_alias_for_docs_compat`
+  - `cargo test --test v100_expression_module_primitives`
+  - `cargo test --test std_json`
+  - `cargo test --test ocp_exec`
+  - `cargo test --test ocp_stdlib`
+  - `cargo test --test runtime_core_diag_display`
+  - `cargo test --test v100_cli_json_error_callsite_context`
+  - `cargo test --test v100_docs_bilingual_structure_parity`
+  - `cargo test --test v100_docs_required_sections`
+- Test results:
+  - Targeted tests (must-pass for gate):
+    - `PASS`: `exec_std_json_parse_returns_ok_payload`
+    - `PASS`: `exec_std_json_parse_payload_supports_dynamic_observe_ctx_pipeline`
+    - `PASS`: `exec_std_json_parse_accepts_text_ctx_alias_for_docs_compat`
+    - `PASS`: `v100_concat_and_comparators_support_module_wiring`
+    - `PASS`: `v100_lt_typecheck_rejects_mixed_types`
+    - `PASS`: `exec_observe_ctx_shape_error_includes_callsite_module_and_span`
+    - `PASS`: `exec_runtime_call_type_error_includes_callsite_module_and_span`
+    - `PASS`: `runtime_core_diagnostic_display_includes_location_reason_and_hint`
+    - `PASS`: `v100_cli_json_error_payload_includes_callsite_context`
+    - `PASS`: `v100_module_runtime_dx_unblock_report`
+  - Regression tests (supporting only):
+    - `PASS`: `cargo test --test ocp_exec`
+    - `PASS`: `cargo test --test ocp_stdlib`
+    - `PASS`: `cargo test --test std_json`
+    - `PASS`: `cargo test --test v100_docs_bilingual_structure_parity`
+    - `PASS`: `cargo test --test v100_docs_required_sections`
+- Kết luận gate:
+  - `DONE`
+- Design alignment:
+  - `FULL`
+- Notes/risks:
+  - Đã đóng toàn bộ nhóm blocker community A..G trong phạm vi v1.0.x: parse typed usable, pipeline ctx động, expression primitives tối thiểu, docs/runtime parity, diagnostics context, ecosystem-grade sample, và warning policy rõ ràng.
+  - Report artifacts gate `1.0-J` đã được sinh theo chain-of-evidence (`run_manifest_ref` + `run_manifest_sha256`) để downstream CI/release gate có thể verify máy đọc.
+
 ---
 
 ## 13) Checklist khóa trước khi đóng gate
@@ -3657,7 +3837,7 @@ v1.0 chỉ `DONE` khi:
 
 ## 14) Handoff v1.0 -> v1.1
 - Chỉ mở v1.1 khi:
-  - toàn bộ gate core `1.0-A..1.0-I` đã `DONE`,
+  - toàn bộ gate core `1.0-A..1.0-J` đã `DONE`,
   - `target/ocp/w100/signoff/v1_0_release_go_no_go.json` = `GO`,
   - không còn finding critical/high mở.
 - v1.1 ưu tiên:

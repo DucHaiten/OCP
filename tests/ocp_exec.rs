@@ -195,3 +195,85 @@ fn exec_entangle_degree_cap_fails() {
         Some("RC-POLICY-DENIED")
     );
 }
+
+#[test]
+fn exec_observe_ctx_shape_error_includes_callsite_module_and_span() {
+    let src = r#"
+observe("std.json.parse", "tier2", ctx("raw={\"path\":\"./out/dynamic.txt\"}"), budget(5)) -> parsed;
+observe("std.fs.write_text", "tier2", { path: parsed.path, text: parsed.missing, overwrite: true }, budget(5)) -> wr;
+"#;
+    let p = parse_program(src, 1).expect("parse should pass");
+    typecheck_program(&p).expect("typecheck should pass");
+
+    let err = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 300,
+            ..ExecConfig::default()
+        },
+    )
+    .expect_err("exec should fail with observe ctx shape error");
+    assert_eq!(err.code.as_str(), ErrorCode::RCapabilityDenied.as_str());
+    assert!(
+        err.hint
+            .as_deref()
+            .unwrap_or_default()
+            .contains("observe callsite bind `wr`"),
+        "hint must include observe bind callsite, got: {:?}",
+        err.hint
+    );
+    assert!(
+        err.hint
+            .as_deref()
+            .unwrap_or_default()
+            .contains("module file_id=1"),
+        "hint must include module/file_id context, got: {:?}",
+        err.hint
+    );
+    assert!(err.span.line > 0, "runtime diagnostic must expose line");
+    assert!(err.span.column > 0, "runtime diagnostic must expose column");
+}
+
+#[test]
+fn exec_runtime_call_type_error_includes_callsite_module_and_span() {
+    let src = r#"
+let p = payload();
+let s = concat(p.missing);
+"#;
+    let p = parse_program(src, 1).expect("parse should pass");
+    typecheck_program(&p).expect("typecheck should pass");
+
+    let err = execute_program(
+        &p,
+        ExecConfig {
+            step_cap: 100,
+            ..ExecConfig::default()
+        },
+    )
+    .expect_err("concat over unknown must fail in runtime");
+    assert_eq!(err.code.as_str(), ErrorCode::XCommitForbidden.as_str());
+    assert!(
+        err.message
+            .contains("concat(...) does not accept unknown runtime value"),
+        "unexpected runtime message: {}",
+        err.message
+    );
+    assert!(
+        err.hint
+            .as_deref()
+            .unwrap_or_default()
+            .contains("callsite `concat`"),
+        "hint must include concat callsite, got: {:?}",
+        err.hint
+    );
+    assert!(
+        err.hint
+            .as_deref()
+            .unwrap_or_default()
+            .contains("module file_id=1"),
+        "hint must include module/file_id context, got: {:?}",
+        err.hint
+    );
+    assert!(err.span.line > 0, "runtime diagnostic must expose line");
+    assert!(err.span.column > 0, "runtime diagnostic must expose column");
+}

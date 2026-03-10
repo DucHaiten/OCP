@@ -127,11 +127,97 @@ observe("std.json.parse", "tier2", ctx("raw={\"a\":1}"), budget(5)) -> r;
     };
     assert_eq!(r.kind, ResultKind::Ok);
     match &r.payload {
-        Some(Value::Payload(map)) => {
-            assert_eq!(map.get("parsed"), Some(&"true".to_string()));
+        Some(Value::Map(map)) => {
+            assert_eq!(map.get("a"), Some(&Value::Int(1)));
         }
         _ => panic!("expected payload map"),
     }
+}
+
+#[test]
+fn exec_std_json_parse_payload_supports_dynamic_observe_ctx_pipeline() {
+    let _guard = env_serial_guard()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock")
+        .as_millis();
+    let root = std::env::temp_dir().join(format!("ocp_std_json_pipeline_{stamp}"));
+    std::fs::create_dir_all(root.join("out")).expect("create out dir");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_write_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_WRITE", "./out/**");
+
+    let src = r#"
+observe("std.json.parse", "tier2", ctx("raw={\"path\":\"./out/dynamic.json\",\"text\":\"from-json\"}"), budget(5)) -> parsed;
+observe("std.fs.write_text", "tier2", { path: parsed.path, text: parsed.text, overwrite: true }, budget(5)) -> wr;
+"#;
+    let p = parse_program(src, 1).expect("parse should pass");
+    typecheck_program(&p).expect("typecheck should pass");
+
+    let out = Executor::new(ExecConfig {
+        step_cap: 200,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
+    let Some(Value::Result4(wr)) = out.env.get("wr") else {
+        panic!("expected write result4 binding");
+    };
+    assert_eq!(wr.kind, ResultKind::Ok);
+    match &wr.payload {
+        Some(Value::Map(map)) => {
+            assert_eq!(
+                map.get("path"),
+                Some(&Value::String("./out/dynamic.json".to_string()))
+            );
+            assert_eq!(
+                map.get("text"),
+                Some(&Value::String("from-json".to_string()))
+            );
+        }
+        other => panic!("expected map payload, got {:?}", other),
+    }
+}
+
+#[test]
+fn exec_std_json_parse_accepts_text_ctx_alias_for_docs_compat() {
+    let src = r#"
+observe("std.json.parse", "tier2", { text: "{\"a\":1}" }, budget(5)) -> r;
+"#;
+    let p = parse_program(src, 1).expect("parse should pass");
+    typecheck_program(&p).expect("typecheck should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 100,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
+    let Some(Value::Result4(r)) = out.env.get("r") else {
+        panic!("expected result4 binding");
+    };
+    assert_eq!(r.kind, ResultKind::Ok);
+}
+
+#[test]
+fn exec_std_json_parse_call_accepts_runtime_unknown_string() {
+    let src = r#"
+observe("std.json.parse", "tier2", { raw: "{\"raw\":\"{\\\"k\\\":\\\"v\\\"}\"}" }, budget(5)) -> seed;
+let parsed = std.json.parse(seed.raw);
+condition(eq(parsed?.k, "v"));
+"#;
+    let p = parse_program(src, 1).expect("parse should pass");
+    typecheck_program(&p).expect("typecheck should pass");
+    let out = Executor::new(ExecConfig {
+        step_cap: 200,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
+    let Some(Value::Result4(parsed)) = out.env.get("parsed") else {
+        panic!("expected parsed result4 binding");
+    };
+    assert_eq!(parsed.kind, ResultKind::Ok);
 }
 
 #[test]

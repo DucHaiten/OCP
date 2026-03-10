@@ -2,7 +2,7 @@
 
 Ngày tạo: 2026-03-03  
 Trạng thái: `DONE` (2026-03-04)
-Phạm vi: **OCP-only** (không có HAR, không có AI runtime).  
+Phạm vi: **OCP-only** (không có AI runtime).  
 Mục tiêu: Xây nền để OCP trở nên “dùng được cho dev bình thường” (ít boilerplate, ít file sprawl, ít lỗi vặt, DX tốt) nhưng **giữ nguyên** cốt lõi OCP: capability/permission chặt, bounded, deterministic replay, 4-kind everywhere, commit-gated effects.
 
 ---

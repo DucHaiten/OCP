@@ -33,7 +33,25 @@ impl Display for RuntimeCoreError {
         match self {
             Self::Io(err) => write!(f, "IO error: {err}"),
             Self::Diagnostic(diag) => {
-                write!(f, "{}: {}", diag.code.as_str(), diag.message)
+                write!(f, "{}: {}", diag.code.as_str(), diag.message)?;
+                write!(
+                    f,
+                    " [module=file_id:{} span={}-{} line={} column={}]",
+                    diag.span.file_id,
+                    diag.span.start,
+                    diag.span.end,
+                    diag.span.line,
+                    diag.span.column
+                )?;
+                if let Some(reason) = diag.root_reason {
+                    write!(f, " [root_reason={}]", reason.as_str())?;
+                }
+                if let Some(hint) = diag.hint.as_deref() {
+                    if !hint.trim().is_empty() {
+                        write!(f, " [hint: {}]", hint)?;
+                    }
+                }
+                Ok(())
             }
         }
     }

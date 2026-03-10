@@ -41,9 +41,11 @@ pub enum TokenKind {
     Semi,
     Colon,
     Dot,
+    Plus,
     Range,
     Question,
     Eq,
+    EqEq,
     Arrow,
     FatArrow,
     Eof,
@@ -83,7 +85,7 @@ impl<'a> Lexer<'a> {
     fn lex_all(&mut self) -> Result<Vec<Token>, Diagnostic> {
         let mut out = Vec::new();
         loop {
-            self.skip_ws();
+            self.skip_ws_and_comments()?;
             let start = self.mark();
             let Some(ch) = self.peek() else {
                 out.push(Token {
@@ -157,6 +159,7 @@ impl<'a> Lexer<'a> {
                 ',' => out.push(self.single(TokenKind::Comma)),
                 ';' => out.push(self.single(TokenKind::Semi)),
                 ':' => out.push(self.single(TokenKind::Colon)),
+                '+' => out.push(self.single(TokenKind::Plus)),
                 '?' => out.push(self.single(TokenKind::Question)),
                 '.' => {
                     self.bump();
@@ -177,7 +180,14 @@ impl<'a> Lexer<'a> {
                 }
                 '=' => {
                     self.bump();
-                    if self.peek() == Some('>') {
+                    if self.peek() == Some('=') {
+                        self.bump();
+                        out.push(Token {
+                            kind: TokenKind::EqEq,
+                            text: "==".to_string(),
+                            span: self.span_from(start),
+                        });
+                    } else if self.peek() == Some('>') {
                         self.bump();
                         out.push(Token {
                             kind: TokenKind::FatArrow,
@@ -298,18 +308,69 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn skip_ws(&mut self) {
-        while let Some(ch) = self.peek() {
-            if ch.is_whitespace() {
+    fn skip_ws_and_comments(&mut self) -> Result<(), Diagnostic> {
+        loop {
+            let before = self.idx;
+            while let Some(ch) = self.peek() {
+                if ch.is_whitespace() {
+                    self.bump();
+                } else {
+                    break;
+                }
+            }
+            if self.starts_with("//") {
                 self.bump();
-            } else {
+                self.bump();
+                self.skip_line_comment();
+            } else if self.starts_with("#") {
+                self.bump();
+                self.skip_line_comment();
+            } else if self.starts_with("/*") {
+                let start = self.mark();
+                self.bump();
+                self.bump();
+                self.skip_block_comment(start)?;
+            }
+            if self.idx == before {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.source[self.idx..].chars().next()
+    }
+
+    fn starts_with(&self, marker: &str) -> bool {
+        self.source[self.idx..].starts_with(marker)
+    }
+
+    fn skip_line_comment(&mut self) {
+        while let Some(ch) = self.peek() {
+            self.bump();
+            if ch == '\n' {
                 break;
             }
         }
     }
 
-    fn peek(&self) -> Option<char> {
-        self.source[self.idx..].chars().next()
+    fn skip_block_comment(&mut self, start: Mark) -> Result<(), Diagnostic> {
+        loop {
+            if self.starts_with("*/") {
+                self.bump();
+                self.bump();
+                return Ok(());
+            }
+            if self.peek().is_none() {
+                return Err(self.error_at(
+                    ErrorCode::PUnexpectedEof,
+                    start,
+                    "unterminated block comment",
+                ));
+            }
+            self.bump();
+        }
     }
 
     fn bump(&mut self) -> Option<char> {

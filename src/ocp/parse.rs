@@ -438,6 +438,38 @@ impl Parser {
     }
 
     fn parse_expr(&mut self) -> Result<Expr, Diagnostic> {
+        self.parse_equality_expr()
+    }
+
+    fn parse_equality_expr(&mut self) -> Result<Expr, Diagnostic> {
+        let mut expr = self.parse_concat_expr()?;
+        while self.consume_if(TokenKind::EqEq) {
+            let rhs = self.parse_concat_expr()?;
+            let span = merge_span(expr.span(), rhs.span());
+            expr = Expr::Call {
+                callee: "eq".to_string(),
+                args: vec![expr, rhs],
+                span,
+            };
+        }
+        Ok(expr)
+    }
+
+    fn parse_concat_expr(&mut self) -> Result<Expr, Diagnostic> {
+        let mut expr = self.parse_postfix_expr()?;
+        while self.consume_if(TokenKind::Plus) {
+            let rhs = self.parse_postfix_expr()?;
+            let span = merge_span(expr.span(), rhs.span());
+            expr = Expr::Call {
+                callee: "concat".to_string(),
+                args: vec![expr, rhs],
+                span,
+            };
+        }
+        Ok(expr)
+    }
+
+    fn parse_postfix_expr(&mut self) -> Result<Expr, Diagnostic> {
         let mut expr = self.parse_primary()?;
         loop {
             if self.consume_if(TokenKind::Dot) {
@@ -452,7 +484,8 @@ impl Parser {
                 continue;
             }
             if self.consume_if(TokenKind::Question) {
-                let span = merge_span(expr.span(), self.peek().span);
+                let q_span = self.tokens[self.idx.saturating_sub(1)].span;
+                let span = merge_span(expr.span(), q_span);
                 expr = Expr::Try {
                     value: Box::new(expr),
                     span,

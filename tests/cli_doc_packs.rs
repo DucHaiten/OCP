@@ -33,6 +33,10 @@ fn cli_doc_packs_text_contains_required_sections() {
         "expected std.fs.read_text in text output"
     );
     assert!(
+        text.contains("key: std.hash.sha256"),
+        "expected std.hash.sha256 in text output"
+    );
+    assert!(
         text.contains("permission_class: permissions.std_fs"),
         "expected std_fs permission class in text output"
     );
@@ -61,6 +65,14 @@ fn cli_doc_packs_json_contains_known_pack_fields() {
     assert!(
         text.contains("\"key\":\"std.net.http.request\""),
         "expected std.net.http.request in json output"
+    );
+    assert!(
+        text.contains("\"key\":\"std.hash.sha256\""),
+        "expected std.hash.sha256 in json output"
+    );
+    assert!(
+        text.contains("\"key_kind\":\"pure_builtin\""),
+        "expected pure_builtin key_kind in json output"
     );
     assert!(
         text.contains("\"permission_class\":\"permissions.std_net_http\""),

@@ -970,6 +970,48 @@ impl TypeChecker {
                 }
                 Ok(Type::Map(Box::new(Type::String), Box::new(Type::Unknown)))
             }
+            "concat" => {
+                if args.is_empty() {
+                    return Err(self.type_error(span, "concat(...) expects at least 1 argument"));
+                }
+                for arg in args {
+                    let _ = self.infer_expr(arg)?;
+                }
+                Ok(Type::String)
+            }
+            "eq" | "ne" => {
+                if args.len() != 2 {
+                    return Err(
+                        self.type_error(span, format!("{callee}(...) expects exactly 2 arguments"))
+                    );
+                }
+                let _ = self.infer_expr(&args[0])?;
+                let _ = self.infer_expr(&args[1])?;
+                Ok(Type::Bool)
+            }
+            "lt" | "le" | "gt" | "ge" => {
+                if args.len() != 2 {
+                    return Err(
+                        self.type_error(span, format!("{callee}(...) expects exactly 2 arguments"))
+                    );
+                }
+                let left_ty = self.infer_expr(&args[0])?;
+                let right_ty = self.infer_expr(&args[1])?;
+                let numeric_pair = left_ty == Type::Int && right_ty == Type::Int;
+                let string_pair = left_ty == Type::String && right_ty == Type::String;
+                let unknown_pair = left_ty == Type::Unknown || right_ty == Type::Unknown;
+                if !(numeric_pair || string_pair || unknown_pair) {
+                    return Err(self.type_error(
+                        span,
+                        format!(
+                            "{callee}(...) expects both arguments to be int or string, got {} and {}",
+                            left_ty.as_str(),
+                            right_ty.as_str()
+                        ),
+                    ));
+                }
+                Ok(Type::Bool)
+            }
             "std.json.parse" => {
                 if args.len() != 1 {
                     return Err(
@@ -977,12 +1019,26 @@ impl TypeChecker {
                     );
                 }
                 let arg_ty = self.infer_expr(&args[0])?;
-                if arg_ty != Type::String {
+                if arg_ty != Type::String && arg_ty != Type::Unknown {
                     return Err(
                         self.type_error(span, "std.json.parse(...) argument must be string")
                     );
                 }
                 Ok(Type::Result4(Box::new(Type::Unknown)))
+            }
+            "std.hash.sha256" => {
+                if args.len() != 1 {
+                    return Err(
+                        self.type_error(span, "std.hash.sha256(...) expects exactly 1 argument")
+                    );
+                }
+                let arg_ty = self.infer_expr(&args[0])?;
+                if arg_ty != Type::String && arg_ty != Type::Unknown {
+                    return Err(
+                        self.type_error(span, "std.hash.sha256(...) argument must be string")
+                    );
+                }
+                Ok(Type::String)
             }
             "std.json.stringify" => {
                 if args.len() != 1 {

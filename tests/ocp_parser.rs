@@ -97,3 +97,43 @@ guard rs;
         other => panic!("expected guard statement, got {other:?}"),
     }
 }
+
+#[test]
+fn parse_allows_hash_and_slash_slash_comments() {
+    let src = r#"
+# comment line (python/shell style)
+let k = "world.exists"; // inline C++ style comment
+observe(k, "tier2", ctx("scene=lab"), budget(10)) -> r; # another inline comment
+condition(true); // trailing comment
+"#;
+    let program = parse_program(src, 1).expect("comments should be ignored");
+    assert_eq!(program.statements.len(), 3);
+}
+
+#[test]
+fn parse_allows_block_comments() {
+    let src = r#"
+/* top note */
+let x = 1;
+/* multi-line
+   note */
+condition(true);
+"#;
+    let program = parse_program(src, 1).expect("block comments should be ignored");
+    assert_eq!(program.statements.len(), 2);
+}
+
+#[test]
+fn parse_fail_on_unterminated_block_comment() {
+    let src = r#"
+let x = 1;
+/* missing closing marker
+"#;
+    let err = parse_program(src, 1).expect_err("unterminated block comment must fail");
+    assert_eq!(err.code, ErrorCode::PUnexpectedEof);
+    assert!(
+        err.message.contains("unterminated block comment"),
+        "unexpected message: {}",
+        err.message
+    );
+}

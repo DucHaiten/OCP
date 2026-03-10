@@ -416,7 +416,9 @@ Ghi chú:
 - Đây là mẫu cú pháp để nhìn nhanh toàn bộ construct; nếu editor báo `unused` ở `import toolkit.api.math`, `ping`, hoặc `seen` thì có thể xóa mà không làm đổi ý nghĩa bài học.
 
 Những quy tắc cú pháp bạn phải nhớ:
-- Comment 1 dòng dùng `//`.
+- Comment 1 dòng dùng được cả `//` và `#`.
+- Comment khối dùng `/* ... */` (không lồng nhau).
+- Nếu `/* ... */` không đóng, parser sẽ báo lỗi `unterminated block comment`.
 - `module ...;`, `import ...;`, `let ...;`, `observe(...) -> r;`, `commit(r);`, `condition(...);` đều kết thúc bằng `;`.
 - `fn { ... }`, `match { ... }`, `repeat { ... }`, `for ... cap N { ... }` là khối nên không thêm `;` sau dấu `}` ngoài cùng.
 - `match` chuẩn bắt buộc đủ 4 arm: `OK`, `DEGRADED`, `INSUFFICIENT`, `DEFERRED`.
@@ -589,7 +591,7 @@ Khi code đã dài hơn baseline, bạn có thể dùng sugar để giảm boile
 Ví dụ:
 
 ```ocp
-observe("std.json.parse", "tier2", { text: "{\"ok\":true}" }, budget(5)) -> rs;
+observe("std.json.parse", "tier2", { raw: "{\"ok\":true}" }, budget(5)) -> rs;
 let parsed = try rs else { 0 };
 let reason = try rs else { r.reason_code };
 
@@ -602,9 +604,45 @@ condition(true);
 
 Nguyên tắc:
 - Sugar phải cho ra semantics tương đương với `match` 4-kind canonical.
-- `std.json.parse` trong ví dụ này chỉ dùng để minh họa sugar trên `Result4`; khi cần request/schema chính xác cho key này, hãy tra `ocp doc packs --json`.
+- `observe("std.json.parse", ...)` trả payload JSON đã parse (typed `Value`); có thể truy cập field trực tiếp qua `rs.<field>` hoặc `let v = try rs else { ... }`.
+- `raw` là field chuẩn cho input JSON; `text` vẫn được chấp nhận như alias tương thích tài liệu cũ.
+- Khi module hóa đường dẫn/điều kiện động, dùng `concat(...)` và các comparator `eq/ne/lt/le/gt/ge(...)` thay cho hardcode.
+- Với digest chuẩn trong lane locked, dùng `std.hash.sha256(...)` (input UTF-8, output hex lowercase cố định).
 - Trong `try r else { ... }`, biến ngầm `r` bên trong khối `else` trỏ tới chính `Result4` gốc; vì vậy `try rs else { r.reason_code }` là cú pháp hợp lệ, không phải typo.
 - Luôn chạy lại `ocp check --locked` + `ocp replay` sau khi refactor sang sugar.
+
+#### Mẫu module reusable end-to-end (ecosystem-grade)
+Mục tiêu mẫu:
+- Nhận input JSON động.
+- Parse typed bằng `std.json.parse`.
+- Dựng path artifact động bằng `concat`.
+- Verify điều kiện bằng comparator.
+- Replay deterministic không hardcode theo từng project.
+
+```ocp
+observe("std.json.parse", "tier2", ctx("raw={\"run_id\":\"r42\",\"path\":\"./out/r42.txt\",\"text\":\"hello\",\"expected\":\"hello-r42\"}"), budget(5)) -> parsed;
+observe("std.fs.write_text", "tier2", { path: parsed.path, text: concat(parsed.text, "-", parsed.run_id), overwrite: true }, budget(5)) -> wr;
+commit(wr);
+observe("std.fs.read_text", "tier2", { path: parsed.path }, budget(5)) -> rd;
+condition(eq(rd.text, parsed.expected));
+```
+
+Checklist verify chuẩn:
+1. `ocp check . --locked`
+2. `ocp run .`
+3. `ocp replay <artifact_dir>`
+4. `ocp trace view <artifact_dir> --json --tail 20`
+5. `ocp doc packs --json`
+
+#### Migration note: surrogate hash -> canonical hash
+- Thay các pattern surrogate như `statehash-v1:*` và `state_hash_algo=chain-surrogate-v1` bằng `std.hash.sha256(...)`.
+- Không dùng workaround `std.proc.exec` để gọi hash từ shell trong lane locked.
+- Pattern canonical state-hash:
+
+```ocp
+let canonical = concat(events, views, s1, s2, s3);
+let state_hash = std.hash.sha256(canonical);
+```
 
 ### Lộ trình thực hành 15 phút
 1. `ocp init hello-ocp --template tool-cli`
@@ -876,7 +914,7 @@ match kvp {
 observe("std.fs.read_text", "tier2", { path: "./fixtures/in/sample.json" }, budget(5)) -> r;
 guard r;
 
-observe("std.json.parse", "tier2", { text: "{\"ok\":true}" }, budget(5)) -> rs;
+observe("std.json.parse", "tier2", { raw: "{\"ok\":true}" }, budget(5)) -> rs;
 let parsed = try rs else { 0 };
 let reason = try rs else { r.reason_code };
 condition(true);
@@ -1340,7 +1378,7 @@ module app.sugar;
 observe("std.fs.read_text", "tier2", { path: "./fixtures/in/sample.json" }, budget(5)) -> r;
 guard r;
 
-observe("std.json.parse", "tier2", { text: "{\"ok\":true}" }, budget(5)) -> rs;
+observe("std.json.parse", "tier2", { raw: "{\"ok\":true}" }, budget(5)) -> rs;
 let parsed = try rs else { 0 };
 let reason = try rs else { r.reason_code };
 condition(true);
@@ -1945,6 +1983,10 @@ Không được “âm thầm fallback” sang IO thật.
   - Canonical extension là `.ocp`; warning `W-LEGACY-OCP-EXTENSION` chỉ áp dụng cho file legacy `.oc`.
   - Khi dùng `--json`, warnings phải nằm trong payload JSON (không có warning plain text ngoài JSON).
   - `entry` dùng extension không hỗ trợ sẽ báo lỗi rõ ràng, không fallback ngầm về `src/main.ocp`.
+  - Warning policy cho gate strict:
+    - `BLOCK`: xuất hiện warning code khác `W-LEGACY-OCP-EXTENSION`.
+    - `WAIVER tạm`: chỉ còn đúng `W-LEGACY-OCP-EXTENSION`, có issue migration theo dõi, và không có warning code khác.
+    - `MIGRATION bắt buộc`: đổi source `.oc` -> `.ocp`, cập nhật `entry` trong manifest, rồi chạy lại `ocp check --json` để xác nhận sạch warning.
 - `ocp run <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
 - `ocp fmt <project_dir> [--check]`
 - `ocp test <project_dir> [--locked] [--universe <id>] [--domain <id>] [...]`
