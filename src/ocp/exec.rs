@@ -6141,9 +6141,15 @@ fn observe_stub_result(key: &str, ctx_literal: &str) -> Result4<Value> {
         }
         "std.json.emit" => {
             let mut map = BTreeMap::new();
-            let value = ctx.get("value").cloned().unwrap_or_default();
-            map.insert("value".to_string(), value.clone());
-            map.insert("json".to_string(), format!("{{\"value\":\"{value}\"}}"));
+            let raw_value = ctx.get("value").cloned().unwrap_or_default();
+            let canonical_value = parse_json_value(&raw_value)
+                .unwrap_or_else(|_| Value::String(raw_value.clone()));
+            let canonical_text = stringify_json_value(&canonical_value);
+            map.insert("value".to_string(), raw_value);
+            // `text` is the canonical serializer output for production write paths.
+            map.insert("text".to_string(), canonical_text.clone());
+            // Keep `json` as a compatibility alias for existing modules.
+            map.insert("json".to_string(), canonical_text);
             Result4::ok(Value::Payload(map))
         }
         "std.kv.get" => {

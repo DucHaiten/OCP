@@ -221,6 +221,58 @@ condition(eq(parsed?.k, "v"));
 }
 
 #[test]
+fn exec_std_json_emit_text_supports_jsonl_concat_and_write_text_ctx() {
+    let _guard = env_serial_guard()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock")
+        .as_millis();
+    let root = std::env::temp_dir().join(format!("ocp_std_json_emit_pipeline_{stamp}"));
+    std::fs::create_dir_all(root.join("out")).expect("create out dir");
+    let _root_guard = EnvVarGuard::set("OCP_STD_FS_ROOT", &root.to_string_lossy());
+    let _allow_write_guard = EnvVarGuard::set("OCP_STD_FS_ALLOW_WRITE", "./out/**");
+
+    let src = r#"
+observe("std.json.emit", "tier2", { value: { run_id: "r1", event_id: "e1" } }, budget(5)) -> e1;
+observe("std.json.emit", "tier2", { value: { run_id: "r1", event_id: "e2" } }, budget(5)) -> e2;
+condition(eq(e1.json, e1.text));
+let jsonl = concat(e1.text, "\n", e2.text, "\n");
+observe("std.fs.write_text", "tier2", { path: "./out/events.jsonl", text: jsonl, overwrite: true }, budget(5)) -> wr;
+"#;
+    let p = parse_program(src, 1).expect("parse should pass");
+    typecheck_program(&p).expect("typecheck should pass");
+
+    let out = Executor::new(ExecConfig {
+        step_cap: 300,
+        ..ExecConfig::default()
+    })
+    .run(&p)
+    .expect("exec should pass");
+    let Some(Value::Result4(wr)) = out.env.get("wr") else {
+        panic!("expected write result4 binding");
+    };
+    assert_eq!(wr.kind, ResultKind::Ok);
+    match &wr.payload {
+        Some(Value::Map(map)) => {
+            assert_eq!(
+                map.get("text"),
+                Some(&Value::String(
+                    "{\"event_id\":\"e1\",\"run_id\":\"r1\"}\n{\"event_id\":\"e2\",\"run_id\":\"r1\"}"
+                        .to_string(),
+                ))
+            );
+            assert_eq!(
+                map.get("path"),
+                Some(&Value::String("./out/events.jsonl".to_string()))
+            );
+        }
+        other => panic!("expected map payload, got {:?}", other),
+    }
+}
+
+#[test]
 fn exec_std_time_sleep_is_deferred_and_commit_forbidden() {
     let src = r#"
 observe("std.time.sleep", "tier2", ctx("ms=10"), budget(5)) -> r;
