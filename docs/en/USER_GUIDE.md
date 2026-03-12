@@ -99,7 +99,7 @@ Read in this order:
 
 ### 2) Install on Windows (installer)
 1. Download `ocp-v1.0.0-setup-win-x64.exe` directly from:
-   - `https://github.com/DucHaiten/OCP/raw/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe`
+   - `https://github.com/DucHaiten/OCP/releases/latest/download/ocp-v1.0.0-setup-win-x64.exe`
    - fallback: `https://github.com/DucHaiten/OCP/releases`
 2. Run the installer and choose:
    - the install directory on the drive you want;
@@ -1837,7 +1837,9 @@ Replay must fail clearly when:
     - `BLOCK`: any warning code other than `W-LEGACY-OCP-EXTENSION`.
     - `TEMPORARY WAIVER`: only `W-LEGACY-OCP-EXTENSION` remains, migration issue is tracked, and no other warning code appears.
     - `MANDATORY MIGRATION`: rename `.oc` sources to `.ocp`, update manifest `entry`, then rerun `ocp check --json` to confirm clean warnings.
-- `ocp run <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
+- `ocp run <project_dir> [--engine interpreter|bytecode|dual] [--max-steps <u32>] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
+  - `--max-steps` overrides global step cap for non-reactor `run`.
+  - Default step cap comes from `[runtime] max_steps` (alias: `[runtime] step_cap`) in `Ocp.toml`.
 - `ocp fmt <project_dir> [--check]`
 - `ocp test <project_dir> [--locked] [--universe <id>] [--domain <id>] [...]`
 - `ocp cache stats <project_dir> [--json]`

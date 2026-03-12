@@ -99,7 +99,7 @@ ocp replay <artifact_dir>
 
 ### 2) Cài đặt trên Windows (installer)
 1. Tải trực tiếp file `ocp-v1.0.0-setup-win-x64.exe` tại:
-   - `https://github.com/DucHaiten/OCP/raw/main/installer/releases/ocp-v1.0.0-setup-win-x64.exe`
+   - `https://github.com/DucHaiten/OCP/releases/latest/download/ocp-v1.0.0-setup-win-x64.exe`
    - dự phòng: `https://github.com/DucHaiten/OCP/releases`
 2. Chạy installer và chọn:
    - Thư mục cài đặt trên ổ bạn muốn dùng.
@@ -1987,7 +1987,9 @@ Không được “âm thầm fallback” sang IO thật.
     - `BLOCK`: xuất hiện warning code khác `W-LEGACY-OCP-EXTENSION`.
     - `WAIVER tạm`: chỉ còn đúng `W-LEGACY-OCP-EXTENSION`, có issue migration theo dõi, và không có warning code khác.
     - `MIGRATION bắt buộc`: đổi source `.oc` -> `.ocp`, cập nhật `entry` trong manifest, rồi chạy lại `ocp check --json` để xác nhận sạch warning.
-- `ocp run <project_dir> [--engine interpreter|bytecode|dual] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
+- `ocp run <project_dir> [--engine interpreter|bytecode|dual] [--max-steps <u32>] [--reactor --ticks N --runtime deterministic|throughput --socket-listen <addr> --runtime-report <file> --replay-audit <file>] [--shadow <id> --shadow-policy forbid_commit|shadow_commit_log] [--locked] [--universe <id>] [--domain <id>] [--view <id>]`
+  - `--max-steps` cho phép override global step cap khi chạy `run` non-reactor.
+  - Step cap mặc định lấy từ `[runtime] max_steps` (alias: `[runtime] step_cap`) trong `Ocp.toml`.
 - `ocp fmt <project_dir> [--check]`
 - `ocp test <project_dir> [--locked] [--universe <id>] [--domain <id>] [...]`
 - `ocp cache stats <project_dir> [--json]`
