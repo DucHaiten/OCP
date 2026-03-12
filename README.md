@@ -2,9 +2,9 @@
 
 **English:**
 
-OCP (Observation-Collapse Programming) is a governed general-purpose language/runtime, built around observe -> 4-kind -> commit to achieve determinism, bounded execution, and capability/permission-controlled side effects.
+OCP (Observation-Collapse Programming) is a governed deterministic DSL/runtime, built around observe -> 4-kind -> commit to achieve determinism, bounded execution, and capability/permission-controlled side effects.
 
-OCP is not a “narrow domain-only DSL”: it can power tools/apps/games/agent runtimes via packs/engines, packaging + lockfiles, trace/debug/diff tooling, conformance suites, and an LTS rehearsal track. Yet it still feels DSL-strict because the core semantics are deliberately constrained: all reads must go through observe, all outcomes are normalized into 4 kinds (OK/DEGRADED/INSUFFICIENT/DEFERRED), and all I/O/side effects are commit-gated under explicit policy.
+OCP is currently a workflow/orchestration DSL (not yet a general-purpose language): it can power tools/apps/games/agent runtimes via packs/engines, packaging + lockfiles, trace/debug/diff tooling, conformance suites, and an LTS rehearsal track. The core semantics are deliberately constrained: all reads must go through observe, all outcomes are normalized into 4 kinds (OK/DEGRADED/INSUFFICIENT/DEFERRED), and all I/O/side effects are commit-gated under explicit policy.
 
 OCP follows the principle “observe before collapse”: all world-data must go through observe, all outcomes are normalized into a 4-kind contract (OK/DEGRADED/INSUFFICIENT/DEFERRED), and only valid side-effects may pass through commit. The goal is deterministic behavior, bounded execution (budgets/caps), and permissioned control over I/O.
 
@@ -16,9 +16,11 @@ The underlying ideas synthesize concepts from TSS (TIERED STATE SYSTEM), ELW (EN
 
 **Tiếng Việt:**
 
-OCP (Observation-Collapse Programming) là một ngôn ngữ + runtime đa dụng có governance rõ ràng, được thiết kế quanh mô hình observe -> 4-kind -> commit để đạt determinism, bounded execution, và kiểm soát side-effect theo capability/permission.
+OCP (Observation-Collapse Programming) hiện là một DSL/runtime xác định có governance rõ ràng, được thiết kế quanh mô hình observe -> 4-kind -> commit để đạt determinism, bounded execution, và kiểm soát side-effect theo capability/permission.
 
-OCP không phải “DSL thuần theo domain hẹp” nó có thể xây tool/app/game/agent runtime nhờ hệ packs/engines, packaging/lockfile, trace/debug/diff, conformance và LTS. Tuy nhiên nó vẫn mang “dáng dấp khắt khe của DSL” vì semantics lõi bị ràng buộc nghiêm ngặt: mọi đọc world-data phải qua observe, mọi kết quả đi qua 4-kind (OK/DEGRADED/INSUFFICIENT/DEFERRED), và mọi I/O/side-effect chỉ được phép xảy ra qua commit theo policy.
+OCP hiện là DSL workflow/orchestration (chưa phải ngôn ngữ tổng quát): có thể xây tool/app/game/agent runtime nhờ hệ packs/engines, packaging/lockfile, trace/debug/diff, conformance và LTS. Semantics lõi được ràng buộc nghiêm ngặt: mọi đọc world-data phải qua observe, mọi kết quả đi qua 4-kind (OK/DEGRADED/INSUFFICIENT/DEFERRED), và mọi I/O/side-effect chỉ được phép xảy ra qua commit theo policy.
+
+Mục tiêu roadmap tương lai là mở rộng dần lên năng lực ngôn ngữ tổng quát, nhưng đó chưa phải claim của phiên bản hiện tại.
 
 OCP được thiết kế quanh nguyên lý “quan sát rồi mới sụp trạng thái”: mọi world-data bắt buộc đi qua observe, mọi kết quả chuẩn hoá theo 4-kind (OK/DEGRADED/INSUFFICIENT/DEFERRED), và chỉ side-effect hợp lệ mới được đi qua commit. Mục tiêu là giữ tính xác định, bounded execution (budgets/caps), và kiểm soát I/O theo quyền hạn.
 
@@ -37,7 +39,8 @@ Nền tảng ý tưởng tổng hợp từ TSS (TIERED STATE SYSTEM), ELW (ENTIT
 </p>
 
 ## What is OCP
-OCP is a general-purpose language/runtime for teams that need predictable behavior under real-world I/O, not only pure compute.
+OCP v1.0 is a deterministic, capability-governed DSL/runtime for teams that need predictable behavior under real-world I/O.
+General-purpose language capabilities are a roadmap goal, not a current claim.
 
 Execution contract:
 - `observe`: read world state through declared capabilities.
